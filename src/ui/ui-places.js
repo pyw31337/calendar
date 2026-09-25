@@ -2,6 +2,8 @@
  * Places map + places view (P4-10)
  */
 
+import { PanelResizeHandle } from './ui-widgets.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -28,10 +30,6 @@ function formatPlaceBadgeDate(...args) {
 }
 function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceCategoryIcon(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function isDomesticLatLng(...args) {
@@ -285,11 +283,23 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // `Unexpected token '<'` inside the MapLibre worker. The raster layer above is complete
       // and interactive, so prefer it on WebKit rather than letting an optional vector overlay
       // break the entire Places view.
-      if (!isAppleWebKit && typeof loadMapLibreLeaflet === 'function') {
+      // MapLibre needs WebGL. Without it (GPU acceleration off, some Firefox/Linux setups,
+      // locked-down WebViews) the bridge layer is left half-attached with no GL map, and every
+      // later pan/zoom throws "this._glMap is undefined". Keep the raster layer instead.
+      const hasWebGL = (() => {
+        try {
+          const canvas = document.createElement('canvas');
+          return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+        } catch (_) {
+          return false;
+        }
+      })();
+      if (!isAppleWebKit && hasWebGL && typeof loadMapLibreLeaflet === 'function') {
+        let monoVectorLayer = null;
         try {
           await loadMapLibreLeaflet();
           if (!cancelled && mapRef.current && L.maplibreGL) {
-            const monoVectorLayer = L.maplibreGL({
+            monoVectorLayer = L.maplibreGL({
               style: MINIMAL_MONO_MAP_STYLE,
               className: 'places-map-vector-basemap',
               attribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -297,6 +307,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
               padding: 0.08
             }).addTo(map);
             const vectorMap = monoVectorLayer.getMaplibreMap();
+            if (!vectorMap) throw new Error('MapLibre map was not created');
             let vectorReady = false;
             const vectorLoadTimer = window.setTimeout(() => {
               if (vectorReady || cancelled) return;
@@ -318,6 +329,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
             });
           }
         } catch (err) {
+          if (monoVectorLayer) { try { map.removeLayer(monoVectorLayer); } catch (_) {} }
           console.warn('Minimal vector basemap unavailable, keeping raster fallback:', err);
         }
       }
@@ -918,6 +930,14 @@ export function PlacesView({
   // only one entry across all place cards is in edit mode at a time.
   const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);
   const [editingMemoEntryText, setEditingMemoEntryText] = React.useState('');
+  // A place card with 2+ visit-memo entries shows only the most recent one by default, with a
+  // "N개 장소 더보기" toggle to reveal the rest -- keyed by place id, independent per card.
+  const [expandedPlaceMemoIds, setExpandedPlaceMemoIds] = React.useState(() => new Set());
+  const togglePlaceMemoExpanded = placeId => setExpandedPlaceMemoIds(prev => {
+    const next = new Set(prev);
+    if (next.has(placeId)) next.delete(placeId); else next.add(placeId);
+    return next;
+  });
   const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
   const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
   const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
@@ -938,6 +958,7 @@ export function PlacesView({
   const [mapHeight, setMapHeight] = React.useState(Math.round(window.innerHeight * 0.4));
   
   const isDraggingRef = React.useRef(false);
+  const mapResizeMovedRef = React.useRef(false);
   const startYRef = React.useRef(0);
   const startHeightRef = React.useRef(mapHeight);
   const mapHeightRef = React.useRef(mapHeight);
@@ -946,43 +967,46 @@ export function PlacesView({
     mapHeightRef.current = mapHeight;
   }, [mapHeight]);
 
-  const handleDragStart = e => {
-    isDraggingRef.current = true;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    startYRef.current = clientY;
-    startHeightRef.current = mapHeightRef.current;
-    
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
-    document.addEventListener('touchmove', handleDragMove, { passive: false });
-    document.addEventListener('touchend', handleDragEnd);
-  };
+  // V2 desktop: size the map once so the category bar's bottom hairline sits on the same pixel
+  // row as the side nav's divider under 메모 -- one continuous line across rail and page.
+  // The drag handle still resizes freely afterwards; other layouts keep the 40% default.
+  const mapAreaRef = React.useRef(null);
+  const categoryTabsRef = React.useRef(null);
+  const mapAlignedRef = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (mapAlignedRef.current || typeof renderV2 !== 'function' || isMobile) return;
+    const area = mapAreaRef.current;
+    const tabs = categoryTabsRef.current;
+    if (!area || !tabs) return;
+    const divider = [...document.querySelectorAll('.bp-side-nav-group')]
+      .find(group => parseFloat(getComputedStyle(group).borderTopWidth) > 0 && group.getBoundingClientRect().height > 0);
+    if (!divider) return;
+    mapAlignedRef.current = true;
+    const target = divider.getBoundingClientRect().top + 1 - area.getBoundingClientRect().top - tabs.getBoundingClientRect().height;
+    if (target >= 160) setMapHeight(Math.round(target));
+  });
 
-  const handleDragMove = e => {
+  const beginMapResize = event => {
+    event.preventDefault();
+    isDraggingRef.current = true;
+    mapResizeMovedRef.current = false;
+    startYRef.current = event.clientY;
+    startHeightRef.current = mapHeightRef.current;
+    if (event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveMapResize = event => {
     if (!isDraggingRef.current) return;
-    if (e.cancelable) e.preventDefault();
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const deltaY = clientY - startYRef.current;
+    const deltaY = event.clientY - startYRef.current;
+    if (Math.abs(deltaY) > 4) mapResizeMovedRef.current = true;
     const nextHeight = Math.max(160, Math.min(window.innerHeight - 220, startHeightRef.current + deltaY));
     setMapHeight(nextHeight);
   };
-
-  const handleDragEnd = () => {
+  const endMapResize = () => {
+    if (isDraggingRef.current && !mapResizeMovedRef.current) {
+      setMapExpanded(prev => !prev);
+    }
     isDraggingRef.current = false;
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchmove', handleDragMove);
-    document.removeEventListener('touchend', handleDragEnd);
   };
-
-  React.useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-      document.removeEventListener('touchmove', handleDragMove);
-      document.removeEventListener('touchend', handleDragEnd);
-    };
-  }, []);
 
   const places = getCalendarPlaces(calendar);
   const categories = getPlaceCategories(calendar);
@@ -1520,6 +1544,7 @@ export function PlacesView({
     /* Sticky Map Area */
     /*#__PURE__*/React.createElement("div", {
       className: "places-map-sticky-area",
+      ref: mapAreaRef,
       style: mapExpanded
         ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005 }
         : { position: 'relative', width: '100%', height: `${mapHeight}px`, minHeight: '160px', flexShrink: 0, zIndex: 10 }
@@ -1534,110 +1559,53 @@ export function PlacesView({
         onSelectDate: onSelectDate
       }),
       
-      /* Centered Grip Handle + Right Resizer Handle Control Bar */
+      /* Shared ns-resize grip — same PanelResizeHandle as the chat composer. */
       /*#__PURE__*/React.createElement("div", {
+        className: "panel-resize-bar",
         style: {
-          position: 'absolute', left: 0, right: 0, bottom: 0, height: '32px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 12px', borderTop: '1px solid var(--border-subtle)',
+          position: 'absolute', left: 0, right: 0, bottom: 0, height: '22px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           backgroundColor: 'var(--bg-card)', zIndex: 6, boxSizing: 'border-box'
         }
       },
-        /* Left Spacer */
-        /*#__PURE__*/React.createElement("div", { style: { width: '32px' } }),
-        
-        /* Centered expand/collapse button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setMapExpanded(prev => !prev),
-          "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
-          title: mapExpanded ? '지도 축소' : '지도 확대',
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
+        /*#__PURE__*/React.createElement(PanelResizeHandle, {
+          label: mapExpanded ? '지도 축소' : '지도 높이 조절',
+          onPointerDown: beginMapResize,
+          onPointerMove: moveMapResize,
+          onPointerUp: endMapResize,
+          onPointerCancel: endMapResize,
+          onKeyDown: event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setMapExpanded(prev => !prev);
+              return;
+            }
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowDown' ? 24 : -24;
+            setMapHeight(height => Math.max(160, Math.min(window.innerHeight - 220, height + delta)));
           }
-        }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          className: "icon icon-tabler icons-tabler-outline icon-tabler-fold-up"
-        },
-          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 13v-8l-3 3m6 0l-3 -3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 17l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M14 17l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M19 17l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M4 17l1 0" })
-        ) : /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          className: "icon icon-tabler icons-tabler-outline icon-tabler-fold-down"
-        },
-          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 11v8l3 -3m-6 0l3 3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 7l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M14 7l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M19 7l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M4 7l1 0" })
-        )),
-        
-        /* Right drag resizer handle (only shown when map is not fullscreen expanded) */
-        !mapExpanded ? /*#__PURE__*/React.createElement("div", {
-          onMouseDown: handleDragStart,
-          onTouchStart: handleDragStart,
-          title: "드래그하여 지도 높이 조절",
-          style: {
-            width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'ns-resize', color: 'var(--text-light)', userSelect: 'none', touchAction: 'none'
-          }
-        },
-          /* Lucide-style split diagonal resizing arrows */
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg",
-            width: "20",
-            height: "20",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-            className: "icon icon-tabler icons-tabler-outline icon-tabler-selector"
-          },
-            /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-            /*#__PURE__*/React.createElement("path", { d: "M8 9l4 -4l4 4" }),
-            /*#__PURE__*/React.createElement("path", { d: "M16 15l-4 4l-4 -4" })
-          )
-        ) : /*#__PURE__*/React.createElement("div", { style: { width: '32px' } })
+        })
       )
     ),
 
     /* Sticky Category Tabs */
     !mapExpanded && categories.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "places-category-sticky-tabs",
-      style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }
+      ref: categoryTabsRef,
+      style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)' }
     },
       /* Desktop Category Bar (Only on PC) */
       !isMobile && /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
+          activeColor: typeof renderV2 === 'function' ? 'var(--v2-primary, #7C2FE5)' : undefined,
           tabs: [
-            { key: 'all', label: '전체', count: searchedPlaces.length, color: '#2563EB' },
+            { key: 'all', label: '전체', count: searchedPlaces.length, color: typeof renderV2 === 'function' ? 'var(--v2-primary, #7C2FE5)' : '#2563EB' },
             ...categories.map(category => ({
               key: category.id,
-              label: `${getPlaceCategoryIcon(category)} ${category.name}`,
+              // Desktop tab bar uses plain text labels (V2 reference) -- the emoji icon
+              // belongs to the mobile select box / card badges, not this row.
+              label: category.name,
               count: countsByCategory[category.id] || 0,
               color: category.color
             }))
@@ -1662,10 +1630,11 @@ export function PlacesView({
             {
               value: 'all',
               label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
+                className: "section-count-badge",
                 style: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                   borderRadius: 'var(--radius-full)',
-                  backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
+                  backgroundColor: searchedPlaces.length >= 1 ? 'var(--v2-primary, #2563EB)' : '#E2E8F0',
                   color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
                   fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
                 }
@@ -1676,8 +1645,10 @@ export function PlacesView({
               return {
                 value: category.id,
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
-                  `${getPlaceCategoryIcon(category)} ${category.name} `,
+                  /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category, size: 18 }),
+                  " ",
                   /*#__PURE__*/React.createElement("span", {
+                    className: "section-count-badge",
                     style: {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                       borderRadius: 'var(--radius-full)',
@@ -1700,7 +1671,7 @@ export function PlacesView({
       className: "places-list-toolbar",
       style: {
         ...LIST_TOOLBAR_ROW_STYLE,
-        padding: '12px 16px 4px',
+        padding: '20px 16px 14px',
         gap: isMobile ? '6px' : '8px',
         backgroundColor: 'var(--bg-primary)'
       }
@@ -1719,20 +1690,15 @@ export function PlacesView({
       }, renderPlacesActionButtons())
     ),
 
-    /* Scrollable Cards List Container (Scrolling independently) */
+    /* Scrollable Cards List Container (Scrolling independently). Cards render directly here --
+       no extra card-styled wrapper div around the whole list (each place-card-row already has
+       its own border/background/radius; wrapping them all in a second card box double-boxed
+       them, per user feedback). */
     !mapExpanded && /*#__PURE__*/React.createElement("div", {
       ref: scrollBodyRef,
       className: "places-list-body",
-      style: { flex: 1, overflowY: 'auto', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+      style: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
-      /* Place cards list layout */
-      /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px',
-          border: 'none', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-        }
-      },
         filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
         }, places.length === 0 ? "등록된 장소가 없습니다. 추가 버튼을 눌러 등록해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
@@ -1871,8 +1837,8 @@ export function PlacesView({
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, highlightKeyword(place.alias || place.name || '이름 없음', listSearchQuery)),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, marginTop: '2px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)', marginBottom: '4px' } }, highlightKeyword(place.alias || place.name || '이름 없음', listSearchQuery)),
               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, highlightKeyword(place.name, listSearchQuery)),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, highlightKeyword(getDisplayPlaceAddress(place), listSearchQuery))
             ),
@@ -1882,11 +1848,15 @@ export function PlacesView({
                edit/delete, minus the participant dot since a place-memo entry isn't attributed to
                one person. */
                 displayVisitEntries.length > 0
-              ? /*#__PURE__*/React.createElement("div", {
+              ? (() => {
+                  const isMemoExpanded = expandedPlaceMemoIds.has(place.id);
+                  const visibleVisitEntries = isMemoExpanded ? displayVisitEntries : displayVisitEntries.slice(0, 1);
+                  const hiddenCount = displayVisitEntries.length - visibleVisitEntries.length;
+                  return /*#__PURE__*/React.createElement("div", {
                   className: "place-memo-stack",
                   style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' },
                   onClick: e => e.stopPropagation()
-                }, displayVisitEntries.map((entry, idx) => {
+                }, visibleVisitEntries.map((entry, idx) => {
                   const entryKey = `${place.id}::${entry.date}`;
                   const isEditingEntry = editingMemoEntryKey === entryKey;
                   if (isEditingEntry) {
@@ -1912,7 +1882,15 @@ export function PlacesView({
                         },
                         style: { width: '100%', height: '32px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
                       }),
-                      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } },
+                      /* Delete lives inside edit mode (left), away from 취소/수정 (right), so a
+                         stray tap on the row's only icon can never delete a memo. */
+                      /*#__PURE__*/React.createElement("div", { className: "item-edit-actions-row", style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+                        /*#__PURE__*/React.createElement("button", {
+                          type: "button",
+                          className: "item-edit-delete-btn",
+                          onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); handleDeletePlaceMemoEntry(place, entry); },
+                          style: { height: '28px', padding: '0 10px', marginRight: 'auto', borderRadius: 'var(--radius-sm)', border: 'none', background: 'none', color: 'var(--status-red, #DC2626)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' }
+                        }, "삭제"),
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
@@ -1950,11 +1928,7 @@ export function PlacesView({
                           /*#__PURE__*/React.createElement("button", {
                             type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                             style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
-                          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 })),
-                          /*#__PURE__*/React.createElement("button", {
-                            type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
-                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
-                          }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
+                          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
                         )
                       ),
                       /* Line 2: Memo note full width below */
@@ -1980,17 +1954,39 @@ export function PlacesView({
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-                    }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
-                    /*#__PURE__*/React.createElement("button", {
-                      type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
-                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-                    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
+                    }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
                   );
-                }))
+                }),
+                hiddenCount > 0 && /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: e => { e.stopPropagation(); togglePlaceMemoExpanded(place.id); },
+                  style: {
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                    fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
+                  }
+                }, `${hiddenCount}개 장소 더보기`, /*#__PURE__*/React.createElement("svg", {
+                  xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+                  fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+                }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))),
+                isMemoExpanded && displayVisitEntries.length > 1 && /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: e => { e.stopPropagation(); togglePlaceMemoExpanded(place.id); },
+                  style: {
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                    fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
+                  }
+                }, "접기", /*#__PURE__*/React.createElement("svg", {
+                  xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+                  fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round",
+                  style: { transform: 'rotate(180deg)' }
+                }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
+                );
+                })()
               : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
-      )
     ),
 
     isPlacesMenuOpen && typeof document !== 'undefined' && window.ReactDOM && window.ReactDOM.createPortal
@@ -2092,7 +2088,7 @@ export function PlacesView({
       className: "modal-overlay",
       style: { zIndex: 30000 },
       onClick: () => { if (!isSavingGatherPlacesPaste) setGatherPlacesPastePreview(null); }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container confirm-dialog-modal",
       onClick: e => e.stopPropagation(),
       style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -2134,7 +2130,7 @@ export function PlacesView({
       className: "modal-overlay",
       style: { zIndex: 30000 },
       onClick: () => setBulkShareResultUrl('')
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container confirm-dialog-modal",
       onClick: e => e.stopPropagation(),
       style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -2180,6 +2176,8 @@ export function PlacesView({
       onSearch: (value) => { setListSearchQuery(value); setIsSearchOpen(true); },
       onCompose: () => { setEditingPlace(null); setIsRegisterOpen(true); },
       onToggleMap: () => setMapExpanded(v => !v),
+      // The header 지도보기 icon mirrors this state (the map's own resize handle toggles it too).
+      mapExpanded,
       slots: {},
     });
   }

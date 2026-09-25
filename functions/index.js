@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
+const mediaCommands = require('./media-commands');
 
 admin.initializeApp();
 
@@ -48,14 +49,24 @@ function getMessageImageEntriesForIndex(message) {
   const thumbs = Array.isArray(message.thumbUrls) && message.thumbUrls.length
     ? message.thumbUrls : (message.thumbUrl ? [message.thumbUrl] : []);
   const tags = Array.isArray(message.imageTags) ? message.imageTags : [];
+  const tagMap = message?.imageTagMap && typeof message.imageTagMap === 'object' && !Array.isArray(message.imageTagMap)
+    ? message.imageTagMap
+    : {};
   const count = Math.max(urls.length, thumbs.length);
   return Array.from({ length: count }, (_, index) => {
-    const hasEditableTags = Object.prototype.hasOwnProperty.call(tags, index);
+    const imageUrl = urls[index] || thumbs[index] || '';
+    const thumbUrl = thumbs[index] || urls[index] || '';
+    const assetKey = getPhotoAssetKey(imageUrl || thumbUrl);
+    // imageTagMap is keyed by the immutable Storage asset, while imageTags is kept as a
+    // legacy positional mirror. Prefer the former so a deleted sibling can never move a tag
+    // onto this photo during photoIndex rebuild.
+    const hasAssetTag = assetKey && Object.prototype.hasOwnProperty.call(tagMap, assetKey);
+    const hasEditableTags = hasAssetTag || Object.prototype.hasOwnProperty.call(tags, index);
     return {
       index,
-      imageUrl: urls[index] || thumbs[index] || '',
-      thumbUrl: thumbs[index] || urls[index] || '',
-      tags: hasEditableTags ? (tags[index] || '') : (message.tags || ''),
+      imageUrl,
+      thumbUrl,
+      tags: hasAssetTag ? (tagMap[assetKey] || '') : (hasEditableTags ? (tags[index] || '') : (message.tags || '')),
       tagAuthority: hasEditableTags ? 'editable' : ''
     };
   }).filter(entry => entry.imageUrl || entry.thumbUrl);
@@ -158,7 +169,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       tags: String(Object.prototype.hasOwnProperty.call(photo || {}, 'tags')
         ? (photo.tags || '')
         : ((Array.isArray(data.imageTags) ? data.imageTags[imageIndex] : '') || '')),
-      tagAuthority: String(photo?.tagAuthority || ''),
+      tagAuthority: String(photo?.tagAuthority || (
+        sourceType === 'meeting' && Object.prototype.hasOwnProperty.call(photo || {}, 'tags') ? 'editable' : ''
+      )),
       text: String(data.text || data.content || data.body || context.text || '').slice(0, 1000),
       participantId: String(data.participantId || ''),
       source,
@@ -193,6 +206,25 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     return [];
   }
   return entries;
+}
+
+// Keep the new asset-keyed tag map bounded to photos that still exist on this document.  The
+// positional imageTags array remains for legacy clients, but it is only a mirror; this map is
+// what makes a tag survive deletion/reordering of neighbouring photos.
+function reconcileImageTagMapForIndex(message, tagMap = null) {
+  const raw = tagMap == null ? message?.imageTagMap : tagMap;
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const next = {};
+  getMessageImageEntriesForIndex({ ...(message || {}), imageTagMap: source }).forEach(entry => {
+    const assetKey = getPhotoAssetKey(entry.imageUrl || entry.thumbUrl);
+    if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey) || Object.keys(next).length >= 50) return;
+    const hasAssetTag = Object.prototype.hasOwnProperty.call(source, assetKey);
+    const legacyTags = Array.isArray(message?.imageTags) ? message.imageTags : [];
+    const hasLegacyTag = Object.prototype.hasOwnProperty.call(legacyTags, entry.index);
+    if (!hasAssetTag && !hasLegacyTag) return;
+    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 100);
+  });
+  return next;
 }
 
 function photoIndexOwnerRank(owner) {
@@ -1933,6 +1965,54 @@ exports.listUntaggedPhotoIndexEntries = functions.https.onRequest(async (req, re
   }
 });
 
+// Admin 데이터풀 > "중복사진 검사" -- lists every photoIndex row across every calendar (read-only,
+// no filter) so the client can run gallery-dedup.js's findDuplicatePhotoGroups/chooseDedupWinner
+// against a full snapshot. Same trust model as listUntaggedPhotoIndexEntries above. Intentionally
+// returns a report only; this endpoint never writes anything -- merge/delete stays a follow-up,
+// separate admin-gated write endpoint once the user has reviewed a report from this one.
+exports.listPhotoIndexEntriesForDedup = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, cursor, limit } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const pageSize = Math.min(200, Math.max(1, Number(limit) || 200));
+    let query = admin.firestore().collectionGroup('photoIndex')
+      .orderBy('updatedAt', 'desc')
+      .limit(pageSize);
+    if (typeof cursor === 'number' && Number.isFinite(cursor)) query = query.startAfter(cursor);
+    const snap = await query.get();
+    const items = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      const calendarDocId = doc.ref.parent.parent ? doc.ref.parent.parent.id : '';
+      const calendarId = calendarDocId.startsWith('cal_') ? calendarDocId.slice(4) : calendarDocId;
+      return {
+        calendarId,
+        assetKey: doc.id,
+        full: String(data.full || data.thumb || ''),
+        thumb: String(data.thumb || data.full || ''),
+        timestamp: Number(data.timestamp) || 0,
+        tags: String(data.tags || ''),
+        commentCount: Number(data.commentCount) || 0,
+        participantId: String(data.participantId || ''),
+        source: String(data.source || ''),
+        mergedInto: String(data.mergedInto || '')
+      };
+    }).filter(item => item.calendarId && item.assetKey && item.full);
+    const nextCursor = snap.docs.length === pageSize ? Number(snap.docs[snap.docs.length - 1].data()?.updatedAt) || null : null;
+    res.status(200).json({ ok: true, items, nextCursor });
+  } catch (err) {
+    console.error('listPhotoIndexEntriesForDedup failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Admin-gated read of the sharedFiles/linkPreviews collections (both have `list: false` in
 // firestore.rules -- a hash/urlHash is only useful to someone who already has the matching
 // file/URL, so no client can enumerate them) filtered to entries onSharedFileWrite/
@@ -2022,10 +2102,24 @@ async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
       tx.update(docRef, { directMediaTags });
       return;
     }
+    const entries = getMessageImageEntriesForIndex(data);
+    // photoIndex can be one revision behind a delete/reorder. Find the current source slot by
+    // immutable asset key first; its historical owner index is only a fallback.
+    const target = entries.find(entry => getPhotoAssetKey(entry.imageUrl || entry.thumbUrl) === assetKey)
+      || entries.find(entry => entry.index === imageIndex);
+    if (!target) return;
     const imageTags = Array.isArray(data.imageTags) ? data.imageTags.slice() : [];
-    while (imageTags.length <= imageIndex) imageTags.push('');
-    imageTags[imageIndex] = cleanTags;
-    tx.update(docRef, { imageTags });
+    while (imageTags.length <= target.index) imageTags.push('');
+    imageTags[target.index] = cleanTags;
+    const imageTagMap = data.imageTagMap && typeof data.imageTagMap === 'object' && !Array.isArray(data.imageTagMap)
+      ? { ...data.imageTagMap }
+      : {};
+    const targetAssetKey = getPhotoAssetKey(target.imageUrl || target.thumbUrl);
+    if (targetAssetKey) imageTagMap[targetAssetKey] = cleanTags;
+    tx.update(docRef, {
+      imageTags,
+      imageTagMap: reconcileImageTagMapForIndex({ ...data, imageTags, imageTagMap }, imageTagMap)
+    });
   });
   return { ok: true };
 }
@@ -2059,6 +2153,80 @@ exports.adminBulkTagPhotos = functions.https.onRequest(async (req, res) => {
     }
   }
   res.status(200).json({ ok: true, results });
+});
+
+// Admin "중복사진 검사" 보고서의 병합 실행. 사용자가 요청한 "데이터가 적은 쪽을 많은 쪽으로
+// 합쳐주고 데이터가 적은 사진을 제거해줘" 중 병합 절반만 서버에서 수행한다: 태그(해시태그
+// 토큰의 합집합)와 댓글(합쳐서 시간순 정렬)을 승자 쪽으로 옮긴다. 의도적으로 패자 사진 자체
+// (Storage 객체, 소유 문서의 imageUrls/photos[] 배열 항목)는 여기서 지우지 않는다 -- 그 삭제
+// 로직은 이미 클라이언트에 있고(handleDeleteChatMessagePhoto 등, 이번 세션에서 방금 검증한
+// 경로) 실사용/테스트가 된 코드라, 같은 로직을 서버에서 라이브 검증 없이 새로 복제하는 것은
+// CLAUDE.md의 "데이터 모델을 백업/복구 리허설 없이 바꾸지 않는다" 원칙과 정면으로 부딪힌다.
+// 병합이 끝나면 패자의 photoIndex 행에 mergedInto를 표시해 보고서에서 "삭제해도 데이터 유실
+// 없음"으로 안내하고, 관리자가 그 캘린더를 열어 기존 라이트박스 삭제 버튼으로 마무리한다.
+function mergeTagTokens(...tagStrings) {
+  const seen = new Set();
+  const tokens = [];
+  tagStrings.forEach(str => String(str || '').split(/\s+/).forEach(token => {
+    const clean = token.trim();
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    tokens.push(clean);
+  }));
+  return tokens.join(' ').slice(0, 160);
+}
+
+exports.mergeDedupPhotos = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, calendarId, winnerAssetKey, loserAssetKey } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !PHOTO_ASSET_KEY_RE.test(String(winnerAssetKey || '')) || !PHOTO_ASSET_KEY_RE.test(String(loserAssetKey || ''))) {
+    res.status(400).json({ ok: false, message: 'invalid ids' }); return;
+  }
+  if (winnerAssetKey === loserAssetKey) { res.status(400).json({ ok: false, message: 'same asset' }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const db = admin.firestore();
+    const calendarDocId = `cal_${calendarId}`;
+    const indexColl = db.collection('calendars').doc(calendarDocId).collection('photoIndex');
+    const [winnerSnap, loserSnap] = await Promise.all([indexColl.doc(winnerAssetKey).get(), indexColl.doc(loserAssetKey).get()]);
+    if (!winnerSnap.exists || !loserSnap.exists) { res.status(404).json({ ok: false, message: 'not-found' }); return; }
+    const winnerData = winnerSnap.data() || {};
+    const loserData = loserSnap.data() || {};
+
+    const mergedTags = mergeTagTokens(winnerData.tags, loserData.tags);
+    if (mergedTags !== String(winnerData.tags || '')) {
+      const tagOutcome = await applyPhotoIndexTagWrite(calendarId, winnerAssetKey, mergedTags);
+      if (!tagOutcome.ok) { res.status(200).json({ ok: false, reason: `tag-${tagOutcome.reason || 'failed'}` }); return; }
+    }
+
+    const commentsColl = db.collection('calendars').doc(calendarDocId).collection('photoComments');
+    const [winnerCommentsSnap, loserCommentsSnap] = await Promise.all([commentsColl.doc(winnerAssetKey).get(), commentsColl.doc(loserAssetKey).get()]);
+    const winnerComments = Array.isArray(winnerCommentsSnap.data()?.comments) ? winnerCommentsSnap.data().comments : [];
+    const loserComments = Array.isArray(loserCommentsSnap.data()?.comments) ? loserCommentsSnap.data().comments : [];
+    let mergedCommentCount = winnerComments.length;
+    if (loserComments.length > 0) {
+      const merged = [...winnerComments, ...loserComments]
+        .sort((a, b) => Number(a?.timestamp || 0) - Number(b?.timestamp || 0))
+        .slice(0, 200);
+      await commentsColl.doc(winnerAssetKey).set({ comments: merged }, { merge: true });
+      await commentsColl.doc(loserAssetKey).delete();
+      mergedCommentCount = merged.length;
+    }
+
+    await indexColl.doc(loserAssetKey).set({ mergedInto: winnerAssetKey, mergedAt: Date.now() }, { merge: true });
+
+    res.status(200).json({ ok: true, mergedTags, mergedCommentCount });
+  } catch (err) {
+    console.error('mergeDedupPhotos failed:', err);
+    res.status(500).json({ ok: false });
+  }
 });
 
 // Admin-only aggregate health view for Web Push subscriptions. Endpoints and encryption keys
@@ -2151,6 +2319,61 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
 // Production admin path: same rebuild as the emulator helper, but gated by the admin password
 // (identical check to listAllCalendars / listServerAuditLogs). Dry-run by default; pass
 // apply:true to write. Never relaxes Firestore photoIndex write:false for clients.
+// P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
+// one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
+// checks); rate limited per IP and scoped to one calendar id per request.
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset']);
+exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { calendarId, op, asset, tags } = req.body || {};
+  if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !MEDIA_COMMAND_OPS.has(op)) { res.status(400).json({ ok: false, reason: 'invalid' }); return; }
+  const imageUrl = String(asset?.imageUrl || '');
+  const thumbUrl = String(asset?.thumbUrl || '');
+  if (![imageUrl, thumbUrl].some(value => /^https:\/\/firebasestorage\.googleapis\.com\//.test(value))) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
+  const db = admin.firestore();
+  const calendarDocId = `cal_${calendarId}`;
+  const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+  if (!calendarSnap.exists) { res.status(404).json({ ok: false, reason: 'calendar' }); return; }
+  const cleanAsset = {
+    imageUrl, thumbUrl,
+    messageId: typeof asset?.messageId === 'string' ? asset.messageId.slice(0, 200) : '',
+    memoId: typeof asset?.memoId === 'string' ? asset.memoId.slice(0, 200) : '',
+  };
+  try {
+    const result = op === 'deleteAsset'
+      ? await mediaCommands.deleteAsset({ db, calendarDocId, asset: cleanAsset })
+      : await mediaCommands.tagAsset({ db, calendarDocId, asset: cleanAsset, tags: String(tags || '') });
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error(`mediaCommand ${op} failed:`, err);
+    res.status(500).json({ ok: false, reason: 'error' });
+  }
+});
+
+// Nightly reconciliation (invariant I6): rebuild every calendar's photoIndex from its source
+// documents, so owners that incremental triggers missed or processed out of order cannot
+// linger (they were ~2% of owners and every stale 404 row), then sweep the Storage GC queue.
+exports.nightlyMediaMaintenance = functions.runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
+    const calendars = await admin.firestore().collection('calendars').select().get();
+    for (const doc of calendars.docs) {
+      const calendarId = doc.id.startsWith('cal_') ? doc.id.slice(4) : doc.id;
+      if (!CALENDAR_ID_RE.test(calendarId)) continue;
+      try {
+        const report = await rebuildPhotoIndexForCalendarAdmin(calendarId, true);
+        console.log('nightly photoIndex rebuild', JSON.stringify({ calendarId, indexedPhotos: report.indexedPhotos, staleRows: report.staleRows }));
+      } catch (err) {
+        console.error(`nightly photoIndex rebuild failed for ${calendarId}:`, err);
+      }
+    }
+    const gc = await mediaCommands.sweepStorageGc({ db: admin.firestore(), bucket: admin.storage().bucket() });
+    console.log('nightly storage GC', JSON.stringify(gc));
+    return null;
+  });
+
 exports.rebuildPhotoIndex = functions.runWith({ timeoutSeconds: 300, memory: '1GB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }

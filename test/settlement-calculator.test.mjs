@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
+import { calculateSettlementRows, calculateSettlementTransfers } from '../src/core/settlement-calculator.js';
 
 test('splits evenly across participants with no owner', () => {
   const rows = calculateSettlementRows(90000, ['A', 'B', 'C']);
@@ -76,4 +76,19 @@ test('negative or non-numeric totalExpense is clamped to 0, never produces negat
   for (const row of negative) assert.equal(row.share, 0);
   const nonNumeric = calculateSettlementRows('not-a-number', ['A', 'B']);
   for (const row of nonNumeric) assert.equal(row.share, 0);
+});
+
+test('actual prepayments produce a direct payer-to-recipient transfer', () => {
+  const rows = calculateSettlementRows(
+    350700,
+    ['박영우', '송은혜'],
+    new Map([['박영우', -175700], ['송은혜', -175000]])
+  );
+  const youngwoo = rows.find(row => row.name === '박영우');
+  const eunhye = rows.find(row => row.name === '송은혜');
+  assert.equal(youngwoo.actualPaid, 175700);
+  assert.equal(eunhye.actualPaid, 175000);
+  assert.deepEqual(calculateSettlementTransfers(rows), [
+    { from: '송은혜', to: '박영우', amount: 350 }
+  ]);
 });

@@ -1,0 +1,68 @@
+name: Deploy Firebase backend (manual)
+
+# Cloud Functions / Firestore rules / Storage rules are never deployed implicitly. This workflow
+# runs only when started by hand, and deploys only after the emulator test suite passes.
+# Requires the repository secret FIREBASE_SERVICE_ACCOUNT (JSON key of a service account with
+# Firebase Admin + Cloud Functions Admin + Service Account User roles on metro-live-2918e).
+# No --force: if the deploy would delete a function that is missing from source, it stops instead.
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'firebase deploy --only targets'
+        required: true
+        default: 'functions'
+        type: choice
+        options:
+          - functions
+          - firestore:rules,storage
+          - functions,firestore:rules,storage
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-firebase-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix functions ci
+      - name: Emulator tests (gate)
+        run: npm run test:functions:emulator
+      - name: Deploy
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TOUR_API_SERVICE_KEY_SECRET: ${{ secrets.TOUR_API_SERVICE_KEY }}
+        run: |
+          test -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" || { echo "FIREBASE_SERVICE_ACCOUNT secret is not set"; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          # functions/index.js declares the optional param TOUR_API_SERVICE_KEY. A non-interactive
+          # deploy needs a value, and an empty one would wipe the key the live function already has.
+          # Use the TOUR_API_SERVICE_KEY repo secret when set; otherwise carry over the deployed value.
+          tour_key="$TOUR_API_SERVICE_KEY_SECRET"
+          if [ -z "$tour_key" ]; then
+            gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" --quiet >/dev/null 2>&1
+            # If the live function cannot be read, stop rather than deploy an empty key over it.
+            live=$(gcloud functions describe tourApiSearchProxy --project metro-live-2918e --region us-central1 --format=json 2>"$RUNNER_TEMP/describe.err") \
+              || { echo "Could not read the live tourApiSearchProxy config:"; cat "$RUNNER_TEMP/describe.err"; exit 1; }
+            tour_key=$(printf '%s' "$live" | jq -r '.environmentVariables.TOUR_API_SERVICE_KEY // .serviceConfig.environmentVariables.TOUR_API_SERVICE_KEY // ""')
+          fi
+          if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi
+          printf 'TOUR_API_SERVICE_KEY="%s"\n' "$tour_key" > functions/.env.metro-live-2918e
+          npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive

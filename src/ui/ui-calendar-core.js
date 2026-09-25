@@ -1,3 +1,7 @@
+import { shortParticipantName } from './v2/view-data.js';
+import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
+
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
  */
@@ -966,7 +970,7 @@ export function CalendarGrid({
           }
         }, cornerText, isHoliday && isConfirmed ? /*#__PURE__*/React.createElement("span", {
           style: {
-            color: '#7C3AED'
+            color: 'var(--v2-accent, #7C3AED)'
           }
         }, "·확정") : null)
       ),
@@ -983,6 +987,7 @@ export function CalendarGrid({
         return /*#__PURE__*/React.createElement(ParticipantBadge, {
           key: p.id + (e.id || e.date || ''),
           participant: p,
+          asDot: true,
           style: { cursor: 'pointer' },
           draggable: !isNone,
           onDragStart: isNone ? undefined : (event => {
@@ -1519,6 +1524,39 @@ export function CommentsSection({
   }) : null));
 }
 
+// One fold rule for memo comments everywhere a memo is shown (memo page, date sheet, home,
+// search): the latest comment is visible (the "is anyone reacting?" signal) and the earlier ones
+// sit behind a single 더보기/접기 toggle placed where they unfold, above it.
+// While the viewer is writing a comment the whole thread is shown.
+export const MEMO_COMMENT_PREVIEW_COUNT = 1;
+export function MemoCommentFold({ comments, renderComment, forceExpanded = false }) {
+  const React = window.React;
+  const [expanded, setExpanded] = React.useState(false);
+  const list = Array.isArray(comments) ? comments : [];
+  const hiddenCount = Math.max(0, list.length - MEMO_COMMENT_PREVIEW_COUNT);
+  const open = expanded || forceExpanded;
+  const offset = open || !hiddenCount ? 0 : hiddenCount;
+  const visible = list.slice(offset);
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    hiddenCount > 0 && !forceExpanded && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "memo-comment-fold-toggle",
+      "aria-expanded": open,
+      "data-stop-card-open": "true",
+      onClick: e => { e.stopPropagation(); setExpanded(v => !v); }
+    },
+      /*#__PURE__*/React.createElement("svg", {
+        width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
+        strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true",
+        style: { transform: open ? 'none' : 'rotate(180deg)', transition: 'transform 200ms ease' }
+      }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
+      open ? '댓글 접기' : `이전 댓글 ${hiddenCount}개 더보기`
+    ),
+    // Index stays the comment's position in the whole thread so row keys/dividers are stable.
+    visible.map((comment, index) => renderComment(comment, index + offset))
+  );
+}
+
 export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1528,14 +1566,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
     const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   // 'page' = memo-page standard module; 'preview' = main-screen section customization.
   const isPreview = variant === 'preview';
+  // The date sheet shows the memo exactly like the memo page: date in the footer, one comment
+  // action there (not a second one in the tag row).
+  const isPageLayout = variant === 'v2-page' || variant === 'date-modal';
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
@@ -1574,9 +1613,16 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (memoFirstUrl && text === memo.text) text = removeFirstUrl(text);
     return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   })();
-  const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
-  const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
-  const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
+  const memoMeta = (() => {
+    const value = memo.updatedAt ?? memo.createdAt;
+    if (!value) return '';
+    const rawValue = value && typeof value.toDate === 'function' ? value.toDate() : value;
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) return '';
+    const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+    const pad = value => String(value).padStart(2, '0');
+    return `${pad(date.getMonth() + 1)}.${pad(date.getDate())}(${weekday}) ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  })();
   const [openVideoByUrl, setOpenVideoByUrl] = React.useState({});
 
   // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
@@ -1594,12 +1640,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     || __deps.refocusComposerField
     || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
-  // Long comment threads otherwise push the composer far below the fold -- collapse to the most
-  // recent COMMENT_COLLAPSE_LIMIT by default, with a toggle above the list to see the rest.
-  const COMMENT_COLLAPSE_LIMIT = 3;
-  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
-  const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
-  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
 
   const handleSaveComment = async (e) => {
     e.stopPropagation();
@@ -1680,24 +1720,34 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (typeof setActiveLightbox !== 'function' || imageUrls.length === 0) return;
     const urls = imageUrls.slice();
     const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
-    const meta = urls.map((_, imageIndex) => ({
-      timestamp: memo.updatedAt || memo.createdAt || 0,
-      messageId: memo.id,
-      imageIndex,
-      thumb: thumbUrls[imageIndex] || urls[imageIndex],
-      tags: String(memoImageTags[imageIndex] || ''),
-      source: 'memo',
-      uploadSource: 'memo'
-    }));
+    const meta = urls.map((full, imageIndex) => {
+      const thumb = thumbUrls[imageIndex] || full;
+      const assetKey = canonicalPhotoAssetKey({ full, thumb, imageUrl: full });
+      const slotKey = memo.id ? `memo:${memo.id}:${imageIndex}` : '';
+      return {
+        timestamp: memo.updatedAt || memo.createdAt || 0,
+        messageId: memo.id,
+        imageIndex,
+        thumb,
+        full,
+        tags: String(memoImageTags[imageIndex] || ''),
+        source: 'memo',
+        uploadSource: 'memo',
+        assetKey,
+        mediaKey: assetKey,
+        refKey: assetKey,
+        slotKey,
+        legacyKeys: slotKey && slotKey !== assetKey ? [slotKey] : []
+      };
+    });
     setActiveLightbox({ urls, index: Math.max(0, Math.min(index, urls.length - 1)), meta });
   };
 
   const renderMemoCardImages = () => {
     if (imageUrls.length === 0) return null;
     if (imageUrls.length === 1) {
-      return /*#__PURE__*/React.createElement(MediaThumb, {
-        src: thumbUrls[0] || imageUrls[0],
-        fallbackSrc: imageUrls[0] || thumbUrls[0],
+      return /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+        photo: { full: imageUrls[0], thumb: thumbUrls[0] || imageUrls[0], imageUrl: imageUrls[0], thumbUrl: thumbUrls[0] || '' },
         alt: "메모 첨부 이미지",
         loading: 'lazy',
         decoding: 'async',
@@ -1720,10 +1770,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         maxWidth: maxW,
         marginBottom: '8px'
       }
-    }, imageUrls.slice(0, count).map((_, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
-      key: idx,
-      src: thumbUrls[idx] || imageUrls[idx],
-      fallbackSrc: imageUrls[idx] || thumbUrls[idx],
+    }, imageUrls.slice(0, count).map((full, idx) => /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+      key: canonicalPhotoAssetKey({ full, thumb: thumbUrls[idx] || full, imageUrl: full }) || idx,
+      photo: { full, thumb: thumbUrls[idx] || full, imageUrl: full, thumbUrl: thumbUrls[idx] || '' },
       alt: `메모 첨부 이미지 ${idx + 1}`,
       loading: 'lazy',
       decoding: 'async',
@@ -1762,19 +1811,19 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : '#fff'),
-      border: '0',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : '#fff')),
+      border: variant === 'date-modal' ? '1px solid var(--border-subtle)' : '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',
       cursor: 'pointer',
-      boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+      boxShadow: variant === 'date-modal' ? 'none' : '0 2px 5px rgba(0,0,0,0.03)',
       display: 'flex',
       flexDirection: 'column',
       position: 'relative',
       transition: 'box-shadow 0.2s ease',
       boxSizing: 'border-box'
     },
-    className: "memo-card-hover"
+    className: "memo-card-hover v2-memo-card-contract"
   },
     /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
        absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color
@@ -1823,8 +1872,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
     /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
     memo.title && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-title",
       style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
     }, highlightKeyword(memo.title, searchQuery)),
+    variant !== 'preview' && !isPageLayout && memoMeta && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-meta",
+    }, memoMeta),
 
     /* Images */
     renderMemoCardImages(),
@@ -1834,43 +1887,17 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
        memo.linkPreview is the source of truth for whether the preview actually has content
        (same field LinkPreviewCard's cachedData reads), so this stays in sync with it. */
     displayMemoText && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-body",
       style: {
         fontSize: 'var(--font-size-md)',
         color: 'var(--text-main)',
         lineHeight: '1.4',
         whiteSpace: 'pre-wrap',
         overflowWrap: 'break-word',
-        wordBreak: 'break-all',
-        ...(hasLongMemoText && !isMemoTextExpanded ? {
-          display: '-webkit-box',
-          WebkitLineClamp: 8,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden'
-        } : {})
+        wordBreak: 'break-all'
       }
     }, parseTextWithLinks(displayMemoText, searchQuery)),
 
-    hasLongMemoText && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: (e) => {
-        e.stopPropagation();
-        setIsMemoTextExpanded(v => !v);
-      },
-      "data-stop-card-open": "true",
-      style: {
-        width: '100%',
-        marginTop: '8px',
-        padding: '8px 12px',
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        background: 'var(--bg-primary)',
-        color: 'var(--text-main)',
-        fontSize: 'var(--font-size-md)',
-        fontWeight: 800,
-        cursor: 'pointer',
-        textAlign: 'center'
-      }
-    }, isMemoTextExpanded ? "접기" : "더 보기"),
 
     /* Media Embed or Link Preview Card under the card content if applicable */
     memoPreviewUrls.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -1946,24 +1973,27 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-tags",
       style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
     },
-      /* Writer badge (capsule with participant's color and white text) */
+      /* Writer badge:
+         In V2 (variant === 'v2-page' or V2 shell active): 8px x 8px circle, no text, no shadow/border.
+         In V1 (legacy): original capsule badge with writer's name. */
       (() => {
         const writer = (calendar?.participants || []).find(p => p.id === memo.participantId);
         if (!writer) return null;
         return /*#__PURE__*/React.createElement("span", {
+          className: "v2-author-dot v2-memo-author-dot",
+          role: "img",
+          tabIndex: 0,
+          "data-author-name": writer.name || '작성자',
+          "aria-label": `${writer.name || '작성자'} 작성자`,
+          title: writer.name || '작성자',
+          onClick: e => e.stopPropagation(),
           style: {
-            backgroundColor: writer.color || '#94A3B8',
-            color: '#FFFFFF',
-            borderRadius: 'var(--radius-full)',
-            padding: '4px 8px',
-            fontSize: 'var(--font-size-xs)',
-            fontWeight: 'bold',
-            lineHeight: 1,
-            whiteSpace: 'nowrap'
+            backgroundColor: writer.color || '#94A3B8'
           }
-        }, writer.name);
+        });
       })(),
       
       /* Tags */
@@ -1993,65 +2023,32 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         },
         title: "댓글",
         "aria-label": "댓글",
+        className: "memo-card-comment-toggle",
         style: {
           marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: (comments.length > 0 || isCommentComposerOpen) ? 'var(--accent-primary)' : '#94A3B8', flexShrink: 0
         }
       }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }), /*#__PURE__*/React.createElement("span", {
-        style: { marginLeft: '4px', fontSize: '0.75rem', fontWeight: 700 }
-      }, "댓글"), comments.length > 0 ? /*#__PURE__*/React.createElement("span", {
-        "aria-label": `댓글 ${comments.length}개`,
-        style: {
-          marginLeft: '4px',
-          minWidth: '18px',
-          height: '18px',
-          padding: '0 5px',
-          borderRadius: '999px',
-          backgroundColor: '#2563EB',
-          color: '#FFFFFF',
-          fontSize: '0.7rem',
-          fontWeight: 800,
-          lineHeight: '18px',
-          textAlign: 'center',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxSizing: 'border-box'
-        }
-      }, String(comments.length)) : null)
+        style: { marginLeft: '4px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand, #7C2FE5)' }
+      }, comments.length > 0 ? `댓글 ${comments.length}` : "댓글"))
     ),
 
     /* Comment list -- no background, thin divider line between rows instead */
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-comments",
       style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' }
     },
-      hasMoreComments && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.stopPropagation(); setIsCommentsExpanded(v => !v); },
-        style: {
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          width: '100%', boxSizing: 'border-box', alignSelf: 'stretch',
-          background: 'none', cursor: 'pointer', padding: '6px',
-          border: '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)',
-          borderRadius: '8px',
-          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
-        }
-      },
-        /*#__PURE__*/React.createElement("svg", {
-          width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
-          strokeLinecap: "round", strokeLinejoin: "round",
-          style: { transform: isCommentsExpanded ? 'none' : 'rotate(180deg)' }
-        }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
-        isCommentsExpanded ? '댓글 접기' : `댓글 더보기 (${comments.length - COMMENT_COLLAPSE_LIMIT}개)`
-      ),
-      visibleComments.map((comment, commentIdx) => {
+      /*#__PURE__*/React.createElement(MemoCommentFold, {
+        comments,
+        forceExpanded: isCommentComposerOpen,
+        renderComment: (comment, commentIdx) => {
       const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
       return /*#__PURE__*/React.createElement("div", {
-        key: comment.id,
+        key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
         onClick: e => e.stopPropagation(),
         style: {
-          display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
+          display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 2px',
           borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
         }
       },
@@ -2065,18 +2062,40 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
         }),
         /*#__PURE__*/React.createElement("span", {
-          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', wordBreak: 'break-word' }
-        }, comment.text),
+          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
+        }, typeof (window.GATHER_UI_DEPS || {}).renderTextWithUrlBadge === 'function'
+          ? window.GATHER_UI_DEPS.renderTextWithUrlBadge(comment.text)
+          : comment.text),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
+        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
       );
-    })),
+        }
+      })),
+
+    variant !== 'preview' && /*#__PURE__*/React.createElement("div", {
+      className: "memo-card-comment-footer",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "memo-card-comment-toggle",
+        onClick: e => {
+          e.stopPropagation();
+          setEditingCommentId(null);
+          setCommentText('');
+          setIsCommentComposerOpen(v => !v);
+        },
+        title: "댓글 입력",
+        "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력"
+      }, isPageLayout
+        ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), /* Count as plain brand-coloured text ("댓글 2"), same as the home memo section -- no
+           filled badge. */
+        comments.length > 0 ? `댓글 ${comments.length}` : "댓글")
+    ),
 
     /* Comment composer -- always column (input, then picker left / cancel+save right).
        See .comment-composer rules in app.css. */
@@ -2118,10 +2137,27 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }),
       /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
         /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-          participant: commentPart,
+          participant: commentPart && isPageLayout
+            ? { ...commentPart, name: shortParticipantName(commentPart.name) }
+            : commentPart,
           onClick: () => setIsCommentPartOpen(true)
         }),
         /*#__PURE__*/React.createElement("div", { className: "comment-composer-buttons" },
+          /* Editing an existing comment: 삭제 sits here (left of 취소/저장) instead of as a
+             trash icon beside every comment. */
+          editingCommentId && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "item-edit-delete-btn",
+            onClick: e => {
+              const target = comments.find(c => c.id === editingCommentId);
+              if (target) handleDeleteComment(e, target);
+            },
+            style: {
+              flexShrink: 0, height: '30px', padding: '0 10px', marginRight: 'auto', borderRadius: 'var(--radius-sm)',
+              border: 'none', background: 'none', color: 'var(--status-red, #DC2626)',
+              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
+            }
+          }, "삭제"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: handleCancelComment,
@@ -2268,6 +2304,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       nonVoters.map(p => /*#__PURE__*/React.createElement(ParticipantBadge, {
         key: p.id,
         participant: p,
+        asDot: true,
         style: { opacity: 0.65 }
       }))
     );
@@ -2358,33 +2395,92 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
         className: "poll-voter-badges"
       }, voterIds.map(participantId => {
         const participant = participantsMap[participantId];
-        const textColor = '#FFFFFF';
         return /*#__PURE__*/React.createElement("span", {
           key: participantId,
-          className: "poll-voter-badge",
+          className: "v2-author-dot",
+          role: "img",
+          tabIndex: 0,
+          "data-author-name": participant.name,
+          title: participant.name,
           style: {
-            backgroundColor: participant.color,
-            color: textColor,
-            // .poll-voter-badge's CSS padding is intentionally right-light (3px 4px 3px 8px) to
-            // make room for the 투표 취소 (X) button below -- once that button stops rendering
-            // (closed poll), the smaller right padding alone made the name text look off-center,
-            // hugging the right edge. Restore symmetric padding here when there's no button.
-            ...(closed ? { padding: '3px 8px' } : null)
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            verticalAlign: 'middle'
           }
-        }, participant.name, !closed && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "poll-voter-remove",
-          title: `${participant.name} \uD22C\uD45C \uCDE8\uC18C`,
-          onClick: event => {
-            event.stopPropagation();
-            onRequestConfirm('투표 취소', `${participant.name}님 투표를 취소하시겠습니까?`, () => {
-              onCancelVote(poll, option, participant.id);
-            });
-          }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, null)));
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-block',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: participant.color
+            }
+          }),
+          !closed && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "poll-voter-remove",
+            title: `${participant.name} \uD22C\uD45C \uCDE8\uC18C`,
+            onClick: event => {
+              event.stopPropagation();
+              onRequestConfirm('투표 취소', `${participant.name}님 투표를 취소하시겠습니까?`, () => {
+                onCancelVote(poll, option, participant.id);
+              });
+            }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, null)));
       }))));
     })));
   })));
+}
+
+const SEARCH_CULTURE_GENRE_LABELS = {
+  classic_tradition: '클래식/전통',
+  play: '연극',
+  musical: '뮤지컬',
+  concert: '콘서트',
+  exhibition: '전시',
+  activity: '체험',
+  museum: '박물관',
+  baseball: '야구',
+  basketball: '농구',
+  volleyball: '배구',
+  soccer: '축구',
+  handball: '핸드볼',
+  movie: '영화'
+};
+const SEARCH_CULTURE_KIND_LABELS = {
+  performance: '문화행사',
+  festival: '지역축제',
+  sports: '스포츠',
+  movie: '영화'
+};
+function searchCultureGenreLabel(code) {
+  const raw = String(code || '').trim();
+  if (!raw) return '';
+  if (SEARCH_CULTURE_GENRE_LABELS[raw]) return SEARCH_CULTURE_GENRE_LABELS[raw];
+  if (/^[a-z0-9_]+$/i.test(raw)) return '';
+  return raw;
+}
+function searchCultureKindLabel(kind) {
+  return SEARCH_CULTURE_KIND_LABELS[kind] || '';
+}
+function inferSearchCultureKind(item) {
+  if (!item) return '';
+  if (item.searchKind) return item.searchKind;
+  if (item.kind && SEARCH_CULTURE_KIND_LABELS[item.kind]) return item.kind;
+  const byCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+  if (byCategory[item.category] || byCategory[item.anniversaryCategory]) {
+    return byCategory[item.category] || byCategory[item.anniversaryCategory];
+  }
+  if (item.genre === 'movie') return 'movie';
+  if (['baseball', 'basketball', 'volleyball', 'soccer', 'handball'].includes(item.genre)) return 'sports';
+  return 'performance';
+}
+function searchCultureSourcePath(item) {
+  const kind = searchCultureKindLabel(inferSearchCultureKind(item)) || '콘텐츠';
+  const sub = searchCultureGenreLabel(item?.subGenre) || searchCultureGenreLabel(item?.genre);
+  return sub && sub !== kind ? `${kind} · ${sub}` : kind;
 }
 
 export function GlobalSearchModal({
@@ -2397,6 +2493,8 @@ export function GlobalSearchModal({
   onOpenChatMessage,
   onOpenImage,
   onOpenMemo,
+  onOpenPlaces,
+  onOpenContent,
   initialQuery = '',
   inline = false
 }) {
@@ -2461,9 +2559,11 @@ export function GlobalSearchModal({
     Promise.all(['culture-performances', 'culture-festivals', 'culture-sports', 'culture-movies'].map(name =>
       fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
     )).then(payloads => {
+      const feedKinds = ['performance', 'festival', 'sports', 'movie'];
       const byId = new Map();
-      payloads.forEach(payload => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
-        if (item?.id) byId.set(item.id, item);
+      payloads.forEach((payload, index) => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
+        if (!item?.id || byId.has(item.id)) return;
+        byId.set(item.id, { ...item, searchKind: item.kind || feedKinds[index] });
       }));
       setCatalogContent(Array.from(byId.values()));
     });
@@ -2479,8 +2579,12 @@ export function GlobalSearchModal({
   const contentMatches = React.useMemo(() => {
     if (!q) return [];
     return contentSearchItems.filter(item => {
-      const haystack = [item?.title, item?.description, item?.genre, item?.subGenre, item?.venue, item?.address]
-        .filter(Boolean).join(' ').toLowerCase();
+      const kind = inferSearchCultureKind(item);
+      const haystack = [
+        item?.title, item?.description, item?.genre, item?.subGenre, item?.venue, item?.address,
+        searchCultureGenreLabel(item?.genre), searchCultureGenreLabel(item?.subGenre),
+        searchCultureKindLabel(kind), '콘텐츠', '컨텐츠'
+      ].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
     });
   }, [contentSearchItems, q]);
@@ -2494,7 +2598,6 @@ export function GlobalSearchModal({
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
 
   const tabDefs = [
-    { key: 'all', label: '전체', count: Object.values(matches).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) },
     { key: 'schedules', label: '일정', count: (matches.schedules || []).length },
     { key: 'chat', label: '채팅', count: (matches.chat || []).length },
     { key: 'photos', label: '사진', count: (matches.photos || []).length },
@@ -2507,7 +2610,7 @@ export function GlobalSearchModal({
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
 
-  const [activeTab, setActiveTab] = React.useState('all');
+  const [activeTab, setActiveTab] = React.useState('schedules');
   // Whenever the query (or its results) changes, jump to the first category that actually has
   // matches instead of leaving the user staring at an empty tab.
   React.useEffect(() => {
@@ -2520,58 +2623,178 @@ export function GlobalSearchModal({
     });
   }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, (matches.files || []).length, contentMatches.length]);
 
+  const finishPick = React.useCallback((next) => {
+    if (typeof next === 'function') next();
+    if (!inline && typeof onClose === 'function') onClose();
+  }, [inline, onClose]);
+
+  const SEARCH_KIND = {
+    schedules: { label: '일정', color: 'var(--v2-primary, #7C2FE5)' },
+    chat: { label: '채팅', color: '#2563EB' },
+    photos: { label: '사진', color: 'var(--v2-accent, #8B5CF6)' },
+    places: { label: '장소', color: '#0D9488' },
+    tags: { label: '사진 태그', color: 'var(--v2-accent, #7C3AED)' },
+    expenses: { label: '정산', color: '#DC2626' },
+    memos: { label: '메모', color: '#CA8A04' },
+    files: { label: '파일', color: '#4B5563' },
+    content: { label: '콘텐츠', color: '#EA580C' }
+  };
+
   // The default view is a single chronological result stream. Category tabs remain
   // available for drilling down, but users no longer need to guess which tab contains
   // a matching record. This is intentionally deterministic text search, not AI.
   const allResults = React.useMemo(() => {
     const rows = [];
     (matches.schedules || []).forEach(item => rows.push({
-      id: `schedule_${item.date}_${item.participantId}`, badgeName: `일정 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatDateWithDayName(item.date), content: item.note || item.participantName,
-      onClick: () => { onSelectDate(item.date); onClose(); }, sortStamp: item.date
+      id: `schedule_${item.date}_${item.participantId}`,
+      kind: 'schedules',
+      pathLabel: item.participantName || '',
+      title: item.note || item.participantName || '일정',
+      meta: '',
+      timeStr: formatDateWithDayName(item.date),
+      onClick: () => finishPick(() => onSelectDate?.(item.date, { tab: 'participant', participantId: item.participantId })),
+      sortStamp: item.date
     }));
     (matches.chat || []).forEach(item => rows.push({
-      id: `chat_${item.id}`, badgeName: `채팅 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatLogTimestamp(item.timestamp), content: item.text || '사진/미디어',
-      onClick: () => { onOpenChatMessage?.(item.id); onClose(); }, sortStamp: String(item.timestamp || 0).padStart(14, '0')
+      id: `chat_${item.id}`,
+      kind: 'chat',
+      pathLabel: item.participantName || '',
+      title: item.text || '사진/미디어',
+      meta: '',
+      timeStr: formatLogTimestamp(item.timestamp),
+      onClick: () => finishPick(() => onOpenChatMessage?.(item.id)),
+      sortStamp: String(item.timestamp || 0).padStart(14, '0')
     }));
     (matches.photos || []).forEach((item, idx) => rows.push({
-      id: `photo_${item.id || idx}`, badgeName: '사진', badgeColor: '#8B5CF6',
-      timeStr: item.date ? formatDateWithDayName(item.date) : '', content: item.tags || '일정 사진',
-      onClick: () => { if (item.date) onSelectDate(item.date); onClose(); }, sortStamp: item.date || ''
+      id: `photo_${item.id || idx}`,
+      kind: 'photos',
+      pathLabel: '캘린더 사진',
+      title: item.tags || '일정 사진',
+      meta: '',
+      timeStr: item.date ? formatDateWithDayName(item.date) : '',
+      onClick: () => finishPick(() => { if (item.date) onSelectDate?.(item.date, { tab: 'photo' }); }),
+      sortStamp: item.date || ''
     }));
     (matches.places || []).forEach(item => rows.push({
-      id: `place_${item.id}`, badgeName: `장소 · ${item.alias || item.name}`, badgeColor: '#06B6D4',
-      timeStr: item.address || '', content: item.memo || item.name || '', onClick: () => onClose(), sortStamp: item.visitDate || ''
+      id: `place_${item.id}`,
+      kind: 'places',
+      pathLabel: item.alias || item.name || '장소',
+      title: item.name || item.alias || '장소',
+      meta: item.memo || item.address || '',
+      timeStr: item.address || '',
+      onClick: () => finishPick(() => onOpenPlaces?.(item.id)),
+      sortStamp: item.visitDate || ''
     }));
     (matches.expenses || []).forEach(item => rows.push({
-      id: `expense_${item.id}`, badgeName: item.categoryName, badgeColor: item.categoryColor,
-      timeStr: formatDateWithDayName(item.date), content: `${item.label || item.url || ''} · ${item.amount < 0 ? '+' : '-'}${Math.abs(Number(item.amount)).toLocaleString()}원`,
-      onClick: () => { onSelectDate(item.date); onClose(); }, sortStamp: item.date || ''
+      id: `expense_${item.id}`,
+      kind: 'expenses',
+      pathLabel: item.categoryName || '정산',
+      title: item.label || item.url || '정산 항목',
+      meta: `${item.amount < 0 ? '+' : '-'}${Math.abs(Number(item.amount)).toLocaleString()}원`,
+      timeStr: formatDateWithDayName(item.date),
+      onClick: () => finishPick(() => onSelectDate?.(item.date, { tab: 'settlement', expenseId: item.id })),
+      sortStamp: item.date || ''
     }));
     (matches.memos || []).forEach(item => rows.push({
-      id: `memo_${item.id}`, badgeName: `메모 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatLogTimestamp(item.createdAt), content: [item.title, item.text].filter(Boolean).join(' · '),
-      onClick: () => { onOpenMemo?.(item.id); onClose(); }, sortStamp: String(item.createdAt || 0).padStart(14, '0')
+      id: `memo_${item.id}`,
+      kind: 'memos',
+      pathLabel: item.participantName || '',
+      title: item.title || '메모',
+      meta: item.text ? (item.text.length > 80 ? item.text.slice(0, 80) + '…' : item.text) : '',
+      timeStr: formatLogTimestamp(item.createdAt),
+      onClick: () => finishPick(() => onOpenMemo?.(item.id)),
+      sortStamp: String(item.createdAt || 0).padStart(14, '0')
+    }));
+    (matches.tags || []).forEach(item => rows.push({
+      id: `tag_${item.messageId}_${item.directMediaUrl ? 'direct' : item.imageIndex}`,
+      kind: 'tags',
+      pathLabel: '채팅 사진',
+      title: item.tags || '사진 태그',
+      meta: '',
+      timeStr: '',
+      thumb: item.thumb,
+      onClick: () => finishPick(() => onOpenImage?.(item.messageId, item.imageIndex, item.directMediaUrl)),
+      sortStamp: String(item.timestamp || 0).padStart(14, '0')
     }));
     (matches.files || []).forEach(item => rows.push({
-      id: `file_${item.messageId}_${item.id}`, badgeName: `파일 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatLogTimestamp(item.uploadedAt), content: item.name || '파일',
-      onClick: () => { onOpenChatMessage?.(item.messageId); onClose(); }, sortStamp: String(item.uploadedAt || 0).padStart(14, '0')
+      id: `file_${item.messageId}_${item.id}`,
+      kind: 'files',
+      pathLabel: item.participantName || '',
+      title: item.name || '파일',
+      meta: [typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel(item) : '', typeof formatChatFileSize === 'function' ? formatChatFileSize(item.size) : ''].filter(Boolean).join(' · '),
+      timeStr: formatLogTimestamp(item.uploadedAt),
+      onClick: () => finishPick(() => onOpenChatMessage?.(item.messageId)),
+      sortStamp: String(item.uploadedAt || 0).padStart(14, '0')
     }));
-    contentMatches.forEach(item => rows.push({
-      id: `content_${item.id}`, badgeName: `콘텐츠 · ${item.title || '제목 없음'}`, badgeColor: '#F97316',
-      timeStr: item.dateLabel || item.startDate || item.releaseDate || '', content: [item.subGenre || item.genre, item.venue || item.address].filter(Boolean).join(' · '),
-      onClick: () => onClose(), sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
-    }));
+    contentMatches.forEach(item => {
+      const venue = item.venue && item.venue !== '장소 확인 필요' ? item.venue : '';
+      const address = item.address || '';
+      rows.push({
+        id: `content_${item.id}`,
+        kind: 'content',
+        pathLabel: searchCultureSourcePath(item),
+        title: item.title || '제목 없음',
+        meta: venue || address,
+        timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
+        onClick: () => finishPick(() => {
+          if (typeof onOpenContent === 'function') {
+            const cultureKind = inferSearchCultureKind(item);
+            const tabMap = { festival: 'festival', performance: 'culture', sports: 'sports', movie: 'movies' };
+            onOpenContent({ ...item, contentTab: tabMap[cultureKind] || 'festival' });
+          }
+        }),
+        sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
+      });
+    });
     return rows.sort((a, b) => String(b.sortStamp || '').localeCompare(String(a.sortStamp || '')));
-  }, [matches, contentMatches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
+  }, [matches, contentMatches, finishPick, onOpenChatMessage, onOpenMemo, onOpenPlaces, onOpenContent, onOpenImage, onSelectDate]);
+
+  const visibleResults = allResults.filter(item => item.kind === activeTab);
+
+  const renderResultRow = (item) => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+    key: item.id,
+    kindLabel: SEARCH_KIND[item.kind]?.label || '',
+    kindColor: SEARCH_KIND[item.kind]?.color,
+    badgeName: item.pathLabel ? highlightKeyword(item.pathLabel, q) : '',
+    timeStr: item.timeStr,
+    title: highlightKeyword(item.title, q),
+    onClick: item.onClick
+  }, item.meta ? highlightKeyword(item.meta, q) : null);
+
+  const Frame = inline ? 'div' : ResizableModalContainer;
+  const tabBar = q && hasResults ? (isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+    title: "검색 카테고리 선택",
+    value: activeTab,
+    options: tabDefs.map(t => {
+      const hasCount = (t.count || 0) >= 1;
+      return {
+        value: t.key,
+        label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
+          style: {
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
+            color: hasCount ? '#FFFFFF' : '#475569',
+            fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+          }
+        }, t.count))
+      };
+    }),
+    onSelect: setActiveTab
+  }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
+    options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
+    value: activeTab,
+    onChange: setActiveTab,
+    activeColor: inline ? 'var(--v2-primary, #7C2FE5)' : '#7C3AED',
+    variant: 'flush',
+    className: 'global-search-tabs'
+  }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))) : null;
 
   return /*#__PURE__*/React.createElement("div", {
     className: inline ? "global-search-page" : "modal-overlay",
     onClick: inline ? undefined : onClose,
     style: inline ? undefined : { zIndex: 11000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+  }, /*#__PURE__*/React.createElement(Frame, {
     className: inline ? "global-search-page-card" : "modal-container",
     onClick: e => e.stopPropagation(),
     style: inline ? undefined : { maxWidth: '520px' }
@@ -2589,12 +2812,14 @@ export function GlobalSearchModal({
         onChange: e => setQuery(e.target.value)
       }),
       /*#__PURE__*/React.createElement("button", {
-        onClick: inline ? () => setQuery('') : onClose,
-        'aria-label': inline ? '검색어 지우기' : '검색 닫기',
+        type: "button",
+        onClick: onClose,
+        'aria-label': '검색 닫기',
         style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
-    /*#__PURE__*/React.createElement("div", { className: "modal-body" },
+    inline && tabBar,
+    /*#__PURE__*/React.createElement("div", { className: `modal-body${!q || !hasResults ? ' is-empty' : ''}` },
       !inline && /*#__PURE__*/React.createElement("input", {
         ref: inputRef,
         type: "text",
@@ -2606,100 +2831,27 @@ export function GlobalSearchModal({
       }),
 
       isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
-        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: '8px' }
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: inline ? 0 : '8px' }
       }, "전체 기록에서 검색 중..."),
 
-      q && hasResults && /*#__PURE__*/React.createElement("div", {
-        style: { position: 'sticky', top: '-18px', backgroundColor: 'var(--bg-card)', zIndex: 10, marginTop: '10px', marginBottom: '12px', width: '100%' }
-      }, isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-        title: "검색 카테고리 선택",
-        value: activeTab,
-        options: tabDefs.map(t => {
-          const hasCount = (t.count || 0) >= 1;
-          return {
-            value: t.key,
-            label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
-              style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
-                color: hasCount ? '#FFFFFF' : '#475569',
-                fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
-              }
-            }, t.count))
-          };
-        }),
-        onSelect: setActiveTab
-      }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
-        options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
-        value: activeTab,
-        onChange: setActiveTab,
-        activeColor: '#7C3AED',
-        variant: 'flush',
-        className: 'global-search-tabs'
-      }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))),
+      !inline && tabBar,
 
-      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색어를 입력해 주세요."),
-      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색 결과가 없습니다."),
-
-      q && hasResults && activeTab === 'schedules' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: `${item.date}_${item.participantId}`,
-          badgeName: item.participantName,
-          badgeColor: item.participantColor,
-          timeStr: formatDateWithDayName(item.date),
-          onClick: () => { onSelectDate(item.date); onClose(); }
-        }, highlightKeyword(item.note || '', q)))
-      ),
-
-      q && hasResults && activeTab === 'all' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        allResults.slice(0, 100).map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: item.id,
-          badgeName: item.badgeName,
-          badgeColor: item.badgeColor,
-          timeStr: item.timeStr,
-          onClick: item.onClick
-        }, highlightKeyword(item.content, q)))
-      ),
-
-      q && hasResults && activeTab === 'chat' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.chat.map(msg => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: msg.id,
-          badgeName: msg.participantName,
-          badgeColor: msg.participantColor,
-          timeStr: formatLogTimestamp(msg.timestamp),
-          onClick: () => { if (typeof onOpenChatMessage === 'function') onOpenChatMessage(msg.id); if (typeof onClose === 'function') onClose(); }
-        }, highlightKeyword(msg.text || '', q)))
-      ),
-
-      q && hasResults && activeTab === 'photos' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        (matches.photos || []).map((photo, idx) => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: photo.id || `${photo.imageUrl}_${idx}`,
-          badgeName: "일정 사진",
-          badgeColor: "#8B5CF6",
-          timeStr: photo.date ? formatDateWithDayName(photo.date) : '',
-          onClick: () => { if (photo.date) onSelectDate(photo.date); onClose(); }
-        }, photo.tags || '일정 사진'))
-      ),
-
-      q && hasResults && activeTab === 'places' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        (matches.places || []).map(place => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: place.id,
-          badgeName: place.alias || place.name,
-          badgeColor: "#06B6D4",
-          timeStr: place.address || '',
-          onClick: () => { onClose(); }
-        }, highlightKeyword(place.memo || place.name || '', q)))
-      ),
+      !q && /*#__PURE__*/React.createElement("div", {
+        className: "global-search-empty"
+      }, "검색어를 입력해 주세요."),
+      q && !hasResults && !isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
+        className: "global-search-empty"
+      }, "검색 결과가 없습니다."),
 
       q && hasResults && activeTab === 'tags' && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(72px, 100%), 1fr))', gap: '6px' }
+        className: "global-search-tag-grid",
+        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(88px, 100%), 1fr))', gap: '10px' }
       },
         matches.tags.map(entry => /*#__PURE__*/React.createElement("button", {
           key: `${entry.messageId}_${entry.directMediaUrl ? 'direct' : entry.imageIndex}`,
           type: "button",
           title: entry.tags,
-          onClick: () => { onOpenImage && onOpenImage(entry.messageId, entry.imageIndex, entry.directMediaUrl); onClose(); },
+          onClick: () => finishPick(() => onOpenImage && onOpenImage(entry.messageId, entry.imageIndex, entry.directMediaUrl)),
           style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '4px' }
         },
           /*#__PURE__*/React.createElement("img", {
@@ -2715,52 +2867,9 @@ export function GlobalSearchModal({
         ))
       ),
 
-      q && hasResults && activeTab === 'expenses' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.expenses.map(exp => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: exp.id,
-          badgeName: exp.categoryName,
-          badgeColor: exp.categoryColor,
-          timeStr: formatDateWithDayName(exp.date),
-          onClick: () => { onSelectDate(exp.date); onClose(); }
-        }, highlightKeyword(exp.label || exp.url || '', q), ' · ', /*#__PURE__*/React.createElement("span", {
-          style: { fontWeight: 800, color: exp.amount < 0 ? 'var(--status-green)' : '#DC2626' }
-        }, `${exp.amount < 0 ? '+' : '-'}${Math.abs(Number(exp.amount)).toLocaleString()}원`)))
-      ),
-
-      q && hasResults && activeTab === 'memos' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.memos.map(memo => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: memo.id,
-          badgeName: memo.participantName,
-          badgeColor: memo.participantColor,
-          timeStr: formatLogTimestamp(memo.createdAt),
-          onClick: () => { onOpenMemo && onOpenMemo(memo.id); onClose(); }
-        },
-          memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
-          memo.text && highlightKeyword(memo.text.length > 80 ? memo.text.slice(0, 80) + '...' : memo.text, q)
-        ))
-      ),
-
-      q && hasResults && activeTab === 'files' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        (matches.files || []).map(file => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: `${file.messageId}_${file.id}`,
-          badgeName: file.participantName,
-          badgeColor: file.participantColor,
-          timeStr: formatLogTimestamp(file.uploadedAt),
-          onClick: () => { onOpenChatMessage?.(file.messageId); onClose(); }
-        }, highlightKeyword(file.name || '파일', q), ' · ', /*#__PURE__*/React.createElement("span", {
-          style: { color: 'var(--text-muted)' }
-        }, [typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel(file) : '', typeof formatChatFileSize === 'function' ? formatChatFileSize(file.size) : ''].filter(Boolean).join(' · '))))
-      ),
-
-      q && hasResults && activeTab === 'content' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        contentMatches.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: item.id,
-          badgeName: item.title || '콘텐츠',
-          badgeColor: '#F97316',
-          timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
-          onClick: () => onClose()
-        }, highlightKeyword([item.subGenre || item.genre, item.description || item.venue || item.address].filter(Boolean).join(' · '), q)))
-      )
+      q && hasResults && activeTab !== 'tags' && /*#__PURE__*/React.createElement("div", {
+        className: "global-search-result-list"
+      }, visibleResults.map(renderResultRow))
     )
   ));
 }
@@ -2992,9 +3101,9 @@ export function EditMessageModal({
     className: "modal-container",
     onClick: e => e.stopPropagation(),
     style: {
-      width: '90%',
-      maxWidth: '400px',
-      borderRadius: 'var(--radius-md)',
+      width: '92%',
+      maxWidth: '520px',
+      borderRadius: '20px',
       // Grow with content; ResizableModalContainer also clamps to visualViewport
       maxHeight: 'min(92vh, 100dvh)',
       display: 'flex',
@@ -3002,9 +3111,9 @@ export function EditMessageModal({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
-    style: { padding: '16px', marginBottom: 0, flexShrink: 0 }
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
+    style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) requestClose(); },
@@ -3193,7 +3302,7 @@ export function EditMessageModal({
     }, /*#__PURE__*/React.createElement("path", { d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }), /*#__PURE__*/React.createElement("rect", { x: "9", y: "3", width: "6", height: "4", rx: "1" }))))
   )), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
-    style: { padding: '16px', justifyContent: 'space-between', alignItems: 'center' }
+    style: { display: 'flex', padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }
   },
     /* Participant reassignment -- fixes a message posted under the wrong participant */
     /*#__PURE__*/React.createElement(ParticipantPickerButton, {
@@ -3245,6 +3354,7 @@ export function EditMessageModal({
     CalendarGrid: CalendarGrid,
     CommentsSection: CommentsSection,
     MemoCard: MemoCard,
+    MemoCommentFold: MemoCommentFold,
     PollList: PollList,
     GlobalSearchModal: GlobalSearchModal,
     EditMessageModal: EditMessageModal,

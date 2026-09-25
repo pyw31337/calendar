@@ -120,19 +120,22 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
     onClick: onClose,
     style: { zIndex: 10080 }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal",
+    className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '460px' }
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-header"
-  }, /*#__PURE__*/React.createElement("h3", null, "채팅알림 권한 필요"), /*#__PURE__*/React.createElement("button", {
+    className: "modal-header",
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }
+  }, "채팅알림 권한 필요"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn-icon",
     onClick: onClose,
     "aria-label": "닫기"
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 22 }))), /*#__PURE__*/React.createElement("div", {
     className: "modal-body",
-    style: { display: 'flex', flexDirection: 'column', gap: '14px' }
+    style: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.1)', color: '#1D4ED8' }
   }, /*#__PURE__*/React.createElement("span", {
@@ -186,7 +189,8 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
   }, idx + 1), /*#__PURE__*/React.createElement("span", null, step)))), /*#__PURE__*/React.createElement("p", {
     style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', lineHeight: 1.5 }
   }, "참고: 브라우저가 이미 알림을 차단한 상태에서는 보안 정책상 웹페이지가 설정을 자동으로 바꿀 수 없습니다. 대신 위 경로로 권한을 허용한 뒤 다시 시도해 주세요.")), /*#__PURE__*/React.createElement("div", {
-    className: "modal-footer"
+    className: "modal-footer",
+    style: { display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",

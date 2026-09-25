@@ -2,8 +2,8 @@ export function getInitialAppView(locationLike, parseSharePath) {
   const share = typeof parseSharePath === 'function' ? parseSharePath(locationLike?.pathname) : null;
   if (share?.view && share.view !== 'calendar') return share.view;
   const params = new URLSearchParams(locationLike?.search || '');
-  // Opt-in V2 shell maps tab/sub onto the existing data views without changing default routes.
-  if (params.get('shell') === 'v2' && params.has('tab')) {
+  // V2 shell (default; `?shell=v1` opts back out) maps tab/sub onto the existing data views.
+  if (params.get('shell') !== 'v1' && params.has('tab')) {
     const tab = params.get('tab');
     // First-class destinations (post shell-structure upgrade).
     if (tab === 'memo' || tab === 'places' || tab === 'chat' || tab === 'settlement') return tab;
@@ -28,7 +28,7 @@ export function buildAppViewUrl(locationLike, view, currentMonthDate) {
     params.delete('month');
   }
   if (view === 'calendar') params.delete('view'); else params.set('view', view);
-  if (params.get('shell') === 'v2') {
+  if (params.get('shell') !== 'v1') {
     // First-class: memo/places/chat/settlement use ?tab=<dest> (no records sub).
     // Gallery/history/content remain under records + sub.
     const recordsSub = { gallery: 'media', history: 'archive', content: 'content' }[view];

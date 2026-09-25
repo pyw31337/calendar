@@ -2,9 +2,43 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory } from '../core/gallery-data.js';
+import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { CapsuleTextBadge } from './ui-widgets.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { TABLER_ICONS } from './v2/tabler-icons.js';
+
+function ArchivePhotoThumb({ photo }) {
+  const React = window.React;
+  return React.createElement(PhotoAssetThumb, {
+    photo,
+    alt: '',
+    fill: true,
+    draggable: false,
+  });
+}
+
+// A memory's cover is "its first photo that actually loads": a deleted/missing file must not
+// turn the whole card into a broken-image tile when the group has other good photos.
+const MEMORY_COVER_MAX_ATTEMPTS = 8;
+function MemoryCoverThumb({ photos }) {
+  const React = window.React;
+  const list = Array.isArray(photos) ? photos : [];
+  const [attempt, setAttempt] = React.useState(0);
+  const photo = list[Math.min(attempt, list.length - 1)];
+  if (!photo) return null;
+  const canAdvance = attempt + 1 < Math.min(list.length, MEMORY_COVER_MAX_ATTEMPTS);
+  return React.createElement(PhotoAssetThumb, {
+    key: `cover-${attempt}`,
+    photo,
+    alt: '',
+    fill: true,
+    draggable: false,
+    onBroken: canAdvance ? () => setAttempt(value => value + 1) : undefined,
+  });
+}
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -203,25 +237,31 @@ function handleSectionHeaderKeyDown(event, onToggle) {
   onToggle();
 }
 
-export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
+export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle, activeColor = '#2563EB' }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("div", {
+    className: "underline-tabs",
+    role: "tablist",
     style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', ...containerStyle }
   }, tabs.map(tab => {
     const count = Number(tab.count || 0);
+    const isActive = activeKey === tab.key;
     return /*#__PURE__*/React.createElement("button", {
       key: tab.key,
       type: "button",
+      role: "tab",
+      "aria-selected": isActive,
       onClick: () => onSelect(tab.key),
       style: {
         minWidth: 0,
+        flex: '1 1 0',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
         padding: tabPadding || '10px 4px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: activeKey === tab.key ? '#2563EB' : '#64748B',
-        borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
-        marginBottom: '-1px',
+        color: isActive ? activeColor : '#64748B',
+        borderBottom: isActive ? `2px solid ${activeColor}` : '2px solid transparent',
+        marginBottom: '0',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         ...tabTextStyle
@@ -252,7 +292,8 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
 export function ParticipantBackdrop({ participant, name, dotSize = 10, style = {}, className }) {
   const React = window.React;
   const color = participant?.color || '#94A3B8';
-  const label = name || participant?.name || '참여자';
+  const raw = name || participant?.name || '참여자';
+  const label = /^[가-힣]{3,4}$/.test(String(raw).trim()) ? String(raw).trim().slice(1) : raw;
   return React.createElement('span', {
     className,
     style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color, fontWeight: 700, ...style }
@@ -447,7 +488,6 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     return React.createElement('span', {
@@ -587,20 +627,19 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
           const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
           const commentCount = getPhotoCommentCount(identity, photoCommentCounts);
           return /*#__PURE__*/React.createElement("div", {
-          key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
+          key: entry.assetKey || entry.mediaKey || entry.refKey || entry.full || entry.thumb,
           className: commentCount ? 'gallery-comment-heartbeat' : '',
           style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
         },
-          /*#__PURE__*/React.createElement(MediaThumb, {
-            src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
-            fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
+          /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+            photo: entry,
             alt: "채팅에 첨부된 사진",
             loading: "lazy",
             decoding: "async",
             referrerPolicy: 'no-referrer',
             onClick: () => setLightbox({
               urls: displayedEntries.map(e => e.full),
-              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey, legacyKeys: e.legacyKeys })),
+              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey, legacyKeys: e.legacyKeys, slotKey: e.slotKey })),
               index: idx
             }),
             onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
@@ -802,7 +841,7 @@ export function SummaryList({
     }, formattedDateStr), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '6px',
         flexWrap: 'wrap'
       }
@@ -812,8 +851,9 @@ export function SummaryList({
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
+      return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
         key: e.participantId || p.id,
+        text: memoText,
         className: "memo-capsule-badge",
         style: isPast ? {
           backgroundColor: 'transparent',
@@ -822,7 +862,7 @@ export function SummaryList({
           boxShadow: 'none'
         } : {
           backgroundColor: p.color,
-          color: getContrastTextColor(p.color)
+          color: 'var(--text-main, #1e1b2e)'
         },
         title: `${p.name}: ${memoText}`
       }, memoText);
@@ -917,7 +957,7 @@ export function SummaryList({
     }, isPast ? '지나간 모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '6px',
         flexWrap: 'wrap'
       }
@@ -927,8 +967,9 @@ export function SummaryList({
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
+      return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
         key: e.participantId || p.id,
+        text: memoText,
         className: "memo-capsule-badge",
         style: isPast ? {
           backgroundColor: 'var(--bg-primary)',
@@ -937,7 +978,7 @@ export function SummaryList({
           boxShadow: 'none'
         } : {
           backgroundColor: p.color,
-          color: getContrastTextColor(p.color)
+          color: 'var(--text-main, #1e1b2e)'
         },
         title: `${p.name}: ${memoText}`
       }, memoText);
@@ -968,7 +1009,7 @@ export function SummaryList({
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
     "data-no-press-feedback": true,
     style: {
-      color: '#7C3AED',
+      color: 'var(--v2-accent, #7C3AED)',
       marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -996,8 +1037,9 @@ export function SummaryList({
     const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
-    const ddayLabel = isPast ? '지난 모임' : (() => {
+    const ddayLabel = (() => {
       const dday = calculateDday(d);
+      if (isPast) return `D+${Math.abs(dday)}`;
       return dday <= 0 ? 'D-DAY' : `D-${dday}`;
     })();
     return /*#__PURE__*/React.createElement("button", {
@@ -1035,7 +1077,7 @@ export function SummaryList({
     }, ddayLabel)), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '6px',
         flexWrap: 'wrap'
       }
@@ -1045,8 +1087,9 @@ export function SummaryList({
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
+      return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
         key: e.participantId || p.id,
+        text: memoText,
         className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
         style: isPast ? {
           backgroundColor: 'transparent',
@@ -1056,7 +1099,7 @@ export function SummaryList({
           boxShadow: 'none'
         } : {
           backgroundColor: p.color,
-          color: getContrastTextColor(p.color)
+          color: 'var(--text-main, #1e1b2e)'
         },
         title: `${p.name}: ${memoText}`
       }, memoText);
@@ -1341,6 +1384,19 @@ export function HistoryView({
     setSelectedMemoryGroupId(null);
     pushHistoryState(tab);
   };
+  // Leaving 보관함 drops its own URL params. Navigation elsewhere keeps the rest of the query, so
+  // a lingering historyTab=meetings made the next visit (from the side menu too) open on 지난모임
+  // instead of 추억. A deep link that already carries historyTab still opens that tab.
+  React.useEffect(() => () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('historyTab') && !params.has('memory')) return;
+      params.delete('historyTab');
+      params.delete('memory');
+      const qs = params.toString();
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+    } catch (_) {}
+  }, []);
   React.useEffect(() => {
     const handleHistoryPopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -1449,14 +1505,24 @@ export function HistoryView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const [, setV2SlotRenderTick] = React.useState(0);
+  React.useEffect(() => {
+    if (v2Embed && typeof document !== 'undefined') {
+      const el = document.getElementById('v2-archive-header-tabs-slot');
+      if (el) setV2SlotRenderTick(t => t + 1);
+    }
+  }, [v2Embed]);
   // 갤러리 페이지(ContentView/PhotoGallery)와 동일하게 헤더 실측 높이만 예약한다 -- 여기만 별도
   // 여유를 더하면 탭 페이지마다 헤더 아래 여백이 달라 보인다(문제로 지적됨).
-  const historyScrollPadTop = isHeaderVisible
-    ? `calc(${Math.max(headerStackHeight, 56)}px + env(safe-area-inset-top, 0px))`
-    : 'calc(12px + env(safe-area-inset-top, 0px))';
+  const historyScrollPadTop = v2Embed
+    ? '0px'
+    : (isHeaderVisible
+      ? `calc(${Math.max(headerStackHeight, 56)}px + env(safe-area-inset-top, 0px))`
+      : 'calc(12px + env(safe-area-inset-top, 0px))');
   const historyScrollStyle = {
     flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
-    WebkitOverflowScrolling: 'touch', padding: `${historyScrollPadTop} 16px 16px`
+    WebkitOverflowScrolling: 'touch',
+    ...(v2Embed ? {} : { padding: `${historyScrollPadTop} 16px 16px` })
   };
     const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -1583,6 +1649,9 @@ export function HistoryView({
           const mediaKey = photo.mediaKey
             || (photo.sourceMessageId && sourceImageIndex != null ? `chat:${photo.sourceMessageId}:${sourceImageIndex}` : `meeting-index:${date}:${photo.id || index}`);
           const refKey = photo.refKey || `meeting-index:${photo.id || `${date}:${index}`}`;
+          const assetKey = photo.assetKey && String(photo.assetKey).startsWith('asset:v1:')
+            ? photo.assetKey
+            : canonicalPhotoAssetKey({ full: full || thumb, thumb: thumb || full, imageUrl: full || thumb });
           entries.push({
             full: full || thumb,
             thumb: thumb || full,
@@ -1597,7 +1666,10 @@ export function HistoryView({
             source: 'meeting',
             meetingDate: date,
             mediaKey,
-            refKey
+            refKey,
+            assetKey,
+            slotKey: mediaKey,
+            legacyKeys: [mediaKey, refKey].filter(key => key && key !== assetKey)
           });
         });
       });
@@ -1623,6 +1695,14 @@ export function HistoryView({
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
   const [memoryViewMode, setMemoryViewMode] = React.useState('all');
   const [collapsedMemoryDates, setCollapsedMemoryDates] = React.useState(() => new Set());
+  // A confirmed-meeting card with 2+ registered places shows only the most recent one by
+  // default, with a "N개 장소 더보기" toggle to reveal the rest -- keyed by meeting date.
+  const [expandedMeetingPlaceDates, setExpandedMeetingPlaceDates] = React.useState(() => new Set());
+  const toggleMeetingPlacesExpanded = date => setExpandedMeetingPlaceDates(prev => {
+    const next = new Set(prev);
+    if (next.has(date)) next.delete(date); else next.add(date);
+    return next;
+  });
   const [isMemoryListEditMode, setIsMemoryListEditMode] = React.useState(false);
   const [selectedMemoryGroupIds, setSelectedMemoryGroupIds] = React.useState(() => new Set());
   const [isMemoryAddModalOpen, setIsMemoryAddModalOpen] = React.useState(false);
@@ -1768,7 +1848,7 @@ export function HistoryView({
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
     // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
-    return (anniversaries || [])
+    return assignPhotosToSingleMemory((anniversaries || [])
       .filter(a => a && (a.startDate || a.date) && !a.hiddenFromMemories)
       .map(a => {
         const start = a.startDate || a.date;
@@ -1784,7 +1864,8 @@ export function HistoryView({
         const photos = photosInRange.filter(entry => !isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
         const excludedPhotos = photosInRange.filter(entry => isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
         return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos, excludedPhotos };
-      })
+      }), getPhotoAssetCommentKey)
+      // 겹치는 추억(예: 여행 기간 중 하루짜리 축제)에서는 사진이 더 구체적인 한 곳에만 보인다.
       // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
@@ -1923,14 +2004,12 @@ export function HistoryView({
       style: {
         position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
         border: isChecked ? '2px solid var(--accent-primary)' : 'none', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-card)'
-      }
+      },
+      className: 'archive-photo-cell'
     },
       /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
       cover
-        ? /*#__PURE__*/React.createElement("img", {
-            src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
-            style: { width: '100%', height: '100%', objectFit: 'cover' }
-          })
+        ? /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: group.photos })
         : /*#__PURE__*/React.createElement("div", {
             style: {
               width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2025,14 +2104,11 @@ export function HistoryView({
       const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
       return /*#__PURE__*/React.createElement("button", {
         key: photoKey, type: "button",
-        className: commentCount ? 'gallery-comment-heartbeat' : '',
+        className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
         onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
         style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
       },
-        /*#__PURE__*/React.createElement("img", {
-          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-          style: { width: '100%', height: '100%', objectFit: 'cover' }
-        }),
+        /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
         PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
         checkable && (EditSelectCheckbox
           ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
@@ -2053,79 +2129,76 @@ export function HistoryView({
     }))
   );
 
-  return /*#__PURE__*/React.createElement("div", {
-    className: "places-view-container",
-    style: {
-      position: v2Embed ? 'relative' : 'fixed',
-      top: v2Embed ? undefined : 0,
-      left: v2Embed ? undefined : 0,
-      right: v2Embed ? undefined : 0,
-      bottom: v2Embed ? undefined : 0,
+  const v2ArchiveTabsSlot = v2Embed && typeof document !== 'undefined'
+    ? document.getElementById('v2-archive-header-tabs-slot')
+    : null;
+  const historyHeaderStackEl = /*#__PURE__*/React.createElement("div", {
+    ref: headerStackRef,
+    className: "history-header-stack",
+    style: v2Embed ? undefined : {
+      position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
       backgroundColor: 'var(--bg-primary)',
-      display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflow: 'hidden',
-      height: v2Embed ? '100%' : undefined,
-      minHeight: v2Embed ? '100%' : undefined,
-      zIndex: v2Embed ? 1 : undefined,
+      transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
   },
+  !v2Embed && /*#__PURE__*/React.createElement("div", {
+    className: "places-view-header",
+    style: {
+      position: 'relative', height: '56px',
+      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 16px', flexShrink: 0
+    }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button", onClick: onBack, "aria-label": "뒤로가기",
+      style: PAGE_HEADER_BACK_BTN_STYLE
+    }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
     /*#__PURE__*/React.createElement("div", {
-      ref: headerStackRef,
-      className: "history-header-stack",
-      style: {
-        // iOS 홈화면 설치(standalone) 상태에서는 상태바 영역까지 콘텐츠가 그려지므로, top:0
-        // 대신 env(safe-area-inset-top)만큼 아래로 밀어야 상태바 아이콘과 겹치지 않고 버튼도
-        // 눌린다. 일반 브라우저 탭에서는 이 값이 0이라 동작 변화 없음.
-        position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)', left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1010,
-        backgroundColor: 'var(--bg-primary)',
-        transition: 'transform 0.3s ease',
-        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
-      }
-    },
-    /*#__PURE__*/React.createElement("div", {
-      className: "places-view-header",
-      style: {
-        position: 'relative', height: '56px',
-        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', flexShrink: 0
-      }
-    },
+      style: PAGE_HEADER_TITLE_STYLE
+    }, calendar.title + " 보관함"),
+    /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
       /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: PAGE_HEADER_BACK_BTN_STYLE
-      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
-      /*#__PURE__*/React.createElement("div", {
-        style: PAGE_HEADER_TITLE_STYLE
-      }, v2Embed ? '보관함' : (calendar.title + " 보관함")),
-      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
-      )
-    ),
-    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
-      value: searchQuery,
-      placeholder: "날짜·참여자·메모·장소 검색...",
-      onChange: e => setSearchQuery(e.target.value),
-      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
-    }),
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "보관함 탭",
-      value: historyTab,
-      onChange: changeHistoryTab,
-      options: [
-        { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
-        { value: 'people', label: '인물', badge: personTagChips.length },
-        { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
-      ]
-    })
-    ), // end history-header-stack
+        type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
+        style: PAGE_HEADER_ICON_BTN_STYLE
+      }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
+        style: PAGE_HEADER_ICON_BTN_STYLE
+      }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
+    )
+  ),
+  isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    value: searchQuery,
+    placeholder: "날짜·참여자·메모·장소 검색...",
+    onChange: e => setSearchQuery(e.target.value),
+    onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
+  }),
+  UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+    ariaLabel: "보관함 탭",
+    value: historyTab,
+    onChange: changeHistoryTab,
+    activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
+    options: [
+      { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
+      { value: 'people', label: '인물', badge: personTagChips.length },
+      { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
+    ]
+  })
+  );
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: v2Embed ? { height: '100%', minHeight: '100%' } : {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflow: 'hidden'
+    }
+  },
+    v2ArchiveTabsSlot && ReactDOM?.createPortal
+      ? ReactDOM.createPortal(historyHeaderStackEl, v2ArchiveTabsSlot)
+      : (!v2Embed ? historyHeaderStackEl : null),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid history-page-scroll",
       onScroll: handleHistoryScroll,
@@ -2140,16 +2213,16 @@ export function HistoryView({
         const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
         const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
         const isPast = d < todayStr;
-        const ddayLabel = isPast ? '지난 모임' : (() => {
+        const ddayLabel = (() => {
           const dday = calculateDday(d);
+          if (isPast) return `D+${Math.abs(dday)}`;
           return dday <= 0 ? 'D-DAY' : `D-${dday}`;
         })();
         const datePlaces = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d));
         return /*#__PURE__*/React.createElement("button", {
           key: d,
           className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
-          onClick: () => onSelectDate(d),
-          style: { flexDirection: 'column', alignItems: 'flex-start' }
+          onClick: () => onSelectDate(d)
         },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' } },
             /*#__PURE__*/React.createElement("span", {
@@ -2165,23 +2238,28 @@ export function HistoryView({
               const memoUrl = extractFirstUrl(e.note);
               const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
               if (!memoText) return null;
-              return /*#__PURE__*/React.createElement("span", {
+              return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
                 key: e.participantId || p.id,
+                text: memoText,
                 className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
                 style: isPast
-                  ? { backgroundColor: 'transparent', background: 'transparent', color: p.color, border: `1px solid ${p.color}`, boxShadow: 'none' }
-                  : { backgroundColor: p.color, color: getContrastTextColor(p.color) },
+                  ? { color: p.color }
+                  : { backgroundColor: p.color, color: 'var(--text-main, #1e1b2e)' },
                 title: `${p.name}: ${memoText}`
               }, highlightKeyword(memoText, searchQuery));
             })
           ),
-          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", {
+          datePlaces.length > 0 && (() => {
+            const isPlacesExpanded = expandedMeetingPlaceDates.has(d);
+            const visibleDatePlaces = isPlacesExpanded ? datePlaces : datePlaces.slice(0, 1);
+            const hiddenPlaceCount = datePlaces.length - visibleDatePlaces.length;
+            return /*#__PURE__*/React.createElement("div", {
             style: {
-              display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%',
+              display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'auto', paddingTop: '6px', width: '100%',
               ...(isPast ? {} : { mixBlendMode: 'luminosity' })
             }
           },
-            datePlaces.map(place => {
+            visibleDatePlaces.map(place => {
               const mapUrl = getKakaoMapLinkUrl(place);
               const placeName = place.alias || place.name;
               const address = place.address ? getDisplayPlaceAddress(place) : '';
@@ -2190,13 +2268,11 @@ export function HistoryView({
                 className: "place-memo-stack",
                 style: {
                   display: 'flex', alignItems: 'flex-start', gap: '6px',
-                  backgroundColor: isPast ? 'transparent' : '#333',
-                  borderRadius: isPast ? 0 : 'var(--radius-md)',
-                  borderTop: isPast ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+                  backgroundColor: isPast ? '#d4dce8' : '#333',
                   padding: '7px 10px', width: '100%', boxSizing: 'border-box'
                 }
               },
-                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: '#7C3AED' } }),
+                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: 'var(--v2-accent, #7C3AED)' } }),
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
                   mapUrl
                     ? /*#__PURE__*/React.createElement("a", {
@@ -2208,8 +2284,33 @@ export function HistoryView({
                   address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: isPast ? 'var(--text-muted)' : '#fff', wordBreak: 'break-word' } }, highlightKeyword(address, searchQuery))
                 )
               );
-            })
-          )
+            }),
+            // The whole card is a <button> (date-item-btn), so this toggle is a role="button"
+            // span rather than a nested <button> -- nesting interactive buttons is invalid HTML
+            // and browsers will hoist the inner one out of the DOM, corrupting the card layout.
+            (hiddenPlaceCount > 0 || isPlacesExpanded) && /*#__PURE__*/React.createElement("span", {
+              role: "button",
+              tabIndex: 0,
+              onClick: e => { e.stopPropagation(); toggleMeetingPlacesExpanded(d); },
+              onKeyDown: e => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.stopPropagation();
+                e.preventDefault();
+                toggleMeetingPlacesExpanded(d);
+              },
+              style: {
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                cursor: 'pointer', padding: '4px 0',
+                fontSize: 'var(--font-size-sm)', fontWeight: 700,
+                color: isPast ? 'var(--text-muted)' : 'rgba(255,255,255,0.8)'
+              }
+            }, hiddenPlaceCount > 0 ? `${hiddenPlaceCount}개 장소 더보기` : '접기', /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+              fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round",
+              style: { transform: hiddenPlaceCount > 0 ? 'none' : 'rotate(180deg)' }
+            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
+          );
+          })()
         );
       })
     ),
@@ -2222,7 +2323,7 @@ export function HistoryView({
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
+        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px', ...(v2Embed ? { padding: '4px 0 2px' } : {}) }
       },
         (!isMemoryListEditMode || !isMobile) && renderMemoryAllDateToggle(),
         /*#__PURE__*/React.createElement("div", {
@@ -2369,7 +2470,7 @@ export function HistoryView({
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
-    }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
+    }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
       // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
@@ -2397,7 +2498,7 @@ export function HistoryView({
           onClick: handleAddPersonTagClick,
           style: {
             flexShrink: 0, height: '40px', padding: '0 16px', borderRadius: 'var(--radius-md)',
-            border: 'none', background: 'var(--accent-gradient)', color: '#fff',
+            border: 'none', background: 'var(--v2-accent-fill, var(--accent-gradient))', color: 'var(--v2-on-accent, #fff)',
             fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
             opacity: (isAddingPersonTag || !newPersonTag.trim()) ? 0.5 : 1
           }
@@ -2419,14 +2520,12 @@ export function HistoryView({
                 style: {
                   position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                   border: 'none', padding: 0, cursor: 'pointer', backgroundColor: tag.color
-                }
+                },
+                className: 'archive-photo-cell'
               },
                 /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(tagPhotos.length)),
                 cover
-                  ? /*#__PURE__*/React.createElement("img", {
-                      src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
-                      style: { width: '100%', height: '100%', objectFit: 'cover' }
-                    })
+                  ? /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: tagPhotos })
                   : /*#__PURE__*/React.createElement("div", {
                       style: {
                         width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2452,7 +2551,7 @@ export function HistoryView({
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
-    }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+    }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-detail", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setSelectedPersonTag(null), "aria-label": "인물 목록으로",
@@ -2534,14 +2633,11 @@ export function HistoryView({
             return /*#__PURE__*/React.createElement("button", {
               key: photo.mediaKey || photo.refKey || `person_${idx}`,
               type: "button",
-              className: commentCount ? 'gallery-comment-heartbeat' : '',
+              className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
               onClick: () => openHistoryLightbox(photosForPersonTag, idx),
               style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
             },
-              /*#__PURE__*/React.createElement("img", {
-                src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-                style: { width: '100%', height: '100%', objectFit: 'cover' }
-              }),
+              /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
               PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
             );
           })
@@ -2656,13 +2752,6 @@ export function ContentView({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const [editingContentItem, setEditingContentItem] = React.useState(null);
-  // v2 shell (PC): side-nav's per-tab submenu needs 컨텐츠 등록 -- otherwise only reachable via
-  // this component's own asPage 메뉴 overlay, which v2 always redirects to the side-nav drawer.
-  React.useEffect(() => {
-    if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); } });
-    return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions]);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
   const VALID_CONTENT_TABS = ['festival', 'culture', 'sports', 'movies'];
   const [contentTab, setContentTab] = React.useState(() => {
@@ -2737,7 +2826,7 @@ export function ContentView({
         // 쓰지만, AnniversaryModal에서 직접 첨부한 사진은 a.photos 배열(url/thumbUrl)에 저장되어
         // a.image는 항상 비어 있다. a.image가 없을 때는 첫 번째 첨부 사진으로 대체해야
         // 사용자가 직접 올린 사진이 있는데도 "포스터 없음"으로 나오는 걸 막을 수 있다.
-        image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
+        image: culturePosterUrl(a)
       }));
   }, [anniversaries]);
 
@@ -2751,19 +2840,31 @@ export function ContentView({
   // "Maximum update depth exceeded" and continuous CPU/battery drain with no other visible symptom,
   // which is exactly why it went unnoticed).
   const performanceExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'performance'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'performance')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'performance'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'performance')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
   const festivalExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'festival'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'festival')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'festival'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'festival')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
   const sportsExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'sports'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'sports')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'sports'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'sports')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
   const movieExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'movie'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'movie')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'movie'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'movie')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
 
@@ -2806,6 +2907,17 @@ export function ContentView({
     setGridCols(next);
     try { localStorage.setItem(CULTURE_GRID_COLS_STORAGE_KEY, next); } catch (_) { /* best-effort */ }
   };
+  // v2 page header: 지역설정 / 컨텐츠등록 / 그리드·리스트 토글
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({
+      register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); },
+      openRegion: () => setIsRegionFilterOpen(true),
+      setGridCols: persistGridCols,
+      gridCols
+    });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions, gridCols]);
   const handleUseCurrentLocation = () => {
     if (isLocating) return;
     setIsLocating(true);
@@ -2930,75 +3042,24 @@ export function ContentView({
     return () => ro.disconnect();
   }, []);
   const [chipRowSlot, setChipRowSlot] = React.useState(null);
-  const contentPaddingTop = isHeaderVisible
-    ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
-    : `calc(12px + env(safe-area-inset-top, 0px))`;
-
-  return /*#__PURE__*/React.createElement("div", {
-    className: "places-view-container",
-    style: {
-      position: v2Embed ? 'relative' : 'fixed',
-      top: v2Embed ? undefined : 0,
-      left: v2Embed ? undefined : 0,
-      right: v2Embed ? undefined : 0,
-      bottom: v2Embed ? undefined : 0,
-      backgroundColor: 'var(--bg-primary)',
-      display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflow: 'hidden',
-      height: v2Embed ? '100%' : undefined,
-      minHeight: v2Embed ? '100%' : undefined,
-      zIndex: v2Embed ? 1 : undefined,
+  const [, setV2ContentSlotTick] = React.useState(0);
+  React.useEffect(() => {
+    if (v2Embed && typeof document !== 'undefined') {
+      const el = document.getElementById('v2-content-header-tabs-slot');
+      if (el) setV2ContentSlotTick(t => t + 1);
     }
-  },
-    /*#__PURE__*/React.createElement("div", {
-      ref: headerStackRef,
-      className: "history-header-stack",
-      style: {
-        position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)', left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1010,
-        backgroundColor: 'var(--bg-primary)',
-        transition: 'transform 0.3s ease',
-        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
-      }
-    },
-    /*#__PURE__*/React.createElement("div", {
-      className: "places-view-header",
-      style: {
-        position: 'relative', height: '56px',
-        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', flexShrink: 0
-      }
-    },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: PAGE_HEADER_BACK_BTN_STYLE
-      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
-      /*#__PURE__*/React.createElement("div", {
-        style: PAGE_HEADER_TITLE_STYLE
-      }, v2Embed ? '컨텐츠' : (calendar.title + " 컨텐츠")),
-      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
-      )
-    ),
-    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
-      value: searchQuery,
-      placeholder: "제목으로 검색...",
-      onChange: e => setSearchQuery(e.target.value),
-      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
-    }),
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "컨텐츠 탭",
-      value: contentTab,
-      onChange: changeContentTab,
-      options: contentTabOptions
-    }),
+  }, [v2Embed]);
+  const v2ContentTabsSlot = v2Embed && typeof document !== 'undefined'
+    ? document.getElementById('v2-content-header-tabs-slot')
+    : null;
+
+  const contentPaddingTop = v2Embed
+    ? 0
+    : (isHeaderVisible
+      ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
+      : `calc(12px + env(safe-area-inset-top, 0px))`);
+
+  const regionFilterToolbar = /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       className: "region-filter-trigger-row"
     },
@@ -3071,9 +3132,97 @@ export function ContentView({
         className: "region-filter-reset-btn",
         onClick: resetRegionSelections
       }, "초기화")
+    )
+  );
+
+  const regionBadgesOnly = regionSelections.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "region-selection-badges-row"
+  },
+    regionSelections.map((sel, idx) => /*#__PURE__*/React.createElement(RegionSelectionBadge, {
+      key: `${sel.sido}::${sel.gugun}`,
+      sel,
+      onRemove: () => removeRegionSelection(idx)
+    })),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "region-filter-reset-btn",
+      onClick: resetRegionSelections
+    }, "초기화")
+  ) : null;
+
+  const contentHeaderStackEl = /*#__PURE__*/React.createElement("div", {
+    ref: headerStackRef,
+    className: "history-header-stack",
+    style: v2Embed ? undefined : {
+      position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
+      backgroundColor: 'var(--bg-primary)',
+      transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+    }
+  },
+    !v2Embed && /*#__PURE__*/React.createElement("div", {
+      className: "places-view-header",
+      style: {
+        position: 'relative', height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', flexShrink: 0
+      }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: onBack, "aria-label": "뒤로가기",
+        style: PAGE_HEADER_BACK_BTN_STYLE
+      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
+      /*#__PURE__*/React.createElement("div", {
+        style: PAGE_HEADER_TITLE_STYLE
+      }, calendar.title + " 컨텐츠"),
+      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
+      )
     ),
-    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot })
-    ), // end history-header-stack
+    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: searchQuery,
+      placeholder: "제목으로 검색...",
+      onChange: e => setSearchQuery(e.target.value),
+      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
+    }),
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "컨텐츠 탭",
+      value: contentTab,
+      onChange: changeContentTab,
+      activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
+      options: contentTabOptions
+    }),
+    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot, className: "v2-content-subcat-slot" }),
+    !v2Embed && regionFilterToolbar
+  );
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: {
+      position: v2Embed ? 'relative' : 'fixed',
+      top: v2Embed ? undefined : 0,
+      left: v2Embed ? undefined : 0,
+      right: v2Embed ? undefined : 0,
+      bottom: v2Embed ? undefined : 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflow: 'hidden',
+      height: v2Embed ? '100%' : undefined,
+      minHeight: v2Embed ? '100%' : undefined,
+      zIndex: v2Embed ? 1 : undefined,
+    }
+  },
+    v2ContentTabsSlot && ReactDOM?.createPortal
+      ? ReactDOM.createPortal(contentHeaderStackEl, v2ContentTabsSlot)
+      : (!v2Embed ? contentHeaderStackEl : null),
     /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
       isOpen: isRegionFilterOpen,
       onClose: () => setIsRegionFilterOpen(false),
@@ -3083,37 +3232,22 @@ export function ContentView({
       onReset: resetRegionSelections,
       items: regionFilterItems
     }),
-    contentTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
-      emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "event",
-      extraItems: performanceExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
-    contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
-      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "festival",
-      extraItems: festivalExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
-    contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
-      emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "sports",
-      extraItems: sportsExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
-    contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
-      emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "movie", extraItems: movieExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
+    (() => {
+      const cfg = {
+        culture: { dataUrl: CULTURE_PERFORMANCES_URL, emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", anniversaryCategory: "event", extraItems: performanceExtraItems },
+        festival: { dataUrl: CULTURE_FESTIVALS_URL, emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", anniversaryCategory: "festival", extraItems: festivalExtraItems },
+        sports: { dataUrl: CULTURE_SPORTS_URL, emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", anniversaryCategory: "sports", extraItems: sportsExtraItems },
+        movies: { dataUrl: CULTURE_MOVIES_URL, emptyLabel: "등록된 영화가 없습니다.", anniversaryCategory: "movie", extraItems: movieExtraItems },
+      }[contentTab];
+      return cfg ? /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+        calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo,
+        regionSelections, onItemsLoaded: setRegionFilterItems,
+        chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+        gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor,
+        topToolbar: v2Embed ? regionBadgesOnly : null,
+        ...cfg
+      }) : null;
+    })(),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
       isOpen: isMenuOpen,
@@ -3145,6 +3279,7 @@ export function ContentView({
       onOpenAppSettings
     }),
     isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
+      calendar: calendar,
       onClose: () => { setIsContentRegisterOpen(false); setEditingContentItem(null); },
       onSave: onSaveCustomCultureItem,
       showToast: showToast,
@@ -3345,14 +3480,17 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
   };
 
   const sheet = /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet-overlay",
+    className: "modal-overlay region-filter-overlay",
     onClick: e => { e.stopPropagation(); onClose(); }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet region-filter-sheet",
+    className: "modal-container region-filter-sheet",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "지역 설정",
     onClick: e => e.stopPropagation()
   },
-    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
-      /*#__PURE__*/React.createElement("h4", null, "지역 설정"),
+    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+      /*#__PURE__*/React.createElement("h3", null, "지역 설정"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
         selections.length > 0 && /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -3366,7 +3504,7 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
         }, "✕")
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body region-filter-body" },
+    /*#__PURE__*/React.createElement("div", { className: "modal-body region-filter-body" },
       /*#__PURE__*/React.createElement("div", { className: "region-filter-search-row" },
         /*#__PURE__*/React.createElement("input", {
           type: "text",
@@ -3418,7 +3556,7 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
         )
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-footer" },
+    /*#__PURE__*/React.createElement("div", { className: "modal-footer region-filter-footer" },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "region-filter-save-btn",
@@ -3503,17 +3641,102 @@ function filterCultureItemsByRegion(items, regionSelections, category) {
   }));
 }
 
+function culturePosterUrl(item) {
+  if (!item || typeof item !== 'object') return '';
+  const photos = Array.isArray(item.photos) ? item.photos : [];
+  const photo = photos.find(entry => entry && (entry.thumbUrl || entry.url || entry.imageUrl || entry.image)) || null;
+  const candidates = [
+    item.thumbUrl,
+    item.image,
+    item.imageUrl,
+    item.posterUrl,
+    item.poster,
+    item.thumbnailUrl,
+    photo && (photo.thumbUrl || photo.url || photo.imageUrl || photo.image)
+  ];
+  for (const value of candidates) {
+    const url = String(value || '').trim();
+    if (url && url !== 'undefined' && url !== 'null') return url;
+  }
+  return '';
+}
+
+function mergeCultureItemPreferPoster(base, overlay) {
+  const poster = culturePosterUrl(overlay) || culturePosterUrl(base);
+  const merged = { ...(base || {}), ...(overlay || {}) };
+  if (poster) {
+    merged.image = poster;
+    if (!merged.imageUrl) merged.imageUrl = poster;
+    if (!merged.thumbUrl) merged.thumbUrl = poster;
+  }
+  return merged;
+}
+
+// Anniversary-derived cards and a later custom save of the same event used to
+// both render. The anniversary card has no poster, so it covered the upload.
+function dedupeCultureExtras(items) {
+  const records = [];
+  const idIndex = new Map();
+  const titleIndex = new Map();
+  (Array.isArray(items) ? items : []).forEach(item => {
+    if (!item) return;
+    const title = String(item.title || '').trim();
+    const id = item.id ? String(item.id) : '';
+    const index = (id && idIndex.has(id)) ? idIndex.get(id)
+      : (title && titleIndex.has(title) ? titleIndex.get(title) : -1);
+    if (index < 0) {
+      const next = records.length;
+      const poster = culturePosterUrl(item);
+      records.push(poster ? { ...item, image: poster } : item);
+      if (id) idIndex.set(id, next);
+      if (title) titleIndex.set(title, next);
+      return;
+    }
+    const merged = mergeCultureItemPreferPoster(records[index], item);
+    records[index] = merged;
+    const mergedId = merged && merged.id ? String(merged.id) : '';
+    if (id) idIndex.set(id, index);
+    if (mergedId) idIndex.set(mergedId, index);
+    if (title) titleIndex.set(title, index);
+  });
+  return records;
+}
+
 // Crawled snapshot + same-titled extras de-dupe (orphans omitted -- they only exist after the
 // active tab has loaded anniversaries against that feed). Used for cross-tab search badges so
 // ContentView can score every tab without mounting four CulturePerformancesTab instances.
 function mergeCultureCrawledWithExtras(crawledItems, extraItems) {
   const crawled = Array.isArray(crawledItems) ? crawledItems.filter(Boolean) : [];
-  const crawledTitles = new Set(crawled.map(i => String(i.title || '').trim()).filter(Boolean));
-  const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
-    .filter(e => !crawledTitles.has(String(e.title || '').trim()))
-    .map(e => ({ ...e, isCustomRegistered: true }));
-  const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
-  return [...extras, ...crawled.filter(i => i && i.id && !seen.has(i.id))];
+  const extrasRaw = dedupeCultureExtras(Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
+  const extrasById = new Map();
+  const extrasByTitle = new Map();
+  extrasRaw.forEach(e => {
+    if (e && e.id) extrasById.set(e.id, e);
+    const title = String(e && e.title || '').trim();
+    if (title) extrasByTitle.set(title, e);
+  });
+  const usedExtraIds = new Set();
+  const result = [];
+  extrasRaw.forEach(e => {
+    if (!e) return;
+    const title = String(e.title || '').trim();
+    const matchesCrawled = crawled.some(i => i && (i.id === e.id || String(i.title || '').trim() === title));
+    if (matchesCrawled) return;
+    result.push({ ...e, isCustomRegistered: true });
+    if (e.id) usedExtraIds.add(e.id);
+  });
+  crawled.forEach(i => {
+    if (!i || !i.id || usedExtraIds.has(i.id)) return;
+    const title = String(i.title || '').trim();
+    const custom = extrasById.get(i.id) || (title ? extrasByTitle.get(title) : null);
+    if (custom) {
+      if (custom.id) usedExtraIds.add(custom.id);
+      result.push(mergeCultureItemPreferPoster({ ...i, isCustomRegistered: true }, custom));
+    } else {
+      result.push(i);
+    }
+  });
+  return result;
 }
 
 function countCultureSearchMatches(crawledItems, extraItems, anniversaryCategory, regionSelections, searchQuery) {
@@ -3679,7 +3902,29 @@ function parseGatherContentClipboardText(text) {
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
-function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
+
+function renderOutlineTablerIcon(name, size = 16) {
+  const def = TABLER_ICONS[name];
+  const html = def && (def.off || def.on);
+  if (!html) return null;
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+    style: { display: 'block', flexShrink: 0 },
+    dangerouslySetInnerHTML: { __html: html }
+  });
+}
+
+function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3701,6 +3946,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   const [link, setLink] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [image, setImage] = React.useState('');
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState(null);
+  const fileInputRef = React.useRef(null);
   const [price, setPrice] = React.useState('');
   const [contact, setContact] = React.useState('');
   const [director, setDirector] = React.useState('');
@@ -3715,7 +3963,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     setKind(['festival', 'sports', 'movie'].includes(nextKind) ? nextKind : 'performance');
     setTitle(initialItem.title || ''); setStartDate(initialItem.releaseDate || initialItem.startDate || '');
     setEndDate(initialItem.endDate || ''); setVenue(initialItem.venue || ''); setAddress(initialItem.address || '');
-    setLink(initialItem.link || ''); setDescription(initialItem.description || ''); setImage(initialItem.image || '');
+    setLink(initialItem.link || ''); setDescription(initialItem.description || ''); setImage(culturePosterUrl(initialItem));
     setPrice(initialItem.price || ''); setContact(initialItem.contact || ''); setDirector(initialItem.director || '');
     setCast(Array.isArray(initialItem.cast) ? initialItem.cast.join(', ') : (initialItem.cast || ''));
     setRating(initialItem.ageRating || ''); setAudience(initialItem.audienceCount || ''); setBookingRate(initialItem.bookingRate || '');
@@ -3734,7 +3982,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     setAddress(item.address || '');
     setLink(item.link || '');
     setDescription(item.description || '');
-    setImage(item.image || '');
+    setImage(culturePosterUrl(item));
     setPrice(item.price || '');
     setContact(item.contact || '');
     setDirector(item.director || '');
@@ -3755,14 +4003,153 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     applyPastedContent(item);
     if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
   };
+
+  const handleProcessAndUploadImage = async (file) => {
+    if (!file) return;
+    if (!/^image\//i.test(file.type || '') && !file.name?.toLowerCase().endsWith('.heic')) {
+      if (typeof showToast === 'function') showToast('이미지 파일만 업로드할 수 있습니다.', 'error');
+      return;
+    }
+    setUploadingImage(true);
+    setUploadProgress({ pct: 10, text: '이미지 최적화 중...' });
+    try {
+      const deps = window.GATHER_UI_DEPS || {};
+      const utils = window.GATHER_APP_UTILS || {};
+      const processImages = deps.processImageFilesSequentially || utils.processImageFilesSequentially;
+      const resolveBatch = deps.resolveAnniversaryImageBatch || utils.resolveAnniversaryImageBatch || deps.resolveMemoImageBatch || utils.resolveMemoImageBatch;
+
+      let processed = null;
+      if (typeof processImages === 'function') {
+        const { succeeded } = await processImages([file], p => {
+          if (p && p.total) {
+            setUploadProgress({ pct: Math.round((p.current / p.total) * 45), text: '이미지 압축 중...' });
+          }
+        });
+        if (succeeded && succeeded.length > 0) {
+          processed = succeeded;
+        }
+      }
+
+      if (!processed || processed.length === 0) {
+        const reader = new FileReader();
+        const dataUrl = await new Promise(resolve => {
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+        if (dataUrl) {
+          setImage(dataUrl);
+          if (typeof showToast === 'function') showToast('이미지가 등록되었습니다.', 'success');
+        }
+        return;
+      }
+
+      setUploadProgress({ pct: 50, text: '업로드 중...' });
+      const calId = calendar?.id || 'common';
+      let uploadResult = null;
+      if (typeof resolveBatch === 'function') {
+        const res = await resolveBatch(calId, processed, p => {
+          if (p && typeof p.pct === 'number') {
+            setUploadProgress({ pct: Math.min(99, 50 + Math.round(p.pct * 0.49)), text: `업로드 중... ${p.pct}%` });
+          }
+        });
+        if (res && res[0]) {
+          uploadResult = res[0].imageUrl || res[0].thumbUrl || res[0].original;
+        }
+      }
+
+      if (!uploadResult) {
+        uploadResult = processed[0].original || processed[0].thumbnail;
+      }
+
+      if (uploadResult) {
+        setImage(uploadResult);
+        if (typeof showToast === 'function') showToast('이미지가 등록되었습니다.', 'success');
+      } else {
+        if (typeof showToast === 'function') showToast('이미지 업로드에 실패했습니다.', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+      if (typeof showToast === 'function') showToast('이미지 업로드 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setUploadingImage(false);
+      setUploadProgress(null);
+    }
+  };
+
+  const handleProcessAndUploadImageRef = React.useRef(handleProcessAndUploadImage);
+  handleProcessAndUploadImageRef.current = handleProcessAndUploadImage;
+
+  const handlePasteEvent = async (e) => {
+    const deps = window.GATHER_UI_DEPS || {};
+    const utils = window.GATHER_APP_UTILS || {};
+    const getFiles = deps.getImageFilesFromClipboardEvent || utils.getImageFilesFromClipboardEvent;
+    let files = [];
+    if (typeof getFiles === 'function') {
+      files = getFiles(e);
+    } else if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      files = Array.from(e.clipboardData.files).filter(f => /^image\//i.test(f.type));
+    }
+    if (files && files.length > 0) {
+      e.preventDefault();
+      await handleProcessAndUploadImageRef.current(files[0]);
+    }
+  };
+
+  const handleClickPaste = async () => {
+    try {
+      const deps = window.GATHER_UI_DEPS || {};
+      const utils = window.GATHER_APP_UTILS || {};
+      const readClipboard = deps.readClipboardImageFiles || utils.readClipboardImageFiles;
+      if (typeof readClipboard === 'function') {
+        const files = await readClipboard(showToast);
+        if (files && files.length > 0) {
+          await handleProcessAndUploadImage(files[0]);
+          return;
+        }
+      }
+      if (navigator?.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const file = new File([blob], `clipboard-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType });
+            await handleProcessAndUploadImage(file);
+            return;
+          }
+        }
+      }
+      if (typeof showToast === 'function') showToast('클립보드에 이미지가 없습니다. 복사 후 다시 시도해 주세요.', 'info');
+    } catch (err) {
+      console.warn('Clipboard read failed:', err);
+      if (typeof showToast === 'function') showToast('클립보드 접근 권한이 필요합니다. 사진을 복사한 뒤 영역에 Ctrl+V로 붙여넣어 주세요.', 'info');
+    }
+  };
+
   React.useEffect(() => {
-    const handlePaste = e => {
+    const handlePaste = async e => {
       const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
       const item = parseGatherContentClipboardText(text);
-      if (!item) return;
-      e.preventDefault();
-      applyPastedContent(item);
-      if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+      if (item) {
+        e.preventDefault();
+        applyPastedContent(item);
+        if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+        return;
+      }
+      const deps = window.GATHER_UI_DEPS || {};
+      const utils = window.GATHER_APP_UTILS || {};
+      const getFiles = deps.getImageFilesFromClipboardEvent || utils.getImageFilesFromClipboardEvent;
+      let files = [];
+      if (typeof getFiles === 'function') {
+        files = getFiles(e);
+      } else if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+        files = Array.from(e.clipboardData.files).filter(f => /^image\//i.test(f.type));
+      }
+      if (files && files.length > 0) {
+        e.preventDefault();
+        await handleProcessAndUploadImageRef.current(files[0]);
+      }
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
@@ -3791,6 +4178,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     const stamp = Date.now();
     const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_', movie: 'custom_movie_' };
     const prefix = idPrefixByKind[kind] || 'custom_perf_';
+    const poster = String(image || '').trim();
     const id = initialItem?.id || (prefix + stamp + '_' + Math.random().toString(36).slice(2, 8));
     const normalizedKind = ['festival', 'sports', 'movie'].includes(kind) ? kind : 'performance';
     const item = {
@@ -3804,7 +4192,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
       address: (address || '').trim(),
       link: (link || '').trim(),
       description: (description || '').trim(),
-      image: (image || '').trim(),
+      image: poster,
+      imageUrl: poster,
+      thumbUrl: poster,
       price: (price || '').trim(),
       contact: (contact || '').trim(),
       source: initialItem?.source || 'custom',
@@ -3850,21 +4240,24 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   if (typeof document === 'undefined' || !ReactDOM) return null;
   return ReactDOM.createPortal(
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
       onClick: () => !saving && onClose && onClose(),
-      style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 14000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+      style: { zIndex: 14000 }
     },
-      /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
+        className: "modal-container",
         onClick: e => e.stopPropagation(),
         role: "dialog",
         "aria-label": "컨텐츠 등록",
-        style: {
-          width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
-          backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '16px 16px 20px',
-          display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box'
-        }
+        style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }
       },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
+        /*#__PURE__*/React.createElement("div", {
+          className: "modal-header",
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
+        },
+          /*#__PURE__*/React.createElement("h3", {
+            style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }
+          }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
             !initialItem && /*#__PURE__*/React.createElement("button", {
               type: "button", onClick: handlePasteContentClick, disabled: saving,
@@ -3884,7 +4277,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
           ariaLabel: "컨텐츠 종류",
           value: kind,
           onChange: v => setKind(v),
-          style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
+          style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', height: '46px', flexShrink: 0 },
           options: [
             { value: 'performance', label: '문화공연' },
             { value: 'festival', label: '지역축제' },
@@ -3892,6 +4285,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
             { value: 'movie', label: '영화' }
           ]
         }),
+        /*#__PURE__*/React.createElement("div", {
+          className: "modal-body",
+          style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+        },
         field("제목 *", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
           placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : (kind === 'movie' ? "영화 제목" : "공연 제목")), maxLength: 120
@@ -3918,9 +4315,126 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
           className: "form-input", type: "url", value: link, onChange: e => setLink(e.target.value),
           placeholder: "https://", maxLength: 500
         })),
+        field("이미지 직접 등록 / 붙여넣기", /*#__PURE__*/React.createElement("div", {
+          onPaste: handlePasteEvent,
+          tabIndex: 0,
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '10px 12px',
+            border: '1px dashed var(--border-subtle, #E5E7EB)',
+            borderRadius: 'var(--radius-md, 8px)',
+            backgroundColor: 'var(--bg-primary, #F9FAFB)',
+            outline: 'none',
+            boxSizing: 'border-box'
+          }
+        },
+          /*#__PURE__*/React.createElement("input", {
+            ref: fileInputRef,
+            type: "file",
+            accept: "image/*",
+            style: { display: 'none' },
+            onChange: e => {
+              if (e.target.files && e.target.files[0]) {
+                handleProcessAndUploadImage(e.target.files[0]);
+              }
+              e.target.value = '';
+            }
+          }),
+          image ? /*#__PURE__*/React.createElement("div", {
+            style: { position: 'relative', width: '56px', height: '56px', flexShrink: 0 }
+          },
+            /*#__PURE__*/React.createElement("img", {
+              src: image,
+              alt: "미리보기",
+              onError: e => { e.target.style.display = 'none'; },
+              style: {
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: 'var(--radius-sm, 6px)',
+                border: '1px solid var(--border-subtle, #E5E7EB)',
+                backgroundColor: 'var(--bg-card, #FFFFFF)'
+              }
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: e => { e.stopPropagation(); setImage(''); },
+              title: "이미지 삭제",
+              "aria-label": "이미지 삭제",
+              style: {
+                position: 'absolute',
+                top: '-6px',
+                right: '-6px',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                border: 'none',
+                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                color: '#FFFFFF',
+                fontSize: '11px',
+                lineHeight: '18px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }
+            }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 10 }) : "✕")
+          ) : null,
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                disabled: uploadingImage,
+                onClick: () => fileInputRef.current && fileInputRef.current.click(),
+                style: {
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: '1px solid var(--border-subtle, #D1D5DB)',
+                  backgroundColor: 'var(--bg-card, #FFFFFF)',
+                  color: 'var(--text-primary, #1F2937)',
+                  fontSize: 'var(--font-size-sm, 13px)',
+                  fontWeight: 600,
+                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }
+              }, renderOutlineTablerIcon("photoUp", 16), "사진 업로드"),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                disabled: uploadingImage,
+                onClick: handleClickPaste,
+                style: {
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: '1px solid var(--border-subtle, #D1D5DB)',
+                  backgroundColor: 'var(--bg-card, #FFFFFF)',
+                  color: 'var(--text-primary, #1F2937)',
+                  fontSize: 'var(--font-size-sm, 13px)',
+                  fontWeight: 600,
+                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }
+              }, renderOutlineTablerIcon("clipboardPlus", 16), "붙여넣기")
+            ),
+            uploadingImage ? /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--accent-primary, #7C2FE5)', fontWeight: 600 }
+            }, uploadProgress?.text || "업로드 중...") : /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted, #6B7280)', lineHeight: '1.4' }
+            }, "사진 파일을 선택하거나 복사한 이미지를 붙여넣기(Ctrl+V) 하세요.")
+          )
+        )),
         field("이미지 URL (선택)", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "url", value: image, onChange: e => setImage(e.target.value),
-          placeholder: "https://", maxLength: 500
+          placeholder: "https://", maxLength: 8000
         })),
         /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
           field("가격 / 요금", /*#__PURE__*/React.createElement("input", {
@@ -3959,11 +4473,16 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
               onInput: e => autoGrowTextarea(e.target, 240),
               placeholder: "간단한 설명", rows: 3, maxLength: 2000,
               style: { resize: 'none', minHeight: '72px', overflow: 'hidden', width: '100%' }
-            })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn btn-primary btn-action", disabled: saving, onClick: handleSave,
-          style: { width: '100%', marginTop: '4px', height: '44px', minHeight: '44px', opacity: saving ? 0.7 : 1 }
-        }, saving ? "저장 중..." : "저장")
+            }))),
+        /*#__PURE__*/React.createElement("div", {
+          className: "modal-footer",
+          style: { flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end' }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-primary btn-action", disabled: saving || uploadingImage, onClick: handleSave,
+            style: { width: '100%', height: '44px', minHeight: '44px', opacity: (saving || uploadingImage) ? 0.7 : 1 }
+          }, saving ? "저장 중..." : (uploadingImage ? "이미지 업로드 중..." : "저장"))
+        )
       )
     ),
     document.body
@@ -4039,7 +4558,7 @@ function buildQuickMemoPlaceholder(item) {
   return '메모를 입력하세요';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '', topToolbar = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -4264,33 +4783,61 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       });
   }, [items, anniversaries, anniversaryCategory]);
 
-  // Merge calendar-owned custom items (컨텐츠 등록) ahead of the crawled snapshot. Custom ids
-  // use custom_perf_/custom_fest_ prefixes so they never collide with crawled perf_/fest_ ids,
-  // but still de-dupe by id in case a write echoes twice.
+  // Merge calendar-owned custom items (컨텐츠 등록) with the crawled snapshot.
+  // Custom ids normally use custom_perf_/custom_fest_ prefixes, but editing a crawled card
+  // reuses its id. Previously same-title customs were DROPPED in favor of crawled rows, which
+  // threw away user-uploaded posters (image) after a successful save -- the card kept showing
+  // "포스터 없음". Prefer custom fields (especially image) when id/title collides, and only
+  // render one card per real-world event.
   const mergedItems = React.useMemo(() => {
     if (items === null) return null;
-    // A self-authored anniversary (기념일 등록으로 직접 typed, no cultureSourceId at all) or a
-    // manually 개별등록-ed card can coincidentally share its title with something that's also
-    // sitting right there in today's live crawled feed -- the user typed/found it independently,
-    // unaware it was already a registerable listing. Without this check both would render as two
-    // separate cards for the same real-world event: the rich crawled one, and the other holding
-    // only whatever the user themselves typed -- exactly the "이중으로 관리되는" duplicate this
-    // caused. Prefer the live crawled version (richer, and always the freshest available data)
-    // over a same-titled self-authored/custom entry.
-    const crawledTitles = new Set((items || []).map(i => i && String(i.title || '').trim()).filter(Boolean));
-    // isCustomRegistered marks every self-authored/컨텐츠-등록 item (as opposed to crawled from
-    // the portal snapshot) so the "개별등록" category chip below can filter on it directly,
-    // instead of guessing from genre/id-prefix which crawled items can also lack.
-    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
-      .filter(e => !crawledTitles.has(String(e.title || '').trim()))
-      .map(e => ({ ...e, isCustomRegistered: true }));
-    const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
-    const orphaned = orphanedSourceItems
-      .filter(o => o && o.id && !seen.has(o.id))
-      .map(o => ({ ...o, isCustomRegistered: true }));
-    orphaned.forEach(o => seen.add(o.id));
-    const crawled = (items || []).filter(i => i && i.id && !seen.has(i.id));
-    return [...extras, ...orphaned, ...crawled];
+    const extrasRaw = dedupeCultureExtras(Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
+    const extrasById = new Map();
+    const extrasByTitle = new Map();
+    extrasRaw.forEach(e => {
+      if (e && e.id) extrasById.set(e.id, e);
+      const title = String(e && e.title || '').trim();
+      if (title) extrasByTitle.set(title, e);
+    });
+    const usedExtraIds = new Set();
+    const result = [];
+
+    // Custom-only rows (no crawled match) stay at the front so a just-registered card is visible.
+    extrasRaw.forEach(e => {
+      if (!e) return;
+      const title = String(e.title || '').trim();
+      const matchesCrawled = (items || []).some(i => i && (i.id === e.id || String(i.title || '').trim() === title));
+      if (matchesCrawled) return;
+      result.push({ ...e, isCustomRegistered: true });
+      if (e.id) usedExtraIds.add(e.id);
+    });
+
+    orphanedSourceItems.forEach(o => {
+      if (!o || !o.id || usedExtraIds.has(o.id)) return;
+      const title = String(o.title || '').trim();
+      if (title && (items || []).some(i => i && String(i.title || '').trim() === title)) return;
+      const existingIdx = title ? result.findIndex(entry => String(entry && entry.title || '').trim() === title) : -1;
+      if (existingIdx >= 0) {
+        result[existingIdx] = mergeCultureItemPreferPoster(result[existingIdx], o);
+        usedExtraIds.add(o.id);
+        return;
+      }
+      result.push({ ...o, image: culturePosterUrl(o), isCustomRegistered: true });
+      usedExtraIds.add(o.id);
+    });
+
+    (items || []).forEach(i => {
+      if (!i || !i.id || usedExtraIds.has(i.id)) return;
+      const title = String(i.title || '').trim();
+      const custom = extrasById.get(i.id) || (title ? extrasByTitle.get(title) : null);
+      if (custom) {
+        if (custom.id) usedExtraIds.add(custom.id);
+        result.push(mergeCultureItemPreferPoster({ ...i, isCustomRegistered: true }, custom));
+      } else {
+        result.push(i);
+      }
+    });
+    return result;
   }, [items, extraItems, orphanedSourceItems]);
 
   // Reported unfiltered (crawled snapshot + any custom items merged in above) -- RegionFilterBackdrop's
@@ -4312,7 +4859,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     focusAttemptedRef.current = true;
     const match = mergedItems.find(i => i && i.id === focusItemId)
       || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null);
-    if (match) setSelected(match);
+    if (match) {
+      setSelected(match);
+      setTimeout(() => {
+        const el = document.querySelector(`[data-content-id="${String(match.id).replace(/"/g, '')}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 80);
+    }
   }, [focusItemId, focusTitle, mergedItems]);
 
   if (mergedItems === null) {
@@ -4332,10 +4885,19 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
   const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
 
+  const renderEmptyGrid = (msg, chips = null) => /*#__PURE__*/React.createElement("div", {
+    className: "culture-items-grid is-cols-1",
+    style: { flex: 1, overflowY: 'auto', padding: contentPaddingTop ? `${contentPaddingTop}px 16px 96px` : undefined, alignContent: 'start' }
+  },
+    chips,
+    topToolbar && /*#__PURE__*/React.createElement("div", { className: "v2-content-scroll-top-slot", style: { gridColumn: '1 / -1', width: '100%' } }, topToolbar),
+    /*#__PURE__*/React.createElement("div", {
+      style: { gridColumn: '1 / -1', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+    }, msg)
+  );
+
   if (regionFilteredItems.length === 0) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-    }, "선택한 지역에 해당하는 항목이 없습니다.");
+    return renderEmptyGrid("선택한 지역에 해당하는 항목이 없습니다.");
   }
 
   const searchNeedle = (searchQuery || '').trim().toLowerCase();
@@ -4346,9 +4908,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     : regionFilteredItems;
 
   if (searchFilteredItems.length === 0) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-    }, "검색 결과가 없습니다.");
+    return renderEmptyGrid("검색 결과가 없습니다.");
   }
 
   // Counts (and which genres even exist) are computed off the region+search-filtered set, not the
@@ -4381,7 +4941,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     // can't reach pseudo-elements) -- the row still scrolls by touch swipe or drag, the
     // scrollbar itself is just visually hidden, per the v2 design system request.
     className: "bp-cat-scroll-row",
-    style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center', scrollbarWidth: 'none', msOverflowStyle: 'none' }
+    style: { display: 'flex', gap: '6px', padding: '0', overflowX: 'auto', flexShrink: 0, alignItems: 'center', scrollbarWidth: 'none', msOverflowStyle: 'none' }
   },
     [
       { value: '', label: '전체', count: searchFilteredItems.length },
@@ -4393,11 +4953,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         key: opt.value || 'all',
         type: "button",
         onClick: () => setCategoryFilter(opt.value),
+        className: isActive ? 'bp-cat-chip bp-is-selected' : 'bp-cat-chip',
         style: {
-          flexShrink: 0, border: 'none', borderRadius: 'var(--radius-full)', padding: '6px 12px',
+          // padding/font-size read the shared 2뎁스 서브메뉴 칩 토큰(v2/design.css
+          // --v2-subnav-chip-*) so Places' .bp-cat-chip and this row stay in sync from one
+          // definition; the var() fallback keeps the original default-shell look wherever
+          // those tokens aren't defined (outside .v2-design).
+          flexShrink: 0, border: 'none', borderRadius: 'var(--radius-full)', padding: 'var(--v2-subnav-chip-pad, 6px 12px)',
           background: isActive ? 'var(--accent-primary)' : 'var(--bg-primary)',
           color: isActive ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer', whiteSpace: 'nowrap',
+          fontWeight: 700, fontSize: 'var(--v2-subnav-chip-font-size, var(--font-size-sm))', cursor: 'pointer', whiteSpace: 'nowrap',
           display: 'inline-flex', alignItems: 'center', gap: '6px'
         }
       }, opt.label, /*#__PURE__*/React.createElement(SectionCountBadge, { count: opt.count }));
@@ -4408,20 +4973,27 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // chip row slides away together with the rest of the header on scroll, instead of scrolling
   // with the poster grid underneath it. Falls back to rendering inline (its pre-existing spot,
   // right above the grid) on the rare render where the slot ref hasn't attached yet.
+  // Always portal into the header-stack slot under 1st-level tabs. Never fall
+  // back to an inline row in the poster grid — that made 2nd-level chips look
+  // like a list toolbar instead of a subnav.
   const renderedCategoryChipRow = chipRowSlot
-    ? (categoryChipRow ? ReactDOM.createPortal(categoryChipRow, chipRowSlot) : null)
-    : categoryChipRow;
+    ? ReactDOM.createPortal(categoryChipRow, chipRowSlot)
+    : null;
 
   if (filteredItems.length === 0) {
-    return /*#__PURE__*/React.createElement(React.Fragment, null,
-      renderedCategoryChipRow,
-      /*#__PURE__*/React.createElement("div", {
-        style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-      }, "선택한 카테고리에 해당하는 항목이 없습니다.")
-    );
+    return renderEmptyGrid("선택한 카테고리에 해당하는 항목이 없습니다.", renderedCategoryChipRow);
   }
 
-  const visibleItems = filteredItems.slice(0, renderLimit);
+  const focusedItem = (focusItemId || focusTitle)
+    ? (filteredItems.find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
+      || (mergedItems || []).find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
+      || null)
+    : null;
+  const visibleItems = (() => {
+    const sliced = filteredItems.slice(0, renderLimit);
+    if (!focusedItem) return sliced;
+    return [focusedItem, ...sliced.filter(i => i.id !== focusedItem.id)];
+  })();
   const hasMoreToRender = filteredItems.length > visibleItems.length;
   // 스크롤이 하단 근처(300px 이내)에 닿으면 "더 보기"를 누른 것과 동일하게 다음 60개를 이어
   // 붙인다. 이 그리드는 HistoryView가 헤더 접힘 효과에 쓰는 자기 onScroll도 받고 있어서, 그걸
@@ -4485,8 +5057,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid is-cols-" + (gridCols === '1' ? '1' : '2'),
       onScroll: handleGridScroll,
-      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start', gridAutoRows: 'max-content' }
+      style: { flex: 1, overflowY: 'auto', padding: contentPaddingTop ? `${contentPaddingTop}px 16px 96px` : undefined, alignContent: 'start', gridAutoRows: 'max-content' }
     },
+      topToolbar && /*#__PURE__*/React.createElement("div", {
+        className: "v2-content-scroll-top-slot",
+        style: { gridColumn: '1 / -1', width: '100%' }
+      }, topToolbar),
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
@@ -4495,10 +5071,15 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           && cultureItemDay(item) <= todayIsoLocal()
           && (!item.endDate || item.endDate >= todayIsoLocal());
         const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
+        const posterUrl = culturePosterUrl(item);
         const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
           type: "button",
+          "data-content-id": item.id,
+          className: (focusItemId && item.id === focusItemId) || (focusTitle && String(item.title || '').trim() === String(focusTitle || '').trim())
+            ? 'search-result-focus'
+            : undefined,
           onClick: () => setSelected(item),
           style: {
             display: 'flex', flexDirection: 'column', gap: '6px', padding: 0,
@@ -4515,10 +5096,25 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // so every one 404s -- reveals this placeholder underneath once onError hides the
             // <img>, instead of leaving a blank box with nothing in it.
             /*#__PURE__*/React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "포스터 없음"),
-            item.image && /*#__PURE__*/React.createElement("img", {
-              src: item.image, alt: item.title, loading: 'lazy', decoding: 'async',
+            posterUrl && /*#__PURE__*/React.createElement("img", {
+              src: posterUrl, alt: item.title, loading: 'lazy', decoding: 'async',
               style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
-              onError: e => { e.currentTarget.style.display = 'none'; }
+              onError: e => {
+                const img = e.currentTarget;
+                if (!img || img.dataset.posterFallback === '1') {
+                  if (img) img.style.display = 'none';
+                  return;
+                }
+                const next = [item.imageUrl, item.thumbUrl, item.image]
+                  .map(value => String(value || '').trim())
+                  .find(value => value && value !== img.src);
+                if (next) {
+                  img.dataset.posterFallback = '1';
+                  img.src = next;
+                  return;
+                }
+                img.style.display = 'none';
+              }
             }),
             isMovieNowShowing && /*#__PURE__*/React.createElement("span", {
               style: {
@@ -4636,14 +5232,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     ),
     selected && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {
+        className: "modal-overlay",
         onClick: () => setSelected(null),
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 13000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
       },
-        /*#__PURE__*/React.createElement("div", {
+        /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
+          className: "modal-container",
           onClick: e => e.stopPropagation(),
           style: {
-            position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
-            backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '20px',
+            position: 'relative', width: '100%', maxWidth: '520px', maxHeight: '85vh',
+            backgroundColor: 'var(--bg-card)', borderRadius: '20px', padding: '20px',
             display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
           }
         },
@@ -4666,7 +5264,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: '18px', lineHeight: 1
             }
           }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : "✎"),
-          selected.image && /*#__PURE__*/React.createElement("div", {
+          culturePosterUrl(selected) && /*#__PURE__*/React.createElement("div", {
             role: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'button' : undefined,
             tabIndex: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 0 : undefined,
             onClick: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? () => openMovieVideoSearch(selected) : undefined,
@@ -4675,7 +5273,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             style: { position: 'relative', width: '100%', flexShrink: 0, cursor: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'pointer' : 'default' }
           },
             /*#__PURE__*/React.createElement("img", {
-              src: selected.image, alt: selected.title, loading: 'lazy',
+              src: culturePosterUrl(selected), alt: selected.title, loading: 'lazy',
               style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
               onError: e => { e.currentTarget.style.display = 'none'; }
             }),
@@ -4686,7 +5284,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '25px', paddingLeft: '4px', boxSizing: 'border-box',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.3)', pointerEvents: 'none'
               }
-            }, "▶")
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlayIcon, { size: 22 }))
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, selected.title),
           // 기간~설명까지 한 블록으로 스크롤 -- 예전엔 설명 칸만 따로 120px 높이로 스크롤돼서
@@ -4894,9 +5492,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     ),
     contentShareUrl && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {
+        className: "modal-overlay",
         onClick: () => setContentShareUrl(''),
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 30000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
-      }, /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
+        className: "modal-container",
         onClick: e => e.stopPropagation(),
         style: { width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '20px', boxSizing: 'border-box' }
       },
@@ -4938,10 +5538,12 @@ function SharedContentPreviewModal({ item, onClose }) {
   if (!item || typeof document === 'undefined' || !ReactDOM) return null;
   return ReactDOM.createPortal(
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
       onClick: onClose,
       style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 40000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
     },
-      /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
+        className: "modal-container",
         onClick: e => e.stopPropagation(),
         style: {
           position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
@@ -4958,8 +5560,8 @@ function SharedContentPreviewModal({ item, onClose }) {
             backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
           }
         }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
-        item.image && /*#__PURE__*/React.createElement("img", {
-          src: item.image, alt: item.title, loading: 'lazy',
+        culturePosterUrl(item) && /*#__PURE__*/React.createElement("img", {
+          src: culturePosterUrl(item), alt: item.title, loading: 'lazy',
           style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
           onError: e => { e.currentTarget.style.display = 'none'; }
         }),

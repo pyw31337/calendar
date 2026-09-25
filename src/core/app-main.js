@@ -20,6 +20,9 @@ import {
   getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
 } from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
+import { createImageTagSaveHandler } from './app-image-tag-save.js';
+import { findImageSlotByAsset, removeAssetFromMeetings, replaceAssetInMeetings, syncAssetTagsInMeetings, listOtherAssetReferences } from './media-reference-integrity.js';
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -101,6 +104,8 @@ import {
   memePoolDeleteRemote,
   listUntaggedPhotoIndexEntriesRemote,
   adminBulkTagPhotosRemote,
+  listPhotoIndexEntriesForDedupRemote,
+  mergeDedupPhotosRemote,
   listSharedDataPoolRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
@@ -173,6 +178,8 @@ import {
   getDirectChatMediaInfo,
   withTimeout,
   getMessageImageEntries,
+  resolveMessagePhotoImageIndex,
+  reconcileMessageImageTagMap,
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,
@@ -1255,9 +1262,13 @@ function CalendarApp() {
   // show up in the admin 감사 로그 tab as action "client_error", same place as every other
   // audit event. Registered once for the page's lifetime, not per calendar.
   React.useEffect(() => {
+    // One report per distinct message, max 5 per page load (a failed Firestore client repeats).
+    const reportedClientErrors = new Set();
     const reportClientError = (message, extra) => {
       const calId = activeCalRef.current?.id || 'unknown';
       const note = sanitizeText(`${message || '알 수 없는 오류'} ${extra || ''}`.trim(), 200);
+      if (reportedClientErrors.has(note) || reportedClientErrors.size >= 5) return;
+      reportedClientErrors.add(note);
       queueServerAuditEvent(calId, 'client_error', note, getClientAuditContext());
     };
     const onError = (event) => {
@@ -1267,11 +1278,20 @@ function CalendarApp() {
       const reason = event?.reason;
       reportClientError(reason?.message || String(reason || '').slice(0, 160));
     };
+    // SDK internal assertion = realtime stops for this page (firestore-listener-guard.js): offer reload.
+    const onFirestoreBroken = (event) => {
+      reportClientError(event?.detail?.message || 'FIRESTORE INTERNAL ASSERTION FAILED');
+      showToast('실시간 연결에 문제가 생겼습니다. 새로고침하면 복구됩니다.', 'error', 60000,
+        () => { window.location.reload(); }, null, '새로고침');
+    };
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onRejection);
+    window.addEventListener('gather:firestore-broken', onFirestoreBroken);
+    if (window.__gatherFirestoreBroken) onFirestoreBroken({ detail: { message: window.__gatherFirestoreBroken } });
     return () => {
       window.removeEventListener('error', onError);
       window.removeEventListener('unhandledrejection', onRejection);
+      window.removeEventListener('gather:firestore-broken', onFirestoreBroken);
     };
   }, []);
 
@@ -2371,7 +2391,10 @@ function CalendarApp() {
   // memo collection (e.g. calendar -> chat -> settlement) never tears down and recreates these
   // three memo listeners -- only crossing into/out of memo|gallery|search actually should.
   const needsMemoCollection = React.useMemo(
-    () => activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
+    // The calendar home preview also needs the server-backed pinned and recent-comment
+    // queries; otherwise an old pinned memo falls outside the small createdAt window and
+    // the preview silently shows unrelated recent cards.
+    () => activeView === 'calendar' || activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
     [activeView, isGlobalSearchOpen]
   );
   // 보관함 인물/추억 탭의 사진 목록용 memo 스냅샷 -- 위 needsMemoCollection에 'history'를 넣어 실시간
@@ -3034,14 +3057,7 @@ function CalendarApp() {
       lastScrollTopRef.current = scrollTop;
       return;
     }
-    const lastScrollTop = lastScrollTopRef.current;
-    if (scrollTop < 10) {
-      setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
-      setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
-      setIsHeaderVisible(true);
-    }
+    setIsHeaderVisible(true);
     lastScrollTopRef.current = scrollTop;
   };
 
@@ -3177,6 +3193,7 @@ function CalendarApp() {
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
+          messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
           if (i === 0 && uploadedFileAttachments.length) messageData.fileAttachments = uploadedFileAttachments;
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
           if (i === 0 && replyToPayload) messageData.replyTo = replyToPayload;
@@ -3349,6 +3366,7 @@ function CalendarApp() {
           // Distinguishes gallery uploads so the Lightbox can show their source accurately.
           uploadSource: 'gallery'
         };
+        messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
         if (sent.queued) anyQueued = true;
@@ -3398,6 +3416,7 @@ function CalendarApp() {
       timestamp: Date.now(),
       uploadSource: 'gallery'
     };
+    messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
     try {
       const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 링크 저장', { documentId: messageOperationId });
       if (!sent) throw new Error('Gallery link save failed');
@@ -3517,6 +3536,7 @@ function CalendarApp() {
       timestamp: Date.now(),
       uploadSource: 'gallery'
     };
+    messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
     try {
       const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
       if (!sent) throw new Error('Gather photo paste save failed');
@@ -3562,6 +3582,7 @@ function CalendarApp() {
           timestamp: baseTs + i,
           uploadSource: 'gallery'
         };
+        messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 일괄 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gather photos paste save failed at index ${i}`);
         if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
@@ -3596,6 +3617,32 @@ function CalendarApp() {
     if (!deletingMessage) return;
     const { id, calId } = deletingMessage;
     const sourceSnapshot = JSON.parse(JSON.stringify(deletingMessage));
+    // Optimistic: remove from the chat immediately, matching every other delete flow in the
+    // app (availability, memo, photo comments/tags) -- see docs/lightbox-optimistic-ui-audit.md.
+    // restoreMessage below is reused both for the undo toast's "되돌리기" action and, on a
+    // failed/erroring delete, to roll the optimistic removal back.
+    removeLocalChatMessage(id);
+    const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
+    const restoreMessage = async (options = {}) => {
+      try {
+        const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
+        const createData = {};
+        for (const key of allowed) {
+          if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
+        }
+        if (typeof createData.participantId !== 'string') createData.participantId = String(sourceSnapshot.participantId || '');
+        if (typeof createData.timestamp !== 'number') createData.timestamp = Number(sourceSnapshot.timestamp) || Date.now();
+        if (createData.text === undefined) createData.text = String(sourceSnapshot.text || '');
+        const data = sanitizeMessageForFirestore(createData);
+        const restored = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'set', '메시지 복원');
+        if (!restored) throw new Error('Message restore failed');
+        upsertLocalChatMessage({ ...sourceSnapshot, ...data, id });
+        if (!options.silentRestore) showToast('메시지 삭제를 되돌렸습니다.', 'success', 3000);
+      } catch (err) {
+        console.error('handleConfirmDeleteMessage undo failed:', err);
+        showToast('메시지 복원 실패', 'error', 4000);
+      }
+    };
     try {
       const deleted = await writeCollectionDocumentWithFallback('messages', calId, id, null, 'delete', '메시지 삭제');
       const ok = Boolean(deleted);
@@ -3603,32 +3650,10 @@ function CalendarApp() {
         // See handleDeleteChatMessagePhoto's matching comment -- `deleted.queued` means this was
         // only durably saved for a later automatic retry, not actually removed on the server yet.
         const wasQueued = Boolean(deleted?.queued);
-        removeLocalChatMessage(id);
         await unlinkMeetingPhotoReferences(id, null);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
-        const restoreMessage = async () => {
-          try {
-            const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
-            const createData = {};
-            for (const key of allowed) {
-              if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
-            }
-            if (typeof createData.participantId !== 'string') createData.participantId = String(sourceSnapshot.participantId || '');
-            if (typeof createData.timestamp !== 'number') createData.timestamp = Number(sourceSnapshot.timestamp) || Date.now();
-            if (createData.text === undefined) createData.text = String(sourceSnapshot.text || '');
-            const data = sanitizeMessageForFirestore(createData);
-            const restored = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'set', '메시지 복원');
-            if (!restored) throw new Error('Message restore failed');
-            upsertLocalChatMessage({ ...sourceSnapshot, ...data, id });
-            showToast('메시지 삭제를 되돌렸습니다.', 'success', 3000);
-          } catch (err) {
-            console.error('handleConfirmDeleteMessage undo failed:', err);
-            showToast('메시지 복원 실패', 'error', 4000);
-          }
-        };
         if (wasQueued) {
           showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
         } else if (firebaseDb) {
@@ -3637,10 +3662,13 @@ function CalendarApp() {
           showToast('삭제완료', 'delete', 3000, null, finalizeStorage);
         }
       } else {
+        // The delete never actually happened server-side -- undo the optimistic removal.
+        await restoreMessage({ silentRestore: true });
         showToast('삭제 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleConfirmDeleteMessage failed:', err);
+      await restoreMessage({ silentRestore: true });
       showToast('삭제 실패', 'error', 3000);
     }
   };
@@ -3656,6 +3684,10 @@ function CalendarApp() {
     const hasNewImages = (newImages || []).some(img => !img.isExisting);
     if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     let saved = false;
+    // Declared outside the try block (not just inside it) so the catch handler below can also
+    // see them, to roll back the optimistic patch on a thrown error, not just an `ok === false`.
+    let appliedOptimistically = false;
+    let previousRestore = null;
     try {
       let linkPreview = null;
       const url = extractFirstUrl(newText);
@@ -3697,9 +3729,14 @@ function CalendarApp() {
         ? editingMessage.imageUrls
         : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []);
       const originalTags = Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [];
+      const consumedOriginalIndexes = new Set();
       const nextImageTags = (newImages || []).map(img => {
         if (!img.isExisting) return '';
-        const originalIdx = originalUrls.indexOf(img.original);
+        // Two intentionally duplicated uploads can have the same URL. Match each occurrence
+        // once in source order instead of repeatedly taking indexOf's first slot, otherwise the
+        // first photo's tag gets copied to every duplicate while editing.
+        const originalIdx = originalUrls.findIndex((url, index) => url === img.original && !consumedOriginalIndexes.has(index));
+        if (originalIdx >= 0) consumedOriginalIndexes.add(originalIdx);
         return originalIdx >= 0 ? (originalTags[originalIdx] || '') : '';
       });
 
@@ -3721,7 +3758,33 @@ function CalendarApp() {
         linkPreview: linkPreview || null,
         fileAttachments: uploadedFileAttachments
       };
+      data.imageTagMap = reconcileMessageImageTagMap({ ...editingMessage, ...data }, editingMessage.imageTagMap);
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
+
+      previousRestore = {
+        text: editingMessage.text || '',
+        imageUrl: editingMessage.imageUrl || '',
+        thumbUrl: editingMessage.thumbUrl || '',
+        imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
+        thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
+        imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
+        imageTagMap: editingMessage.imageTagMap && typeof editingMessage.imageTagMap === 'object' && !Array.isArray(editingMessage.imageTagMap) ? editingMessage.imageTagMap : {},
+        linkPreview: editingMessage.linkPreview || null,
+        participantId: editingMessage.participantId
+      };
+
+      // Optimistic fast path: a text-only edit (no new images, nothing left to upload, so no
+      // extraChunks will be produced below) can apply immediately instead of waiting for the
+      // write -- see docs/lightbox-optimistic-ui-audit.md item 2. Image edits keep the existing
+      // wait-then-apply behavior; that path's chunk-splitting and Storage cleanup make an
+      // optimistic rollback meaningfully riskier for comparatively little benefit (the upload
+      // itself already dominates the wait).
+      const isTextOnlyEdit = !hasNewImages && pendingFiles.length === 0;
+      if (isTextOnlyEdit) {
+        patchLocalChatMessage(id, data);
+        appliedOptimistically = true;
+      }
+
       let ok = false;
       const updateResult = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'update', '메시지 수정');
       ok = Boolean(updateResult);
@@ -3738,6 +3801,11 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
+            imageTagMap: reconcileMessageImageTagMap({
+              imageUrls: chunkImages.map(r => r.imageUrl),
+              thumbUrls: chunkImages.map(r => r.thumbUrl),
+              imageTags: chunkImages.map(() => '')
+            }),
             timestamp: baseTimestamp + i
           }, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
           if (!sent) {
@@ -3748,16 +3816,6 @@ function CalendarApp() {
         }
       }
       if (ok) {
-        const previousRestore = {
-          text: editingMessage.text || '',
-          imageUrl: editingMessage.imageUrl || '',
-          thumbUrl: editingMessage.thumbUrl || '',
-          imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
-          thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
-          imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
-          linkPreview: editingMessage.linkPreview || null,
-          participantId: editingMessage.participantId
-        };
         const originalEntries = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
           ? editingMessage.imageUrls.map((url, idx) => ({ original: url, thumbnail: (editingMessage.thumbUrls || [])[idx] || url }))
           : (editingMessage.imageUrl ? [{ original: editingMessage.imageUrl, thumbnail: editingMessage.thumbUrl || editingMessage.imageUrl }] : []);
@@ -3793,10 +3851,12 @@ function CalendarApp() {
         }
         saved = true;
       } else {
+        if (appliedOptimistically && previousRestore) patchLocalChatMessage(id, previousRestore);
         showToast('수정 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSaveEditMessage failed:', err);
+      if (appliedOptimistically && previousRestore) patchLocalChatMessage(id, previousRestore);
       showToast(describeFirebaseWriteError(err, '수정 실패'), 'error', 4000);
     } finally {
       setChatUploadProgress(null);
@@ -4069,245 +4129,21 @@ function CalendarApp() {
     }
   };
 
-  const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
-    // Photo-index / REST may deliver imageIndex as a numeric string. Coerce before every
-    // Number.isInteger gate so gallery/chat/memo/meeting tag saves do not silently no-op.
-    const coerceTagImageIndex = value => {
-      if (Number.isInteger(value)) return value;
-      const n = Number(value);
-      return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
-    };
-    const resolvedIndex = coerceTagImageIndex(imageIndex);
-    const resolvedMetaIndex = coerceTagImageIndex(meta?.imageIndex);
-    const resolvedSourceIndex = coerceTagImageIndex(meta?.sourceImageIndex);
-    if (meta?.source === 'anniversary') {
-      return handleSaveAnniversaryPhotoTags(meta.anniversaryId, resolvedMetaIndex != null ? resolvedMetaIndex : resolvedIndex, tagsText);
+  const handleSaveImageTags = createImageTagSaveHandler({
+    activeCalId, chatMessages, firebaseDb, findMemoById: (...args) => findMemoById(...args), writeCollectionDocumentWithFallback,
+    sanitizeMemoForFirestore, setMemos, patchGalleryArchiveMemo, galleryPhotoIndex, fetchMessageRest,
+    withTimeout, showToast, handleSaveAnniversaryPhotoTags, handleSaveMeetingPhotoTags,
+    getMessageImageEntries, resolveMessagePhotoImageIndex, reconcileMessageImageTagMap,
+    getPhotoAssetCommentKey, getDirectMediaTagKey, getDirectMediaTagsForUrl, getMediaIdentityKeys,
+    sanitizeText, invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload,
+    patchLocalChatMessage, parseFlexibleDateTokens, linkTaggedImageToMeetingDates,
+    createActivityLog, writeActivityLogsToFirestore,
+    syncMeetingCopyTags: async (asset, tags) => {
+      const { meetings, changed } = syncAssetTagsInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), asset, tags);
+      if (!changed) return true;
+      return commitConfirmedMeetings(meetings, null, [], 'write', 'success');
     }
-    if (meta?.source === 'meeting') {
-      // Auto-linked 일정 사진: edit the source chat photo. Meeting-composer uploads (no meetingDate yet): own message.
-      if (meta.sourceMessageId && resolvedSourceIndex != null) {
-        return handleSaveImageTags(meta.sourceMessageId, resolvedSourceIndex, tagsText, {});
-      }
-      if (messageId && resolvedIndex != null && !meta.meetingDate) {
-        return handleSaveImageTags(messageId, resolvedIndex, tagsText, {});
-      }
-      return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
-    }
-    if (meta?.source === 'memo') {
-      let memoId = messageId || meta.messageId || '';
-      // Canonical photo-index rows used to store messageId:'' for memos; recover from sourceOwner.
-      if (!memoId) {
-        const owner = String(meta.sourceOwner || (Array.isArray(meta.owners) && meta.owners[0] && meta.owners[0].sourceOwner) || '');
-        const match = owner.match(/^memo:([^:]+):/);
-        if (match) memoId = match[1];
-      }
-      if (!memoId || resolvedIndex == null) {
-        showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
-        return false;
-      }
-      const memo = await findMemoById(memoId);
-      if (!memo) { showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000); return false; }
-      const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
-      if (resolvedIndex < 0 || resolvedIndex >= urls.length) {
-        showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
-        return false;
-      }
-      const parseTagTokens = text => Array.from(new Set(String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean))).slice(0, 10);
-      const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
-      const nextImageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
-      while (nextImageTags.length < urls.length) nextImageTags.push('');
-      nextImageTags[resolvedIndex] = cleanTags;
-      try {
-        const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
-        if (!ok?.success || ok?.queued) throw new Error('Memo image tags update failed');
-        setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
-        patchGalleryArchiveMemo(memoId, { imageTags: nextImageTags });
-        try {
-          invalidatePhotoIndexCache(activeCalId);
-          const memoAsset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
-          const memoTagPatch = {
-            messageId: memoId,
-            imageIndex: resolvedIndex,
-            assetKey: memoAsset,
-            mediaKey: memoAsset,
-            refKey: memoAsset,
-            tags: cleanTags
-          };
-          rememberPhotoIndexTags(activeCalId, [memoTagPatch]);
-          if (typeof galleryPhotoIndex?.patchItems === 'function') {
-            galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
-              const sameAsset = memoAsset && (photo.assetKey === memoAsset || photo.mediaKey === memoAsset || photo.refKey === memoAsset);
-              if (sameAsset || (photo.messageId === memoId && Number(photo.imageIndex) === Number(resolvedIndex))) {
-                return { ...photo, tags: cleanTags };
-              }
-              return photo;
-            }));
-          }
-          // Do not force-reload immediately: CF denorm races; poll until sticky clears.
-          schedulePhotoIndexTagReload(galleryPhotoIndex, activeCalId, memoTagPatch);
-        } catch (indexSyncErr) {
-          console.warn('Gallery photoIndex memo-tag sync skipped:', indexSyncErr);
-        }
-        showToast('태그 저장완료', 'success');
-        return true;
-      } catch (err) {
-        console.error('Memo image tag save failed:', err);
-        showToast('태그 저장 실패', 'error');
-        return false;
-      }
-    }
-    // chat / gallery / directMedia (and any other message-backed source)
-    if (!messageId || resolvedIndex == null) {
-      showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
-      return false;
-    }
-    imageIndex = resolvedIndex;
-    let sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
-    if (!sourceMessage) {
-      try {
-        if (firebaseDb) {
-          const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'image tag source message read');
-          sourceMessage = snap?.exists ? { id: messageId, ...snap.data() } : null;
-        } else {
-          sourceMessage = await fetchMessageRest(activeCalId, messageId);
-        }
-      } catch (readErr) {
-        console.warn('Image tag source message read failed:', readErr);
-      }
-    }
-    if (!sourceMessage) {
-      showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
-      return false;
-    }
-    const isDirectMedia = !!meta?.directMediaUrl;
-    const entryCount = getMessageImageEntries(sourceMessage).length;
-    if (!isDirectMedia && (imageIndex < 0 || imageIndex >= entryCount)) {
-      showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
-      return false;
-    }
-    const parseTagTokens = text => Array.from(new Set(
-      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
-    )).slice(0, 10);
-    const prevTokens = parseTagTokens(isDirectMedia ? getDirectMediaTagsForUrl(sourceMessage, meta.directMediaUrl) : (Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : ''));
-    const nextTokens = parseTagTokens(tagsText);
-    const cleanTags = sanitizeText(nextTokens.join(' '), 100);
-    const data = isDirectMedia ? (() => {
-      const previous = sourceMessage.directMediaTags;
-      const nextDirectTags = previous && typeof previous === 'object' && !Array.isArray(previous) ? { ...previous } : {};
-      const directKey = getDirectMediaTagKey(meta.directMediaUrl);
-      if (cleanTags) {
-        nextDirectTags[directKey] = cleanTags;
-      } else {
-        delete nextDirectTags[directKey];
-      }
-      return { directMediaTags: nextDirectTags };
-    })() : (() => {
-      const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
-      while (nextImageTags.length < entryCount) nextImageTags.push('');
-      nextImageTags[imageIndex] = cleanTags;
-      return { imageTags: nextImageTags };
-    })();
-    try {
-      const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장', { requirePersisted: true });
-      if (!ok?.success || ok?.queued) throw new Error('Image tags update failed');
-      // Read the just-written message back from the server and update every local message
-      // snapshot. This prevents a stale onSnapshot/fetched-source snapshot from overwriting a
-      // tag that was successfully saved, especially for meeting photos opened from a modal.
-      const verifiedMessage = await fetchMessageRest(activeCalId, messageId);
-      if (!verifiedMessage) throw new Error('Image tags verification read failed');
-      const verifiedTags = isDirectMedia
-        ? getDirectMediaTagsForUrl(verifiedMessage, meta.directMediaUrl)
-        : (Array.isArray(verifiedMessage.imageTags) ? verifiedMessage.imageTags[imageIndex] : '');
-      if (String(verifiedTags || '') !== cleanTags) throw new Error('Image tags verification mismatch');
-      // Patch-only, not upsertLocalChatMessage -- this message may live only in olderChatMessages
-      // (an older photo scrolled up to and tagged, not in the live chatMessages window). Upserting
-      // it would insert a copy into chatMessages too, growing that "live recent window" array and
-      // tripping the chat-view scroll-to-bottom effect keyed on chatMessages.length (see below),
-      // yanking the chat down to the latest message right after closing the Lightbox.
-      patchLocalChatMessage(messageId, verifiedMessage);
-      const now = Date.now();
-      const added = nextTokens.filter(t => !prevTokens.includes(t));
-      const removed = prevTokens.filter(t => !nextTokens.includes(t));
-      const tagIdentity = getMediaIdentityKeys({
-        messageId,
-        imageIndex: isDirectMedia ? 0 : imageIndex,
-        directMediaUrl: isDirectMedia ? meta.directMediaUrl : '',
-        source: 'chat'
-      }, { source: 'chat', messageId });
-      const tagResource = {
-        resourceType: 'photo-tag',
-        resourceId: tagIdentity.mediaKey,
-        source: 'chat',
-        sourceMessageId: messageId,
-        imageIndex: isDirectMedia ? 0 : imageIndex,
-        before: prevTokens.join(' '),
-        after: cleanTags
-      };
-      const tagLogs = [
-        ...added.map((t, i) => createActivityLog(activeCalId, 'tag_add', '', '', now + i, `#${t}`, tagResource)),
-        ...removed.map((t, i) => createActivityLog(activeCalId, 'tag_remove', '', '', now + added.length + i, `#${t}`, tagResource))
-      ].filter(Boolean);
-      if (tagLogs.length > 0) {
-        try {
-          await writeActivityLogsToFirestore(activeCalId, tagLogs);
-        } catch (logErr) {
-          // Tag persistence is the primary user action; activity logs are best-effort metadata.
-          console.warn('Image tag activity log write skipped:', logErr);
-        }
-      }
-    } catch (err) {
-      console.error('Image tag save failed:', err);
-      showToast('태그 저장 실패', 'error');
-      return false;
-    }
-    const sourceEntry = isDirectMedia ? null : getMessageImageEntries(sourceMessage)[imageIndex];
-    const imageUrl = String(meta?.imageUrl || meta?.directMediaUrl || sourceEntry?.full || sourceEntry?.thumb || '').trim();
-    const thumbUrl = String(meta?.thumb || sourceEntry?.thumb || imageUrl).trim();
-    let linkedCount = 0;
-    if (imageUrl) {
-      // Always call this (even with an empty dateStrs array) so removing every date tag
-      // un-links the photo from any meeting date it was previously auto-linked to.
-      const dateStrs = parseFlexibleDateTokens(tagsText);
-      try {
-        linkedCount = await linkTaggedImageToMeetingDates(dateStrs, { imageUrl, thumbUrl, imageIndex }, sourceMessage, cleanTags);
-      } catch (dateLinkErr) {
-        console.warn('Image tag date link skipped:', dateLinkErr);
-        showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000);
-      }
-    }
-    // Gallery reads tags from photoIndex (CF-maintained). Messages already hold the verified
-    // tags; patch local index rows and remember them for the session. A delayed reload gives
-    // onMessagePhotoIndexWrite time to catch up — an immediate force reload raced CF and wiped
-    // tags, so closing/reopening the lightbox showed empty meta.tags despite "태그 저장완료".
-    try {
-      invalidatePhotoIndexCache(activeCalId);
-      const asset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
-      const stickyProbe = {
-        messageId,
-        imageIndex: isDirectMedia ? 0 : imageIndex,
-        assetKey: asset,
-        mediaKey: asset,
-        refKey: asset,
-        tags: cleanTags
-      };
-      rememberPhotoIndexTags(activeCalId, [stickyProbe]);
-      if (typeof galleryPhotoIndex?.patchItems === 'function') {
-        galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
-          const sameAsset = asset && (photo.assetKey === asset || photo.mediaKey === asset || photo.refKey === asset);
-          const sameMessage = messageId && photo.messageId === messageId
-            && Number(photo.imageIndex) === Number(isDirectMedia ? 0 : imageIndex);
-          if (sameAsset || sameMessage) return { ...photo, tags: cleanTags };
-          return photo;
-        }));
-      }
-      schedulePhotoIndexTagReload(galleryPhotoIndex, activeCalId, stickyProbe);
-    } catch (indexSyncErr) {
-      console.warn('Gallery photoIndex tag sync skipped:', indexSyncErr);
-    }
-    if (!linkedCount) showToast('태그 저장완료', 'success');
-    return true;
-  };
-
+  });
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
     if (rawId && !isAllowedCalendarId(rawId)) {
@@ -4931,6 +4767,7 @@ function CalendarApp() {
           timestamp: now + i,
           uploadSource: 'meeting'
         };
+        messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장', { documentId: messageOperationId });
         if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
         const newMessageId = sent.id;
@@ -5074,10 +4911,11 @@ function CalendarApp() {
     const shouldDeleteStorage = !restoreSourceMessageId && !deletedPhoto?.sourceMessageId;
     const finalizeStorageDeletion = () => {
       if (!shouldDeleteStorage) return;
-      deleteChatImageFromStorage(deletedPhoto.imageUrl || imageUrl);
-      if (deletedPhoto.thumbUrl && deletedPhoto.thumbUrl !== (deletedPhoto.imageUrl || imageUrl)) {
-        deleteChatImageFromStorage(deletedPhoto.thumbUrl);
-      }
+      // Same file may also sit in another meeting's album or a chat/memo message.
+      void deleteAssetFilesIfUnreferenced(
+        { imageUrl: deletedPhoto.imageUrl || imageUrl, thumbUrl: deletedPhoto.thumbUrl || '' },
+        { excludeMeetingDates: [targetDate] }
+      );
     };
     const undoDelete = async () => {
       try {
@@ -5191,6 +5029,67 @@ function CalendarApp() {
     }
   }, [activeCalId, firebaseDb]);
 
+  // Photo mutations (delete/replace/retag) must act on the server's CURRENT message, never on a
+  // possibly stale local copy -- another device may have removed or reordered photos, and acting
+  // on the old array positions is what deleted/retagged neighbouring photos
+  // (docs/data-architecture-v3.md, root cause 2).
+  const memosRef = React.useRef(memos);
+  memosRef.current = memos;
+  const readFreshChatMessage = async messageId => {
+    try {
+      if (firebaseDb) {
+        const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'photo edit fresh message read');
+        if (snap) return snap.exists ? { id: messageId, ...snap.data() } : null;
+      }
+      const rest = await fetchMessageRest(activeCalId, messageId);
+      if (rest) return rest;
+    } catch (readErr) {
+      console.warn('readFreshChatMessage fell back to local copy:', readErr);
+    }
+    return findChatMessageById(messageId);
+  };
+  // photoIndex owners of one asset (server view of every document that references the file).
+  // Returns null when the index cannot be read, so callers keep the file rather than guess.
+  const fetchAssetIndexOwners = async asset => {
+    const assetKey = canonicalPhotoAssetKey(asset);
+    if (!assetKey) return [];
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/photoIndex/${encodeURIComponent(assetKey)}`;
+      const res = await withTimeout(fetch(url), 8000, 'photo index owners read');
+      if (res.status === 404) return [];
+      if (!res.ok) return null;
+      const doc = firestoreDocumentToJs(await res.json()) || {};
+      return (Array.isArray(doc.owners) ? doc.owners : []).map(owner => String(owner?.sourceOwner || '')).filter(Boolean);
+    } catch (err) {
+      console.warn('fetchAssetIndexOwners failed:', err);
+      return null;
+    }
+  };
+  // The only Storage deletion path for user photos: the file goes only when no other message,
+  // memo or meeting album still points at it (otherwise that reference becomes a permanent 404
+  // thumbnail). A leaked file costs a few KB; a dangling reference breaks every screen.
+  const deleteAssetFilesIfUnreferenced = async (asset, exclusions = {}) => {
+    const full = String(asset?.imageUrl || asset?.full || '');
+    const thumb = String(asset?.thumbUrl || asset?.thumb || '');
+    if (!full && !thumb) return false;
+    const indexOwners = await fetchAssetIndexOwners({ imageUrl: full || thumb });
+    if (indexOwners === null) return false;
+    const others = listOtherAssetReferences({ imageUrl: full, thumbUrl: thumb }, {
+      messages: [...(chatMessagesRef.current || []), ...(galleryChatMessagesRef.current || [])],
+      memos: memosRef.current || [],
+      meetings: getConfirmedMeetings(activeCalRef.current || activeCal),
+      indexOwners,
+      ...exclusions
+    });
+    if (others.length) {
+      console.info('Storage file kept; still referenced by', others);
+      return false;
+    }
+    if (full) deleteChatImageFromStorage(full);
+    if (thumb && thumb !== full) deleteChatImageFromStorage(thumb);
+    return true;
+  };
+
   // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
   // the right photo after the chat message they trace back to loses an image -- the entry at
   // the deleted index is dropped (that photo is gone everywhere now, not just here), and every
@@ -5199,41 +5098,14 @@ function CalendarApp() {
   // regardless of index.
   const unlinkMeetingPhotoReferences = async (messageId, deletedImageIndex, deletedPhoto = {}) => {
     if (!activeCal || !messageId) return true;
-    const existingMeetings = getConfirmedMeetings(activeCal);
-    let changed = false;
-    const deletedIdentity = {
-      photoId: deletedPhoto.photoId || '',
-      mediaKey: deletedPhoto.mediaKey || '',
-      refKey: deletedPhoto.refKey || '',
-      imageUrl: deletedPhoto.imageUrl || '',
-      thumbUrl: deletedPhoto.thumbUrl || ''
-    };
-    const nextConfirmedMeetings = existingMeetings.map(meeting => {
-      const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
-      let meetingChanged = false;
-      const nextPhotos = photos.reduce((acc, p) => {
-        if (p?.sourceMessageId !== messageId) {
-          acc.push(p);
-          return acc;
-        }
-        const identityMatch = photoMatchesIdentityPayload(p, deletedIdentity);
-        const indexMatch = deletedImageIndex === null || p.sourceImageIndex === deletedImageIndex;
-        if (identityMatch || indexMatch) {
-          meetingChanged = true;
-          return acc;
-        }
-        if (Number.isInteger(deletedImageIndex) && p.sourceImageIndex > deletedImageIndex) {
-          meetingChanged = true;
-          acc.push({ ...p, sourceImageIndex: p.sourceImageIndex - 1 });
-          return acc;
-        }
-        acc.push(p);
-        return acc;
-      }, []);
-      if (!meetingChanged) return meeting;
-      changed = true;
-      return { ...meeting, photos: nextPhotos };
-    });
+    // Every album entry of the deleted file goes, including copies made by other paths or in a
+    // second meeting (removeAssetFromMeetings matches by Storage identity, not only by
+    // sourceMessageId) -- those leftovers were the 404 thumbnails in 추억/갤러리.
+    const { meetings: nextConfirmedMeetings, changed } = removeAssetFromMeetings(
+      getConfirmedMeetings(activeCal),
+      { imageUrl: deletedPhoto.imageUrl || '', thumbUrl: deletedPhoto.thumbUrl || '' },
+      { messageId, deletedIndex: deletedImageIndex, dropAllFromMessage: deletedImageIndex === null }
+    );
     if (!changed) return true;
     const ok = await commitConfirmedMeetings(nextConfirmedMeetings, null, [], 'write', 'success');
     if (!ok) {
@@ -5245,16 +5117,49 @@ function CalendarApp() {
   const handleDeleteChatMessagePhoto = async (messageId, imageIndex, options) => {
     const silent = !!(options && options.silent);
     if (!messageId || !Number.isInteger(imageIndex)) return false;
-    const sourceMessage = await findChatMessageById(messageId);
+    // The caller's view of the photo (possibly from a stale local copy) says WHICH file to
+    // delete; the fresh server copy says WHERE it is now.
+    const localMessage = await findChatMessageById(messageId);
+    const localTarget = localMessage ? getMessageImageEntries(localMessage).find(entry => entry.imageIndex === imageIndex) : null;
+    const sourceMessage = await readFreshChatMessage(messageId);
     if (!sourceMessage) {
       return false;
     }
     const entries = getMessageImageEntries(sourceMessage);
-    const target = entries[imageIndex];
+    const expected = localTarget
+      ? { imageUrl: localTarget.full || '', thumbUrl: localTarget.thumb || '' }
+      : { imageUrl: options?.imageUrl || '', thumbUrl: options?.thumbUrl || '' };
+    if (expected.imageUrl || expected.thumbUrl) {
+      const slot = findImageSlotByAsset(sourceMessage, expected, imageIndex);
+      if (slot < 0) {
+        if (!silent) showToast('이미 삭제되었거나 변경된 사진입니다. 화면을 새로고침해 주세요.', 'error', 4000);
+        return false;
+      }
+      imageIndex = slot;
+    }
+    const target = entries.find(entry => entry.imageIndex === imageIndex);
     if (!target) return false;
-    const nextUrls = entries.filter((_, i) => i !== imageIndex).map(e => e.full);
-    const nextThumbs = entries.filter((_, i) => i !== imageIndex).map(e => e.thumb);
-    const nextTags = entries.filter((_, i) => i !== imageIndex).map(e => e.tags || '');
+    // Keep the three persisted arrays aligned by their source slot. `entries` is a render list
+    // and may omit a malformed legacy image, so rebuilding arrays from it would shift every
+    // later photo/tag pair after a deletion.
+    const rawUrls = Array.isArray(sourceMessage.imageUrls) && sourceMessage.imageUrls.length
+      ? sourceMessage.imageUrls.slice()
+      : (sourceMessage.imageUrl ? [sourceMessage.imageUrl] : []);
+    const rawThumbs = Array.isArray(sourceMessage.thumbUrls) && sourceMessage.thumbUrls.length
+      ? sourceMessage.thumbUrls.slice()
+      : (sourceMessage.thumbUrl ? [sourceMessage.thumbUrl] : []);
+    const rawTags = Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags.slice() : [];
+    const nextUrls = rawUrls.filter((_, index) => index !== imageIndex);
+    const nextThumbs = rawThumbs.filter((_, index) => index !== imageIndex);
+    const nextTags = rawTags.filter((_, index) => index !== imageIndex);
+    const nextImageTagMap = reconcileMessageImageTagMap({
+      ...sourceMessage,
+      imageUrls: nextUrls,
+      thumbUrls: nextThumbs,
+      imageTags: nextTags,
+      imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+      thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
+    }, sourceMessage.imageTagMap);
     const remainingText = String(sourceMessage.text || '').trim();
     const remainingFiles = Array.isArray(sourceMessage.fileAttachments) ? sourceMessage.fileAttachments.filter(Boolean) : [];
     const previousMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
@@ -5270,8 +5175,8 @@ function CalendarApp() {
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
       const allowed = asCreate
-        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
-        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
+        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
+        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
       const out = {};
       for (const key of allowed) {
         if (msg && msg[key] !== undefined) out[key] = msg[key];
@@ -5283,10 +5188,10 @@ function CalendarApp() {
       }
       return sanitizeMessageForFirestore(out);
     };
-    const finalizeStorageDeletion = () => {
-      deleteChatImageFromStorage(target.full);
-      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
-    };
+    const finalizeStorageDeletion = () => deleteAssetFilesIfUnreferenced(
+      { imageUrl: target.full, thumbUrl: target.thumb },
+      { excludeMessageId: messageId, excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date) }
+    );
     // `writeCollectionDocumentWithFallback` can also return { queued: true } when neither the
     // SDK nor REST attempt could complete in time (see FIRESTORE_WRITE_DEADLINE_MS/
     // shouldQueueCollectionWrite) -- the operation is durably saved for a later automatic retry,
@@ -5307,9 +5212,10 @@ function CalendarApp() {
         const data = sanitizeMessageForFirestore({
           imageUrls: nextUrls,
           thumbUrls: nextThumbs,
-          imageUrl: nextUrls[0] || null,
-          thumbUrl: nextThumbs[0] || null,
-          imageTags: nextTags
+          imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+          thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
+          imageTags: nextTags,
+          imageTagMap: nextImageTagMap
         });
         const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제', { deletePaths });
         if (!ok) throw new Error('Photo delete update failed');
@@ -5343,6 +5249,7 @@ function CalendarApp() {
               imageUrl: sourceSnapshot.imageUrl || (Array.isArray(sourceSnapshot.imageUrls) ? sourceSnapshot.imageUrls[0] : null) || null,
               thumbUrl: sourceSnapshot.thumbUrl || (Array.isArray(sourceSnapshot.thumbUrls) ? sourceSnapshot.thumbUrls[0] : null) || null,
               imageTags: Array.isArray(sourceSnapshot.imageTags) ? sourceSnapshot.imageTags : [],
+              imageTagMap: sourceSnapshot.imageTagMap && typeof sourceSnapshot.imageTagMap === 'object' && !Array.isArray(sourceSnapshot.imageTagMap) ? sourceSnapshot.imageTagMap : {},
               text: sourceSnapshot.text,
               participantId: sourceSnapshot.participantId,
               linkPreview: sourceSnapshot.linkPreview
@@ -5377,7 +5284,7 @@ function CalendarApp() {
           }
         }
         if (!meetingCleanupOk) return;
-        finalizeStorageDeletion();
+        await finalizeStorageDeletion();
       };
       if (wasQueued) {
         if (!silent) showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
@@ -5398,13 +5305,23 @@ function CalendarApp() {
 
   const handleReplaceChatMessagePhoto = async (messageId, imageIndex, file) => {
     if (!messageId || !Number.isInteger(imageIndex) || !file) return false;
-    const sourceMessage = await findChatMessageById(messageId);
+    const localMessage = await findChatMessageById(messageId);
+    const localTarget = localMessage ? getMessageImageEntries(localMessage).find(entry => entry.imageIndex === imageIndex) : null;
+    const sourceMessage = await readFreshChatMessage(messageId);
     if (!sourceMessage) {
       showToast('교체 대상 이미지를 찾지 못했습니다.', 'error', 4000);
       return false;
     }
+    if (localTarget) {
+      const slot = findImageSlotByAsset(sourceMessage, { imageUrl: localTarget.full || '', thumbUrl: localTarget.thumb || '' }, imageIndex);
+      if (slot < 0) {
+        showToast('이미 삭제되었거나 변경된 사진입니다. 화면을 새로고침해 주세요.', 'error', 4000);
+        return false;
+      }
+      imageIndex = slot;
+    }
     const entries = getMessageImageEntries(sourceMessage);
-    const target = entries[imageIndex];
+    const target = entries.find(entry => entry.imageIndex === imageIndex);
     if (!target) return false;
     const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
     if (!compressed.length) { setChatUploadProgress(null); return false; }
@@ -5413,19 +5330,72 @@ function CalendarApp() {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
       });
       if (!resolved) throw new Error('Replacement upload returned no result');
-      const nextUrls = entries.map((e, i) => i === imageIndex ? resolved.imageUrl : e.full);
-      const nextThumbs = entries.map((e, i) => i === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : e.thumb);
+      const rawUrls = Array.isArray(sourceMessage.imageUrls) && sourceMessage.imageUrls.length
+        ? sourceMessage.imageUrls.slice()
+        : (sourceMessage.imageUrl ? [sourceMessage.imageUrl] : []);
+      const rawThumbs = Array.isArray(sourceMessage.thumbUrls) && sourceMessage.thumbUrls.length
+        ? sourceMessage.thumbUrls.slice()
+        : (sourceMessage.thumbUrl ? [sourceMessage.thumbUrl] : []);
+      while (rawUrls.length <= imageIndex) rawUrls.push('');
+      while (rawThumbs.length <= imageIndex) rawThumbs.push('');
+      const nextUrls = rawUrls.map((url, index) => index === imageIndex ? resolved.imageUrl : url);
+      const nextThumbs = rawThumbs.map((url, index) => index === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : url);
+      const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
+      while (nextImageTags.length < Math.max(nextUrls.length, nextThumbs.length)) nextImageTags.push('');
+      // Replacing the pixels does not change what the photo is: keep its tags (they used to be
+      // wiped here) and re-key them to the new file.
+      const keptTags = String(target.tags || nextImageTags[imageIndex] || '');
+      nextImageTags[imageIndex] = keptTags;
+      const oldAssetKey = canonicalPhotoAssetKey({ full: target.full, thumb: target.thumb });
+      const newAssetKey = canonicalPhotoAssetKey({ full: resolved.imageUrl, thumb: resolved.thumbUrl });
+      const seededTagMap = { ...(sourceMessage.imageTagMap && typeof sourceMessage.imageTagMap === 'object' && !Array.isArray(sourceMessage.imageTagMap) ? sourceMessage.imageTagMap : {}) };
+      if (newAssetKey && keptTags) seededTagMap[newAssetKey] = keptTags;
+      const nextImageTagMap = reconcileMessageImageTagMap({
+        ...sourceMessage,
+        imageUrls: nextUrls,
+        thumbUrls: nextThumbs,
+        imageTags: nextImageTags,
+        imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+        thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
+      }, seededTagMap);
       const data = sanitizeMessageForFirestore({
         imageUrls: nextUrls,
         thumbUrls: nextThumbs,
-        imageUrl: nextUrls[0] || null,
-        thumbUrl: nextThumbs[0] || null
+        imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+        thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
+        imageTags: nextImageTags,
+        imageTagMap: nextImageTagMap
       });
       const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 교체');
       if (!ok) throw new Error('Photo replace update failed');
       patchLocalChatMessage(messageId, data);
-      deleteChatImageFromStorage(target.full);
-      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
+      const oldAsset = { imageUrl: target.full, thumbUrl: target.thumb };
+      // Every meeting album copy follows the replacement; otherwise it keeps pointing at the
+      // old file, which is deleted below -> a broken thumbnail in 일정/추억.
+      let meetingsMoved = true;
+      try {
+        const moved = replaceAssetInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), oldAsset, { imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl });
+        if (moved.changed) meetingsMoved = Boolean(await commitConfirmedMeetings(moved.meetings, null, [], 'write', 'success'));
+      } catch (moveErr) {
+        meetingsMoved = false;
+        console.warn('handleReplaceChatMessagePhoto meeting copies not moved:', moveErr);
+      }
+      // Comments follow the photo, not the file.
+      if (oldAssetKey && newAssetKey && oldAssetKey !== newAssetKey) {
+        try {
+          const previousComments = await handleFetchPhotoComments(oldAssetKey);
+          const list = Array.isArray(previousComments) ? previousComments : (Array.isArray(previousComments?.comments) ? previousComments.comments : []);
+          if (list.length && await handleSavePhotoComments(newAssetKey, list)) await handleSavePhotoComments(oldAssetKey, []);
+        } catch (commentErr) {
+          console.warn('handleReplaceChatMessagePhoto comments not moved:', commentErr);
+        }
+      }
+      if (meetingsMoved) {
+        await deleteAssetFilesIfUnreferenced(oldAsset, {
+          excludeMessageId: messageId,
+          excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date)
+        });
+      }
       showToast('사진 교체완료', 'success');
       return resolved.imageUrl;
     } catch (err) {
@@ -5516,6 +5486,16 @@ function CalendarApp() {
     const nextUrls = urls.filter((_, i) => i !== imageIndex);
     const nextThumbs = thumbs.filter((_, i) => i !== imageIndex);
     const nextImageTags = Array.isArray(memo.imageTags) ? memo.imageTags.filter((_, i) => i !== imageIndex) : undefined;
+    const nextImageTagMap = reconcileMessageImageTagMap({
+      ...memo,
+      id: memoId,
+      uploadSource: 'memo',
+      imageUrls: nextUrls,
+      thumbUrls: nextThumbs,
+      imageTags: nextImageTags || [],
+      imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+      thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
+    }, memo.imageTagMap);
     const memoSnapshot = JSON.parse(JSON.stringify(memo));
     const finalizeStorageDeletion = () => {
       deleteChatImageFromStorage(removedUrl);
@@ -5523,7 +5503,14 @@ function CalendarApp() {
     };
     try {
       const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
-      const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null, ...(nextImageTags ? { imageTags: nextImageTags } : {}) });
+      const data = sanitizeMemoForFirestore({
+        imageUrls: nextUrls,
+        thumbUrls: nextThumbs,
+        imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+        thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
+        ...(nextImageTags ? { imageTags: nextImageTags } : {}),
+        imageTagMap: nextImageTagMap
+      });
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제', { deletePaths });
       if (!updated) throw new Error('Memo photo delete failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
@@ -5573,7 +5560,29 @@ function CalendarApp() {
       const removedThumb = thumbs[imageIndex] || removedUrl;
       const nextUrls = urls.map((u, i) => i === imageIndex ? resolved.imageUrl : u);
       const nextThumbs = thumbs.map((t, i) => i === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : t);
-      const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
+      const nextImageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
+      while (nextImageTags.length < nextUrls.length) nextImageTags.push('');
+      // A replacement is a new asset, not a renamed old one. Never carry the removed photo's
+      // people/place tags across to it.
+      nextImageTags[imageIndex] = '';
+      const nextImageTagMap = reconcileMessageImageTagMap({
+        ...memo,
+        id: memoId,
+        uploadSource: 'memo',
+        imageUrls: nextUrls,
+        thumbUrls: nextThumbs,
+        imageTags: nextImageTags,
+        imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+        thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
+      }, memo.imageTagMap);
+      const data = sanitizeMemoForFirestore({
+        imageUrls: nextUrls,
+        thumbUrls: nextThumbs,
+        imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
+        thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
+        imageTags: nextImageTags,
+        imageTagMap: nextImageTagMap
+      });
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 교체');
       if (!updated) throw new Error('Memo photo replace failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
@@ -7116,8 +7125,12 @@ function CalendarApp() {
       showToast: showToast
     })
   );
-  // WP-01 (?shell=v2, see ui-app-shell-v2.js): null unless flagged, so default behavior is unchanged.
-  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE), sharedMemo, setSharedMemo, chatMessages, patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag, isMemoShareOpen, setIsMemoShareOpen }); if (renewalShellEl) return renewalShellEl;
+  // WP-01 (V2 is default; ?shell=v1 opts out, see ui-app-shell-v2.js).
+  // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
+  if (new URLSearchParams(window.location.search).get('shell') !== 'v1') {
+    window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
+  }
+  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE), sharedMemo, setSharedMemo, chatMessages, patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag, isMemoShareOpen, setIsMemoShareOpen }, { chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog, isNotificationHelpOpen, setIsNotificationHelpOpen, onNotificationHelpRetry: handleMainToggleNotifications, showToast }); if (renewalShellEl) return renewalShellEl;
   if (activeView === 'chat') {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
@@ -8775,6 +8788,8 @@ function bindGatherUiDeps() {
     memePoolDeleteRemote: typeof memePoolDeleteRemote === 'function' ? memePoolDeleteRemote : null,
     listUntaggedPhotoIndexEntriesRemote: typeof listUntaggedPhotoIndexEntriesRemote === 'function' ? listUntaggedPhotoIndexEntriesRemote : null,
     adminBulkTagPhotosRemote: typeof adminBulkTagPhotosRemote === 'function' ? adminBulkTagPhotosRemote : null,
+    listPhotoIndexEntriesForDedupRemote: typeof listPhotoIndexEntriesForDedupRemote === 'function' ? listPhotoIndexEntriesForDedupRemote : null,
+    mergeDedupPhotosRemote: typeof mergeDedupPhotosRemote === 'function' ? mergeDedupPhotosRemote : null,
     listSharedDataPoolRemote: typeof listSharedDataPoolRemote === 'function' ? listSharedDataPoolRemote : null,
     fetchMemePoolRest: typeof fetchMemePoolRest === 'function' ? fetchMemePoolRest : null,
     rebuildPhotoIndexRemote: typeof rebuildPhotoIndexRemote === 'function' ? rebuildPhotoIndexRemote : null,

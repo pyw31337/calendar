@@ -12,21 +12,10 @@ function __fb() {
   }
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
-const SIDE_MENU_REQUEST_TIMEOUT_MS = 7000;
-function withSideMenuTimeout(promise, timeoutMs = SIDE_MENU_REQUEST_TIMEOUT_MS) {
-  let timer = null;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('사이드 메뉴 요청 시간이 초과되었습니다.')), timeoutMs);
-  });
-  return Promise.race([promise, deadline]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
-}
 export function AppSettingsModal({
   onClose, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isNotifPermissionGranted, isMasterNotifyEnabled, onToggleMasterNotify,
   notifyChannels, onToggleNotifyChannel, helpSteps,
-  weatherLocation = null, recentLocations = [], onUpdateWeatherLocation, onDeleteRecentLocation, showToast,
   calendarId = null,
   calendar = null,
   onRequestConfirm = null,
@@ -36,178 +25,34 @@ export function AppSettingsModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (({ children, ...p }) => React.createElement('div', p, children));
   const ToggleSwitch = __deps.ToggleSwitch;
   const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
   const MoonStarsIcon = __deps.MoonStarsIcon;
   const TextResizeIcon = __deps.TextResizeIcon;
   const BellIcon = __deps.BellIcon;
-  const MapCogIcon = __deps.MapCogIcon;
-  const translateKoreanToEnglish = __deps.translateKoreanToEnglish;
   const channels = [
     { key: 'chat', label: '채팅 알림' },
     { key: 'memo', label: '메모 알림' },
     { key: 'poll', label: '투표 알림' },
     { key: 'schedule', label: '일정 알림' }
   ];
-  const [weatherQuery, setWeatherQuery] = React.useState('');
-  const [weatherResults, setWeatherResults] = React.useState([]);
-  const [weatherLoading, setWeatherLoading] = React.useState(false);
-  const currentWeatherName = (weatherLocation && weatherLocation.name) || '서울';
   const [localConfirmDialog, setLocalConfirmDialog] = React.useState(null);
-          const isKoreaResult = (loc) => {
-    if (!loc) return false;
-    const cc = String(loc.country_code || loc.countryCode || '').toUpperCase();
-    if (cc === 'KR') return true;
-    const country = String(loc.country || '');
-    if (/대한민국|South Korea|Korea, Republic|한국/i.test(country)) return true;
-    // open-meteo uses country_code
-    return false;
-  };
 
-  const handleWeatherSearch = async (e) => {
-    if (e) e.preventDefault();
-    const cleanQuery = (weatherQuery || '').trim();
-    if (!cleanQuery) {
-      if (typeof showToast === 'function') showToast('검색할 지역 이름을 입력해 주세요.', 'error');
-      return;
-    }
-    setWeatherLoading(true);
-    try {
-      const translated = typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish(cleanQuery) : cleanQuery;
-      let searchResults = [];
-      // Domestic only: countryCode=KR (open-meteo) / countrycodes=kr (nominatim)
-      if (translated) {
-        const res = await withSideMenuTimeout(fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=12&language=ko&format=json&countryCode=KR'));
-        if (res.ok) {
-          const data = await res.json();
-          searchResults = (data.results || []).filter(isKoreaResult);
-        }
-      }
-      if (searchResults.length === 0) {
-        const res = await withSideMenuTimeout(fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=12&accept-language=ko&countrycodes=kr'));
-        if (res.ok) {
-          const data = await res.json();
-          searchResults = (data || []).map((item, idx) => ({
-            id: 'nominatim_' + (item.place_id || idx),
-            name: item.name || (item.display_name || '').split(',')[0],
-            latitude: parseFloat(item.lat),
-            longitude: parseFloat(item.lon),
-            country: '대한민국',
-            country_code: 'KR',
-            admin1: (item.display_name || '').split(',').slice(1, 2)[0]?.trim() || ''
-          }));
-        }
-      }
-      setWeatherResults(searchResults);
-      if (searchResults.length === 0 && typeof showToast === 'function') {
-        showToast('국내에서 일치하는 지역이 없습니다.', 'info');
-      }
-    } catch (err) {
-      console.error(err);
-      if (typeof showToast === 'function') showToast('지역 검색에 실패했습니다.', 'error');
-    } finally {
-      setWeatherLoading(false);
-    }
-  };
-
-  const pickWeatherLocation = (loc) => {
-    if (!loc) return;
-    const normalized = {
-      name: loc.name || loc.admin1 || '선택한 지역',
-      lat: loc.latitude != null ? loc.latitude : loc.lat,
-      lon: loc.longitude != null ? loc.longitude : loc.lon
-    };
-    if (typeof onUpdateWeatherLocation === 'function') onUpdateWeatherLocation(normalized);
-    setWeatherQuery('');
-    setWeatherResults([]);
-    if (typeof showToast === 'function') showToast((normalized.name || '지역') + ' 날씨로 설정했습니다.', 'success');
-  };
-
-  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay app-settings-overlay", onClick: onClose, style: { zIndex: 12000 } },
-    /*#__PURE__*/React.createElement("div", {
-      className: "modal-container app-settings-modal-container", onClick: e => e.stopPropagation(),
-      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
+    /*#__PURE__*/React.createElement(ResizableModalContainer, {
+      // The V2 shell scopes the responsive modal treatment; V1 keeps this
+      // component's existing presentation because its stylesheet is inert
+      // outside `.renewal-shell.v2-design`.
+      className: "modal-container v2-responsive-modal v2-settings-modal", onClick: e => e.stopPropagation(),
+      style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)', borderRadius: '20px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '1.05rem', margin: 0, color: 'var(--text-main)' } }, "설정"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, className: "modal-close-btn", "aria-label": "설정 닫기", style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
-      /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
-        /* Weather region — above dark mode */
-        /*#__PURE__*/React.createElement("div", { style: { padding: '6px 0 12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
-          /*#__PURE__*/React.createElement("div", {
-            className: "admin-side-menu-setting-row",
-            style: { padding: '4px 0 2px', alignItems: 'center' }
-          },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-              /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" },
-                MapCogIcon ? /*#__PURE__*/React.createElement(MapCogIcon, { size: 20 }) : null
-              ),
-              "날씨 지역"
-            ),
-            /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }
-            }, "현재 : ", /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', fontWeight: 700 } }, currentWeatherName))
-          ),
-          /*#__PURE__*/React.createElement("form", {
-            onSubmit: handleWeatherSearch,
-            style: { display: 'flex', gap: '8px', alignItems: 'center' }
-          },
-            /*#__PURE__*/React.createElement("input", {
-              type: "text",
-              value: weatherQuery,
-              onChange: e => setWeatherQuery(e.target.value),
-              placeholder: "지역 이름 검색 (예: 구로구)",
-              style: {
-                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-                color: 'var(--text-main)', fontSize: 'var(--font-size-base)', outline: 'none'
-              }
-            }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "submit",
-              disabled: weatherLoading,
-              style: {
-                flexShrink: 0, padding: '10px 14px', borderRadius: 'var(--radius-md)', border: 'none',
-                background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-md)',
-                cursor: weatherLoading ? 'wait' : 'pointer'
-              }
-            }, weatherLoading ? '검색중' : '검색')
-          ),
-          recentLocations && recentLocations.length > 0 && /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
-          },
-            recentLocations.map((loc, idx) => /*#__PURE__*/React.createElement("button", {
-              key: idx,
-              type: "button",
-              onClick: () => pickWeatherLocation(loc),
-              style: {
-                padding: '5px 10px', fontSize: 'var(--font-size-sm)', borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-                color: 'var(--text-main)', cursor: 'pointer'
-              }
-            }, loc.name))
-          ),
-          weatherResults && weatherResults.length > 0 && /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto' }
-          },
-            weatherResults.map((loc, idx) => /*#__PURE__*/React.createElement("button", {
-              key: loc.id || idx,
-              type: "button",
-              onClick: () => pickWeatherLocation(loc),
-              style: {
-                textAlign: 'left', padding: '8px 10px', borderRadius: '8px',
-                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-                color: 'var(--text-main)', cursor: 'pointer', fontSize: 'var(--font-size-md)'
-              }
-            }, loc.name, loc.admin1 ? ' · ' + loc.admin1 : ''))
-          )
-        ),
-        /*#__PURE__*/React.createElement("div", {
-          "aria-hidden": "true",
-          style: { height: '0', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }
-        }),
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
@@ -278,17 +123,17 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
   const ToggleSwitch = __deps.ToggleSwitch;
   const BellIcon = __deps.BellIcon;
   return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", style: { zIndex: 13000 } },
-    /*#__PURE__*/React.createElement("div", {
+    /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container", onClick: e => e.stopPropagation(),
-      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+      style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)', borderRadius: '20px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '1.05rem', margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' } },
           BellIcon && /*#__PURE__*/React.createElement(BellIcon, null), "알림 허용 안내"),
         /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
-      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
         /*#__PURE__*/React.createElement("div", {
           className: "admin-side-menu-setting-row",
           style: { padding: '14px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
@@ -556,7 +401,6 @@ export function MainSideMenu({
   placeLastName = null,
   memoLastTitleWord = null,
   onClose,
-  onOpenManual,
   onOpenSettings,
   onOpenAnniversaries,
   onOpenShare,
@@ -644,35 +488,8 @@ export function MainSideMenu({
 
         )
     ),
-    /* Group 1: manual (banner) + calendar settings */
+    /* Group 1: calendar settings + anniversaries. 사용자 매뉴얼 is removed. */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px' } },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item main-side-menu-manual-banner",
-        onClick: () => handle(onOpenManual)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-icon-wrap", "aria-hidden": "true" },
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-            fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"
-          },
-            /*#__PURE__*/React.createElement("path", { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }),
-            /*#__PURE__*/React.createElement("path", { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }),
-            /*#__PURE__*/React.createElement("path", { d: "M8 7h8" }),
-            /*#__PURE__*/React.createElement("path", { d: "M8 11h6" })
-          )
-        ),
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-text" },
-          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-title" }, "사용자 매뉴얼"),
-          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-sub" }, "사용 방법 한눈에 보기")
-        ),
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-chevron", "aria-hidden": "true" },
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
-            fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, /*#__PURE__*/React.createElement("path", { d: "m9 18 6-6-6-6" }))
-        )
-      ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",

@@ -3,7 +3,9 @@
 // changing photo identity or deduplication rules. This file must stay importable under plain
 // Node (no `window`) -- firebase-safety-tests.mjs imports it directly to unit-test these
 // functions -- so it never imports app-domain-helpers.js, which touches window at module-eval
-// time.
+// time. photo-asset.js is pure and is the shared asset:v1 identity.
+
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 
 export function coerceGalleryImageIndex(value) {
   if (Number.isInteger(value)) return value;
@@ -241,10 +243,16 @@ export function mergeMemoryPhotoIdentity(preferred, other, getPhotoAssetCommentK
   const merged = { ...(preferred || {}) };
   const donor = other || {};
   if (!merged.meetingDate && donor.meetingDate) merged.meetingDate = donor.meetingDate;
-  const mergedTagCount = String(merged.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-  const donorTagCount = String(donor.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-  if (donorTagCount > mergedTagCount) merged.tags = donor.tags;
-  else if (!merged.tags && donor.tags) merged.tags = donor.tags;
+  // Never pick tags merely because another duplicate has more tokens. That heuristic could
+  // attach a person's tag from one legacy copy to a different photo. An explicit asset/slot tag
+  // is authoritative even when intentionally empty; otherwise keep the deterministic survivor.
+  const preferredHasExplicitTags = merged.tagAuthority === 'editable' || merged.tagAuthoritative === true;
+  const donorHasExplicitTags = donor.tagAuthority === 'editable' || donor.tagAuthoritative === true;
+  if (!preferredHasExplicitTags && donorHasExplicitTags) {
+    merged.tags = String(donor.tags || '');
+    merged.tagAuthority = donor.tagAuthority || 'editable';
+    merged.tagAuthoritative = donor.tagAuthoritative === true;
+  }
   if (!merged.messageId && donor.messageId) merged.messageId = donor.messageId;
   if (!merged.sourceMessageId && donor.sourceMessageId) merged.sourceMessageId = donor.sourceMessageId;
   if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(donor.imageIndex) != null) {
@@ -323,12 +331,16 @@ export function dedupeGalleryPhotoEntries(list, getPhotoAssetCommentKey, sourceR
   const mergeIdentity = (preferred, other) => {
     const merged = { ...preferred };
     if (!merged.meetingDate && other.meetingDate) merged.meetingDate = other.meetingDate;
-    // Prefer the fuller tag string when chat/memo/meeting copies of the same asset disagree
-    // (empty message.imageTags must not blank a tagged meeting album copy).
-    const mergedTagCount = String(merged.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-    const otherTagCount = String(other.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-    if (otherTagCount > mergedTagCount) merged.tags = other.tags;
-    else if (!merged.tags && other.tags) merged.tags = other.tags;
+    // Tags belong to the image asset, not to whichever duplicate happens to have a longer
+    // string. Prefer an explicit asset/slot value (including an intentional empty clear) and
+    // otherwise retain the deterministic survivor selected by source rank.
+    const preferredHasExplicitTags = merged.tagAuthority === 'editable' || merged.tagAuthoritative === true;
+    const otherHasExplicitTags = other.tagAuthority === 'editable' || other.tagAuthoritative === true;
+    if (!preferredHasExplicitTags && otherHasExplicitTags) {
+      merged.tags = String(other.tags || '');
+      merged.tagAuthority = other.tagAuthority || 'editable';
+      merged.tagAuthoritative = other.tagAuthoritative === true;
+    }
     if (!merged.messageId && other.messageId) merged.messageId = other.messageId;
     if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(other.imageIndex) != null) {
       merged.imageIndex = coerceGalleryImageIndex(other.imageIndex);
@@ -438,6 +450,15 @@ export function isMemeKeyboardPhotoEntry(photo) {
   return [photo.imageUrls, photo.thumbUrls].some(urls => Array.isArray(urls) && urls.some(isMemePoolAssetUrl));
 }
 
+function photoAssetLegacyKeys(assetKey, keys) {
+  const out = [];
+  (Array.isArray(keys) ? keys : []).forEach((key) => {
+    const value = typeof key === 'string' ? key.trim() : '';
+    if (value && value !== assetKey && !out.includes(value)) out.push(value);
+  });
+  return out;
+}
+
 export function composeGalleryPhotos({
   chatMessages = [], memos = [], calendar = null, anniversaries = [],
   isTombstone, getMessageImageEntries, getAllDirectMediaImageEntries,
@@ -505,11 +526,25 @@ export function composeGalleryPhotos({
       const sourceImageIndex = coerceGalleryImageIndex(
         photo?.sourceImageIndex ?? resolved?.sourceImageIndex
       );
-      const mediaKey = resolved?.mediaKey || photo?.mediaKey
-        || (photo?.sourceMessageId && sourceImageIndex != null
-          ? `chat:${photo.sourceMessageId}:${sourceImageIndex}`
-          : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
-      const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      const slotMediaKey = photo?.sourceMessageId && sourceImageIndex != null
+        ? `chat:${photo.sourceMessageId}:${sourceImageIndex}`
+        : '';
+      const positionalKey = (value) => {
+        const key = typeof value === 'string' ? value.trim() : '';
+        return key && !key.startsWith('asset:v1:') ? key : '';
+      };
+      const mediaKey = slotMediaKey
+        || positionalKey(photo?.mediaKey)
+        || positionalKey(resolved?.mediaKey)
+        || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      const refKey = positionalKey(photo?.refKey)
+        || positionalKey(resolved?.refKey)
+        || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      const assetKey = canonicalPhotoAssetKey({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageUrl: full || thumb
+      });
       list.push({
         full: full || thumb,
         thumb: thumb || full,
@@ -526,6 +561,7 @@ export function composeGalleryPhotos({
           const photoCount = photoTags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
           return photoCount > resolvedCount ? photoTags : (resolvedTags || photoTags);
         })(),
+        tagAuthority: Object.prototype.hasOwnProperty.call(photo || {}, 'tags') ? 'editable' : '',
         directMediaUrl: '',
         text: `${meeting.date || ''} 일정 사진`,
         participantId: '',
@@ -533,7 +569,9 @@ export function composeGalleryPhotos({
         meetingDate: meeting.date || '',
         mediaKey,
         refKey,
-        assetKey: resolved?.assetKey || photo?.assetKey || mediaKey
+        assetKey,
+        slotKey: mediaKey,
+        legacyKeys: photoAssetLegacyKeys(assetKey, [mediaKey, refKey, resolved?.assetKey, photo?.assetKey])
       });
     });
   });
@@ -547,6 +585,11 @@ export function composeGalleryPhotos({
       if ((!full && !thumb) || broken(full) || broken(thumb)) return;
       const mediaKey = photo?.mediaKey || `anniversary:${anniversary?.id || anniversaryDate || 'date'}:${photo?.id || index}`;
       const refKey = photo?.refKey || mediaKey;
+      const assetKey = canonicalPhotoAssetKey({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageUrl: full || thumb
+      });
       list.push({
         full: full || thumb,
         thumb: thumb || full,
@@ -564,7 +607,10 @@ export function composeGalleryPhotos({
         anniversaryId: anniversary?.id || '',
         meetingDate: anniversaryDate,
         mediaKey,
-        refKey
+        refKey,
+        assetKey,
+        slotKey: mediaKey,
+        legacyKeys: photoAssetLegacyKeys(assetKey, [mediaKey, refKey, photo?.assetKey])
       });
     });
   });
@@ -634,4 +680,36 @@ export function isChatRenderableMessage(message, meetingPhotoMessageIds = null) 
   if (isNonChatUploadSource(message.uploadSource)) return false;
   if (meetingPhotoMessageIds && meetingPhotoMessageIds.has(message.id)) return false;
   return true;
+}
+
+function memorySpanDays(group) {
+  const start = Date.parse(`${String(group?.startDate || '').slice(0, 10)}T00:00:00Z`);
+  const end = Date.parse(`${String(group?.endDate || group?.startDate || '').slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) / 86400000 : Number.POSITIVE_INFINITY;
+}
+
+// A photo is shown in exactly ONE memory. When memories overlap (a 1-day festival inside a
+// 3-day trip) the most specific one owns it: shortest span first, then the later start, then id.
+// `groups` are { id, startDate, endDate, photos } already filtered by range and exclusions, so a
+// photo the user removed from the specific memory falls through to the next matching one.
+export function assignPhotosToSingleMemory(groups, getPhotoAssetCommentKey) {
+  const list = Array.isArray(groups) ? groups : [];
+  const ranked = list.slice().sort((a, b) => (
+    memorySpanDays(a) - memorySpanDays(b)
+    || String(b.startDate || '').localeCompare(String(a.startDate || ''))
+    || String(a.id || '').localeCompare(String(b.id || ''))
+  ));
+  const owner = new Map();
+  ranked.forEach(group => (group.photos || []).forEach(photo => {
+    const keys = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
+    if (!keys.length || keys.some(key => owner.has(key))) return;
+    keys.forEach(key => owner.set(key, group.id));
+  }));
+  return list.map(group => ({
+    ...group,
+    photos: (group.photos || []).filter(photo => {
+      const keys = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
+      return !keys.length || keys.some(key => owner.get(key) === group.id);
+    }),
+  }));
 }

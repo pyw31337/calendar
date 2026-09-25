@@ -1,0 +1,4670 @@
+/**
+ * Loaded AFTER destination reference-*.css so Full-mock chrome cannot
+ * reintroduce 480px shells, 60px clipped headers, or v1 fixed-header gutters.
+ * Default shell never imports this file.
+ */
+
+.v2-design .v2-page-header,
+.v2-design .v2-dest-page > .v2-page-header,
+.v2-design .v2-dest-page > .bp-app-shell > .v2-page-header,
+.v2-design .v2-memo .v2-page-header,
+.v2-design .v2-chat .v2-page-header,
+.v2-design .v2-settlement .v2-page-header,
+.v2-design .v2-places .v2-page-header,
+.v2-design .v2-gallery .v2-page-header,
+.v2-design .v2-content .v2-page-header,
+.v2-design .v2-archive .v2-page-header,
+.v2-design .v2-memo .v2-page-header.bp-header,
+.v2-design .v2-chat .v2-page-header.bp-header,
+.v2-design .v2-settlement .v2-page-header.bp-header,
+.v2-design .v2-places .v2-page-header.bp-header {
+  display: block !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 60px !important;
+  overflow: visible !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
+}
+/* Default (visible) transform/opacity state. Separate from the block above -- without
+   !important here, PageHeader's own scroll-hide transform (screens.css, .is-scroll-hidden)
+   could never win against it, silently disabling hide-on-scroll for every V2 destination page
+   (chat/memo/settlement/places/gallery/content/archive share this one header component). */
+.v2-design .v2-page-header,
+.v2-design .v2-memo .v2-page-header,
+.v2-design .v2-chat .v2-page-header,
+.v2-design .v2-settlement .v2-page-header,
+.v2-design .v2-places .v2-page-header,
+.v2-design .v2-gallery .v2-page-header,
+.v2-design .v2-content .v2-page-header {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  padding-top: max(env(safe-area-inset-top, 0px), 0px) !important;
+}
+.v2-design .v2-gallery-tabs-slot .gallery-page-tabs,
+.v2-design .v2-gallery-tabs-slot .gallery-page-tabs-mobile {
+  position: static !important;
+  width: 100% !important;
+  transform: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+.v2-design .v2-archive,
+.v2-design .v2-content {
+  position: relative !important;
+}
+.v2-design .v2-archive .v2-page-header,
+.v2-design .v2-content .v2-page-header {
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 40 !important;
+  padding: 0 !important;
+  background: var(--bg-card) !important;
+}
+.v2-design .v2-archive .v2-page-header.is-scroll-hidden,
+.v2-design .v2-content .v2-page-header.is-scroll-hidden,
+.v2-design .v2-page-header.is-scroll-hidden,
+.v2-design .v2-memo .v2-page-header.is-scroll-hidden,
+.v2-design .v2-chat .v2-page-header.is-scroll-hidden,
+.v2-design .v2-settlement .v2-page-header.is-scroll-hidden,
+.v2-design .v2-places .v2-page-header.is-scroll-hidden,
+.v2-design .v2-gallery .v2-page-header.is-scroll-hidden {
+  /* Collapse out of the flex column so the list viewport grows into this
+     space. A sticky box left behind is what was covering scrolled cards.
+     The collapse is animated through max-height (see "Header collapse motion"
+     at the end of this file), so height/flex-basis stay auto here. */
+  position: relative !important;
+  top: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.v2-design .v2-page-header .bp-header-row,
+.v2-design .v2-memo .v2-page-header .bp-header-row,
+.v2-design .v2-chat .v2-page-header .bp-header-row,
+.v2-design .v2-settlement .v2-page-header .bp-header-row,
+.v2-design .v2-places .v2-page-header .bp-header-row,
+.v2-design .v2-content .v2-page-header .bp-header-row,
+.v2-design .v2-gallery .v2-page-header .bp-header-row,
+.v2-design .v2-archive .v2-page-header .bp-header-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
+.v2-design .v2-memo .bp-memo-grid,
+.v2-design .v2-memo .v2-memo-body,
+.v2-design .v2-memo .v2-dest-body,
+.v2-design .v2-memo .memo-list-scroll,
+.v2-design .v2-settlement .settlement-page-body,
+.v2-design .v2-settlement-legacy .settlement-page-body,
+.v2-design .v2-settlement .v2-settlement-body,
+.v2-design .v2-settlement .v2-dest-body,
+.v2-design .v2-settlement .bp-content,
+.v2-design .v2-places .places-list-body,
+.v2-design .v2-places .v2-places-body,
+.v2-design .v2-content .content-page-scroll {
+  padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x);
+  box-sizing: border-box;
+}
+.v2-design .v2-records-media {
+  padding: 0 !important;
+}
+.v2-design .v2-gallery .gallery-page-scroll,
+.v2-design .v2-records-media .gallery-page-scroll {
+  padding: 12px 16px 88px !important;
+  box-sizing: border-box !important;
+}
+
+.v2-design .v2-settlement .settlement-page-tabs,
+.v2-design .v2-settlement-legacy .settlement-page-tabs {
+  position: relative !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.v2-design .v2-has-page-header .places-view-header,
+.v2-design .v2-archive .places-view-header,
+.v2-design .v2-content .places-view-header,
+.v2-design .v2-gallery .gallery-page-header {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+}
+
+.v2-design .v2-content .history-header-stack {
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+}
+
+.v2-design .v2-archive .history-header-stack {
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+}
+
+.renewal-shell.v2-design .v2-archive .history-page-scroll,
+.renewal-shell.v2-design .v2-archive .history-meetings-grid {
+  /* Was 0 -- the list (전체/일자 filter row, cards) sat flush against the tab strip's own
+     bottom hairline with no breathing room. A small top gap, same idea as the gallery page's
+     own padding-top under its tabs (screens.css), without reopening the "absolute header"
+     double-spacing this rule was originally added to kill. */
+  padding-top: 12px !important;
+  margin-top: 0 !important;
+}
+.v2-design .v2-archive .history-bento-grid {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.v2-design .v2-content .underline-tabs {
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot,
+.v2-design .v2-content .history-header-stack > .v2-content-subcat-slot {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 8px 20px !important;
+  margin: 0 !important;
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-sizing: border-box !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 0 !important;
+  gap: 4px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #f3f1f7 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+.v2-design .v2-content .region-filter-trigger-row {
+  padding: 10px 20px 12px 20px !important;
+  margin: 0 !important;
+  gap: 8px !important;
+  background: var(--bg-card) !important;
+  border-top: none !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-sizing: border-box !important;
+}
+.v2-design .v2-content .culture-items-grid {
+  padding: 16px 20px 96px 20px !important;
+}
+
+.v2-design .v2-home-memo-bubble,
+.v2-design .v2-home-memo-bubble .v2-bubble-surface,
+.v2-design .v2-home-memo-bubble-surface,
+.v2-design .v2-memo-card-wrap .v2-bubble-surface,
+.v2-design .v2-memo-card-body,
+.v2-design .v2-bubble-summary,
+.v2-design .v2-bubble-comment-text,
+.v2-design .v2-memo-card-comments,
+.v2-design .v2-memo-card-comments span {
+  overflow: visible !important;
+  max-height: none !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  text-overflow: clip !important;
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-summary,
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-text,
+.v2-design .v2-memo-card-body,
+.v2-design .v2-memo .v2-memo-card-body,
+.v2-design .v2-home-memo-module .v2-memo-card-body {
+  display: block !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* Category color and size live in the anniversary lock at the end of this file. */
+
+.v2-design .bottom-sheet-overlay.emoji-sheet-overlay,
+body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
+  z-index: 40000 !important;
+  pointer-events: auto !important;
+}
+
+.v2-design .v2-chat .chat-composer-resize-handle,
+.v2-design .v2-chat-composer > .chat-composer-resize-handle,
+.v2-design .v2-chat .panel-resize-handle {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  margin: 4px auto 2px !important;
+  width: 48px !important;
+  height: 18px !important;
+  opacity: 1 !important;
+  color: var(--v2-ink-3, #9a93a8) !important;
+  cursor: ns-resize !important;
+}
+
+.v2-design .v2-chat .chat-messages-scroll,
+.v2-design .v2-chat-scroll {
+  padding-top: 12px !important;
+}
+
+.v2-design .v2-chat .chat-keyboard-reopen-btn {
+  display: none !important;
+}
+.v2-design .v2-chat .chat-composer:not(.v2-chat-composer) {
+  display: none !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+/* Dest header right-end icons: tight cluster, same gap on every page. */
+@media (max-width: 767px) {
+  .v2-design .v2-page-header .bp-header-actions {
+    gap: 4px !important;
+    padding-right: 0 !important;
+    min-width: 0 !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 2026-09-20 polish-2 — last cascade. Viewport-only anniversary modes,
+ * flush square hero, roomier today badge, borderless name dots.
+ * -------------------------------------------------------------------------- */
+
+.v2-design .bp-p-dot,
+.v2-design .bp-dot-row .bp-p-dot,
+.v2-design .bp-cal-legend .bp-dot {
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+.v2-design .bp-day-cell.bp-today .bp-day-num {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+  font-size: 0.7rem !important;
+  line-height: 1 !important;
+}
+@media (min-width: 768px) {
+  .v2-design .bp-day-cell.bp-today .bp-day-num {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    padding: 5px !important;
+    font-size: 0.74rem !important;
+  }
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-day-cell.bp-today .bp-day-num {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    padding: 6px !important;
+    font-size: 0.78rem !important;
+  }
+}
+
+.v2-design .bp-day-cell {
+  overflow: visible !important;
+}
+.v2-design .bp-dot-row {
+  position: relative;
+  z-index: 3;
+}
+/* Anniversary thickness, gap, and the 460px text switch are owned by the lock at the end of this file. */
+.v2-design .bp-day-bar-stack,
+.v2-design .bp-day-cell .bp-day-bar-stack {
+  z-index: 2;
+}
+.v2-design .festival-bar-desktop,
+.v2-design .festival-bar-mobile {
+  z-index: 1;
+}
+@media (min-width: 768px) {
+  .v2-design .bp-p-dot {
+    width: 7px !important;
+    height: 7px !important;
+    min-width: 7px !important;
+    min-height: 7px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+  .v2-design .bp-p-dot::after {
+    content: none !important;
+    display: none !important;
+  }
+}
+
+.renewal-shell.v2-design .bp-app-shell.is-bento-home,
+.v2-design .bp-app-shell.is-bento-home {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+}
+@media (min-width: 1200px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home,
+  .v2-design .bp-app-shell.is-bento-home {
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-hero-zone,
+  .v2-design .bp-hero-zone,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    margin: 0 0 16px !important;
+    border-radius: 20px !important;
+  }
+}
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design .bp-hero-zone,
+  .v2-design .bp-hero-zone,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding: 10px !important;
+  }
+}
+
+.v2-design .bp-hero-quick-nav-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  gap: 0 !important;
+  cursor: pointer !important;
+  padding: 0 4px !important;
+}
+.v2-design .bp-hero-quick-nav-item .bp-hero-quick-nav-icon {
+  width: 48px !important;
+  height: 48px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: #fff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.v2-design .bp-hero-quick-nav-item .bp-hero-quick-nav-label {
+  color: #fff !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+}
+.v2-design .bp-hero-quick-nav-icon svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+@media (min-width: 461px) and (max-width: 1199px) {
+  .v2-design .bp-hero-quick-nav-item {
+    flex-direction: row !important;
+  }
+}
+@media (max-width: 460px) {
+  .v2-design .bp-hero-quick-nav-item {
+    flex-direction: column !important;
+  }
+  .v2-design .bp-hero-quick-nav {
+    padding: 0 16px 10px;
+  }
+}
+
+.v2-design .v2-home-chat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.v2-design .v2-home-chat-row .v2-name-pill {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+  /* Same name badge as the V2 chat room (screens.css, .msg-row-hover > span:first-child). */
+  font-size: var(--font-size-2xs, 0.62rem);
+  font-weight: 800;
+  padding: 2px 6px;
+  margin-top: 1px;
+}
+.v2-design .v2-home-chat-row:last-child { margin-bottom: 0; }
+.v2-design .v2-home-chat-bubble-wrap {
+  position: relative;
+  min-width: 0;
+  max-width: 72%;
+  flex: 1 1 auto;
+}
+/* Same bubble as the V2 chat room's "other person" message (screens.css .v2-message-bubble):
+   square top-left corner as the tail, hairline card border, no shadow, 0.8rem / 1.45. */
+.v2-design .v2-home-chat-bubble {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--v2-card-border, #eceaf5);
+  border-radius: 0 12px 12px 12px;
+  padding: 8px 11px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-main, #1e1b2e);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  box-shadow: none;
+  overflow: hidden;
+}
+.v2-design .v2-home-chat-image {
+  display: block;
+  width: 92px;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  background: var(--v2-surface-2, #e9e5f7);
+  cursor: zoom-in;
+}
+.v2-design .v2-home-chat-text { display: block; }
+/* Same meta-column shape as ChatRoomView's own "다른 사람" message row (flex column,
+ * justify-content:flex-end, align-self:stretch) -- the difference was never the layout, just
+ * that this preview always showed a non-functional reply glyph the real bubble only reveals
+ * on hover, so removing that glyph (above) is what actually lines the two up. */
+.v2-design .v2-home-chat-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  align-self: stretch;
+  margin-left: 6px;
+  flex-shrink: 0;
+  min-width: 32px;
+  padding: 2px 0;
+}
+.v2-design .v2-home-chat-time {
+  /* Same timestamp as the V2 chat room. */
+  font-size: var(--font-size-2xs, 0.62rem);
+  color: #9ca3af;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.v2-design .v2-home-memo-bubble .v2-memo-card-meta,
+.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-meta,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta {
+  display: none !important;
+}
+.v2-design .v2-bubble-comment-badge,
+.v2-design .v2-memo .memo-card-comment-badge,
+.v2-design .date-modal-memo-list .memo-card-comment-badge,
+.v2-design .v2-home-memo-module .memo-card-comment-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: #2563EB;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 18px;
+  box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------------------
+ * 2026-09-21 completeness — last cascade. 44px tap targets, mobile tab-menu,
+ * empty states, lightbox/date-modal chrome.
+ * -------------------------------------------------------------------------- */
+
+/* Header / dest chrome: 44px hit area, keep the visual icon size. */
+.v2-design .v2-page-header .bp-back-btn,
+.v2-design .v2-page-header .bp-icon-btn,
+.v2-design .v2-dest-page .v2-page-header .bp-back-btn,
+.v2-design .v2-dest-page .v2-page-header .bp-icon-btn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+.v2-design .bp-floating-back-btn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+/* Standardized V2 header is 56px tall across all destinations.
+ * Floating back btn (position:fixed) must mirror the header back btn's y-position:
+ * (56px row − 44px btn) / 2 = 6px from viewport top → matches header btn exactly. */
+.v2-design .bp-floating-back-btn {
+  top: calc(6px + env(safe-area-inset-top, 0px)) !important;
+}
+
+
+/* Meeting cards place box in history-meetings-grid (both confirmed & past) */
+.v2-design .history-meetings-grid .date-item-btn .place-memo-stack {
+  border-radius: 10px !important;
+  border-top: none !important;
+}
+.v2-design .history-meetings-grid .date-item-btn.is-past .place-memo-stack {
+  background-color: #d4dce8 !important;
+}
+
+/* Chat composer tools + send. */
+.v2-design .v2-tool-icon-btn,
+.v2-design .v2-chat .v2-tool-icon-btn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+/* Lightbox close / prev / next. */
+.v2-design .lightbox-close-btn,
+.v2-design button.lightbox-close-btn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+/* Date modal: +기념일 / close. */
+.v2-design .bp-event-sheet .bp-sheet-anniv-btn,
+.v2-design .bp-event-sheet .bp-sheet-close,
+.v2-design .bp-event-sheet button[title="닫기"],
+.v2-design .bp-event-sheet button[title="이 날짜로 기념일 등록"] {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+}
+.v2-design .bp-event-sheet .bp-sheet-close {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  position: static !important;
+  background: var(--bg-primary) !important;
+  font-size: 1.1rem !important;
+}
+
+/* More-modals / overlay close buttons. */
+.v2-design .modal-close-btn,
+.v2-design .admin-side-menu-close-btn,
+.v2-design .bp-side-nav-close-btn {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+/* Mobile drawer: show the tab-specific menu (공지사항, 업로드, 장소 등록…). */
+@media (max-width: 1199px) {
+  .v2-design .bp-side-nav.bp-is-open .bp-side-nav-group.bp-is-tab-menu {
+    display: block !important;
+    margin: 8px 10px 4px !important;
+    padding: 6px !important;
+    border-radius: 14px;
+    background: var(--bg-primary, rgba(124, 47, 229, 0.06));
+    border-top: none !important;
+  }
+  .v2-design .bp-side-nav.bp-is-open .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
+    min-height: 44px !important;
+    margin: 2px 0 !important;
+  }
+  .v2-design .bp-side-nav.bp-is-open .bp-side-nav-item {
+    min-height: 44px !important;
+  }
+}
+
+/* Empty states: dest pages + home summaries. */
+.v2-design .v2-empty,
+.v2-design .bp-renewal-home-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 4px;
+  padding: 28px 16px !important;
+  text-align: center;
+  color: var(--text-muted, #6b6580) !important;
+  font-size: 0.88rem !important;
+  font-weight: 600;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, var(--bg-card));
+  border: 1px dashed color-mix(in srgb, var(--brand, #7C2FE5) 18%, var(--v2-line, #eceaf5));
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+.v2-design .v2-empty-copy {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+}
+.v2-design .bp-renewal-home-empty {
+  padding: 20px 14px !important;
+  font-size: 0.8rem !important;
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 5%, var(--bg-card));
+}
+.v2-design .v2-places .places-list-body > div > div[style*="text-align"] {
+  padding: 36px 16px !important;
+  color: var(--text-muted, #6b6580) !important;
+  font-size: 0.88rem !important;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, var(--bg-card));
+  border: 1px dashed color-mix(in srgb, var(--brand, #7C2FE5) 18%, var(--v2-line, #eceaf5));
+  border-radius: 16px;
+}
+
+/* Places layout and card standardization */
+.v2-design .v2-places .place-card-row {
+  padding: 20px 20px 10px 20px !important;
+  margin-bottom: 8px !important;
+}
+.v2-design .v2-places .place-memo-stack > button {
+  margin-top: 4px !important;
+}
+.v2-design .v2-places .places-list-body {
+  padding-top: 0px !important;
+}
+.v2-design .v2-places .v2-map-panel {
+  height: 302px !important;
+}
+.v2-design .v2-places .places-category-sticky-tabs {
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+
+/* Settlement solid brand purple hero and card spacing */
+.v2-design,
+.v2-settlement {
+  --settlement-hero-start: var(--brand, #7C2FE5) !important;
+  --settlement-hero-mid: var(--brand, #7C2FE5) !important;
+  --settlement-hero-end: var(--brand, #7C2FE5) !important;
+}
+
+/* ---- 2026-09-23 polish batch ------------------------------------------------------------- */
+/* Hero brand title: the BentoPinkFinal mock (reference-home.css, generated) hides it at desktop
+   because the side rail already shows the brand; keep it visible at every width. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-bento-title-brand {
+  display: inline-flex !important;
+}
+/* Hero 캘린더 설정 / 기념일 설정: plain icons (no border, fill or shadow) at every width -- the
+   original rule only applied below 1200px. Higher than the dark theme's hero glass rule so the
+   dark palette cannot put the chrome back. Search keeps its glass chip. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn:hover,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn:hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Chat keyboard + jump-to-latest icons use the header back button's icon color. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  color: var(--v2-ink-2, #6b6580) !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-keyboard-btn:hover,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-scroll-bottom-btn:hover {
+  color: var(--brand, #7C2FE5) !important;
+}
+/* One tab-row height everywhere (settlement/gallery were 50, archive 49, content/places 51):
+   50px border-box including the 1px hairline, buttons fill the 49px above it, so the active
+   underline (::after bottom:-1px) stays flush on the hairline. Applies to portaled modals too. */
+html:has(.renewal-shell.v2-design) body .underline-tabs.underline-tabs {
+  box-sizing: border-box !important;
+  height: 50px !important;
+  min-height: 50px !important;
+  max-height: 50px !important;
+}
+html:has(.renewal-shell.v2-design) body .underline-tabs.underline-tabs > button,
+html:has(.renewal-shell.v2-design) body .underline-tabs.underline-tabs > [role="tab"] {
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+}
+/* Gallery body used 16px side padding while every other destination uses the shared
+   --v2-dest-content-pad-x (40px desktop / 20px mobile). Bottom keeps its FAB clearance. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-gallery .gallery-page-scroll,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-records-media .gallery-page-scroll {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+/* Places: the 전체/방문/예정 filter row already has its own padding; the list body's full 40px
+   top pad on top of it left a large empty band before the first place card. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-places .places-list-body {
+  padding-top: 12px !important;
+}
+/* Places desktop: the sticky container's own bottom border doubled the tab row's hairline
+   (2px line). The tab row keeps the single line (the active underline sits on it); mobile's
+   select-based bar has no tab row, so its container border stays. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-places .places-category-sticky-tabs:has(> .place-category-tabs-desktop-only .underline-tabs) {
+  border-bottom: 0 !important;
+}
+/* Side nav group divider uses the same hairline color as every tab row, so the places bar
+   line and this divider read as one continuous line. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-group:not(:first-of-type) {
+  border-top-color: var(--v2-card-border, #eceaf5) !important;
+}
+/* No hairline between 통합검색 and the first menu group at any width -- the PC rail already
+   drops it (design.css, >=1200px); the phone drawer now matches it. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+  border-top: 0 !important;
+}
+/* Past-meeting D+N badge: same pill as the upcoming D-day badge (dark pill, bright text), in
+   a gray monotone. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confirmed-meeting-card .dday-badge.is-past {
+  background: rgba(51, 65, 85, 0.88) !important;
+  color: #E2E8F0 !important;
+  border: none !important;
+}
+.renewal-shell.v2-design .v2-settlement [data-settlement-edit-button="true"],
+.v2-design .v2-settlement [data-settlement-edit-button="true"] {
+  background: var(--brand, #7C2FE5) !important;
+  color: #fff !important;
+  margin-top: 0 !important;
+}
+.v2-design .v2-settlement .settlement-person-card {
+  padding: 10px !important;
+}
+
+.v2-design .v2-chat-scroll-wrap {
+  position: relative !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.v2-design .v2-chat-scroll-bottom-btn {
+  position: absolute !important;
+  bottom: 16px !important;
+  right: 16px !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: var(--brand, #7C2FE5) !important;
+  z-index: 50 !important;
+}
+
+/* Date sheet: kill leftover v1 320px mock width so it matches dest chrome. */
+@media (max-width: 767px) {
+  .v2-design .bp-event-sheet.modal-container,
+  .v2-design .bp-event-sheet {
+    width: min(100vw, 560px) !important;
+    left: 50% !important;
+    max-width: 100vw !important;
+  }
+}
+@media (min-width: 768px) {
+  .v2-design .bp-event-sheet.modal-container,
+  .v2-design .bp-event-sheet {
+    width: min(560px, calc(100vw - 32px)) !important;
+    border-radius: 20px !important;
+    bottom: 24px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 2026-09-21 polish-3 — badges, content 2/3 tabs, archive air, backdrop popups.
+ * -------------------------------------------------------------------------- */
+
+/* Compact dest header: 44px hit target inside a 56px row. Do not stack
+ * header padding + row min-height (that was producing a 79px bar). */
+.v2-design .v2-page-header,
+.v2-design .v2-dest-page > .v2-page-header,
+.v2-design .v2-dest-page > .bp-app-shell > .v2-page-header,
+.v2-design .v2-memo .v2-page-header,
+.v2-design .v2-chat .v2-page-header,
+.v2-design .v2-settlement .v2-page-header,
+.v2-design .v2-places .v2-page-header,
+.v2-design .v2-gallery .v2-page-header,
+.v2-design .v2-content .v2-page-header {
+  min-height: 56px !important;
+  padding: 0 !important;
+}
+.v2-design .v2-archive .v2-page-header {
+  min-height: 56px !important;
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+.v2-design .v2-archive .v2-page-header .bp-header-row {
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 0 16px !important;
+  background-color: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-sizing: border-box !important;
+}
+.v2-design .v2-page-header .bp-header-row,
+.v2-design .v2-memo .v2-page-header .bp-header-row,
+.v2-design .v2-chat .v2-page-header .bp-header-row,
+.v2-design .v2-settlement .v2-page-header .bp-header-row,
+.v2-design .v2-places .v2-page-header .bp-header-row {
+  min-height: 56px !important;
+  height: 56px !important;
+}
+
+/* ---- Unified badge spec ----
+ * One geometry for every labelled pill: 22px tall, equal x-pad, flex-centered
+ * type. Nested count pills flatten so the number sits on the same baseline. */
+.v2-design {
+  --v2-badge-h: 22px;
+  --v2-badge-pad-x: 8px;
+  --v2-badge-fs: 0.68rem;
+  --v2-chip-h: 32px;
+}
+.v2-design .v2-name-pill,
+.v2-design .bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.chat-name-pill,
+.v2-design .bp-side-nav-item-badge,
+.v2-design .bp-hero-quick-nav-badge,
+.v2-design .v2-bubble-comment-badge,
+.v2-design .v2-memo .memo-card-comment-badge,
+.v2-design .bp-comment-badge,
+.v2-design .bp-settlement-card-badge,
+.v2-design .bp-side-nav-cal-badge,
+.v2-design .underline-tabs [role="tab"] > span,
+.v2-design .section-count-badge,
+.v2-design .participant-badge,
+.v2-design .status-badge,
+.v2-design .bp-ann-cat-chip,
+.v2-design .bp-place-tag,
+.v2-design .bp-expense-cat-chip,
+.v2-design .bp-tag-chip,
+.v2-design .region-selection-badges-row > button,
+.v2-design .region-filter-reset-btn,
+.v2-design .v2-home-memo-module .memo-card-comment-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  height: var(--v2-badge-h) !important;
+  min-height: var(--v2-badge-h) !important;
+  padding: 0 var(--v2-badge-pad-x) !important;
+  line-height: 1 !important;
+  font-size: var(--v2-badge-fs) !important;
+  font-weight: 800 !important;
+  border-radius: 999px !important;
+  vertical-align: middle;
+  text-align: center;
+}
+
+/* Name pills: same geometry, white type on participant color. */
+.v2-design .v2-name-pill,
+.v2-design .bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.chat-name-pill {
+  color: #fff !important;
+  min-width: var(--v2-badge-h);
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+/* Memo card containers suppress the external name pill; author dot is rendered inside the card before tags */
+.v2-design .v2-home-memo-bubble > .v2-name-pill,
+.v2-design .v2-memo .v2-memo-card-wrap > .v2-name-pill,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-name-pill {
+  display: none !important;
+}
+
+/* Calendar name dots: circle, no text offset. */
+.v2-design .bp-p-dot,
+.v2-design .bp-dot-row .bp-p-dot,
+.v2-design .bp-cal-legend .bp-dot {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+.v2-design .bp-p-dot:not([data-author-name])::after {
+  content: none !important;
+  display: none !important;
+}
+
+.v2-design .v2-author-dot,
+.v2-design .memo-comment-author-dot,
+.v2-design .participant-dot,
+.v2-design .bp-p-dot[data-author-name] {
+  position: relative !important;
+  display: inline-block !important;
+  cursor: pointer;
+  outline: none;
+  overflow: visible !important;
+  -webkit-tap-highlight-color: transparent;
+}
+.v2-design .v2-author-dot:hover,
+.v2-design .v2-author-dot.is-tooltip-open,
+.v2-design .memo-comment-author-dot:hover,
+.v2-design .memo-comment-author-dot.is-tooltip-open,
+.v2-design .participant-dot:hover,
+.v2-design .participant-dot.is-tooltip-open,
+.v2-design .bp-p-dot[data-author-name]:hover,
+.v2-design .bp-p-dot[data-author-name].is-tooltip-open {
+  z-index: 60 !important;
+}
+.v2-design .v2-author-dot::after,
+.v2-design .memo-comment-author-dot::after,
+.v2-design .participant-dot::after,
+.v2-design .bp-p-dot[data-author-name]::after {
+  content: attr(data-author-name) !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 6px) !important;
+  transform: translateX(-50%) translateY(3px) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  white-space: nowrap !important;
+  z-index: 9999 !important;
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22) !important;
+  transition: opacity 0.14s ease, transform 0.14s ease !important;
+  letter-spacing: normal !important;
+  text-indent: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  display: block !important;
+}
+.v2-design .v2-author-dot::before,
+.v2-design .memo-comment-author-dot::before,
+.v2-design .participant-dot::before,
+.v2-design .bp-p-dot[data-author-name]::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 1px) !important;
+  transform: translateX(-50%) translateY(3px) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  border-left: 5px solid transparent !important;
+  border-right: 5px solid transparent !important;
+  border-top: 5px solid #0F172A !important;
+  border-bottom: 0 !important;
+  transition: opacity 0.14s ease, transform 0.14s ease !important;
+  width: 0 !important;
+  height: 0 !important;
+  display: block !important;
+}
+.v2-design .v2-author-dot:hover::after,
+.v2-design .v2-author-dot:hover::before,
+.v2-design .v2-author-dot.is-tooltip-open::after,
+.v2-design .v2-author-dot.is-tooltip-open::before,
+.v2-design .memo-comment-author-dot:hover::after,
+.v2-design .memo-comment-author-dot:hover::before,
+.v2-design .memo-comment-author-dot.is-tooltip-open::after,
+.v2-design .memo-comment-author-dot.is-tooltip-open::before,
+.v2-design .participant-dot:hover::after,
+.v2-design .participant-dot:hover::before,
+.v2-design .participant-dot.is-tooltip-open::after,
+.v2-design .participant-dot.is-tooltip-open::before,
+.v2-design .bp-p-dot[data-author-name]:hover::after,
+.v2-design .bp-p-dot[data-author-name]:hover::before,
+.v2-design .bp-p-dot[data-author-name].is-tooltip-open::after,
+.v2-design .bp-p-dot[data-author-name].is-tooltip-open::before {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+/* Anniversary labelled badges: size and label visibility are owned by the lock at the end of this file. */
+
+/* ---- Content 2nd-level tabs: underline, equal columns, brand purple ---- */
+.v2-design .v2-content .underline-tabs,
+.v2-design .v2-archive .underline-tabs {
+  display: flex !important;
+  width: 100% !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+.v2-design .v2-content .underline-tabs [role="tab"],
+.v2-design .v2-archive .underline-tabs [role="tab"] {
+  flex: 1 1 0 !important;
+  height: 48px !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  color: var(--v2-ink-2, #6b6580) !important;
+  font-size: 0.9rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+.v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"],
+.v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] {
+  color: var(--brand, #7C2FE5) !important;
+}
+.v2-design .v2-content .underline-tabs [role="tab"] > span,
+.v2-design .v2-archive .underline-tabs [role="tab"] > span {
+  background: var(--v2-surface-2, #eceaf5) !important;
+  color: var(--v2-ink-2, #6b6580) !important;
+}
+.v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"] > span,
+.v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] > span {
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 14%, var(--bg-card)) !important;
+  color: var(--brand, #7C2FE5) !important;
+}
+
+/* ---- Content 3rd-level chips: grey pills, solid purple selected, count as type ---- */
+.v2-design .v2-content .v2-content-subcat-slot,
+.v2-design .v2-content .history-header-stack > .v2-content-subcat-slot {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 0 !important;
+  padding: 8px 16px !important;
+  margin: 0 !important;
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 6px !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  height: var(--v2-chip-h) !important;
+  min-height: var(--v2-chip-h) !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #f3f1f7 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected {
+  background: var(--brand, #7C2FE5) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip {
+  gap: 6px !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip .section-count-badge {
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin-left: 2px !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  opacity: 0.88;
+}
+
+/* Region row + 1/2-col toggle: v2 purple, not v1 indigo/black. */
+.v2-design .v2-content .region-filter-trigger-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 16px 10px !important;
+  margin: 0 !important;
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
+}
+.v2-design .v2-content .current-location-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  background: var(--brand-soft, #f3eeff) !important;
+  color: var(--brand, #7C2FE5) !important;
+  border: 1px solid color-mix(in srgb, var(--brand, #7C2FE5) 18%, var(--v2-line, #eceaf5)) !important;
+}
+.v2-design .v2-content .region-filter-trigger {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 12px !important;
+  border-radius: 12px !important;
+  background: var(--bg-card) !important;
+  color: var(--text-main, #1e1b2e) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  font-weight: 800 !important;
+}
+.v2-design .v2-content .culture-grid-cols-toggle {
+  height: 40px !important;
+  padding: 3px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important;
+  overflow: hidden;
+}
+.v2-design .v2-content .culture-grid-cols-btn {
+  width: 34px !important;
+  height: 100% !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: var(--v2-ink-2, #6b6580) !important;
+}
+.v2-design .v2-content .culture-grid-cols-btn.is-active {
+  background: var(--brand, #7C2FE5) !important;
+  color: #fff !important;
+}
+
+/* ---- Archive / people / meetings: kill leftover header air ---- */
+.v2-design .v2-archive .history-header-stack,
+.v2-design .v2-content .history-header-stack {
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+}
+.v2-design .v2-archive .history-page-scroll > div:first-child,
+.v2-design .v2-archive .v2-archive-people-stack,
+.v2-design .v2-archive .v2-archive-people-detail {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  gap: 8px !important;
+}
+
+/* 추억: same 12px gap under the 전체/일자 pill as the gallery page (was flush against the grid). */
+.v2-design .v2-archive .history-bento-grid {
+  margin-top: 12px !important;
+}
+
+/* ---- Backdrop popups: glass card, content-centered (not right-docked) ----
+ * MoreModalsHost (공유/설정) is a sibling of .renewal-shell, not a descendant.
+ * Scope via :has() so the v2 chrome still applies.
+ */
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  padding: 24px !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  margin: 0 auto !important;
+  transform: none !important;
+  width: min(520px, calc(100vw - 48px)) !important;
+  max-width: 520px !important;
+  max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
+  border-radius: 20px !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important;
+  box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 52px !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h2,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header > span:first-child,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header > div:first-child,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: var(--text-main) !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-body {
+  padding: 16px !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .btn-primary,
+html:has(.renewal-shell.v2-design) .modal-overlay button.btn-primary {
+  background: #7C2FE5 !important;
+  border-color: var(--v2-accent, #7C2FE5) !important;
+  color: #fff !important;
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+}
+/* Modularized close button across all V2 backdrop popups (matching Image 1) */
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  max-width: 32px !important;
+  max-height: 32px !important;
+  padding: 4px !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--text-muted, #64748B) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.2rem !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+  flex-shrink: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child:hover,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn:hover,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close:hover,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child:hover {
+  background-color: rgba(30, 27, 46, 0.06) !important;
+  color: var(--text-main) !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child svg,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn svg,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close svg,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child svg {
+  width: 20px !important;
+  height: 20px !important;
+  stroke: currentColor !important;
+}
+/* Admin settings modal inner styling - remove double borders, purple V2 tabs, clean layout */
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container.admin-settings-modal {
+  height: auto !important;
+  max-height: calc(100dvh - 8px) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) {
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button {
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  color: var(--text-muted, #64748b) !important;
+  border-bottom: 2px solid transparent !important;
+  padding: 10px 8px !important;
+  transition: color 0.15s ease, border-color 0.15s ease !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[style*="2563EB"],
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[style*="rgb(37, 99, 235)"] {
+  color: var(--v2-primary, #7C3AED) !important;
+  border-bottom: 2px solid var(--v2-primary, #7C3AED) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body {
+  /* Cap the scroller at the viewport minus header/tabs/drag-handle so the sheet
+     grows with the form and only scrolls once it would overflow the browser. */
+  max-height: calc(100dvh - 120px) !important;
+  padding: 16px 16px 24px !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div {
+  padding: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container.v2-settings-modal {
+  height: auto !important;
+  max-height: min(92dvh, 780px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-settings-modal .modal-body {
+  max-height: calc(92dvh - 120px) !important;
+  padding: 14px 16px 28px !important;
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .modal-overlay:not(.meme-preview-overlay) {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    padding-left: 280px !important;
+    box-sizing: border-box !important;
+  }
+}
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+/* ---- Backdrop popups, sheet family: the many `.bottom-sheet-overlay` pickers
+ * (bulk-edit/category/weekday/participant/poll-voter sheets, gallery date
+ * picker, ...) stayed bottom-docked at every viewport width even under v2,
+ * unlike `.modal-overlay` above. Give them the identical v2 treatment: a
+ * centered blurred-glass card on wide screens, true bottom sheet only on
+ * narrow ones -- so every backdrop popup in v2 follows one rule, not two.
+ * `.emoji-sheet-overlay` keeps its own existing handling (dest-chrome-late.css
+ * emoji rule above) and is excluded here so the two don't fight. */
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: center !important;
+    padding: 24px !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    width: min(440px, calc(100vw - 48px)) !important;
+    max-width: 440px !important;
+    border-radius: 20px !important;
+    border: 1px solid var(--v2-card-border, #eceaf5) !important;
+    box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
+  }
+  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    padding-left: 280px !important;
+    box-sizing: border-box !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-header {
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important;
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: var(--text-main) !important;
+}
+
+/* Extra labelled pills that share the same 22px geometry. */
+.v2-design .main-menu-badge,
+.v2-design .side-menu-meta-pill,
+.v2-design .memo-card-comment-badge,
+.v2-design .photo-comment-count-badge,
+.v2-design .bp-comment-badge,
+.v2-design .date-item-badge,
+.v2-design .dday-badge,
+.v2-design .poll-deadline-badge,
+.v2-design .poll-confirmed-badge,
+.v2-design .poll-voter-badge,
+.v2-design .bp-dday-compact-badge,
+.v2-design .bp-dday-pill,
+.v2-design .bp-day-meeting-pill,
+.v2-design .memo-capsule-badge:not(.is-multiline),
+.v2-design .calendar-loading-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  height: var(--v2-badge-h, 22px) !important;
+  min-height: var(--v2-badge-h, 22px) !important;
+  padding: 0 var(--v2-badge-pad-x, 8px) !important;
+  line-height: 1 !important;
+  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-weight: 800 !important;
+  border-radius: 999px !important;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.v2-design .memo-capsule-badge.is-multiline {
+  display: inline-block !important;
+  height: auto !important;
+  min-height: auto !important;
+  padding: 6px 14px !important;
+  line-height: 130% !important;
+  border-radius: 10px !important;
+  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-weight: 800 !important;
+  text-align: left !important;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* V2 Memo author circle indicator (8px x 8px personal color circle, strictly no shadow or border) */
+.v2-design .v2-memo-author-dot,
+.v2-design .v2-memo-author-pill {
+  display: inline-block !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+}
+
+/* Text-field shape (all V2 fields): one line = capsule, 2+ lines = rounded box with even
+   top/bottom padding. Inputs are always one line; textareas get data-field-lines from
+   src/core/field-shape.js (placeholder or text line count) and --field-min-h so a wrapped
+   placeholder is never clipped. */
+html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
+  height: 44px !important;
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  padding: 0 16px !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay textarea.form-input {
+  height: auto !important;
+  min-height: max(44px, var(--field-min-h, 44px)) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  border-radius: 14px !important;
+  padding: 11px 16px !important;
+  line-height: 20px !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) input:is([type="text"], [type="search"], [type="email"], [type="tel"], [type="url"], [type="number"], [type="password"], :not([type])):not(.admin-scope *):not(.lightbox-tag-input) {
+  border-radius: 999px !important;
+}
+html:has(.renewal-shell.v2-design) textarea:not(.admin-scope *) {
+  border-radius: 14px !important;
+}
+html:has(.renewal-shell.v2-design) textarea[data-field-lines="1"]:not(.admin-scope *) {
+  border-radius: 22px !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Side-nav collapse: lock Y. Width/opacity/padding-x may change; height,
+ * margin-y, padding-y and flex gap must be identical so icons only travel
+ * horizontally. Groups are column-flex with a shared gap so adjacent item
+ * margins cannot collapse differently per state.
+ * 통합검색 magnifier is a 20×20 square, geometrically centered in both states.
+ * -------------------------------------------------------------------------- */
+@media (min-width: 1200px) {
+  .renewal-shell.v2-design .bp-side-nav,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) {
+    --v2-side-head-h: 64px;
+    --v2-side-search-h: 40px;
+    --v2-side-search-my: 12px;
+    --v2-side-item-h: 44px;
+    --v2-side-item-gap: 2px;
+    --v2-side-icon: 20px;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-head,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-head {
+    height: var(--v2-side-head-h) !important;
+    min-height: var(--v2-side-head-h) !important;
+    max-height: var(--v2-side-head-h) !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-head {
+    justify-content: flex-start !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    justify-content: flex-start !important;
+    width: 64px !important;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-brand,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-brand {
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Logo glyph stays on the collapsed slot: 26×26 centered in a 40×40
+   * cell at (12,12) → icon origin (19,19) in both rail states. */
+  .renewal-shell.v2-design .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-brand-icon {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 40px !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-brand-icon svg,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+    display: block !important;
+    transform: none !important;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-global-search,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    height: var(--v2-side-search-h) !important;
+    min-height: var(--v2-side-search-h) !important;
+    max-height: var(--v2-side-search-h) !important;
+    margin-top: var(--v2-side-search-my) !important;
+    margin-bottom: var(--v2-side-search-my) !important;
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 9px !important;
+    box-sizing: border-box !important;
+    line-height: 0 !important;
+    transform: none !important;
+    overflow: hidden !important;
+    transition: width .28s ease, border-radius .28s ease, background-color .2s ease !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search {
+    width: calc(100% - 24px) !important;
+    padding-right: 14px !important;
+    gap: 10px !important;
+    border-radius: 999px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: var(--v2-side-search-h) !important;
+    padding-right: 0 !important;
+    gap: 0 !important;
+    border-radius: 50% !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search-icon {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 20px !important;
+    line-height: 0 !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon svg,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search-icon svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex: 0 0 20px !important;
+    aspect-ratio: 1 / 1 !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search-label {
+    display: inline-flex !important;
+    align-items: center !important;
+    line-height: 1 !important;
+    height: var(--v2-side-icon) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Column flex + gap: pitch is 44 + 2 in BOTH states. Vertical margins stay 0
+   * so they cannot collapse to 3px (expanded) vs 2px (collapsed). */
+  .renewal-shell.v2-design .bp-side-nav-group,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v2-side-item-gap) !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-main,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-main,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-main {
+    padding-top: 0 !important;
+    padding-bottom: 4px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-tab-menu,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-tab-menu {
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 8px 10px !important;
+    padding: 6px 0 !important;
+    transform: none !important;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav-footer .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-footer .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-footer .bp-side-nav-item {
+    height: var(--v2-side-item-h) !important;
+    min-height: var(--v2-side-item-h) !important;
+    max-height: var(--v2-side-item-h) !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-footer .bp-side-nav-item {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    margin-left: 10px !important;
+    margin-right: 10px !important;
+    width: calc(100% - 20px) !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-footer .bp-side-nav-item {
+    width: var(--v2-side-item-h) !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-item-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon {
+    width: var(--v2-side-icon) !important;
+    height: var(--v2-side-icon) !important;
+    min-width: var(--v2-side-icon) !important;
+    min-height: var(--v2-side-icon) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 var(--v2-side-icon) !important;
+    align-self: center !important;
+    line-height: 0 !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon svg,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon svg,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon svg {
+    display: block !important;
+    width: var(--v2-side-icon) !important;
+    height: var(--v2-side-icon) !important;
+    transform: none !important;
+  }
+
+  .renewal-shell.v2-design .bp-side-nav-footer,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-footer,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v2-side-item-gap) !important;
+    padding: 8px 8px 16px !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-collapse-btn,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-btn,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-collapse-btn {
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    margin-top: 8px !important;
+    margin-bottom: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    transform: none !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-collapse-btn {
+    width: calc(100% - 8px) !important;
+    justify-content: center !important;
+    padding: 0 12px !important;
+    margin-left: 4px !important;
+    margin-right: 4px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-btn {
+    width: 36px !important;
+    padding: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * 2026-09-21 — integrated search is a full page, not a resizable popup.
+ * Header height matches the side-nav purple brand block (64px). Empty
+ * state is a centered prompt; results use kind + path + highlighted title.
+ * -------------------------------------------------------------------------- */
+.renewal-shell.v2-design .renewal-shell-main.v2-search,
+.renewal-shell.v2-design .v2-destination.v2-search {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100dvh !important;
+  padding: 0 !important;
+  overflow: auto !important;
+  background: #f4f3f8 !important;
+}
+.renewal-shell.v2-design .global-search-page {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 100% !important;
+  padding: 0 !important;
+  background: #f4f3f8 !important;
+}
+.renewal-shell.v2-design .global-search-page-card {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: #f4f3f8 !important;
+  position: relative !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-header,
+.renewal-shell.v2-design .global-search-page-card .modal-header.global-search-header {
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  gap: 10px !important;
+  padding: 0 20px !important;
+  margin: 0 !important;
+  border-bottom: 1px solid var(--border-subtle, #ebe8f3) !important;
+  background: var(--bg-card) !important;
+  flex: 0 0 64px !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-header h3 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-header h3 svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-header-input {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 40px !important;
+  padding: 0 4px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  font-size: 0.92rem !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-header > button {
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-tabs,
+.renewal-shell.v2-design .global-search-page-card > .underline-tabs {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  margin: 0 !important;
+  min-height: 48px !important;
+  background: var(--bg-card) !important;
+}
+.renewal-shell.v2-design .global-search-page-card .global-search-tabs button,
+.renewal-shell.v2-design .global-search-page-card > .underline-tabs button {
+  min-height: 48px !important;
+  font-size: 0.78rem !important;
+}
+.renewal-shell.v2-design .global-search-page-card .modal-body {
+  flex: 1 1 auto !important;
+  min-height: calc(100dvh - 64px - 48px) !important;
+  overflow: visible !important;
+  padding: 16px var(--v2-dest-content-pad-x, 20px) 32px !important;
+  background: #f4f3f8 !important;
+}
+.renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  min-height: calc(100dvh - 64px) !important;
+  padding: max(140px, 18vh) 24px 80px !important;
+  background: #f4f3f8 !important;
+}
+.renewal-shell.v2-design .global-search-empty {
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted, #8a8798) !important;
+  font-size: 0.92rem !important;
+  text-align: center !important;
+  box-shadow: none !important;
+}
+.renewal-shell.v2-design .global-search-result-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+.renewal-shell.v2-design .global-search-result {
+  padding: 14px 16px !important;
+  border-radius: 14px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-subtle, #ebe8f3) !important;
+}
+.renewal-shell.v2-design .global-search-result-kind {
+  height: var(--v2-badge-h, 22px) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 8px !important;
+  line-height: 1 !important;
+}
+.renewal-shell.v2-design .global-search-result-title mark,
+.renewal-shell.v2-design .global-search-result-meta mark,
+.renewal-shell.v2-design .global-search-page-card mark {
+  background: #FEF08A !important;
+  color: #1E293B !important;
+  padding: 0 2px !important;
+  border-radius: 2px !important;
+  font-weight: 800 !important;
+}
+/* Search is a destination page — never show the popup resize grip. */
+.renewal-shell.v2-design .global-search-page-card > div[style*="se-resize"],
+.renewal-shell.v2-design .global-search-page-card .resize-handle {
+  display: none !important;
+}
+
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design .global-search-page-card .global-search-header,
+  .renewal-shell.v2-design .global-search-page-card .modal-header.global-search-header {
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    flex-basis: 56px !important;
+    padding: 0 16px !important;
+  }
+}
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .global-search-page-card .modal-body {
+    padding: 12px 16px 28px !important;
+  }
+  .renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
+    padding: max(88px, 12vh) 16px 64px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Search-result focus: the item the user just picked from 통합검색.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .search-result-focus,
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble,
+html:has(.renewal-shell.v2-design) .place-card-row.is-focused,
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused > .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused > .v2-memo-card-contract {
+  border: 2px solid var(--v2-accent, #7C2FE5) !important;
+  background: rgba(124, 47, 229, 0.14) !important;
+  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.18) !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Backdrop popups: PC centered, tablet bottom-centered, mobile full-bleed.
+ * Overlay is portaled inside .renewal-shell so these rules must beat both
+ * inline ResizableModalContainer position:relative and leftover sheet docks.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  margin: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: center !important;
+    padding: 24px !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: min(520px, calc(100vw - 48px)) !important;
+    max-width: 520px !important;
+    max-height: 86dvh !important;
+    margin: 0 !important;
+    border-radius: 20px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-event-sheet.is-sheet-moved,
+  html:has(.renewal-shell.v2-design) .v2-responsive-modal.is-sheet-moved {
+    position: fixed !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: flex-end !important;
+    padding: 0 16px !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: min(520px, calc(100vw - 32px)) !important;
+    max-width: 520px !important;
+    max-height: 88dvh !important;
+    margin: 0 auto !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 92dvh !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+html:has(.renewal-shell.v2-design) .bp-sheet-handle,
+html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
+  width: 100% !important;
+  height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  touch-action: none;
+  user-select: none;
+}
+.v2-design .bp-event-sheet .underline-tabs {
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+}
+.v2-design .date-modal-memo-list .memo-card-hover,
+html:has(.renewal-shell.v2-design) .date-modal-memo-list .memo-card-hover {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-left: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-sheet-handle::before,
+html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {
+  content: "" !important;
+  width: 40px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
+  background: #d4d0de !important;
+}
+/* Forms that are still the dialog shell (can't be a Resizable div) still show the gray bar. */
+html:has(.renewal-shell.v2-design) .modal-overlay > form.modal-container:not(:has(> .v2-modal-drag-handle)):not(:has(> .bp-sheet-handle))::before {
+  content: "" !important;
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 10px auto 8px;
+  border-radius: 999px;
+  background: #d4d0de;
+  flex-shrink: 0;
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .bp-sheet-handle,
+  html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
+    cursor: grab !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-sheet-handle:active,
+  html:has(.renewal-shell.v2-design) .v2-modal-drag-handle:active {
+    cursor: grabbing !important;
+  }
+}
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .bp-sheet-handle,
+  html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
+    cursor: ns-resize !important;
+  }
+}
+
+/* Chat header collapses with every other destination header (see .is-scroll-hidden).
+   The floating back button is the shared stand-in while that header is off screen. */
+
+/* Emoji picker uses the same dimmed backdrop card as other V2 layer popups,
+   but the overlay stops at the composer (--v2-composer-reserve) so the chat
+   input and the OS keyboard stay visible while an emoji is inserted. */
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: var(--v2-composer-reserve, 148px) !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 24px 16px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box !important;
+  z-index: 40000 !important;
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .bottom-sheet.emoji-sheet {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  width: min(560px, 100%) !important;
+  max-width: 560px !important;
+  max-height: min(520px, 100%) !important;
+  margin: 0 !important;
+  border-radius: 24px !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  animation: none !important;
+  transform: translateY(var(--emoji-sheet-drag, 0px)) !important;
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .emoji-sheet > div:last-child {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .bottom-sheet.emoji-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Title + underline-tab hairlines, site-wide.
+ * The title row owns one full-bleed gray line. Each underline tab bar owns
+ * exactly one more, also full-bleed. The active purple bar is a 2px ::after
+ * painted on the top edge of that gray line — never below it, never gapped.
+ * Stacked borders on the header / history stack are cleared so the chip row
+ * does not pick up a 2–3px line.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .v2-places .places-category-sticky-tabs,
+html:has(.renewal-shell.v2-design) .v2-places-legacy .places-category-sticky-tabs {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  background: var(--bg-card) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header > .bp-header-row {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0 16px !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  max-height: 56px !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-content-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-archive-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-gallery-tabs-slot,
+html:has(.renewal-shell.v2-design) #v2-content-header-tabs-slot,
+html:has(.renewal-shell.v2-design) #v2-archive-header-tabs-slot,
+html:has(.renewal-shell.v2-design) #v2-gallery-header-tabs-slot,
+html:has(.renewal-shell.v2-design) .history-header-stack,
+html:has(.renewal-shell.v2-design) .gallery-page-tabs,
+html:has(.renewal-shell.v2-design) .gallery-page-tabs-mobile,
+html:has(.renewal-shell.v2-design) .settlement-page-tabs {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs,
+html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
+  display: flex !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* content-box + auto height keeps the 1px hairline OUTSIDE the tab row,
+     so the active ::after (bottom: 0) sits on top of that line. */
+  box-sizing: content-box !important;
+  height: auto !important;
+  background: var(--bg-card) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"],
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"],
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"],
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"],
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs > button[aria-selected="true"] {
+  position: relative !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: -1px !important;
+  height: 2px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  pointer-events: none !important;
+  border-radius: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-selected="true"]::after {
+  background: var(--brand, #7C2FE5) !important;
+}
+
+/* Calendar home and destination pages: purple circle menu button, phone/tablet only.
+ * Gallery, content, and archive share .bp-menu-fab and had no size/radius, so the
+ * control collapsed to a small square around the icon. Desktop keeps the side rail. */
+.v2-design .bp-home-menu-fab,
+.v2-design .bp-menu-fab {
+  position: fixed !important;
+  right: 20px !important;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  min-height: 52px !important;
+  max-width: 52px !important;
+  max-height: 52px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  z-index: 40 !important;
+  cursor: pointer;
+}
+.v2-design .bp-home-menu-fab svg,
+.v2-design .bp-menu-fab svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+  flex: 0 0 22px !important;
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-home-menu-fab,
+  .v2-design .bp-menu-fab { display: none !important; }
+}
+
+/* Mobile/tablet drawer uses the same expanded PC rail (brand, search, groups,
+ * 공유/설정/접기). No separate close control — 접기 dismisses the overlay. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
+    padding-left: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed {
+    --v2-side-head-h: 64px;
+    --v2-side-search-h: 40px;
+    --v2-side-search-my: 12px;
+    --v2-side-item-h: 44px;
+    --v2-side-item-gap: 2px;
+    --v2-side-icon: 20px;
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    right: 0 !important;
+    width: 280px !important;
+    max-width: min(280px, 88vw) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-right: none !important;
+    border-left: 1px solid var(--v2-card-border, #eceaf5) !important;
+    background: var(--bg-card) !important;
+    box-shadow: -12px 0 32px rgba(30, 27, 46, 0.18) !important;
+    transform: translateX(105%) !important;
+    z-index: 500 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-open,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed.bp-is-open {
+    transform: translateX(0) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop {
+    z-index: 490 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop.bp-is-open {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-close-btn {
+    display: none !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: calc(100% - 8px) !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    margin: 8px 4px 0 !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+    border-radius: 999px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-label,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label {
+    display: inline !important;
+    opacity: 1 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-head {
+    height: var(--v2-side-head-h) !important;
+    min-height: var(--v2-side-head-h) !important;
+    max-height: var(--v2-side-head-h) !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    overflow: hidden !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-brand {
+    height: 40px !important;
+    min-height: 40px !important;
+    gap: 8px !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-brand-icon,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    flex: 0 0 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-brand-icon svg,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-brand-text,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-text,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-item-title,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-item-title,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-item-meta,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-item-meta,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-global-search-label,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-cal-badge,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-cal-badge,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed .bp-side-nav-cal-badge {
+    display: inline-flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: calc(100% - 24px) !important;
+    height: var(--v2-side-search-h) !important;
+    min-height: var(--v2-side-search-h) !important;
+    margin: var(--v2-side-search-my) 12px !important;
+    padding: 0 14px 0 9px !important;
+    gap: 10px !important;
+    border-radius: 999px !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search-icon,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    flex: 0 0 20px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v2-side-item-gap) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-item,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    height: var(--v2-side-item-h) !important;
+    min-height: var(--v2-side-item-h) !important;
+    max-height: var(--v2-side-item-h) !important;
+    width: calc(100% - 20px) !important;
+    margin: 0 10px !important;
+    padding: 0 12px !important;
+    gap: 12px !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-item-icon,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-item-icon svg {
+    width: var(--v2-side-icon) !important;
+    height: var(--v2-side-icon) !important;
+    min-width: var(--v2-side-icon) !important;
+    flex: 0 0 var(--v2-side-icon) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v2-side-item-gap) !important;
+    margin-top: auto !important;
+    padding: 8px 8px 16px !important;
+  }
+}
+
+/* Header side padding lives on the title row only. The header element itself
+   stays flush so tabs and lists are not double-inset (settlement/memo/places). */
+html:has(.renewal-shell.v2-design) .v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-memo .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-settlement .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-places .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header.bp-header {
+  padding: 0 !important;
+}
+
+/* Legacy destination bodies were position:absolute;top:0, so they painted
+   underneath the sticky header and stayed covered after the header collapsed. */
+html:has(.renewal-shell.v2-design) .v2-places .places-view-container,
+html:has(.renewal-shell.v2-design) .v2-memo .memo-view-container,
+html:has(.renewal-shell.v2-design) .v2-settlement .settlement-page-container,
+html:has(.renewal-shell.v2-design) .v2-gallery .gallery-page-container,
+html:has(.renewal-shell.v2-design) .v2-has-page-header > .v2-legacy-body {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  display: block !important;
+  flex: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+  z-index: 8 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  position: absolute !important;
+  top: auto !important;
+  bottom: 8px !important;
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  color: var(--text-main) !important;
+  cursor: pointer;
+  pointer-events: auto !important;
+  z-index: 9 !important;
+}
+/* Same X as the header back button (.bp-header-row padding-left: 16px).
+   The right inset of the jump-to-latest button matches that left inset. */
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn {
+  left: 16px !important;
+  right: auto !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-scroll > button[aria-label="최근 대화로 이동"] {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  transform: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-root {
+  position: relative !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 30 !important;
+  width: 100% !important;
+  background: var(--bg-card) !important;
+  transition: transform 0.32s var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header.is-scroll-hidden {
+  position: absolute !important;
+  top: 0 !important;
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+  flex: none !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  overflow: hidden !important;
+  transform: translateY(-110%) !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  z-index: 20 !important;
+  width: 100% !important;
+  transition: transform 0.32s var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
+  height: auto !important;
+  min-height: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  transform: translateY(110%) !important;
+  pointer-events: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  bottom: calc(var(--v2-chat-composer-space, 168px) + 8px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Header action icons sit close together on every page (mobile used to force 12px). */
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions,
+html:has(.renewal-shell.v2-design) .bp-header.v2-page-header .bp-header-actions {
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+/* Header hairlines are the pane edge, not an inset of title/icon padding.
+   Reference sheets put padding + border on `.bp-header` itself; that padding
+   is cleared here and kept only on the title row (border-box, so the line
+   still runs edge to edge). Tab bars that live in the header do the same. */
+html:has(.renewal-shell.v2-design) .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-memo .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-settlement .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-places .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-gallery .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-content .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-archive .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-more .bp-header.v2-page-header {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-bottom: none !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header > .bp-header-row {
+  position: relative !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  box-sizing: border-box !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .underline-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .settlement-page-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs-mobile,
+html:has(.renewal-shell.v2-design) .v2-page-header .history-header-stack,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-gallery-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-content-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-archive-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-content-subcat-slot,
+html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs,
+html:has(.renewal-shell.v2-design) .global-search-page-card .global-search-header {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .underline-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs-mobile,
+html:has(.renewal-shell.v2-design) .v2-page-header .history-header-stack,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-gallery-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-content-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-archive-tabs-slot,
+html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Desktop rail is position:fixed. The viewport pin zeroes shell padding, so
+   every page was full-bleed underneath the menu. Inset the page pane by the
+   live rail width (280 expanded, 64 collapsed) so the content width tracks it. */
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
+    --v2-side-nav-width: 280px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed {
+    --v2-side-nav-width: 64px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > .renewal-shell-main,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > .bp-app-shell {
+    margin-left: var(--v2-side-nav-width, 280px) !important;
+    margin-right: 0 !important;
+    width: calc(100% - var(--v2-side-nav-width, 280px)) !important;
+    max-width: calc(100% - var(--v2-side-nav-width, 280px)) !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed > .bp-side-nav,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed {
+    width: var(--v2-side-nav-width, 64px) !important;
+  }
+}
+
+/* Calendar settings: no second inset and no card chrome on tab panels.
+   Sheet height follows the content up to the viewport (see admin max-height above). */
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container.admin-settings-modal {
+    max-height: calc(100dvh - 8px) !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div > div {
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Anniversary list: edit icon matches the borderless delete icon (size + stroke). */
+html:has(.renewal-shell.v2-design) .anniversary-settings-modal .item-edit-delete-actions {
+  position: relative;
+  z-index: 10001;
+}
+html:has(.renewal-shell.v2-design) .anniversary-settings-modal .item-edit-delete-actions button {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  max-width: 22px !important;
+  max-height: 22px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted, #64748b) !important;
+}
+html:has(.renewal-shell.v2-design) .anniversary-settings-modal .item-edit-delete-actions svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke-width: 2 !important;
+}
+
+/* Recovery action pills keep a tinted fill + border (hex alpha on var() was invalid).
+   Name badges in these rows must show the full label, including 시스템. */
+html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-action-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+  min-height: 22px !important;
+  height: auto !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  background: color-mix(in srgb, currentColor 14%, var(--bg-card)) !important;
+  background-color: color-mix(in srgb, currentColor 14%, var(--bg-card)) !important;
+  border: 1px solid color-mix(in srgb, currentColor 34%, transparent) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-left > .participant-badge {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+
+
+
+
+/* Header icon buttons are bare line icons: gray when off, brand purple when a toggle is on
+   (지도보기), never a filled chip. */
+.v2-design .v2-page-header .bp-icon-btn,
+.v2-design .v2-content .v2-page-header .bp-icon-btn {
+  background: transparent !important;
+  color: var(--text-muted, #6b6580) !important;
+  transition: color 180ms ease;
+}
+.v2-design .v2-page-header .bp-icon-btn.is-active,
+.v2-design .v2-content .v2-page-header .bp-icon-btn.is-active {
+  background: transparent !important;
+  color: var(--brand, #7C2FE5) !important;
+}
+
+/* Region settings uses shared modal-overlay chrome; keep sheet body scrollable.
+   The 48px-reserved centered width below is desktop-only -- on mobile it left an unwanted
+   ~24px gutter on each side (the plain .modal-container it overrides is already full-bleed
+   at mobile widths, same as the date/event sheet's own mobile rule right above), so phones
+   now keep the sheet edge-to-edge like every other mobile modal in the app. */
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay.region-filter-overlay > .modal-container.region-filter-sheet {
+    width: min(520px, calc(100vw - 48px)) !important;
+    max-width: 520px !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-body.region-filter-body {
+  overflow-y: auto !important;
+  padding: 14px 18px 8px !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-footer.region-filter-footer {
+  padding: 12px 18px 16px !important;
+  border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+
+/* Content V2: region/grid controls live in page header — hide legacy trigger row if it leaks */
+.v2-design .v2-content .region-filter-trigger-row {
+  display: none !important;
+}
+
+/* Every destination header is exactly the 56px title row (plus the notch).
+   A larger min-height, or scroll padding that includes a safe-area the header
+   does not, left a white band under the hairline. Category tabs stay children
+   of the header, flush under that line. Chat/memo have no category row. */
+html:has(.renewal-shell.v2-design) .v2-page-header.bp-header {
+  min-height: 0 !important;
+  height: auto !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  background: var(--bg-card) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header:not(.is-scroll-hidden) {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: var(--bg-card) !important;
+  overflow: visible !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header > .bp-header-row {
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
+  padding-top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .v2-chat-scroll > div:first-child,
+html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .chat-messages-scroll > div:first-child {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Chat uses the same purple menu FAB. It sits in the old jump-to-latest
+   slot, just above the composer; the jump button itself is centered. */
+html:has(.renewal-shell.v2-design) .v2-chat .bp-menu-fab {
+  right: 16px !important;
+  bottom: calc(var(--v2-chat-composer-space, 168px) + 8px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .bp-menu-fab {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Stand-in back control while the shared header is scrolled away.
+   Portaled to document.body, so it cannot depend on a .v2-design ancestor. */
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
+  display: inline-flex !important;
+  position: fixed !important;
+  z-index: 80 !important;
+  top: calc(6px + env(safe-area-inset-top, 0px)) !important;
+  left: 16px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid var(--border, #e7e4ef) !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: var(--text, #2c2740) !important;
+  box-shadow: 0 4px 14px rgba(35, 20, 64, 0.14) !important;
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .bp-floating-back-btn {
+    left: calc(280px + 16px) !important;
+  }
+  html:has(.renewal-shell.v2-design.is-side-collapsed) .bp-floating-back-btn {
+    left: calc(64px + 16px) !important;
+  }
+}
+
+/* Archive people/memory cells share the gallery thumb contract: the bitmap
+   fills the square. A failed thumb used to shrink to a tiny broken icon in
+   the corner because percentage height never resolved. */
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell {
+  position: relative !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > img,
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > .media-thumb {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > .archive-photo-fallback,
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > [role="img"] {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Last bubble must clear the composer and the menu FAB above it.
+   The scroller fills the pane (composer is overlaid), so bottom padding
+   is the only way to scroll that bubble out from under the button. */
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
+  padding-bottom: calc(var(--v2-chat-composer-space, 168px) + 76px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .chat-messages-scroll {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* v1 meta: time / edit / reply sit beside the bubble, not under it.
+   Incoming (left) → meta on the right. Own (right) → meta on the left. */
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  row-gap: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) {
+  justify-content: flex-start !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] {
+  justify-content: flex-end !important;
+  align-items: flex-end !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover > div {
+  grid-row: auto !important;
+  grid-column: auto !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(3) {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+  align-self: stretch !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 0 0 6px !important;
+  padding: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-end !important;
+  align-items: flex-end !important;
+  align-self: flex-end !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 6px 0 0 !important;
+  padding: 0 !important;
+}
+
+/* Sheets that are not Resizable still get the same gray drag pill. */
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.meme-preview-overlay) > .bottom-sheet:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before,
+html:has(.renewal-shell.v2-design) .bp-event-sheet:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before {
+  content: "" !important;
+  display: block !important;
+  width: 40px !important;
+  height: 4px !important;
+  margin: 10px auto 8px !important;
+  border-radius: 999px !important;
+  background: #d4d0de !important;
+  flex: 0 0 4px !important;
+  align-self: center !important;
+}
+
+/* Reply and edit stay border-only, on the same line as the timestamp. */
+html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid var(--border-subtle, #d9d4e6) !important;
+  box-shadow: none !important;
+  border-radius: 6px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) {
+  align-items: flex-end !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(3),
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  flex-direction: row !important;
+  align-items: center !important;
+  align-self: flex-end !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  justify-content: flex-end !important;
+}
+
+/* Hero D-day chips scroll sideways instead of being clipped by the zone. */
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-strip {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  touch-action: pan-x !important;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-chip {
+  flex: 0 0 auto !important;
+  width: 68px !important;
+  min-width: 68px !important;
+}
+
+/* Quick nav: the group from the left edge of 채팅 to the right edge of 컨텐츠
+   is one centered band (about 90% of the hero), not five equal columns.
+   Equal columns centered each label in its slot, so the longer last label
+   pulled the visual group to the right. */
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 0 5% 10px !important;
+  box-sizing: border-box !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: clamp(6px, 2vw, 18px) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-hero-quick-nav-icon {
+  width: clamp(32px, 9vw, 48px) !important;
+  height: clamp(32px, 9vw, 48px) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-hero-quick-nav-label {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: clamp(0.62rem, 3vw, 0.8rem) !important;
+}
+
+/* Expanded D-day cards keep the closed capsule's glass, and each one
+   opens on its own with a height animation. */
+html:has(.renewal-shell.v2-design) .bp-dday-reveal {
+  display: grid !important;
+  grid-template-rows: 0fr !important;
+  transition: grid-template-rows 0.32s cubic-bezier(.22, 1, .36, 1) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-reveal.bp-is-open {
+  grid-template-rows: 1fr !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-reveal-inner {
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-reveal .bp-dday-expanded,
+html:has(.renewal-shell.v2-design) .bp-dday-chip-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  gap: 8px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.52) !important;
+  border-radius: 18px !important;
+  /* Outer drop-shadow was clipped by the rectangular reveal wrapper, so a
+     dark translucent square stuck out past the rounded corners. The closed
+     capsule only has an inset highlight — match that, and crop the
+     backdrop-filter to the same radius. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
+  clip-path: inset(0 round 18px) !important;
+  backdrop-filter: blur(18px) saturate(165%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(165%) !important;
+  opacity: 0;
+  transform: translateY(-8px);
+  transform-origin: top center;
+  transition: opacity 0.28s ease, transform 0.32s cubic-bezier(.22, 1, .36, 1) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-reveal.bp-is-open .bp-dday-expanded {
+  opacity: 1 !important;
+  transform: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 1px !important;
+  border-radius: inherit !important;
+  pointer-events: none !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 42%, rgba(255, 255, 255, 0.06)) !important;
+  opacity: 0.9 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.renewal-shell.v2-design) .bp-dday-reveal,
+  html:has(.renewal-shell.v2-design) .bp-dday-reveal .bp-dday-expanded {
+    transition: none !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .bp-dday-chip-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-chip-card {
+  margin: 0 14px 10px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded-open {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #fff !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  font-size: 0.92rem !important;
+  line-height: 1.35 !important;
+  font-weight: 800 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded-open .bp-dday-compact-prefix,
+html:has(.renewal-shell.v2-design) .bp-dday-expanded-open .bp-dday-compact-detail {
+  display: block !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  font-weight: 800 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded-date-row {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-collapse-btn {
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+}
+/* Meeting-day forecast pictogram, left of the fold button (white on the brand banner). */
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-weather {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-weather svg {
+  display: block;
+  flex: 0 0 auto;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-weather + .bp-dday-collapse-btn {
+  margin-left: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-view-btn {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-participant-memo {
+  display: flex !important;
+  align-items: center !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  border-radius: 14px !important;
+  max-width: 100% !important;
+  padding: 3px 12px 3px 3px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-text {
+  flex: 1 1 8em !important;
+  min-width: 0 !important;
+  align-self: center !important;
+  display: block !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.35 !important;
+  padding: 3px 0 !important;
+}
+
+/* Phone home: the purple hero stays put. The calendar and the cards below
+   scroll up and paint over it, instead of the whole page moving as one. */
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-hero-zone {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1 !important;
+    contain: none !important;
+  }
+  html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-renewal-home-summary,
+  html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-renewal-home-footer {
+    position: relative !important;
+    z-index: 2 !important;
+    background: var(--bg-primary, #f6f4fb) !important;
+  }
+}
+
+/* Home gallery: square, edge-to-edge thumbs sit flush (no bottom pad).
+   From 460px the thumbs round, so the card gets the same bottom pad as the
+   other summary sections. */
+html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+  padding-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb {
+  border-radius: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
+  box-sizing: border-box !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-photo-strip,
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
+  margin-bottom: 0 !important;
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+@media (max-width: 359px) {
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+    padding-bottom: 28px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb {
+    border-radius: 12px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-photo-strip,
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
+    gap: 8px !important;
+  }
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+    padding-bottom: 18px !important;
+  }
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+    padding-bottom: 24px !important;
+  }
+}
+
+/* Anniversary bars: one height, one 2px gap, category color.
+   Under 460px they are full-width lines. At 460px and up they are text badges.
+   Solo bars and multi-day bars share the same tokens so a later stylesheet
+   cannot paint one of them pink or a different thickness. */
+html:has(.renewal-shell.v2-design) {
+  --ann-bar-h: 4px;
+  --ann-bar-gap: 2px;
+  --ann-birthday: #EF4444;
+  --ann-event: #3B82F6;
+  --ann-festival: #F59E0B;
+  --ann-sports: #0EA5E9;
+  --ann-movie: #8B5CF6;
+  --ann-travel: #10B981;
+  --ann-other: #6B7280;
+}
+html:has(.renewal-shell.v2-design) .bp-cat-birthday { --ann-c: var(--ann-birthday); }
+html:has(.renewal-shell.v2-design) .bp-cat-event { --ann-c: var(--ann-event); }
+html:has(.renewal-shell.v2-design) .bp-cat-festival { --ann-c: var(--ann-festival); }
+html:has(.renewal-shell.v2-design) .bp-cat-sports { --ann-c: var(--ann-sports); }
+html:has(.renewal-shell.v2-design) .bp-cat-movie { --ann-c: var(--ann-movie); }
+html:has(.renewal-shell.v2-design) .bp-cat-travel,
+html:has(.renewal-shell.v2-design) .bp-cat-trip { --ann-c: var(--ann-travel); }
+html:has(.renewal-shell.v2-design) .bp-cat-other,
+html:has(.renewal-shell.v2-design) .bp-cat-custom { --ann-c: var(--anniversary-color, var(--ann-other)); }
+
+html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack,
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .festival-bar-spacer {
+  align-self: stretch !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: var(--ann-bar-gap) !important;
+  margin-top: auto !important;
+  margin-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .festival-bar-spacer {
+  height: calc(var(--festival-stack-depth, 0) * (var(--ann-bar-h) + var(--ann-bar-gap)) - var(--ann-bar-gap)) !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+  pointer-events: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary,
+html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary,
+html:has(.renewal-shell.v2-design) .festival-bar-mobile > .bp-day-anniversary {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  height: var(--ann-bar-h) !important;
+  min-height: var(--ann-bar-h) !important;
+  max-height: var(--ann-bar-h) !important;
+  margin-top: 0 !important;
+  margin-bottom: calc(var(--ann-level, 0) * (var(--ann-bar-h) + var(--ann-bar-gap))) !important;
+  padding: 0 4px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: var(--ann-c, var(--ann-birthday)) !important;
+  color: #fff !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  flex: 0 0 var(--ann-bar-h) !important;
+}
+html:has(.renewal-shell.v2-design) .festival-bar-desktop,
+html:has(.renewal-shell.v2-design) .festival-bar-mobile {
+  padding: 0 3px 3px !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-anniversary-label,
+html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label {
+  display: none !important;
+}
+
+@media (max-width: 459px) {
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop { display: none !important; }
+  html:has(.renewal-shell.v2-design) .festival-bar-mobile { display: flex !important; }
+}
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) {
+    --ann-bar-h: 16px;
+  }
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop { display: flex !important; }
+  html:has(.renewal-shell.v2-design) .festival-bar-mobile { display: none !important; }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary {
+    /* Capsule, same as the thin phone bars. */
+    border-radius: 999px !important;
+    padding: 0 6px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-birthday {
+    background: color-mix(in srgb, var(--ann-birthday) 22%, var(--bg-card)) !important;
+    color: var(--ann-birthday) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-event,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-event {
+    background: color-mix(in srgb, var(--ann-event) 22%, var(--bg-card)) !important;
+    color: var(--ann-event) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-festival {
+    background: color-mix(in srgb, var(--ann-festival) 28%, var(--bg-card)) !important;
+    color: #b45309 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-sports {
+    background: color-mix(in srgb, var(--ann-sports) 22%, var(--bg-card)) !important;
+    color: var(--ann-sports) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-movie {
+    background: color-mix(in srgb, var(--ann-movie) 22%, var(--bg-card)) !important;
+    color: var(--ann-movie) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-travel,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-trip {
+    background: color-mix(in srgb, var(--ann-travel) 22%, var(--bg-card)) !important;
+    color: #047857 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-other,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-custom,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-other,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-custom {
+    background: color-mix(in srgb, var(--ann-c, var(--ann-other)) 22%, var(--bg-card)) !important;
+    color: var(--ann-c, var(--ann-other)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
+    display: block !important;
+    color: inherit !important;
+    font-size: 0.62rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .recent-log-row,
+html:has(.renewal-shell.v2-design) .recent-log-note,
+html:has(.renewal-shell.v2-design) .recent-log-left,
+html:has(.renewal-shell.v2-design) .recent-log-action,
+html:has(.renewal-shell.v2-design) .recent-log-date {
+  font-style: normal !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-participant-memo {
+  align-items: center !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-name {
+  align-self: stretch !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: auto !important;
+  min-height: 100% !important;
+  padding: 0 10px !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+
+/* 연일 bars live inside the day cell, on a shared bottom lane.
+   A grid-sibling bar was what slipped into the row gutter and collapsed
+   to a dash at the start of the next cell. */
+html:has(.renewal-shell.v2-design) .bp-cal-days-grid > .festival-bar-desktop,
+html:has(.renewal-shell.v2-design) .bp-cal-days-grid > .festival-bar-mobile {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell[style*="--ann-lanes"] {
+  padding-bottom: calc(var(--ann-lanes) * (var(--ann-bar-h) + var(--ann-bar-gap)) + 4px) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack .bp-day-anniversary.bp-solo {
+  width: 100% !important;
+  align-self: stretch !important;
+  margin-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range {
+  position: absolute !important;
+  top: auto !important;
+  height: var(--ann-bar-h) !important;
+  min-height: var(--ann-bar-h) !important;
+  max-height: var(--ann-bar-h) !important;
+  bottom: calc(var(--ann-level, 0) * (var(--ann-bar-h) + var(--ann-bar-gap)) + 3px) !important;
+  margin: 0 !important;
+  padding: 0 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+  background: var(--ann-c, var(--ann-birthday)) !important;
+  color: #fff !important;
+  overflow: hidden !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+  border: 0 !important;
+  width: auto !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-single {
+  left: 3px !important;
+  right: 3px !important;
+  border-radius: 999px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-start {
+  left: 3px !important;
+  right: -1px !important;
+  border-radius: 999px 0 0 999px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-end {
+  left: -1px !important;
+  right: 3px !important;
+  border-radius: 0 999px 999px 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-mid {
+  left: -1px !important;
+  right: -1px !important;
+  border-radius: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
+  display: none !important;
+}
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-single {
+    border-radius: 999px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-start {
+    border-radius: 999px 0 0 999px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-end {
+    border-radius: 0 999px 999px 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-birthday {
+    background: color-mix(in srgb, var(--ann-birthday) 22%, var(--bg-card)) !important;
+    color: var(--ann-birthday) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-event {
+    background: color-mix(in srgb, var(--ann-event) 22%, var(--bg-card)) !important;
+    color: var(--ann-event) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-festival {
+    background: color-mix(in srgb, var(--ann-festival) 28%, var(--bg-card)) !important;
+    color: #b45309 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-sports {
+    background: color-mix(in srgb, var(--ann-sports) 22%, var(--bg-card)) !important;
+    color: var(--ann-sports) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-movie {
+    background: color-mix(in srgb, var(--ann-movie) 22%, var(--bg-card)) !important;
+    color: var(--ann-movie) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-travel,
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-trip {
+    background: color-mix(in srgb, var(--ann-travel) 22%, var(--bg-card)) !important;
+    color: #047857 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-other,
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-custom {
+    background: color-mix(in srgb, var(--ann-c, var(--ann-other)) 22%, var(--bg-card)) !important;
+    color: var(--ann-c, var(--ann-other)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-has-label .bp-day-anniversary-label {
+    display: block !important;
+    color: inherit !important;
+    font-size: 0.62rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Anniversary badges, final say (text-badge widths, >=460px). Solo and 연일 badges were
+   styled by several competing rule sets (design.css / aurora-theme.css / this file) whose
+   specificity differed, so solo badges came out 18px tall with 0.7rem pink (--cal-anniversary)
+   text while 연일 bars were 16px with 0.62rem category text, and the stack gap was 6px under one
+   rule and 2px under another. One selector chain, higher than all of them, now owns height,
+   type, gap, alignment and color for both kinds:
+   - tint = 22% of the category color over the card surface, ink = the category color blended
+     toward --text-main (so it darkens in light mode and lightens in dark mode), so every category reads "pale X background, deep X text";
+   - text is centered; a 연일 bar's title lives only in the first segment of each week row and
+     is stretched across the remaining cells (--ann-span, set in ui-app-shell-v2.js) so it shows
+     in full once instead of being clipped and repeated in every day cell. Ellipsis stays only as
+     the fallback for a title longer than the whole bar. */
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary {
+    --ann-ink: color-mix(in srgb, var(--ann-c, #6B7280) 70%, var(--text-main));
+    --ann-tint: color-mix(in srgb, var(--ann-c, #6B7280) 22%, var(--bg-card));
+    height: var(--ann-bar-h) !important;
+    min-height: var(--ann-bar-h) !important;
+    max-height: var(--ann-bar-h) !important;
+    padding: 0 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: var(--ann-tint) !important;
+    color: var(--ann-ink) !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary.bp-cat-festival {
+    --ann-tint: color-mix(in srgb, #EAB308 30%, var(--bg-card));
+    --ann-ink: #A16207;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary.bp-cat-other {
+    --ann-ink: #4B5563;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary > .bp-day-anniversary-label {
+    display: block !important;
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    color: inherit !important;
+    font-size: 0.62rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-bar-stack {
+    gap: var(--ann-bar-gap) !important;
+    padding-bottom: 0 !important;
+  }
+  /* Solo stack bottom sits on the reserved lane padding; +3px (the lanes' own bottom offset)
+     makes the solo-to-연일 gap equal to --ann-bar-gap like the gaps between lanes. */
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell[style*="--ann-lanes"] {
+    padding-bottom: calc(var(--ann-lanes) * (var(--ann-bar-h) + var(--ann-bar-gap)) + 3px) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-is-start { --ann-l: 3px; }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-is-mid,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-is-end { --ann-l: -1px; }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-label-spans {
+    overflow: visible !important;
+    z-index: 3 !important;
+  }
+  /* Cells abut (no column gap): cell width = segment width + its left inset - 1px (the right
+     inset every continuing segment has), and the bar ends --ann-rend short of the last cell. */
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-label-spans > .bp-day-anniversary-label {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100% !important;
+    width: calc(var(--ann-span, 1) * (100% + var(--ann-l, 3px) - 1px) - var(--ann-l, 3px) - var(--ann-rend, 3px)) !important;
+    max-width: none !important;
+    padding: 0 6px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary {
+  --ann-ink: color-mix(in srgb, var(--ann-c, #6B7280) 55%, var(--text-main));
+  --ann-tint: color-mix(in srgb, var(--ann-c, #6B7280) 26%, var(--bg-card));
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary.bp-cat-festival {
+  --ann-ink: #FDE047;
+  --ann-tint: color-mix(in srgb, #EAB308 26%, var(--bg-card));
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary.bp-cat-other {
+  --ann-ink: #D1D5DB;
+}
+
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  aspect-ratio: 3 / 4 !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child > img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* V2 rule: text sits in the vertical middle of its own control.
+   line-height above 1 leaves a fractional line box that the browser rounds
+   toward the top, which is why pills looked top-heavy.
+   Exception: past-meeting participant memos stay top-aligned — the card
+   and the wrapping memo keep flex-start / text-align left. */
+html:has(.renewal-shell.v2-design) :where(
+  .v2-name-pill,
+  .bp-chat-name-pill,
+  .participant-badge,
+  .status-badge,
+  .dday-badge,
+  .date-item-badge,
+  .bp-dday-compact-badge,
+  .bp-dday-pill,
+  .bp-dday-expanded-badge,
+  .bp-dday-participant-memo-name,
+  .section-count-badge,
+  .main-menu-badge,
+  .side-menu-meta-pill,
+  .poll-voter-badge,
+  .poll-deadline-badge,
+  .poll-confirmed-badge,
+  .bp-tag-chip,
+  .bp-place-tag,
+  .bp-ann-cat-chip,
+  .bp-expense-cat-chip,
+  .memo-capsule-badge:not(.is-multiline),
+  .url-capsule-badge:not(.is-multiline),
+  .calendar-loading-pill,
+  .bp-side-nav-item-badge,
+  .bp-hero-quick-nav-badge,
+  .bp-comment-badge,
+  .confirmed-meeting-label-badge
+) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+html:has(.renewal-shell.v2-design) :where(
+  .bp-icon-btn,
+  .bp-renewal-shell-header-icon-btn,
+  .bp-ghost-btn,
+  .bp-dday-collapse-btn,
+  .bp-hero-quick-nav-item,
+  .bp-hero-quick-nav-icon,
+  .underline-tabs [role="tab"],
+  .bp-more-link,
+  .bp-cal-nav-btn,
+  .bp-cal-today-btn
+) {
+  align-items: center !important;
+  justify-content: center !important;
+}
+html:has(.renewal-shell.v2-design) .history-meetings-grid .date-item-btn,
+html:has(.renewal-shell.v2-design) .history-meetings-grid .date-item-btn .place-memo-stack {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+html:has(.renewal-shell.v2-design) .memo-capsule-badge.is-multiline,
+html:has(.renewal-shell.v2-design) .history-meetings-grid .memo-capsule-badge.is-multiline {
+  display: inline-block !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  line-height: 1.3 !important;
+  height: auto !important;
+}
+
+/* ============================================================================
+ * V2 dark mode = "Theme 2": black / neon lime / coral, solid (2026-09-24;
+ * was a black/green/orange gradient system on 2026-09-23)
+ * ----------------------------------------------------------------------------
+ * V2 never had its own dark-mode palette -- .renewal-shell.v2-design's tokens
+ * (--brand, --v2-glass-*, --v2-primary, --v2-card-border, the hero gradient)
+ * are all defined once, unconditionally, with light-mode literal values, so
+ * toggling the app's dark-mode switch (data-theme="dark") left every V2
+ * surface built on them untouched -- plus two outright bugs: .bp-side-nav-head
+ * (the top logo strip) falls back to white when its own --bg-surface variable
+ * is unset, and --bg-surface is never defined anywhere in this codebase, so
+ * it was always literally white; and
+ * .bp-side-nav-collapse-btn (아래 접기 버튼) reads --v2-glass-light-fill, which
+ * only ever had its light value, with no dark counterpart to switch to.
+ *
+ * Rather than the old light-purple brand carried into a dark shell, this is a
+ * deliberately new dark palette: near-black surfaces (~80%), a green point
+ * color standing in for the light theme's purple brand (~15%), and an orange
+ * accent used sparingly (~5%) for count-down/highlight moments. Anniversary
+ * category colors (--cal-anniversary and the per-category badge colors in
+ * app-anniversary-dates.js) are a separate, functional color language (which
+ * category a badge is) and are intentionally left alone.
+ *
+ * Scoped to html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design only -- V1's own
+ * dark theme (app.css) is untouched. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] body,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-memo,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-chat,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-places,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
+  /* body: modals are portaled to <body>, outside .renewal-shell, and read these tokens too.
+     The .v2-* destination roots are generated from reference mocks (reference-*.css) and
+     re-declare --brand/--brand-soft/--acc-* locally, so they need the dark values restated. */
+  --acc-cal: var(--brand);
+  --acc-cal-soft: var(--brand-soft);
+  --acc-chat-soft: color-mix(in srgb, #2563EB 18%, var(--bg-card));
+  --acc-gallery-soft: color-mix(in srgb, #0D9488 18%, var(--bg-card));
+  --acc-memo-soft: color-mix(in srgb, #D97706 18%, var(--bg-card));
+  --acc-places-soft: color-mix(in srgb, #E11D48 18%, var(--bg-card));
+  /* Fixes .bp-side-nav-head's undefined --bg-surface fallback (#fff) above. */
+  --bg-surface: var(--bg-card);
+
+  /* Theme 2 (reference: black / neon lime / coral, all solid, no gradients). */
+  --brand: #C9FD58;
+  --brand-soft: #1F2A0E;
+  --on-brand: #0D0D0D;
+  --cal-schedule: #C9FD58;
+  --accent-primary: var(--brand);
+  --accent-orange: #FC5545;
+  --accent-secondary: #FC5545;
+  --border-confirmed-soft: #4A5E1C;
+
+  --v2-glass-dark-fill: #0D0D0D;
+  --v2-glass-dark-border: #0D0D0D;
+  --v2-glass-dark-inset: none;
+  --v2-glass-dark-glow: none;
+
+  /* Was "light glass (on white / near-white pages)" -- now dark glass on
+     near-black pages. Fixes the collapse button (사이드메뉴 하단 접기) above. */
+  --v2-glass-light-fill: #131313;
+  --v2-glass-light-border: #2C2C2C;
+  --v2-glass-light-inset: none;
+  --v2-glass-light-shadow: none;
+  --v2-glass-light-hover-fill: #1F1F1F;
+  --v2-glass-light-hover-border: #3A3A3A;
+
+  --v2-glass-purple-fill: #1F2A0E;
+  --v2-glass-purple-border: #4A5E1C;
+  --v2-glass-purple-inset: none;
+
+  --v2-primary: #C9FD58;
+  --v2-primary-glow: none;
+  --v2-primary-glow-sm: none;
+
+  --v2-card-border: #2C2C2C;
+  --v2-card-shadow: none;
+
+  /* --bg-primary/--bg-card/--text-main etc are deliberately NOT redefined here --
+     they already go dark via app.css's own :root[data-theme="dark"] block (V1's
+     dark theme), and a V2-local override would violate this repo's established
+     "V2 only ever consumes the shared --bg-* and --text-* tokens, never redefines
+     them" rule (test/v2-dark-tokens-guard.test.mjs) -- V2 legacy-embedded content
+     shares these tokens with V1, so diverging them here would desync the two. The
+     border/surface tokens below aren't part of that guarded set. */
+  --border-subtle: #2C2C2C;
+  --border-hover: #3A3A3A;
+  --surface-confirmed: #1F2A0E;
+  --border-confirmed: var(--brand);
+}
+
+/* Hero zone: one solid lime slab (Theme 2 reference) instead of the light theme's animated
+   aurora. The aurora is three layered blobs (::before/::after and a .bp-hero-aurora child,
+   aurora-theme.css, each with its own !important radial-gradient + mix-blend-mode), so all
+   three are switched off rather than re-hued. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone {
+  background: var(--brand) !important;
+  animation: none !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::before,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::after,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone > .bp-hero-aurora {
+  background: none !important;
+  animation: none !important;
+  opacity: 0 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-head::after,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+  background: var(--bg-card) !important;
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact-badge {
+  background: var(--accent-orange) !important;
+  color: #fff !important;
+}
+
+/* Today's date: solid lime disc with black numerals (was a purple gradient literal). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-today .bp-day-num {
+  background: var(--brand) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-today .bp-day-num::after {
+  border-color: var(--brand) !important;
+}
+
+/* Hardcoded purple/white spots the tokens above don't reach: the active side-nav item is a
+   literal rgba(124,47,229,...) in design.css, .btn-action-outline (app.css, shared with V1)
+   has no dark variant, and Leaflet's zoom controls are white. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-item.bp-is-active {
+  background: var(--brand-soft) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .btn-action-outline {
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-subtle) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .leaflet-control-zoom a,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .leaflet-bar a {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* Hero contents on the solid lime slab, following the reference: text/icons go black; the
+   capsule, date chips and expanded meeting card become solid black pills/cards (white text,
+   lime/coral accents) instead of translucent glass. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-bento-title,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-bento-title-brand,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-brand-name,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-bento-title-actions,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn:not(.bp-hero-plain-icon-btn),
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn:not(.bp-hero-plain-icon-btn) {
+  background: var(--on-brand) !important;
+  border-color: var(--on-brand) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn:not(.bp-hero-plain-icon-btn),
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn:not(.bp-hero-plain-icon-btn) {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact::before,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip::before {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded-badge {
+  background: var(--accent-orange) !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-pill {
+  background: var(--brand) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded .bp-dday-collapse-btn,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded-tag,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-participant-memo {
+  background: #2C2C2C !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded .bp-dday-compact-prefix {
+  color: var(--brand) !important;
+}
+
+/* Remaining light literals found by a dark-mode scan of every V2 page (light values untouched):
+   dashed empty-state borders mixed against #eceaf5, content category chips and grid toggle
+   (#f7f6fa), content/archive tab count pills (#eceaf5), and the OSM map tiles/attribution. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-empty,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-renewal-home-empty,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-places .places-list-body > div > div[style*="text-align"] {
+  border-color: #3A3A3A !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
+  background: var(--bg-secondary) !important;
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] {
+  background: var(--brand) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] > span,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-archive .underline-tabs [role="tab"] > span {
+  background: var(--bg-secondary) !important;
+  color: var(--text-muted) !important;
+}
+/* Dark map: the raster tiles AND the sharper vector (MapLibre) layer drawn over them. Only the
+   tile pane used to be inverted, so on browsers that load the vector layer the map stayed
+   light. Inverted to a near-black base with dim gray roads/labels. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-gl-layer {
+  filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.08) grayscale(0.85);
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-container {
+  background: #111 !important;
+}
+/* app.css already inverts the raster tiles for the legacy dark theme; stacked under the pane
+   invert above they flipped back to mid gray. In V2 the pane does the single inversion. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .places-map-raster-fallback .leaflet-tile {
+  filter: grayscale(1) !important;
+  -webkit-filter: grayscale(1) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution {
+  background: rgba(13, 13, 13, 0.72) !important;
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution a {
+  color: var(--text-main) !important;
+}
+/* Integrated search page paints its whole canvas #f4f3f8 (light page tint). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-destination.v2-search,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card .modal-body,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
+  background: var(--bg-primary) !important;
+}
+/* ToggleSwitch (ui-shared.js) paints its off-state track #CBD5E1 inline. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] button[role="switch"][aria-checked="false"] {
+  background-color: #3A3A3A !important;
+}
+/* Settlement card status chip ("진행중") sets its purple text inline (ui-event-modals.js). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
+  color: var(--on-brand) !important;
+}
+/* Settlement hero: same solid lime slab as the home hero (start = mid = end, no gradient). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
+  --settlement-hero-start: var(--brand) !important;
+  --settlement-hero-mid: var(--brand) !important;
+  --settlement-hero-end: var(--brand) !important;
+}
+
+/* Theme 2 page-level fixes found by scanning every V2 page (light theme untouched):
+   solid confirmed-date cells, black text on every lime fill, lime visited-place tags. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-confirmed {
+  background: var(--brand-soft) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill *,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-cal-badge {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-place-tag.bp-is-visited {
+  background: var(--brand-soft) !important;
+  color: var(--brand) !important;
+  border-color: var(--border-confirmed-soft) !important;
+}
+/* Anything filled with the brand color gets black ink: lime (#C9FD58) with the light theme's
+   white text is ~1.2:1. Covers components that set the fill inline (count badges, segmented
+   buttons, category chips) and the class-driven ones (FAB, pagination, comment badges). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background-color: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background-color: var(--accent-primary)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background: var(--accent-primary)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background-color: var(--brand"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background: var(--brand"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-fab,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .gallery-pagination-button.is-active,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .memo-card-comment-badge {
+  color: var(--on-brand) !important;
+}
+/* Settlement hero on the solid lime slab: black text, solid black member/total cards. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] body,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
+  --status-green: #C9FD58;
+  --settlement-hero-text: #0D0D0D;
+  --settlement-hero-muted: rgba(13, 13, 13, 0.72);
+  --settlement-hero-surface: #0D0D0D;
+  --settlement-hero-surface-text: #FFFFFF;
+  --settlement-hero-surface-muted: #A3A3A3;
+  --settlement-hero-action-bg: #0D0D0D;
+  --settlement-hero-action-border: #0D0D0D;
+  --settlement-hero-action-text: #FFFFFF;
+  --settlement-person-capsule-bg: #2C2C2C;
+  --settlement-person-capsule-text: #FFFFFF;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-total-card {
+  background: var(--settlement-hero-surface) !important;
+  color: var(--settlement-hero-surface-text) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-total-card .settlement-person-amount {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-transfer-guide {
+  background: var(--on-brand) !important;
+  border-color: var(--on-brand) !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-transfer-guide b {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
+  background: var(--on-brand) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] .section-count-badge,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cat-chip.bp-is-selected .section-count-badge {
+  background: var(--on-brand) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cat-chip.bp-is-selected {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected .section-count-badge {
+  background: transparent !important;
+  color: var(--on-brand) !important;
+}
+/* Mobile hero quick-nav (채팅/정산/메모/...) sits on the lime slab. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-item,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-label,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-icon {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-quick-nav-badge {
+  box-shadow: 0 0 0 2px var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-fab {
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design > nav.bp-side-nav,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav {
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.55) !important;
+}
+/* Portaled modals/sheets render under <body>, outside .renewal-shell, so Theme 2's modal rules
+   are scoped to the page (html:has(.renewal-shell.v2-design)) rather than the shell. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .btn-primary,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay .btn-primary,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay button.btn-primary {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: var(--on-brand) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.62) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-container,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay .modal-container,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay > .modal-container.v2-responsive-modal {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 58, 237)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 47, 229)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(139, 92, 246)"]:not(svg):not(path) {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: var(--accent-primary)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background: var(--accent-primary)"] {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .url-capsule-badge {
+  color: var(--text-main) !important;
+}
+/* Light-theme slate ink set inline (#334155/#475569) reads ~2:1 on Theme 2's black cards. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(71, 85, 105)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(51, 65, 85)"] {
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(22, 163, 74)"] {
+  color: var(--brand) !important;
+}
+/* Map cluster counts (inline #3B82F6 + white ring in ui-places.js): black chip, lime ring/ink. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .place-cluster-icon > div {
+  background: var(--on-brand) !important;
+  border-color: var(--brand) !important;
+  color: var(--brand) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: rgb(226, 232, 240)"] {
+  background-color: #2C2C2C !important;
+  color: var(--text-muted) !important;
+}
+
+/* PC home uses the same 40px page gutter as every other destination body (.v2-dest-body,
+   .gallery-page-scroll, .places-list-body all pad 40px at desktop widths) instead of running
+   the hero and calendar edge-to-edge. Tablet/phone contracts (<1200px) are unchanged. */
+@media (min-width: 1200px) {
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    padding: 40px !important;
+    box-sizing: border-box !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    margin: 0 0 16px !important;
+    border-radius: 20px !important;
+  }
+}
+
+/* Header collapse motion ----------------------------------------------------
+   Destination headers slide away on scroll instead of vanishing in one frame.
+   PageHeader (screens.js) writes the measured content height to --v2-header-h
+   just before it hides/shows, so max-height animates between 0 and the real
+   height; once expanded the variable is removed and max-height is none again.
+   Chat keeps its own translate-based slide (.v2-chat rules above win). */
+.v2-design .v2-page-header {
+  transition:
+    max-height 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)),
+    min-height 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)),
+    padding-top 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)),
+    opacity 240ms ease,
+    box-shadow 240ms ease !important;
+}
+.v2-design .v2-page-header:not(.is-scroll-hidden)[style*="--v2-header-h"] {
+  max-height: calc(var(--v2-header-h) + env(safe-area-inset-top, 0px) + 2px) !important;
+}
+.v2-design .v2-page-header > .bp-header-row {
+  transition: transform 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)), opacity 200ms ease;
+}
+.v2-design .v2-page-header.is-scroll-hidden:not(.v2-chat *) > .bp-header-row {
+  transform: translate3d(0, -12px, 0);
+  opacity: 0;
+}
+
+/* The floating back button stands in for the header's back arrow; it scales in
+   as the header leaves and out as it returns. */
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
+  transition:
+    opacity 220ms ease,
+    transform 320ms var(--motion-ease-spring, cubic-bezier(.34, 1.56, .64, 1)),
+    background-color 220ms ease !important;
+}
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn:not(.is-visible) {
+  opacity: 0 !important;
+  transform: translate3d(0, -6px, 0) scale(.82) !important;
+  pointer-events: none !important;
+  visibility: hidden;
+  transition:
+    opacity 180ms ease,
+    transform 200ms ease,
+    visibility 0s linear 200ms !important;
+}
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn:active {
+  transform: scale(.94) !important;
+}
+
+/* Sheet / page / tab motion --------------------------------------------------
+   Individual `translate`/`scale` properties are used where the element's own
+   `transform` is pinned with !important (the event sheet centres itself with
+   translate(-50%, 0) !important), so the motion composes instead of fighting it.
+   No animation-fill-mode on page/sheet entrances: a filling opacity animation
+   would keep a stacking context on the page and re-layer its fixed FAB. */
+@keyframes bp-sheet-up {
+  from { translate: 0 100%; }
+  to { translate: 0 0; }
+}
+@keyframes bp-page-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes bp-exit-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes bp-exit-sheet {
+  from { translate: 0 0; }
+  to { translate: 0 100%; }
+}
+@keyframes bp-exit-pop {
+  from { opacity: 1; translate: 0 0; scale: 1; }
+  to { opacity: 0; translate: 0 18px; scale: .98; }
+}
+.v2-design .bp-event-sheet.modal-container {
+  animation: bp-sheet-up 380ms var(--motion-ease-out, cubic-bezier(.16, 1, .3, 1));
+}
+.v2-design .v2-dest-page {
+  animation: bp-page-in 240ms ease-out;
+}
+/* Overlay exit: src/core/overlay-exit-motion.js re-inserts a just-closed overlay
+   with .is-exit-ghost for 240ms.
+   The dim layer's colour fades inline (JS); the sheet/dialog moves out opaque.
+   Phones show every modal as a bottom sheet, so it slides down; wider screens
+   centre dialogs, which shrink and fade instead. */
+/* Re-inserting an element restarts its CSS animations; the overlay's own fade-in
+   and the cards' entrance must not replay while it leaves. */
+html:has(.renewal-shell.v2-design) .is-exit-ghost,
+html:has(.renewal-shell.v2-design) .is-exit-ghost * {
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design) .is-exit-ghost {
+  pointer-events: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html:has(.renewal-shell.v2-design) .is-exit-ghost.lightbox-overlay {
+  animation: bp-exit-fade 220ms ease-in forwards !important;
+}
+html:has(.renewal-shell.v2-design) .is-exit-ghost .modal-container,
+html:has(.renewal-shell.v2-design) .is-exit-ghost .bottom-sheet,
+html:has(.renewal-shell.v2-design) .is-exit-ghost .bp-event-sheet.modal-container {
+  animation: bp-exit-sheet 230ms cubic-bezier(.4, 0, 1, 1) forwards !important;
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .modal-container,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .bp-event-sheet.modal-container {
+    animation: bp-exit-pop 200ms cubic-bezier(.4, 0, 1, 1) forwards !important;
+  }
+}
+/* Tab underline grows from the centre instead of switching on. */
+html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after {
+  scale: .3 1;
+  transition: scale 280ms var(--motion-ease-out, cubic-bezier(.16, 1, .3, 1)), background-color 180ms ease;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-selected="true"]::after {
+  scale: 1 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .v2-page-header,
+  .v2-design .v2-page-header > .bp-header-row,
+  html:has(.renewal-shell.v2-design) .bp-floating-back-btn,
+  html:has(.renewal-shell.v2-design) .bp-floating-back-btn:not(.is-visible),
+  html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
+  html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after {
+    transition: none !important;
+  }
+  .v2-design .bp-event-sheet.modal-container,
+  .v2-design .v2-dest-page,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .modal-container,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .bottom-sheet {
+    animation: none !important;
+  }
+}
+
+/* Dark-mode values for the light theme's hard-coded, purple-tinted neutrals and accents.
+   Those colours were written as bare hex (#6b6580 muted text, #eceaf5 hairlines, #7c2fe5
+   accents, ...), so the dark theme never reached them: inactive tabs rendered lavender, card
+   lines stayed bright. Each such use is now var(--v2-*, <original hex>) -- the light theme
+   never defines these, so it keeps the exact original colour; only V2 dark maps them. Set
+   on <html> so portaled modals and sheets inherit them too. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] {
+  --v2-ink-1: #F5F5F5;
+  --v2-ink-2: #A3A3A3;
+  --v2-ink-3: #8A8A8A;
+  --v2-line: #2C2C2C;
+  --v2-surface-2: #1F1F1F;
+  --v2-tint-soft: #1F2A0E;
+  --v2-accent: #C9FD58;
+  --v2-accent-line: #4A5E1C;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] {
+  --v2-accent-fill: var(--brand);
+  --v2-on-accent: var(--on-brand);
+}
+
+/* Dark-mode sweep (every page, sheet and modal scanned for purple tints and bright lines). */
+/* 보관함 > 지난모임: upcoming 모임확정 cards are the lime slab (like the home hero cards), not
+   the light theme's flat purple; text flips to the on-brand ink. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past) {
+  background: var(--brand) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past)::before {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past) :is(div, strong, span, small, p):not(.memo-capsule-badge):not(.memo-capsule-badge *):not(.dday-badge):not(.dday-badge *):not(.url-capsule-badge):not(.url-capsule-badge *) {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past) svg {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .history-meetings-grid .date-item-btn.confirmed-meeting-card:not(.is-past) .place-memo-stack {
+  background: rgba(13, 13, 13, 0.1) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .history-meetings-grid .date-item-btn.is-past .place-memo-stack {
+  background-color: #262626 !important;
+}
+/* Legacy secondary buttons (일정 시트의 "추가" 등) and the unselected 작성자 picker. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .btn.btn-secondary {
+  background: #1F1F1F !important;
+  border-color: #2C2C2C !important;
+  color: var(--text-main) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .participant-picker-button:not([style*="--participant"]) {
+  border-color: #2C2C2C !important;
+}
+/* Unselected 작성자 picker: the light theme's slate placeholder chip (#94A3B8, inline) is a
+   bright block on black; use the dark neutral chip instead. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .participant-picker-button[style*="148, 163, 184"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .participant-picker-button[style*="#94A3B8" i] {
+  background-color: #3A3A3A !important;
+}
+
+/* ---------- Settlement dark surfaces ---------- */
+/* 정산 수정: selected expense rows, personal totals, auto-derived rows and notes kept their
+   light inline fills (white / #F8FAFC / pale blue) in dark mode. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-expense-option.is-checked {
+  background: var(--v2-surface-2, #1F1F1F) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-personal-expense-summary {
+  background: var(--bg-card) !important;
+  border-color: var(--v2-line, #2C2C2C) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-personal-total-row,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-auto-item {
+  background: var(--v2-surface-2, #1F1F1F) !important;
+  border-color: var(--v2-line, #2C2C2C) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-personal-total-row strong {
+  color: #60A5FA !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-auto-item strong {
+  color: #F87171 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-auto-note {
+  background: var(--v2-surface-2, #1F1F1F) !important;
+  border-color: var(--v2-line, #2C2C2C) !important;
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-auto-warn {
+  background: rgba(248, 113, 113, 0.12) !important;
+  border-color: rgba(248, 113, 113, 0.4) !important;
+  color: #F87171 !important;
+}
+/* 정산 카드 preview: black page with the lime card (same as the settlement page's top card)
+   instead of the light purple-pink gradient. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-card-preview-body {
+  background: var(--bg-primary) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-card-preview-hero {
+  background: var(--v2-accent, #C9FD58) !important;
+  color: #0A0A0A !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-card-preview-total {
+  color: #0A0A0A !important;
+}
+/* Per-day total badge: lime fill in dark mode needs dark text to be readable. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-day-net.is-positive {
+  color: #0A0A0A !important;
+}

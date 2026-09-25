@@ -74,7 +74,7 @@ export function UserManualOverlay({ calendar, onClose }) {
           fontWeight: 900,
           fontSize: 'var(--font-size-base)'
         }
-      }, day, day === 15 && /*#__PURE__*/React.createElement("span", { style: { color: '#7C3AED', fontSize: 'var(--font-size-2xs)' } }, "확정")), day === 22 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+      }, day, day === 15 && /*#__PURE__*/React.createElement("span", { style: { color: 'var(--v2-accent, #7C3AED)', fontSize: 'var(--font-size-2xs)' } }, "확정")), day === 22 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
         participantBadge(sampleParticipant),
         participantBadge(sampleParticipant2)
       ) : day === 15 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },

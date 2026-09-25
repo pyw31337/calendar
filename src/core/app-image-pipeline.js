@@ -1074,10 +1074,29 @@ async function backfillMeetingUploadSourcesForCalendar(calId, calendar, { maxMes
 // Resolves the {imageUrl, thumbUrl} pair a message/memo should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise. uploadFn
 // is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
+// A slow network can make a user think a send failed and resend the exact same file, and a
+// caller-level retry can re-invoke this with the same compressed object too. Both reach here
+// with the very same `compressed` object as an earlier, already-fully-uploaded attempt --
+// imagePreprocessCache above caches by stable file identity (name+size+lastModified+type), not
+// object identity, so a re-selected/resent file resolves to the same object. Reusing that
+// upload's result instead of uploading again avoids creating a second Storage object (and
+// therefore a duplicate gallery photo) for exactly this case; a freshly-compressed file (new
+// object identity, e.g. a fresh camera capture) is unaffected and still uploads normally.
+// Bounded by both a time window and imagePreprocessCache's own size cap, so a stale/deleted
+// Storage URL can't be reused indefinitely.
+const IMAGE_UPLOAD_REUSE_WINDOW_MS = 30 * 60 * 1000;
+
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
+  const reusable = compressed?.uploadedUrls;
+  if (reusable && Date.now() - reusable.uploadedAt < IMAGE_UPLOAD_REUSE_WINDOW_MS) {
+    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, metadata: compressed?.metadata || null };
+  }
   try {
     const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
+      if (compressed && typeof compressed === 'object') {
+        compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, uploadedAt: Date.now() };
+      }
       revokeCompressedObjectUrls(compressed);
       return { ...uploaded, metadata: compressed?.metadata || null };
     }

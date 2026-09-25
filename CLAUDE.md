@@ -16,6 +16,32 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 스크립트(`check-asset-mirrors.mjs` 등)가 `assets/`와 `public/assets/`의 바이트 동일성만
 확인하니, 그 둘을 건드릴 일이 생기면 서로 동기화해야 한다.
 
+## 지금 가장 중요한 진행 중 작업 (2026-09-23)
+
+**V2 셸이 기본 URL(`?id=cw`)의 기본값이 됐다 (컷오버 완료).** `isRenewalShellEnabled()`는
+이제 `shell !== 'v1'`(부재 시 V2) 이다. `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백
+탈출구다. **Safari 실기기 서명은 사용자가 직접 나중에 진행하기로 하고, 그 게이트를 건너뛰고
+컷오버를 진행하라는 사용자의 명시적 지시로 플립했다** — 이전까지의 "실기기 서명 전엔 금지"
+원칙은 이 특정 지시로 대체됐다. 문제가 발견되면 `?shell=v1`로 즉시 V1로 되돌릴 수 있다.
+
+상세·계획·실행한 diff·다음 단계는:
+
+→ [`docs/v2-default-cutover-handoff.md`](docs/v2-default-cutover-handoff.md)
+→ [`docs/v2-dark-mode-handoff.md`](docs/v2-dark-mode-handoff.md) — 다크모드 P0는 완료됨
+
+짧은 현황: [`docs/V2-STATUS.md`](docs/V2-STATUS.md).  
+**`.github/workflows/apply-*.yml` applicator로 소스 패치하지 말 것** (#732/#733).
+
+## 데이터 무결성 재설계 (2026-09-24)
+
+사진 썸네일 깨짐·태그/댓글 미스매칭이 반복되는 근본 원인(사본 기반 모델, 배열 위치 식별, 비원자적
+다문서 쓰기, 참조 확인 없는 Storage 삭제, 인증 부재)과 단계별 재설계(P0~P5)는
+→ [`docs/data-architecture-v3.md`](docs/data-architecture-v3.md)
+
+사진 삭제/교체/태그 저장은 `src/core/media-reference-integrity.js` 규칙을 거쳐야 한다(같은 파일의 모든
+사본을 함께 처리, 다른 참조가 남아 있으면 Storage 파일을 지우지 않음). `npm run ops:integrity-audit`로
+현황 확인, 데이터 복구 `ops:integrity-repair`는 dry-run 기본이며 APPLY=1 전에 반드시 `ops:export` 백업.
+
 ## 지금 상태 (2026-09-12 기준)
 
 `src/core/app-main.js`를 여러 개의 작은 `src/core/app-*.js` 모듈로 나누는 대규모 리팩터가

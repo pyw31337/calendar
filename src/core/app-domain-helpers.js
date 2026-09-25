@@ -6,6 +6,7 @@
  */
 import { GATHER_APP_UTILS } from './app-utils.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -140,9 +141,7 @@ const getPlaceCategoryIcon = GATHER_APP_UTILS.getPlaceCategoryIcon || function g
   return matchedDefault ? PLACE_CATEGORY_ICONS[matchedDefault.id] : PLACE_CATEGORY_ICONS.etc;
 };
 const getPlaceCategoryLabel = GATHER_APP_UTILS.getPlaceCategoryLabel || function getPlaceCategoryLabel(category) {
-  const name = sanitizeText(category?.name || '기타', 24) || '기타';
-  const icon = getPlaceCategoryIcon(category);
-  return icon ? icon + '\u00a0\u00a0' + name : name;
+  return sanitizeText(category?.name || '기타', 24) || '기타';
 };
 
 const KOREA_BBOX = GATHER_APP_UTILS.KOREA_BBOX || { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
@@ -580,13 +579,35 @@ function sanitizeMessageForFirestore(messageData) {
   const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
   if (tooBig(out.imageUrl)) delete out.imageUrl;
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
-  if (Array.isArray(out.imageUrls)) {
-    out.imageUrls = out.imageUrls.filter(u => typeof u === 'string' && !tooBig(u));
-    if (out.imageUrls.length === 0) delete out.imageUrls;
+  if (Array.isArray(out.imageUrls) || Array.isArray(out.thumbUrls)) {
+    // These arrays describe one physical photo per slot. Remove a rejected base64 photo from
+    // every parallel array in the same pass; filtering only the URL array was what shifted a
+    // later person's tag onto an unrelated food photo.
+    const urls = Array.isArray(out.imageUrls) ? out.imageUrls : [];
+    const thumbs = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
+    const tags = Array.isArray(out.imageTags) ? out.imageTags : null;
+    const nextUrls = [];
+    const nextThumbs = [];
+    const nextTags = tags ? [] : null;
+    const slots = Math.max(urls.length, thumbs.length);
+    for (let index = 0; index < slots; index += 1) {
+      if (tooBig(urls[index]) || tooBig(thumbs[index])) continue;
+      if (Array.isArray(out.imageUrls)) nextUrls.push(urls[index]);
+      if (Array.isArray(out.thumbUrls)) nextThumbs.push(thumbs[index]);
+      if (nextTags) nextTags.push(tags[index] || '');
+    }
+    if (Array.isArray(out.imageUrls)) {
+      out.imageUrls = nextUrls;
+      if (!out.imageUrls.some(Boolean)) delete out.imageUrls;
+    }
+    if (Array.isArray(out.thumbUrls)) {
+      out.thumbUrls = nextThumbs;
+      if (!out.thumbUrls.some(Boolean)) delete out.thumbUrls;
+    }
+    if (nextTags) out.imageTags = nextTags;
   }
-  if (Array.isArray(out.thumbUrls)) {
-    out.thumbUrls = out.thumbUrls.filter(u => typeof u === 'string' && !tooBig(u));
-    if (out.thumbUrls.length === 0) delete out.thumbUrls;
+  if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
+    out.imageTagMap = reconcileMessageImageTagMap(out, normalizeImageTagMap(out.imageTagMap));
   }
   if (out.linkPreview && typeof out.linkPreview === 'object') {
     const lp = { ...out.linkPreview };
@@ -827,11 +848,12 @@ async function listServerAuditLogsRemote(password, options = {}) {
 }
 
 async function rebuildPhotoIndexRemote(password, calendarId, options = {}) {
+  // A full rebuild of a large calendar outlasts the 25s default; the function itself allows 300s.
   const result = await callAdminFunction('rebuildPhotoIndex', {
     password,
     calendarId,
     apply: options.apply === true
-  });
+  }, 300000);
   return result || { ok: false };
 }
 
@@ -864,6 +886,29 @@ async function listUntaggedPhotoIndexEntriesRemote(password, options = {}) {
 async function adminBulkTagPhotosRemote(password, entries) {
   const result = await callAdminFunction('adminBulkTagPhotos', { password, entries });
   return Array.isArray(result?.results) ? result.results : [];
+}
+
+// Admin 데이터풀 > "중복사진 검사" -- lists every photoIndex row across every calendar (unfiltered,
+// unlike listUntaggedPhotoIndexEntriesRemote above) so the admin dashboard can run
+// gallery-dedup.js's findDuplicatePhotoGroups/chooseDedupWinner against a full snapshot. Read-only;
+// see listPhotoIndexEntriesForDedup in functions/index.js.
+async function listPhotoIndexEntriesForDedupRemote(password, options = {}) {
+  const result = await callAdminFunction('listPhotoIndexEntriesForDedup', {
+    password,
+    cursor: options.cursor ?? undefined,
+    limit: options.limit || 200
+  });
+  return { items: Array.isArray(result?.items) ? result.items : [], nextCursor: result?.nextCursor ?? null };
+}
+
+// Admin "중복사진 검사" 보고서의 병합 실행 -- 태그/댓글만 승자 쪽으로 합치고 패자 사진 자체는
+// 지우지 않는다 (실제 삭제는 기존 라이트박스 삭제 버튼으로, 해당 캘린더를 열어 수행). See the
+// detailed rationale comment on mergeDedupPhotos in functions/index.js.
+async function mergeDedupPhotosRemote(password, { calendarId, winnerAssetKey, loserAssetKey }) {
+  const result = await callAdminFunction('mergeDedupPhotos', { password, calendarId, winnerAssetKey, loserAssetKey });
+  return result?.ok === true
+    ? { ok: true, mergedTags: result.mergedTags, mergedCommentCount: result.mergedCommentCount }
+    : { ok: false, reason: result?.reason || result?.message || 'error' };
 }
 
 // Admin 데이터풀 > 파일/링크 -- lists sharedFiles/linkPreviews docs used by 2+ calendars (see
@@ -1313,8 +1358,8 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
   return body;
 }
 
-// Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
-// itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
+// Registers sw.js, which caches static assets (icons/manifests/hashed chunks) and uploaded Storage media
+// -- never index.html itself, since this app deliberately serves its HTML as no-cache (see sw.js). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1748,9 +1793,9 @@ function buildDynamicManifest(calendar) {
     background_color: '#F8FAFC',
     theme_color: '#4F46E5',
     icons: [
-      { src: `${base}icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: `${base}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: `${base}icons/icon-512-maskable.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      { src: `${base}icons/icon-v5-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `${base}icons/icon-v5-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: `${base}icons/icon-v5-512-maskable.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
     ]
   };
 }
@@ -2328,6 +2373,23 @@ function withTimeout(promise, ms, timeoutMessage) {
   });
 }
 
+function stampPhotoAssetIdentity(entry, slotKeys = {}) {
+  const canonicalKey = getPhotoAssetCommentKey(entry);
+  const positional = [slotKeys.assetKey, slotKeys.mediaKey, slotKeys.refKey]
+    .map(key => String(key || '').trim())
+    .filter(Boolean);
+  const legacyKeys = Array.from(new Set(positional.filter(key => key !== canonicalKey)));
+  const identity = canonicalKey || positional[0] || '';
+  return {
+    ...entry,
+    assetKey: identity,
+    mediaKey: identity,
+    refKey: identity,
+    slotKey: positional[0] || '',
+    legacyKeys,
+  };
+}
+
 function getMessageImageEntries(msg) {
   // Prefer multi-image arrays; fall back to legacy singular fields.
   // Do NOT require thumbnails — slimMessageForClient may drop oversized base64 thumbs
@@ -2336,19 +2398,23 @@ function getMessageImageEntries(msg) {
   const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
     ? declaredSource
     : 'chat';
+  // These three arrays are a single record: index `i` is the same physical photo in all of
+  // them.  Do not filter either media array independently here.  Filtering a broken/missing
+  // middle thumbnail shifted every later entry left while imageTags[i] stayed in place, which
+  // is how a tag from one photo could appear on a different one after an upload/delete cycle.
+  // Keep the source slot as imageIndex and skip only the individual unrenderable entry below.
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
-    ? msg.imageUrls.filter(u => typeof u === 'string' && u)
+    ? msg.imageUrls
     : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
-    ? msg.thumbUrls.filter(u => typeof u === 'string' && u)
+    ? msg.thumbUrls
     : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
-  const tags = Array.isArray(msg.imageTags) ? msg.imageTags : [];
   const count = Math.max(urls.length, thumbs.length);
   if (count === 0) return [];
   const entries = [];
   for (let i = 0; i < count; i++) {
-    const fullCandidate = urls[i] || thumbs[i];
-    const thumbCandidate = thumbs[i] || urls[i];
+    const fullCandidate = typeof urls[i] === 'string' ? (urls[i] || thumbs[i]) : thumbs[i];
+    const thumbCandidate = typeof thumbs[i] === 'string' ? (thumbs[i] || urls[i]) : urls[i];
     // Legacy records can contain an empty, relative, or otherwise malformed value. Never pass
     // those through to <img src>; Chromium treats some of them as navigation requests and can
     // fail the whole page's boot/smoke check. Keep valid data/http URLs only and let the caller
@@ -2361,16 +2427,15 @@ function getMessageImageEntries(msg) {
       imageIndex: i,
       source: sourceHint
     }, { source: sourceHint, messageId: msg.id });
-    entries.push({
+    const tagState = getMessagePhotoTagState(msg, { full: full || thumb, imageUrl: full || thumb, thumb: thumb || full }, i);
+    entries.push(stampPhotoAssetIdentity({
       full: full || thumb,
       thumb: thumb || full,
       imageIndex: i,
       messageId: msg.id,
       timestamp: msg.timestamp,
-      tags: tags[i] || '',
-      assetKey: keys.assetKey,
-      mediaKey: keys.mediaKey,
-      refKey: keys.refKey,
+      tags: tagState.tags,
+      tagAuthority: tagState.authoritative ? 'editable' : '',
       // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
       // explicitly -- see ui-chat-gallery.js/ui-summary-gallery.js's sharedPhotos/photoEntries.
       source: sourceHint,
@@ -2379,9 +2444,86 @@ function getMessageImageEntries(msg) {
       // automatically (see getPhotosForTagLabel in ui-summary-gallery.js) instead of relying
       // only on manually-added hashtags, which almost nothing had actually been tagged with.
       participantId: msg.participantId || null
-    });
+    }, keys));
   }
   return entries;
+}
+
+// `imageTags` is retained for compatibility with existing calendar documents, but it is a
+// positional cache and therefore cannot be the durable identity of a photo.  New writes also
+// maintain imageTagMap, keyed by the normalized asset identity used by photo comments and the
+// server-side photo index.  This keeps tags with the image when another image is deleted,
+// deduplicated, or a stale gallery row carries an old array index.
+function normalizeImageTagMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const next = {};
+  Object.entries(value).forEach(([key, rawValue]) => {
+    const cleanKey = String(key || '').trim();
+    if (!/^asset:v1:[A-Za-z0-9-]+$/.test(cleanKey)) return;
+    if (Object.keys(next).length >= 50) return;
+    next[cleanKey] = typeof rawValue === 'string' ? rawValue.slice(0, 100) : '';
+  });
+  return next;
+}
+
+function getMessagePhotoTagState(message, photo = {}, imageIndex = null) {
+  const assetKey = getPhotoAssetCommentKey(photo);
+  const tagMap = normalizeImageTagMap(message?.imageTagMap);
+  if (assetKey && Object.prototype.hasOwnProperty.call(tagMap, assetKey)) {
+    return { assetKey, tags: String(tagMap[assetKey] || ''), authoritative: true };
+  }
+  const tags = Array.isArray(message?.imageTags) ? message.imageTags : [];
+  const hasLegacySlot = Number.isInteger(imageIndex) && Object.prototype.hasOwnProperty.call(tags, imageIndex);
+  return {
+    assetKey,
+    tags: hasLegacySlot ? String(tags[imageIndex] || '') : '',
+    authoritative: hasLegacySlot
+  };
+}
+
+// Return the physical source slot, never the render-array position.  `getMessageImageEntries`
+// intentionally omits invalid display entries, so using entries[index] is unsafe for legacy
+// documents with one malformed URL.  Prefer the immutable asset key/URL and only then accept a
+// supplied positional fallback.
+function resolveMessagePhotoImageIndex(message, preferredIndex, identity = {}) {
+  const entries = getMessageImageEntries(message);
+  if (!entries.length) return -1;
+  const targetAssetKeys = new Set([
+    String(identity?.assetKey || ''),
+    getPhotoAssetCommentKey(identity),
+    getPhotoAssetCommentKey({ full: identity?.imageUrl || identity?.full || '', thumb: identity?.thumbUrl || identity?.thumb || '' })
+  ].filter(key => /^asset:v1:[A-Za-z0-9-]+$/.test(key)));
+  if (targetAssetKeys.size) {
+    const byAsset = entries.find(entry => targetAssetKeys.has(getPhotoAssetCommentKey(entry)));
+    if (byAsset) return byAsset.imageIndex;
+  }
+  const urls = [identity?.imageUrl, identity?.full, identity?.thumbUrl, identity?.thumb]
+    .filter(value => typeof value === 'string' && value);
+  if (urls.length) {
+    const byUrl = entries.find(entry => urls.some(url => entry.full === url || entry.thumb === url));
+    if (byUrl) return byUrl.imageIndex;
+  }
+  const fallback = Number.isInteger(preferredIndex)
+    ? preferredIndex
+    : (Number.isInteger(identity?.imageIndex) ? identity.imageIndex : null);
+  return entries.some(entry => entry.imageIndex === fallback) ? fallback : -1;
+}
+
+// Rebuild a compact tag map from the photos that still exist on a document.  In particular this
+// removes a deleted/replaced asset's map entry, while preserving an intentionally empty tag as a
+// real user choice.  A second copy of the same asset keeps the one shared asset key.
+function reconcileMessageImageTagMap(message, tagMap = null) {
+  const source = tagMap == null ? message?.imageTagMap : tagMap;
+  const existing = normalizeImageTagMap(source);
+  const next = {};
+  getMessageImageEntries({ ...(message || {}), imageTagMap: existing }).forEach(entry => {
+    const assetKey = getPhotoAssetCommentKey(entry);
+    if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey)) return;
+    const state = getMessagePhotoTagState({ ...(message || {}), imageTagMap: existing }, entry, entry.imageIndex);
+    if (!state.authoritative) return;
+    next[assetKey] = String(state.tags || '').slice(0, 100);
+  });
+  return next;
 }
 
 function getDirectMediaTagKey(url) {
@@ -2401,40 +2543,8 @@ function getDirectMediaTagKey(url) {
 // image changing) and use two independent 32-bit hashes plus the source length. The resulting
 // key is compact, Firestore-document-id safe, deterministic, and effectively collision-proof for
 // the scale of this app without depending on async WebCrypto during render.
-function normalizePhotoAssetUrl(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
-  try {
-    const parsed = new URL(raw, typeof window !== 'undefined' ? window.location?.href : undefined);
-    parsed.hash = '';
-    if (parsed.hostname === 'firebasestorage.googleapis.com' || parsed.hostname.endsWith('.firebasestorage.app')) {
-      parsed.search = '';
-    }
-    return parsed.toString();
-  } catch (_) {
-    return raw.split('#')[0];
-  }
-}
-
-function hashPhotoAssetIdentity(value) {
-  const source = String(value || '');
-  let fnv = 2166136261;
-  let djb = 5381;
-  for (let i = 0; i < source.length; i++) {
-    const code = source.charCodeAt(i);
-    fnv ^= code;
-    fnv = Math.imul(fnv, 16777619);
-    djb = Math.imul(djb, 33) ^ code;
-  }
-  return `${(fnv >>> 0).toString(36)}-${(djb >>> 0).toString(36)}-${source.length.toString(36)}`;
-}
-
 function getPhotoAssetCommentKey(photo = {}) {
-  const url = normalizePhotoAssetUrl(
-    photo?.full || photo?.imageUrl || photo?.url || photo?.src || photo?.thumb || photo?.thumbUrl || ''
-  );
-  return url ? `asset:v1:${hashPhotoAssetIdentity(url)}` : '';
+  return canonicalPhotoAssetKey(photo);
 }
 
 function getDirectMediaTagsForUrl(msg, url) {
@@ -2623,7 +2733,7 @@ function getMessageDirectMediaEntry(msg, options = {}) {
     imageIndex: 0,
     directMediaUrl: mediaInfo.url
   }, { source: sourceHint, messageId: msg.id });
-  return {
+  return stampPhotoAssetIdentity({
     full: mediaInfo.url,
     thumb: mediaInfo.url,
     imageIndex: 0,
@@ -2632,11 +2742,8 @@ function getMessageDirectMediaEntry(msg, options = {}) {
     tags: getDirectMediaTagsForUrl(msg, mediaInfo.url),
     directMediaUrl: mediaInfo.url,
     source: sourceHint,
-    uploadSource: msg.uploadSource || null,
-    assetKey: keys.assetKey,
-    mediaKey: keys.mediaKey,
-    refKey: keys.refKey
-  };
+    uploadSource: msg.uploadSource || null
+  }, keys);
 }
 
 function formatBytes(...args) {
@@ -2820,6 +2927,8 @@ export {
   memePoolDeleteRemote,
   listUntaggedPhotoIndexEntriesRemote,
   adminBulkTagPhotosRemote,
+  listPhotoIndexEntriesForDedupRemote,
+  mergeDedupPhotosRemote,
   listSharedDataPoolRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
@@ -2945,6 +3054,10 @@ export {
   getDirectChatMediaInfo,
   withTimeout,
   getMessageImageEntries,
+  normalizeImageTagMap,
+  getMessagePhotoTagState,
+  resolveMessagePhotoImageIndex,
+  reconcileMessageImageTagMap,
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,

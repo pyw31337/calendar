@@ -2,6 +2,8 @@
  * Date modal (schedule popup) (P4-14)
  */
 
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -149,10 +151,6 @@ function getPlaceMemoEntryForDate(...args) {
   const f = __gatherUiDeps().getPlaceMemoEntryForDate || GATHER_APP_UTILS.getPlaceMemoEntryForDate;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getPlaceCategoryLabel(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function isTombstone(...args) {
   const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -237,6 +235,7 @@ export function DateModal({
   memos = [],
   setActiveLightbox,
   initialTab = null,
+  searchFocus = null,
   adminMode = false,
   onSave,
   onConfirmMeeting,
@@ -290,8 +289,8 @@ export function DateModal({
   const LineHeightIcon = __deps.LineHeightIcon;
   const SegmentedToggle = __deps.SegmentedToggle;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const MemoCard = __comp.MemoCard || __deps.MemoCard;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
@@ -375,11 +374,30 @@ export function DateModal({
       const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
-  const [activeTab, setActiveTab] = React.useState(initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo' | 'memo'
+  const [activeTab, setActiveTab] = React.useState(searchFocus?.tab || initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo' | 'memo'
   const [participantId, setParticipantId] = React.useState('');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  React.useEffect(() => {
+    const nextTab = searchFocus?.tab || initialTab;
+    if (nextTab) setActiveTab(nextTab);
+  }, [dateStr, searchFocus?.tab, initialTab]);
+  React.useEffect(() => {
+    const participantId = searchFocus?.participantId;
+    const expenseId = searchFocus?.expenseId;
+    if (!participantId && !expenseId) return undefined;
+    const timer = setTimeout(() => {
+      const sel = participantId
+        ? `.date-modal-attendance-row[data-participant-id="${String(participantId).replace(/"/g, '')}"]`
+        : `.expense-sortable-row[data-expense-id="${String(expenseId).replace(/"/g, '')}"]`;
+      const el = document.querySelector(sel);
+      if (!el) return;
+      el.classList.add('search-result-focus');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [dateStr, activeTab, searchFocus?.participantId, searchFocus?.expenseId]);
   const noteInputRef = React.useRef(null);
   const brokenMeetingPhotoKeysRef = React.useRef(new Set());
   const brokenMeetingPhotoUrlsRef = React.useRef(new Set());
@@ -430,12 +448,17 @@ export function DateModal({
   };
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
-  const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
+  const effectiveAnniversaries = (Array.isArray(anniversaries) && anniversaries.length > 0)
+    ? anniversaries
+    : (Array.isArray(calendar?.anniversaries) && calendar.anniversaries.length > 0
+      ? calendar.anniversaries
+      : (Array.isArray(calendar?.anniversariesWithPosters) ? calendar.anniversariesWithPosters : []));
+  const dateAnns = getAnniversariesForDate(dateStr, effectiveAnniversaries);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
 
   const selectedPart = activeParticipants.find(p => p.id === participantId);
   const selectedPartName = selectedPart ? selectedPart.name : '';
-  const selectedPartColor = selectedPart ? selectedPart.color : '#94A3B8';
+  const selectedPartColor = selectedPart ? selectedPart.color: '#94A3B8';
 
   // Place state
   const [placeQuery, setPlaceQuery] = React.useState('');
@@ -1123,7 +1146,11 @@ export function DateModal({
       const entries = getEntries ? getEntries(msg) : [];
       if (entries.length > 0) {
         entries.forEach((entry, idx) => {
-          const tags = (Array.isArray(msg.imageTags) ? msg.imageTags[idx] : '') || entry.tags || '';
+          // entry.tags is already resolved by getMessageImageEntries via the asset-identity
+          // map (imageTagMap), which survives deletion/reorder; msg.imageTags[idx] is a raw
+          // positional array that can point at the wrong photo once entries shift. Never let
+          // the positional value override the asset-resolved one.
+          const tags = entry.tags || '';
           const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
           const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
           if (matchesTag) {
@@ -1141,7 +1168,13 @@ export function DateModal({
                 createdAt: msg.timestamp || 0,
                 source: 'chat-tag',
                 sourceMessageId: msg.id,
-                sourceImageIndex: idx,
+                // entry.imageIndex is the physical slot, not the forEach position -- entries
+                // omits invalid URL slots, so once one is skipped every later entry's real
+                // imageIndex is greater than its position here. Downstream lookups (e.g.
+                // getMessageImageEntries(...).find(item => item.imageIndex === sourceImageIndex)
+                // in app-chat-render.js) key off the physical slot, so passing the loop index
+                // instead would resolve to the wrong photo.
+                sourceImageIndex: entry.imageIndex,
                 tags: tags,
                 assetKey: entry.assetKey || entry.mediaKey || key,
                 mediaKey: entry.mediaKey || key,
@@ -1203,7 +1236,10 @@ export function DateModal({
         if (full && !alreadyIncluded) {
           directKeys.add(key);
           assetKeys.forEach(assetKey => directKeys.add(assetKey));
-          memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: idx, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
+          // entry.imageIndex is the physical slot (not the forEach position -- entries can
+          // omit invalid URL slots), and downstream lookups key off the physical slot; see the
+          // matching note on the chat-photo branch above.
+          memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: entry.imageIndex, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
         }
       });
       const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(asMsg, { allowVideo: true }) : null;
@@ -1958,65 +1994,64 @@ export function DateModal({
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: isBentoSheet ? "modal-container bp-event-sheet bp-is-open" : "modal-container",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": `${dateStr} 일정 상세`,
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
     onClick: e => e.stopPropagation()
-  }, isBentoSheet ? /*#__PURE__*/React.createElement("div", { className: "bp-sheet-handle", "aria-hidden": true }) : null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
     style: {
       display: 'flex',
-      flexDirection: 'column',
-      gap: 0,
-      // Padding lives on the title row only so UnderlineTabs can span the full modal width
-      // (flush hairline underline, matching 참여자|장소|정산|사진 edge-to-edge).
-      padding: 0,
-      borderBottom: 'none',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '14px 18px',
+      borderBottom: '1px solid var(--border-subtle)',
       backgroundColor: 'var(--bg-card)'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      padding: '14px 16px 12px 16px',
-      boxSizing: 'border-box'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'baseline',
-      gap: '8px'
+      gap: '8px',
+      flexWrap: 'wrap',
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '1.25rem',
-      fontWeight: 900,
-      color: 'var(--text-main)'
+      fontSize: '1.05rem',
+      fontWeight: 800,
+      color: 'var(--text-main)',
+      margin: 0
     }
   }, titleParts.year, /*#__PURE__*/React.createElement("span", {
     style: {
       color: isConfirmed ? '#7C3AED' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
       marginLeft: '4px'
     }
-  }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
-    className: "holiday-tag",
-    style: {
-      fontSize: 'var(--font-size-sm)',
-      fontWeight: 'bold',
-      padding: '3px 8px',
-      borderRadius: 'var(--radius-sm)',
-      backgroundColor: '#FEF2F2',
-      color: '#EF4444',
-      border: '1px solid #FEE2E2',
-      verticalAlign: 'middle'
-    }
-  }, holidayLabelText)), /*#__PURE__*/React.createElement("div", {
+  }, titleParts.rest)),
+  holidayLabelText && /*#__PURE__*/React.createElement("span", {
+      className: "holiday-tag",
+      style: {
+        fontSize: 'var(--font-size-sm)',
+        fontWeight: 'bold',
+        padding: '3px 8px',
+        borderRadius: 'var(--radius-sm)',
+        backgroundColor: '#FEF2F2',
+        color: '#EF4444',
+        border: '1px solid #FEE2E2',
+        verticalAlign: 'middle'
+      }
+    }, holidayLabelText)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px'
+      gap: '8px',
+      flexShrink: 0
     }
   }, onAddAnniversaryForDate && /*#__PURE__*/React.createElement("button", {
     type: "button",
+    className: isBentoSheet ? "bp-sheet-anniv-btn" : undefined,
     onClick: () => { if (!isSubmitting) onAddAnniversaryForDate(dateStr); },
     style: {
       background: 'none',
@@ -2029,11 +2064,27 @@ export function DateModal({
       padding: '5px 10px',
       display: 'flex',
       alignItems: 'center',
-      whiteSpace: 'nowrap'
+      gap: '4px',
+      whiteSpace: 'nowrap',
+      minHeight: 34,
+      boxSizing: 'border-box'
     },
     title: "이 날짜로 기념일 등록"
-  }, "+ 기념일 등록"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+    style: { flexShrink: 0 }
+  }, /*#__PURE__*/React.createElement("path", { d: "M4 4h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M14 4h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M4 14h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M14 17h6" }), /*#__PURE__*/React.createElement("path", { d: "M17 14v6" })), "기념일 등록"), /*#__PURE__*/React.createElement("button", {
     type: "button",
+    className: isBentoSheet ? "bp-sheet-close modal-close-btn" : "modal-close-btn",
     onClick: () => {
       if (!isSubmitting) requestClose();
     },
@@ -2045,15 +2096,21 @@ export function DateModal({
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
-      padding: '2px 4px'
+      justifyContent: 'center',
+      padding: '4px',
+      width: '32px',
+      height: '32px',
+      boxSizing: 'border-box'
     },
-    title: "닫기"
-  }, "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+    title: "닫기",
+    "aria-label": "닫기"
+  }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
     ariaLabel: "일정 탭",
     variant: "flush",
+    activeColor: "var(--brand, #7C2FE5)",
     value: activeTab,
     onChange: (id) => setActiveTab(id),
-    style: { backgroundColor: 'var(--bg-card)', width: '100%' },
+    style: { backgroundColor: 'var(--bg-card)', width: '100%', borderBottom: '1px solid var(--border-subtle)' },
     options: [
       { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
       { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
@@ -2061,13 +2118,15 @@ export function DateModal({
       { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingImages.length })) },
       { value: 'memo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "메모", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateTaggedMemos.length })) }
     ]
-  })), /*#__PURE__*/React.createElement("form", {
+  }), /*#__PURE__*/React.createElement("form", {
+    style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
     onSubmit: e => {
       e.preventDefault();
       if (activeTab === 'participant') handleSubmit(e);
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
+    className: "modal-body",
+    style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px' }
   },
 
     /* TAB CONTENTS */
@@ -2084,7 +2143,7 @@ export function DateModal({
         const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
         const hasDetail = !!(hasRealAnnPlace(ann) || ann.description || getAnnBannerDateDisplay(ann) || cultureLink || (ann.memo && String(ann.memo).trim()));
         const photos = getAnnBannerPhotos(ann);
-        const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
+        const listIdx = Array.isArray(effectiveAnniversaries) ? effectiveAnniversaries.findIndex(a => a && a.id === ann.id) : -1;
         const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : (aIdx + 1);
         const openAnniversaryLightbox = (startIndex) => {
           if (typeof setActiveLightbox !== 'function' || photos.length === 0) return;
@@ -2286,7 +2345,7 @@ export function DateModal({
           ),
           // 첨부된 사진 전부를 카드 하단에 썸네일로 보여준다 -- 예전엔 titleRow 안에 photos[0]
           // 하나만 (폴딩 화살표 왼쪽에) 보여줘서 2장 이상 첨부해도 나머지는 확인할 방법이 없었음.
-          photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement("div", {
+          photos.length > 0 && /*#__PURE__*/React.createElement("div", {
             style: {
               display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 12px',
               backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`
@@ -2305,9 +2364,15 @@ export function DateModal({
                 animationDelay: commentCount > 0 ? `${(pIdx % 8) * 90}ms` : undefined
               }
             },
-              /*#__PURE__*/React.createElement(MediaThumb, {
-                src: p.thumbUrl || p.url,
-                fallbackSrc: p.url || p.thumbUrl,
+              /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+                photo: {
+                  full: p.url || p.imageUrl || p.full || '',
+                  thumb: p.thumbUrl || p.thumb || p.url || p.imageUrl || '',
+                  imageUrl: p.url || p.imageUrl || '',
+                  thumbUrl: p.thumbUrl || p.thumb || '',
+                  assetKey: p.assetKey,
+                  tags: p.tags
+                },
                 alt: "기념일 사진",
                 onClick: e => {
                   e.stopPropagation();
@@ -2449,7 +2514,7 @@ export function DateModal({
           return /*#__PURE__*/React.createElement("div", {
             key: entry.id || `${entry.participantId || 'participant'}_${entryIndex}`,
             "data-participant-id": entry.participantId,
-            className: `date-modal-attendance-row attendance-sortable-row poll-sortable-row${canReorder ? ' date-modal-attendance-row--reorderable' : ''}${draggingParticipantId === entry.participantId ? ' is-dragging' : ''}${dragOverParticipantId === entry.participantId ? ' is-drop-target' : ''}`,
+            className: `date-modal-attendance-row attendance-sortable-row poll-sortable-row${canReorder ? ' date-modal-attendance-row--reorderable' : ''}${draggingParticipantId === entry.participantId ? ' is-dragging' : ''}${dragOverParticipantId === entry.participantId ? ' is-drop-target' : ''}${searchFocus?.participantId && searchFocus.participantId === entry.participantId ? ' search-result-focus' : ''}`,
             style: {
               display: 'flex',
               flexDirection: 'column',
@@ -2494,7 +2559,7 @@ export function DateModal({
             entry.note && /*#__PURE__*/React.createElement("div", {
               className: "date-modal-attendance-note",
               style: {
-                fontSize: 'var(--font-size-md)',
+                fontSize: 'var(--font-size-sm)',
                 color: 'var(--text-main)',
                 minWidth: 0,
                 lineHeight: 1.4,
@@ -2567,7 +2632,7 @@ export function DateModal({
             backgroundColor: 'rgba(239, 68, 68, 0.06)',
             color: 'rgb(239, 68, 68)'
           } : {
-            border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: '#7C3AED'
+            border: '1.5px solid var(--v2-accent-line, #C4B5FD)', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: 'var(--v2-accent, #7C3AED)'
           })
         }
       }, (!isConfirmed && isAllAvailable)
@@ -2708,7 +2773,7 @@ export function DateModal({
             /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
               title: "카테고리 선택",
               value: placeCategoryId,
-              options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
+              options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category: c, size: 18 }) })),
               onSelect: setPlaceCategoryId,
               placeholder: "카테고리 선택"
             })
@@ -2832,7 +2897,7 @@ export function DateModal({
               if (!dateNote) return null;
               const memoDate = typeof toMemoDateFormat === 'function' ? toMemoDateFormat(dateStr) : dateStr;
               return /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+                style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
               }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
@@ -3081,7 +3146,7 @@ export function DateModal({
           return /*#__PURE__*/React.createElement("div", {
             key: expense.id,
             "data-expense-id": expense.id,
-            className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}`,
+            className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}${searchFocus?.expenseId && searchFocus.expenseId === expense.id ? ' search-result-focus' : ''}`,
             onClick: () => handleExpenseItemClick(expense),
             onDragOver: event => {
               event.preventDefault();
@@ -3161,6 +3226,7 @@ export function DateModal({
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                 /*#__PURE__*/React.createElement("span", {
+                  className: "expense-category-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3174,6 +3240,7 @@ export function DateModal({
                   }
                 }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', categoryName),
                 expenseTime && /*#__PURE__*/React.createElement("span", {
+                  className: "expense-time-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3186,6 +3253,7 @@ export function DateModal({
                   }
                 }, expenseTime),
                 expense.payerId && /*#__PURE__*/React.createElement("span", {
+                  className: "expense-payer-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3198,6 +3266,7 @@ export function DateModal({
                   }
                 }, expense.isSelfPay ? expense.payerId : `${expense.payerId} 선결제`),
                 expense.isSelfPay && /*#__PURE__*/React.createElement("span", {
+                  className: "expense-self-pay-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3240,11 +3309,13 @@ export function DateModal({
       dateTaggedMemos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 12px', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "이 날짜에 연결된 메모가 없습니다.") : MemoCard ? /*#__PURE__*/React.createElement("div", {
+        className: "date-modal-memo-list",
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       }, dateTaggedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
         key: memo.id,
         memo,
         calendar,
+        variant: "date-modal",
         onOpenEdit: typeof onOpenEditMemo === 'function' ? () => onOpenEditMemo(memo) : undefined,
         onTogglePin: typeof onToggleMemoPin === 'function' ? () => onToggleMemoPin(memo) : () => {},
         onShare: typeof onShareMemo === 'function' ? () => onShareMemo(memo) : () => {},
@@ -3269,10 +3340,9 @@ export function DateModal({
         },
           title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '6px', color: 'var(--text-main)' } }, title),
           body && /*#__PURE__*/React.createElement("div", { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, color: 'var(--text-main)' } }, body),
-          imageEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' } }, imageEntries.map((entry, imageIndex) => /*#__PURE__*/React.createElement(MediaThumb, {
-            key: `${memo.id || index}-${imageIndex}`,
-            src: entry.thumb || entry.full || entry.imageUrl,
-            fallbackSrc: entry.full || entry.imageUrl,
+          imageEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' } }, imageEntries.map((entry, imageIndex) => /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+            key: entry.assetKey || `${memo.id || index}-${imageIndex}`,
+            photo: entry,
             alt: '메모 첨부 이미지',
             loading: 'lazy',
             decoding: 'async',
@@ -3280,7 +3350,25 @@ export function DateModal({
             onClick: () => {
               if (typeof setActiveLightbox !== 'function') return;
               const urls = imageEntries.map(item => item.full || item.thumb || item.imageUrl).filter(Boolean);
-              if (urls.length) setActiveLightbox({ urls, index: imageIndex, meta: urls.map(() => ({ source: 'date-memo', memoId: memo.id })) });
+              if (urls.length) setActiveLightbox({
+                urls,
+                index: imageIndex,
+                meta: imageEntries.map(item => ({
+                  timestamp: memo.updatedAt || memo.createdAt || 0,
+                  messageId: memo.id,
+                  imageIndex: item.imageIndex,
+                  thumb: item.thumb,
+                  full: item.full,
+                  tags: item.tags,
+                  source: 'memo',
+                  uploadSource: 'memo',
+                  assetKey: item.assetKey,
+                  mediaKey: item.mediaKey,
+                  refKey: item.refKey,
+                  slotKey: item.slotKey,
+                  legacyKeys: item.legacyKeys
+                }))
+              });
             }
           })))
         );
@@ -3359,9 +3447,15 @@ export function DateModal({
         className: commentCount ? 'gallery-comment-heartbeat' : '',
         style: { position: 'relative', minWidth: 0, animationDelay: `${(index % 7) * 0.9}s` }
       },
-        /*#__PURE__*/React.createElement(MediaThumb, {
-          src: photo.thumbUrl || photo.imageUrl,
-          fallbackSrc: photo.imageUrl || photo.thumbUrl,
+        /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+          photo: {
+            full: photo.imageUrl || photo.full || '',
+            thumb: photo.thumbUrl || photo.thumb || photo.imageUrl || '',
+            imageUrl: photo.imageUrl || '',
+            thumbUrl: photo.thumbUrl || '',
+            assetKey: photo.assetKey,
+            tags: photo.tags
+          },
           alt: "일정 사진",
           loading: "lazy",
           decoding: "async",
@@ -3460,7 +3554,7 @@ export function DateModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelPastePreview
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }

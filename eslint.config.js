@@ -77,7 +77,7 @@ export default [
     }
   },
   {
-    files: ['functions/*.js'],
+    files: ['functions/*.js', 'functions/test/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'commonjs',

@@ -78,7 +78,12 @@ export function extractChatSlots(legacyTree) {
     const inner = extractSlotsByClass(top.composer, {
       resize: 'chat-composer-resize-handle',
       memes: 'chat-composer-meme-area',
+      photos: 'chat-composer-photos',
+      files: 'chat-composer-files',
     });
+    if (!inner.resize) {
+      Object.assign(inner, extractSlotsByClass(top.composer, { resize: 'panel-resize-handle' }));
+    }
     Object.assign(top, inner);
     const walk = (node, bag) => {
       if (!node || bag._done) return;
@@ -92,6 +97,17 @@ export function extractChatSlots(legacyTree) {
       const typeName = typeof type === 'function'
         ? String(type.displayName || type.name || '')
         : (type && type.$$typeof ? String(type.displayName || '') : '');
+      // PanelResizeHandle is a component element, so its rendered
+      // `chat-composer-resize-handle` class is not present on this source
+      // node. Capture the live element by its component/label and move it
+      // above the V2 textarea without replacing its pointer/key handlers.
+      if (!bag.resize && (
+        cls.includes('chat-composer-resize-handle')
+        || /PanelResizeHandle/i.test(typeName)
+        || /입력창 높이 조절/.test(String(props.label || props['aria-label'] || ''))
+      )) {
+        bag.resize = node;
+      }
       if (!bag.participant && (
         cls.split(/\s+/).includes('participant-picker-button')
         || cls.includes('participant-picker')
@@ -99,6 +115,13 @@ export function extractChatSlots(legacyTree) {
         || (Object.prototype.hasOwnProperty.call(props, 'participant') && typeof props.onClick === 'function' && 'placeholder' in props)
       )) {
         bag.participant = node;
+      }
+      // The "OO님에게 답장" preview card (ui-chat-room.js) carries no className -- it's
+      // styled entirely via an inline --reply-accent custom property -- so it's invisible
+      // to the className-based extraction above and gets silently dropped when composer's
+      // children are replaced by the V2 layout unless captured here.
+      if (!bag.reply && props.style && Object.prototype.hasOwnProperty.call(props.style, '--reply-accent')) {
+        bag.reply = node;
       }
       if (type === 'textarea' && !bag.textarea) bag.textarea = node;
       if (type === 'button') {
@@ -108,10 +131,13 @@ export function extractChatSlots(legacyTree) {
             ? props.children.filter(c => typeof c === 'string').join('')
             : '';
         const hay = `${label} ${childText}`;
-        if (!bag.attach && /첨부|파일|사진|attach/i.test(hay)) bag.attach = node;
+        if (!bag.attach && /파일 업로드|사진 또는 파일|사진 첨부|파일 첨부|paperclip|attach/i.test(hay) && !/제거|remove/i.test(hay)) {
+          bag.attach = node;
+        }
         if (!bag.send && /전송|보내|send/i.test(hay)) bag.send = node;
         if (!bag.paste && /붙여넣기|paste/i.test(hay)) bag.paste = node;
         if (!bag.emoji && /이모티콘|emoji/i.test(hay)) bag.emoji = node;
+        if (!bag.keyboard && /키보드|keyboard/i.test(hay)) bag.keyboard = node;
       }
       if (type === 'input' && props.type === 'file' && !bag.fileInput) bag.fileInput = node;
       walk(props.children, bag);

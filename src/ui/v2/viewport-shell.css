@@ -1,0 +1,364 @@
+@import './segmented-toggle.css';
+/* Viewport pin + bottom-gap kill switch for V2 (loaded with chat-bubble-modules.css).
+ * Selectors use html/body:has(.v2-design) so portaled/document chrome stays V2-scoped
+ * (see test/v2-style-isolation.test.mjs). */
+
+html:has(.v2-design),
+html:has(.v2-design) body {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg-primary);
+}
+html:has(.v2-design) #root {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.renewal-shell.v2-design {
+  height: var(--app-vv-height, 100dvh) !important;
+  min-height: var(--app-vv-height, 100dvh) !important;
+  max-height: var(--app-vv-height, 100dvh) !important;
+  position: fixed !important;
+  top: var(--app-vv-offset-top, 0px) !important;
+  left: var(--app-vv-offset-left, 0px) !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.v2-design .v2-destination {
+  padding: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+.v2-design .v2-fullscreen {
+  height: 100% !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.v2-design .v2-fullscreen > .bp-app-shell {
+  padding: 0 !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+/* Calendar / bento home is <main class=\"bp-app-shell is-bento-home\"> — NOT
+ * .renewal-shell-main. Document + shell overflow are locked for chat VV pinning,
+ * so home must own a viewport-bounded scrollport or content below the fold is clipped.
+ */
+.renewal-shell.v2-design > main.bp-app-shell.is-bento-home,
+.renewal-shell.v2-design main.bp-app-shell.is-bento-home {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box !important;
+}
+
+.v2-design .renewal-shell-main {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.v2-design .renewal-shell-main .v2-chat,
+.v2-design .renewal-shell-main .v2-chat .chat-room-container,
+.v2-design .renewal-shell-main .v2-chat .v2-chat-root {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main .v2-chat .v2-chat-scroll-wrap {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.v2-design .v2-chat-composer,
+.v2-design .v2-chat .chat-composer.v2-chat-composer,
+.v2-design .v2-chat .chat-composer {
+  position: relative !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 1200px) {
+  .v2-design .v2-chat .chat-composer,
+  .v2-design .v2-chat .chat-composer.v2-chat-composer,
+  .v2-design .v2-chat-composer {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+  }
+}
+
+
+/* Settlement: outer .v2-settlement-body is the scroll owner. Nested
+ * .settlement-page-body used to keep overflow:auto while sizing to content, so
+ * wheel/touch hit an inert scroller and never reached the outer pane (same
+ * pattern as memo-list-scroll in screens.css). */
+.v2-design .v2-settlement .v2-settlement-body .settlement-page-body,
+.v2-design .v2-settlement .v2-dest-body .settlement-page-body {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+  flex: none !important;
+  min-height: 0 !important;
+}
+/* Drop overflow:auto from the shared memo/settlement scroll-owner rule when it
+ * also targeted .settlement-page-body (screens.css). Outer pane still scrolls. */
+.v2-design .v2-settlement .settlement-page-body {
+  overflow: visible !important;
+}
+/* Wrap-legacy settlement: legacy root is the scroll owner (mirrors places). */
+.v2-design .v2-settlement.v2-wrap-legacy .v2-settlement-legacy,
+.v2-design .v2-settlement.v2-wrap-legacy .v2-legacy-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Lightbox is portaled to body — scope via :has(.v2-design). */
+body:has(.v2-design) .lightbox-overlay .lightbox-stage,
+body:has(.v2-design) .lightbox-overlay .lightbox-image-stage {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+body:has(.v2-design) .lightbox-overlay .lightbox-track {
+  display: flex !important;
+}
+body:has(.v2-design) .lightbox-overlay .lightbox-slide {
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* --------------------------------------------------------------------------
+ * iOS standalone safe-area contract
+ * --------------------------------------------------------------------------
+ *
+ * `viewport-fit=cover` deliberately lets a home-screen web app paint behind
+ * the status bar and home indicator.  The shell itself is viewport-pinned, so
+ * applying a notch inset separately in every page header made the result
+ * depend on the page: calendar painted its title under the status bar while
+ * gallery happened to be protected by its legacy header; some destinations
+ * also paid the bottom inset twice.
+ *
+ * Keep the visual treatment intentional:
+ * - calendar's gradient continues behind the status bar, but its controls do
+ *   not;
+ * - every destination gets one bounded, safe content viewport;
+ * - fixed, document-level affordances (drawer/FAB/portal) retain their own
+ *   `env()` positioning because they are not children of that viewport.
+ *
+ * On browsers without a display cutout the env() values resolve to 0px, so
+ * this is a no-op.  Desktop retains its rail/viewport sizing unchanged.
+ */
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design {
+    --v2-safe-top: env(safe-area-inset-top, 0px);
+    --v2-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* The home is its own scrollport.  Keep the purple hero under the status
+     bar, then move only its interactive/content padding below the indicator. */
+  .renewal-shell.v2-design > main.bp-app-shell.is-bento-home {
+    padding-bottom: var(--v2-safe-bottom) !important;
+  }
+  .renewal-shell.v2-design > main.bp-app-shell.is-bento-home > .bp-hero-zone {
+    padding-top: calc(10px + var(--v2-safe-top)) !important;
+  }
+
+  /* All destination panes share the same usable visual viewport.  Moving the
+     pane (rather than adding padding to arbitrary bodies) also keeps its
+     internal absolute/flex scroll owners and composers above the home
+     indicator. */
+  .renewal-shell.v2-design > main.renewal-shell-main {
+    height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
+    min-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
+    margin-top: var(--v2-safe-top) !important;
+    margin-bottom: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* PageHeader now lives inside the safe destination viewport.  Leaving its
+     former inset in place produces the visible blank band that differed from
+     page to page. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-page-header,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-page-header.bp-header {
+    padding-top: 0 !important;
+  }
+
+  /* `v2-fullscreen` is nested in the bounded pane.  It must not grow back to
+     the full physical viewport or add a second pair of safe-area gutters. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-fullscreen {
+    min-height: 100% !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* The shared header already takes up a 56px flex row.  Preserve that
+     established list offset but remove only the duplicate standalone inset.
+     The hidden-composer controls are positioned inside the safe pane too. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-scroll,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .chat-messages-scroll {
+    padding-top: 56px !important;
+  }
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
+    padding-bottom: 80px !important;
+  }
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+    bottom: calc(12px + var(--v2-pane-bottom, 0px)) !important;
+  }
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-wrap-legacy .v2-chat-legacy {
+    height: calc(100% - 58px) !important;
+  }
+
+  /* The drawer is fixed to the physical viewport.  Its surface remains full
+     height while its first/last controls clear the iOS indicators. */
+  .renewal-shell.v2-design .bp-side-nav {
+    box-sizing: border-box !important;
+    padding-top: var(--v2-safe-top) !important;
+    padding-bottom: var(--v2-safe-bottom) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * iOS standalone: WebKit reports the viewport one status bar short
+ * --------------------------------------------------------------------------
+ * visual-viewport-sync.js sizes the shell to the real screen and sets
+ * .v2-standalone-extended while that correction is active (never while the
+ * keyboard is open). Fixed layers would still stop at the short reported
+ * height, leaving the same empty band under sheets, drawers and the FAB:
+ * - inside the shell, the shell itself becomes their containing block;
+ * - layers portaled to <body> take the corrected height explicitly. */
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] .renewal-shell.v2-design {
+  transform: translateZ(0);
+}
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .modal-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .bottom-sheet-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .admin-side-menu-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .manual-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="dialog"][aria-modal="true"] {
+  top: 0 !important;
+  bottom: auto !important;
+  height: var(--app-vv-height, 100dvh) !important;
+  min-height: var(--app-vv-height, 100dvh) !important;
+  max-height: var(--app-vv-height, 100dvh) !important;
+}
+
+@media (max-width: 1199px) {
+  /* Chat used its own header rule that re-added the notch inset on top of the
+     safe pane offset above, so its title sat one status bar lower than every
+     other destination. Same contract as the other headers: no inset here. */
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .bp-header.v2-page-header,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .bp-header.v2-page-header:not(.is-scroll-hidden) {
+    padding-top: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .chat-messages-scroll {
+    padding-top: 56px !important;
+  }
+
+  /* 기록(gallery/archive/content) frame was 100dvh tall inside the pane that
+     already starts below the status bar, so its bottom (photos, pagination)
+     ran one status bar + home indicator past the screen. Fill the pane. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-records-frame {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+  }
+
+  /* The status-bar strip above a destination pane showed the gray page
+     background, cutting it off from the white header below. Paint it with the
+     header surface so the two read as one bar (home keeps its hero gradient). */
+  .renewal-shell.v2-design:has(> main.renewal-shell-main)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--v2-safe-top);
+    background: var(--bg-card);
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+@media (max-width: 1199px) {
+  /* Home-indicator strip: destination panes used to stop above it, leaving an
+     empty gray band on every page. The pane now runs to the screen edge and
+     each scroll owner / the chat composer pads its end by the same inset, so
+     lists scroll under the indicator like native iOS lists. While the keyboard
+     is open the indicator is hidden behind it, so the inset drops to 0. */
+  .renewal-shell.v2-design {
+    --v2-pane-bottom: var(--v2-safe-bottom);
+  }
+  html:has(.renewal-shell.v2-design)[data-v2-keyboard] .renewal-shell.v2-design {
+    --v2-pane-bottom: 0px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main {
+    height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
+    min-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-dest-body {
+    padding-bottom: calc(var(--v2-dest-content-pad-y, 20px) + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-legacy-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .history-page-scroll {
+    padding-bottom: var(--v2-pane-bottom) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .gallery-page-scroll {
+    padding-bottom: calc(88px + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .culture-items-grid {
+    padding-bottom: calc(20px + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-composer {
+    padding-bottom: calc(8px + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
+    padding-bottom: calc(80px + var(--v2-pane-bottom)) !important;
+  }
+}

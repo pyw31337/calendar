@@ -148,8 +148,11 @@
     overflow: hidden;
     isolation: isolate;
     contain: paint;
-    clip-path: inset(0 round 16px);
-    border-radius: 16px !important;
+    /* Square corners on mobile (no rounding) -- border-radius itself is the
+       single source of truth further down ("Final full-bleed hero rule",
+       border-radius: 0 !important); clip-path only needs to match that same
+       square shape for the containment fix below, not reintroduce rounding. */
+    clip-path: inset(0);
     background-size: auto, 100% 100% !important;
     background-position: 0 0, 50% 50% !important;
     animation: none !important;
@@ -167,6 +170,178 @@
   .v2-design .bp-hero-zone::before,
   .v2-design .bp-hero-zone::after { opacity: .78 !important; }
   .v2-design .bp-hero-zone > .bp-hero-aurora { opacity: .62 !important; }
+}
+
+/* Full-bleed hero contract: whenever the side rail is absent (tablet and
+ * mobile), the aurora card touches the viewport edges and has no rounded
+ * corners. The PC rail layout (>=1201px) retains the card radius. Restated
+ * verbatim further down ("Final full-bleed hero rule for tablet/mobile") --
+ * an earlier byte-identical copy of that rule here was removed as dead
+ * weight (same selector, same media query, same importance: later wins). */
+
+/* Last cascade layer for the side rail coordinate contract. */
+@media (min-width: 768px) {
+  .v2-design .bp-side-nav-head { height: 64px; min-height: 64px; box-sizing: border-box; padding: 12px 16px; }
+  .v2-design .bp-side-nav-group.bp-is-main { padding: 0 10px; }
+  .v2-design .bp-side-nav-global-search { height: 40px; min-height: 40px; margin: 12px auto; box-sizing: border-box; }
+  .v2-design .bp-side-nav-global-search-icon { width: 20px; height: 20px; min-width: 20px; min-height: 20px; display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
+  .v2-design .bp-side-nav-global-search-icon svg { display: block; width: 20px; height: 20px; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search { width: 40px; height: 40px; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: 50%; line-height: 0; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg { width: 20px; height: 20px; }
+  .v2-design .bp-side-nav-item { height: 44px; min-height: 44px; margin-top: 0; margin-bottom: 0; box-sizing: border-box; transform: none; }
+  .v2-design .bp-side-nav-item-icon, .v2-design .bp-side-nav-item-icon svg { transform: none; align-self: center; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 44px; margin-left: auto; margin-right: auto; padding: 0; justify-content: center; }
+  .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
+
+
+/* The V2 shell can be mounted without the legacy .renewal-shell class. Keep
+ * the coordinate contract on the V2 root itself so both mounted variants use
+ * exactly the same y positions. */
+
+  .v2-design .bp-side-nav { overflow-x: hidden; }
+  .v2-design .bp-side-nav-head {
+    height: 64px;
+    min-height: 64px;
+    box-sizing: border-box;
+    padding: 12px 16px;
+  }
+  .v2-design .bp-side-nav-group.bp-is-main { padding: 0 10px; }
+  .v2-design .bp-side-nav-global-search {
+    height: 40px;
+    min-height: 40px;
+    margin: 12px auto;
+    box-sizing: border-box;
+  }
+  .v2-design .bp-side-nav-global-search-icon {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+  .v2-design .bp-side-nav-global-search-icon svg {
+    display: block;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    line-height: 0;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .v2-design .bp-side-nav-item {
+    height: 44px;
+    min-height: 44px;
+    margin-top: 0;
+    margin-bottom: 0;
+    box-sizing: border-box;
+    transform: translate3d(0, 0, 0);
+  }
+  .v2-design .bp-side-nav-item-icon,
+  .v2-design .bp-side-nav-item-icon svg {
+    transform: translate3d(0, 0, 0);
+    align-self: center;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: 48px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px 0;
+    justify-content: center;
+  }
+  .v2-design .bp-side-nav-brand-icon,
+  .v2-design .bp-side-nav-brand-icon svg {
+    fill: none !important;
+    stroke: currentColor;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    color: #fff;
+    fill: none !important;
+    stroke: currentColor;
+  }
+
+
+/* Final rail motion/geometry overrides (kept last so legacy V2 rules cannot
+ * reintroduce a vertical jump). */
+
+  .renewal-shell.v2-design .bp-side-nav-head {
+    position: relative;
+    isolation: isolate;
+    background: var(--bg-surface, #fff);
+  }
+  .renewal-shell.v2-design .bp-side-nav-head::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
+    opacity: 0;
+    transform: translate3d(-100%, 0, 0);
+    transition: opacity .18s ease, transform .42s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head::after {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  .renewal-shell.v2-design .bp-side-nav-head > * {
+    position: relative;
+    z-index: 1;
+  }
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+    padding: 0 10px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item {
+    height: 44px;
+    min-height: 44px !important;
+    margin: 0 10px !important;
+    padding: 0 12px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    height: 44px;
+    min-height: 44px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search {
+    height: 40px;
+    min-height: 40px;
+    margin: 12px auto;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    color: #fff !important;
+    fill: currentColor;
+    stroke: currentColor;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon {
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 /* V2 calendar readability: larger navigation and weekday rhythm. */
@@ -203,38 +378,32 @@
   padding: 0.2rem 0 !important;
 }
 
-/* Keep compact, textless bars on phones; expose readable pale labels on PC. */
-.v2-design .bp-day-bar-stack .bp-day-anniversary {
-  background: #fce7f3;
-  color: #ec4899;
+/* Keep compact, textless bars on phones; expose readable pale labels on PC.
+ * Anniversary badges are always the same pink (bg + text). Category tints
+ * used to paint movie badges purple-on-pink; that mismatch is gone. */
+.v2-design .bp-day-bar-stack .bp-day-anniversary,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other {
+  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff);
+  color: var(--cal-anniversary, #F76AAD);
   border-color: transparent;
 }
-.v2-design .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
-  color: inherit;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday {
-  background: #fce7f3;
-  color: #ec4899;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel,
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip {
-  background: #dff7ee;
-  color: #059669;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event {
-  background: #dbeafe; color: #2563eb;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival {
-  background: #fef3c7; color: #d97706;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports {
-  background: #e0f2fe; color: #0284c7;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie {
-  background: #ede9fe; color: #7c3aed;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other {
-  background: #f1f5f9; color: #64748b;
+.v2-design .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie .bp-day-anniversary-label,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other .bp-day-anniversary-label {
+  color: var(--cal-anniversary, #F76AAD);
 }
 .v2-design .bp-day-bar-stack .bp-day-bar,
 .v2-design .bp-day-bar-stack .bp-day-schedule {
@@ -245,18 +414,6 @@
 .v2-design .bp-day-bar-stack .bp-day-schedule-label {
   color: #059669;
 }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday .bp-day-anniversary-label {
-  color: #ec4899;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel .bp-day-anniversary-label,
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip .bp-day-anniversary-label {
-  color: #059669;
-}
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event .bp-day-anniversary-label { color: #2563eb; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival .bp-day-anniversary-label { color: #d97706; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports .bp-day-anniversary-label { color: #0284c7; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie .bp-day-anniversary-label { color: #7c3aed; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other .bp-day-anniversary-label { color: #64748b; }
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary {
     min-height: 1.05rem !important;
@@ -269,6 +426,525 @@
     white-space: nowrap;
     font-size: 0.68rem !important;
     font-weight: 800 !important;
+  }
+
+
+/* Side-nav coordinate contract: the collapsed rail is the vertical reference.
+ * Both states use the same head/search/item heights and vertical rhythm; only
+ * width, opacity and horizontal alignment are animated. This prevents the
+ * expanded state from drifting downward while the rail opens. */
+
+  .renewal-shell.v2-design .bp-side-nav {
+    --v2-side-head-size: 64px;
+    --v2-side-item-size: 44px;
+    overflow-x: hidden;
+  }
+  .renewal-shell.v2-design .bp-side-nav-head,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    height: var(--v2-side-head-size);
+    min-height: var(--v2-side-head-size);
+    box-sizing: border-box;
+    padding: 12px 16px !important;
+    overflow: hidden;
+    transition: background-position .42s cubic-bezier(.22,.61,.36,1),
+      width .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-brand {
+    height: 40px;
+    min-height: 40px;
+    align-items: center;
+    transform: translateX(0);
+    transition: transform .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav-brand-icon svg {
+    transition: color .2s ease, fill .2s ease, stroke .2s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+    padding-top: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    margin: 12px auto;
+    box-sizing: border-box;
+    transform: translateX(0);
+    transition: width .32s cubic-bezier(.22,.61,.36,1),
+      height .32s cubic-bezier(.22,.61,.36,1),
+      border-radius .32s cubic-bezier(.22,.61,.36,1),
+      margin .32s cubic-bezier(.22,.61,.36,1),
+      padding .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon svg {
+    display: block;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item {
+    height: var(--v2-side-item-size);
+    min-height: var(--v2-side-item-size) !important;
+    margin: 0 var(--v2-side-item-gutter) !important;
+    padding: 0 12px !important;
+    box-sizing: border-box;
+    transform: none;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon {
+    transform: translateX(0);
+    align-self: center;
+    transition: transform .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon svg {
+    display: block;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-title,
+  .renewal-shell.v2-design .bp-side-nav-item-meta,
+  .renewal-shell.v2-design .bp-side-nav-brand-text {
+    transition: opacity .16s ease, max-width .24s cubic-bezier(.22,.61,.36,1), transform .24s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    color: #fff;
+    stroke: currentColor;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: var(--v2-side-item-lane);
+    margin-left: auto !important;
+    margin-right: auto !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 0 !important;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+
+/* Side-nav motion contract: collapse changes only the horizontal rail width;
+ * vertical metrics stay identical in both states. */
+
+  .renewal-shell.v2-design .bp-side-nav {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    will-change: transform, width;
+    transition: transform .28s cubic-bezier(.22, 1, .36, 1), width .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-head {
+    height: 64px;
+    min-height: 64px;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    height: 64px;
+    min-height: 64px;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    height: 36px;
+    min-height: 36px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon svg,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 36px;
+    padding: 8px;
+    border-radius: 50%;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item {
+    min-height: 42px;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon {
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    transition: transform .28s cubic-bezier(.22, 1, .36, 1);
+  }
+}
+
+/* Responsive shell contract:
+ * - 1201px+: persistent PC rail and four-card lower matrix.
+ * - 768–1200px: no persistent rail; use the header menu drawer and a
+ *   full-bleed hero, with calendar on one row and summaries in two columns.
+ * - <=419px: edge-to-edge, square section surfaces. */
+@media (min-width: 1201px) {
+  .renewal-shell.v2-design {
+    padding-left: 280px;
+  }
+  .renewal-shell.v2-design .bp-side-nav {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 280px;
+    transform: none;
+  }
+  .renewal-shell.v2-design .bp-side-nav-toggle-btn,
+  .renewal-shell.v2-design .bp-side-nav-backdrop,
+  .renewal-shell.v2-design .bp-side-nav-close-btn {
+    display: none;
+  }
+}
+@media (max-width: 1200px) {
+  /* Off-canvas drawer for every width without a persistent rail (mobile AND
+   * tablet, <=1200px) -- was tablet-only (768-1200px); mobile (<768px) fell
+   * through to a hard "no rail" block further down that set .bp-side-nav to
+   * display:none unconditionally, so the header's 더보기 button opened a
+   * drawer that could never actually become visible on a phone. Widening
+   * this block's own condition to also cover <768px, and removing that
+   * conflicting display:none, gives mobile the exact same working drawer
+   * tablet already had. */
+  .renewal-shell.v2-design {
+    padding-left: 0;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  .renewal-shell.v2-design .bp-side-nav {
+    display: flex;
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: 274px;
+    transform: translateX(100%);
+    z-index: 150;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-open {
+    transform: translateX(0);
+  }
+  .renewal-shell.v2-design .bp-side-nav-toggle-btn {
+    display: inline-flex;
+  }
+  .renewal-shell.v2-design .bp-side-nav-close-btn {
+    display: inline-flex;
+  }
+  .renewal-shell.v2-design .bp-side-nav-backdrop {
+    display: block;
+  }
+  .renewal-shell.v2-design .bp-hero-zone {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+  .renewal-shell.v2-design .bp-bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .renewal-shell.v2-design .bp-bento-grid > .bp-renewal-home-summary-section:first-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 419px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  .renewal-shell.v2-design .bp-hero-zone,
+  .renewal-shell.v2-design .bp-bento-card,
+  .renewal-shell.v2-design .bp-renewal-home-summary-section {
+    border-radius: 0;
+  }
+  .renewal-shell.v2-design .bp-bento-grid {
+    width: 100%;
+    gap: 0;
+  }
+}
+
+/* Shared responsive modal module. ResizableModalContainer adds the opt-in
+ * marker; shell-specific modifiers (event/share/settings) may refine size,
+ * while all other feature modals inherit the same placement contract. */
+.v2-design .modal-overlay:has(.v2-responsive-modal) {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.v2-design .v2-responsive-modal {
+  position: relative;
+  width: min(560px, calc(100vw - 48px));
+  max-width: 560px;
+  max-height: min(86dvh, var(--gather-vv-modal-max, 860px));
+  margin: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  transform: translate3d(0, 0, 0);
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), border-radius .28s ease,
+    width .28s ease, max-height .28s ease;
+  will-change: transform;
+}
+@media (max-width: 767px) {
+  .v2-design .modal-overlay:has(.v2-responsive-modal) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .v2-design .v2-responsive-modal {
+    width: 100%;
+    max-width: none;
+    max-height: min(90dvh, var(--gather-vv-modal-max, 860px));
+    border-radius: 24px 24px 0 0;
+    animation: bp-responsive-sheet-in .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  .v2-design .modal-overlay:has(.confirm-dialog-modal) {
+    align-items: center;
+    padding: 16px;
+  }
+  .v2-design .v2-responsive-modal.confirm-dialog-modal {
+    width: min(420px, calc(100vw - 32px));
+    max-width: 420px;
+    border-radius: 18px;
+  }
+}
+@keyframes bp-responsive-sheet-in {
+  from { opacity: .72; transform: translate3d(0, 16px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .v2-responsive-modal { animation: none; transition: none; }
+}
+
+/* Collapsed rail reference state + polished expand/collapse transitions.
+ * .bp-side-nav.bp-is-collapsed .bp-side-nav-head itself is fully restated
+ * further down (adds justify-content: center) with equal-or-greater
+ * importance, so a duplicate of it here was removed as dead weight. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    background: transparent;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search {
+    transition: width .28s ease, border-radius .28s ease, background-color .2s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-label {
+    display: inline-flex !important;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 1;
+    transform: none;
+    transition: opacity .22s ease, max-width .28s ease;
+    max-width: 120px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    margin: 12px auto;
+    transition: width .28s ease, border-radius .28s ease, background-color .2s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label {
+    display: none !important;
+    max-width: 0;
+    opacity: 0;
+    transform: none;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-title,
+  .renewal-shell.v2-design .bp-side-nav-item-meta {
+    transition: opacity .2s ease, max-width .28s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-title {
+    display: none !important;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: none;
+    white-space: nowrap;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-meta {
+    display: none !important;
+    max-width: 0;
+    opacity: 0;
+    transform: none;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon {
+    transition: none;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon {
+    transform: none;
+  }
+}
+
+/* Shared side-nav alignment module. The collapsed rail is the reference
+ * coordinate system: its 48px item lane centers a 20px icon at x=22px. The
+ * expanded rail reuses the same lane start and only reveals the text/meta
+ * columns to the right, so toggling collapse never makes icons jump. */
+.renewal-shell.v2-design .bp-side-nav {
+  --v2-side-item-lane: 48px;
+  --v2-side-item-gutter: 10px;
+  --v2-side-item-icon: 20px;
+}
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item {
+    width: calc(100% - (var(--v2-side-item-gutter) * 2));
+    margin: 0 var(--v2-side-item-gutter) !important;
+    padding: 0 12px !important;
+    gap: 12px !important;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon {
+    flex: 0 0 var(--v2-side-item-icon);
+    width: var(--v2-side-item-icon);
+    height: var(--v2-side-item-icon);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon svg {
+    width: var(--v2-side-item-icon) !important;
+    height: var(--v2-side-item-icon) !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: var(--v2-side-item-lane);
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon {
+    flex: 0 0 var(--v2-side-item-icon);
+    width: var(--v2-side-item-icon);
+    height: var(--v2-side-item-icon);
+  }
+}
+
+/* Side rail parity: the search entry is an outlined action in the open rail,
+ * while the collapsed rail keeps only the centered magnifier. */
+.renewal-shell.v2-design .bp-side-nav-global-search {
+  background: none;
+  color: var(--brand, #7c2fe5);
+  width: calc(100% - 20px);
+  min-height: 36px;
+  font: inherit;
+  font-size: var(--font-size-sm, .74rem);
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--brand, #7c2fe5);
+  border-radius: 999px;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 10px 12px;
+  padding: 8px 12px;
+  font-weight: 800;
+  display: flex;
+  box-sizing: border-box;
+}
+.renewal-shell.v2-design .bp-side-nav-global-search:hover {
+  background: var(--brand-soft, #f3eeff);
+}
+.renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+  padding-top: 0 !important;
+}
+
+/* The collapsed rail is a compact icon dock: square brand mark, icon-only
+ * navigation, visible quick-menu panel and a true circular expand control. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed {
+    width: 64px;
+  }
+  .renewal-shell.v2-design:has(.bp-side-nav.bp-is-collapsed) {
+    padding-left: 64px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    box-sizing: border-box;
+    padding: 12px 16px 12px !important;
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
+    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    flex: 0 0 40px;
+    gap: 0;
+    border-radius: 10px;
+    /* Use the same vivid aurora palette as the calendar hero card so the
+     * collapsed brand tile remains a true continuation of the main canvas. */
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%);
+    background-size: 300% 300%;
+    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
+    color: #fff;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+    color: #fff;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    justify-content: center;
+    margin: 12px auto;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-main {
+    padding-top: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: var(--v2-side-item-lane);
+    min-height: 44px;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu {
+    display: block;
+    margin: 8px 10px;
+    padding: 6px 0 !important;
+    border-radius: 14px;
+    background: var(--bg-primary, #f8f7fb);
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
+    width: 40px;
+    min-height: 40px;
+    margin: 2px auto !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-footer {
+    padding: 10px 8px 16px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-btn {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    margin: 8px auto 0;
+    border-radius: 50%;
+    justify-content: center;
   }
 }
 
@@ -311,6 +987,41 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Anniversary text must remain readable on the translucent desktop badges.
+ * Some stored anniversary records carry a white badgeColor; using that value
+ * directly made the title disappear against the pale tint.  Keep the V2
+ * desktop label dark (with category-specific dark accents) regardless of the
+ * legacy record color. */
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary > .bp-day-anniversary-label {
+    color: var(--cal-anniversary, #F76AAD) !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other > .bp-day-anniversary-label {
+    color: var(--cal-anniversary, #F76AAD) !important;
+  }
+
+  /* Keep the in-flow anniversary stack below participant name pills.  The
+   * generic tablet cell height (60px) is enough for names alone but not for
+   * names plus a labelled anniversary, so those cells need a dedicated
+   * vertical budget instead of allowing flex items to crowd each other. */
+  .v2-design .bp-day-cell:has(.bp-day-bar-stack) {
+    min-height: 84px !important;
+  }
+  .v2-design .bp-day-cell .bp-day-bar-stack {
+    margin-top: 6px !important;
+    gap: 6px !important;
+  }
+}
 @media (max-width: 767px) {
   .renewal-shell.v2-design .bp-app-shell.is-bento-home
     .bp-renewal-home-summary.bp-bento-grid {
@@ -324,6 +1035,55 @@
 .v2-design .bp-renewal-home-photo-strip.bp-thumb-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: 1fr;
+}
+/* Home gallery strip: loading skeletons instead of blank grey squares while photoIndex resolves.
+ * Broken/missing media is filtered by resolveHomeGalleryStripState — never opacity:0 ghosts. */
+.v2-design .bp-renewal-home-photo-strip.bp-thumb-grid .bp-thumb.is-skeleton,
+.v2-design .bp-renewal-home-photo-strip.bp-thumb-grid.is-loading .bp-thumb.is-skeleton {
+  aspect-ratio: 1;
+  background: linear-gradient(90deg, #e8e6f0 0%, #f4f2f8 45%, #e8e6f0 100%);
+  background-size: 200% 100%;
+  animation: bp-gallery-thumb-shimmer 1.2s ease-in-out infinite;
+  border: none;
+  pointer-events: none;
+}
+@keyframes bp-gallery-thumb-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+
+/* Fold/tablet home contract (768–1199px): the hero and calendar are the two
+ * full-bleed, single-column lead surfaces.  Supporting modules remain a
+ * two-column matrix.  Keep this contract last so the generic >=768 card
+ * rounding and desktop grid rules cannot re-introduce gutters or radii. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 16px !important;
+    border-radius: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    width: 100% !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+    /* Supporting cards keep a small page gutter and their existing rounded
+     * surfaces; only the lead calendar below is allowed to bleed outward. */
+    padding: 0 16px 24px !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid
+    > .bp-renewal-home-summary-section:first-child {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 0 !important;
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    width: calc(100% + 32px) !important;
+  }
 }
 
 /* Mobile holiday labels are deliberately constrained to five Korean
@@ -340,31 +1100,21 @@
     line-height: 1.15;
     text-align: center;
   }
-}
-@media (max-width: 767px) {
+
+
   .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
     display: none !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
     min-height: 0.34rem !important;
+    height: 0.34rem !important;
+    padding: 0 !important;
   }
 }
 
-/* Participant pills: one consistent readable scale wherever the calendar grid
-   has room for names (the small-phone mode intentionally remains dot-only). */
-@media (min-width: 560px) {
-  .v2-design .bp-dot-row { gap: 4px !important; }
-  .v2-design .bp-p-dot {
-    min-height: 1.25rem;
-    padding: 0.12rem 0.48rem !important;
-    font-size: 0.66rem !important;
-    line-height: 1.2 !important;
-  }
-  .v2-design .bp-p-dot::after {
-    font-size: 0.66rem !important;
-    line-height: 1.2 !important;
-  }
-}
+/* Participant pills at this breakpoint: same-file dead duplicate of .bp-dot-row/.bp-p-dot
+   removed -- the tablet-treatment block below (same media query) already fully re-declares
+   both selectors and wins the cascade (later wins at equal specificity/importance). */
 
 /* Keep the tablet calendar treatment until two participant pills per row no
    longer fit. The old 768px cut-over made a 3+1 arrangement jump to the
@@ -376,8 +1126,8 @@
     margin: 0 auto !important;
   }
   .v2-design .bp-hero-zone {
-    margin: 16px 20px 0 !important;
-    border-radius: 20px !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
   }
   .v2-design .bp-bento-title {
     padding-left: 20px !important;
@@ -393,7 +1143,7 @@
   }
   .v2-design .bp-bento-card {
     border-radius: 16px !important;
-    box-shadow: 0 1px 4px rgba(30,27,46,0.07);
+    box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03));
     padding: 18px !important;
   }
   .v2-design .bp-bento-card:first-of-type.bp-wide { grid-column: 1 / -1; }
@@ -401,12 +1151,8 @@
   .v2-design .bp-day-num { font-size: 0.74rem !important; }
   .v2-design .bp-dot-row { gap: 3px !important; }
   .v2-design .bp-p-dot {
-    width: auto; height: auto; border-radius: var(--radius-full);
-    display: inline-flex; align-items: center; padding: 1px 6px;
-  }
-  .v2-design .bp-p-dot::after {
-    content: attr(data-name); display: inline; color: #fff;
-    font-size: 0.56rem; font-weight: 800; line-height: 1.4; white-space: nowrap;
+    width: 8px !important; height: 8px !important; border-radius: 50% !important;
+    display: inline-block; padding: 0 !important;
   }
   .v2-design .bp-day-anniversary-label { display: block !important; }
 }
@@ -451,20 +1197,90 @@
   .v2-design .bp-side-nav-close-btn { display: none; }
 }
 @media (max-width: 767px) {
-  /* Mobile: no rail; every home section is a vertical stack and the hero
-   * consumes the full available width. */
+  /* Mobile: no persistent rail; every home section is a vertical stack and
+   * the hero consumes the full available width. .bp-side-nav itself now
+   * stays an off-canvas drawer here too (see the widened <=1200px drawer
+   * block above) instead of display:none, so the header's 더보기 button
+   * has something to open. */
   .v2-design { padding-left: 0; }
-  .v2-design .bp-side-nav {
-    display: none;
-  }
   .v2-design .bp-bento-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
+  /* .bp-hero-zone width/margin/border-radius: already covered by the "Final
+   * full-bleed hero rule" below (max-width: 1200px, which mobile also
+   * matches) with equal-or-greater importance -- removed the duplicate that
+   * used to be here. */
+}
+
+/* Final full-bleed hero rule for tablet/mobile. */
+@media (max-width: 1200px) {
   .v2-design .bp-hero-zone {
     width: 100%;
     margin-left: 0;
     margin-right: 0;
-    border-radius: 0;
+    border-radius: 0 !important;
+  }
+}
+
+/* Final rail coordinate contract (must remain after all responsive rules). */
+@media (min-width: 768px) {
+  .v2-design .bp-side-nav-head { height: 64px; min-height: 64px; box-sizing: border-box; padding: 12px 16px; }
+  .v2-design .bp-side-nav-group.bp-is-main { padding: 0 10px; }
+  .v2-design .bp-side-nav-global-search { height: 40px; min-height: 40px; margin: 12px auto; box-sizing: border-box; }
+  .v2-design .bp-side-nav-global-search-icon { width: 20px; height: 20px; min-width: 20px; min-height: 20px; display: flex; align-items: center; justify-content: center; line-height: 0; }
+  .v2-design .bp-side-nav-global-search-icon svg { display: block; width: 20px; height: 20px; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search { width: 40px; height: 40px; min-height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; line-height: 0; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg { width: 20px; height: 20px; }
+  .v2-design .bp-side-nav-item { height: 44px; min-height: 44px; margin-top: 2px; margin-bottom: 2px; box-sizing: border-box; transform: none; }
+  .v2-design .bp-side-nav-item-icon, .v2-design .bp-side-nav-item-icon svg { transform: none; align-self: center; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 44px; margin-left: auto; margin-right: auto; padding: 0; justify-content: center; }
+  .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
+  .v2-design .bp-side-nav-brand-icon,
+  .v2-design .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+}
+
+/* Must be last: reference-home.css contains a 560–767px floating-card rule.
+   The V2 mobile hero owns the viewport edge at every phone width. */
+@media (max-width: 767px) {
+  .renewal-shell.v2-design,
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    clip-path: none !important;
+  }
+}
+
+/* Hero plain settings icons (no glass chrome) — calendar / anniversary */
+@media (max-width: 1199px) {
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn,
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 8px !important;
+  }
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn:hover,
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn:hover {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    opacity: 0.88;
   }
 }

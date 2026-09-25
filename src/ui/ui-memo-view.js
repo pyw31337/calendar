@@ -2105,10 +2105,52 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   );
 
   if (typeof renderV2 === 'function') {
-    return renderV2({
+    const lifted = [];
+    React.Children.toArray(__memoLegacyTree.props.children).forEach(node => {
+      if (!node || !React.isValidElement(node)) return;
+      const cls = String(node.props?.className || '');
+      // The V2 screen renders its own list, but the legacy body also hosts the memo editor
+      // overlay (and other popups) next to that list -- keep those, drop only the list.
+      if (/memo-view-body/.test(cls)) {
+        React.Children.toArray(node.props.children).forEach(child => {
+          if (!child || !React.isValidElement(child)) return;
+          if (/memo-list-scroll/.test(String(child.props?.className || ''))) return;
+          lifted.push(child);
+        });
+        return;
+      }
+      if (/memo-view-header|admin-side-menu-overlay/.test(cls)) return;
+      if (node.type === 'button') return;
+      lifted.push(node);
+    });
+    const ReactDOM = window.ReactDOM;
+    const extraTree = lifted.length
+      ? (ReactDOM && typeof ReactDOM.createPortal === 'function'
+        ? ReactDOM.createPortal(React.createElement(React.Fragment, null, ...lifted), document.body)
+        : lifted)
+      : null;
+    return React.createElement(React.Fragment, null, renderV2({
       legacyView: __memoLegacyTree,
       calendar,
       allMemos: memos || [],
+      memos: memos || [],
+      focusedMemo: sharedMemo || null,
+      renderCard: (memo) => /*#__PURE__*/React.createElement(MemoCard, {
+        memo,
+        calendar,
+        onOpenEdit: handleOpenEdit,
+        onTogglePin: () => handleTogglePin(memo),
+        onShare: () => setSharingMemo(memo),
+        onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
+        onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
+        getBorderColor,
+        onRequestConfirm,
+        showToast,
+        setActiveLightbox,
+        searchQuery,
+        effectivePinned: !!memo.isPinned,
+        variant: 'v2-page',
+      }),
       searchQuery,
       selectedTag,
       onBack,
@@ -2117,8 +2159,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       onSearch: (value) => { setSearchQuery(value); setIsSearchOpen(!!value || isSearchOpen); },
       onSelectTag: (tag) => { setSelectedTag(tag); if (tag) setIsSearchOpen(true); },
       onCompose: () => setIsComposerExpanded(true),
+      isComposerExpanded,
+      onCloseComposer: () => setIsComposerExpanded(false),
       slots: {},
-    });
+    }), extraTree);
   }
   return __memoLegacyTree;
 }

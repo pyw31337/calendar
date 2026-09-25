@@ -13,31 +13,66 @@ function __fb() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
 
-export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onClick, children }) {
+export function SearchResultLogRow({ kindLabel, kindColor, badgeName, badgeColor, title, timeStr, calendarLabel, onClick, children }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const Tag = onClick ? "button" : "div";
+  const hasTitle = title != null && title !== '';
   return /*#__PURE__*/React.createElement(Tag, {
     type: onClick ? "button" : undefined,
     onClick,
+    className: "global-search-result",
     style: {
       display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
-      padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: '#F8FAFC', border: '1px solid var(--border-subtle)',
+      padding: '14px 16px', borderRadius: '14px', backgroundColor: '#F8FAFC', border: '1px solid var(--border-subtle)',
       cursor: onClick ? 'pointer' : 'default', font: 'inherit'
     }
   },
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
+    /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-top",
+      style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: hasTitle || children ? '8px' : 0, flexWrap: 'wrap' }
+    },
+      kindLabel && /*#__PURE__*/React.createElement("span", {
+        className: "global-search-result-kind",
+        style: {
+          backgroundColor: kindColor || badgeColor || '#94A3B8', color: '#FFFFFF',
+          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+          fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: '18px', whiteSpace: 'nowrap'
+        }
+      }, kindLabel),
       badgeName && /*#__PURE__*/React.createElement("span", {
-        style: { backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        className: kindLabel ? "global-search-result-path" : "global-search-result-kind",
+        style: kindLabel ? {
+          fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700, lineHeight: '18px'
+        } : {
+          backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF',
+          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+          fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: '18px', whiteSpace: 'nowrap'
+        }
       }, badgeName),
       calendarLabel && /*#__PURE__*/React.createElement("span", {
         style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-light)', fontWeight: 700 }
       }, calendarLabel)
     ),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
-    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '6px' } }, timeStr)
+    hasTitle && /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-title",
+      style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' }
+    }, title),
+    children ? /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-meta",
+      style: {
+        fontSize: hasTitle ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+        color: hasTitle ? 'var(--text-muted)' : 'var(--text-main)',
+        lineHeight: 1.45, wordBreak: 'break-word',
+        marginTop: hasTitle ? '4px' : 0
+      }
+    }, children) : null,
+    timeStr && /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-time",
+      style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '8px' }
+    }, timeStr)
   );
 }
 
@@ -106,22 +141,49 @@ export function TikTokEmbedWidget({ url, videoId, onFailed }) {
 export function useCapsuleAutoRadius(text) {
   const React = window.React;
   const ref = React.useRef(null);
-  const [isMultiline, setIsMultiline] = React.useState(false);
+  const [isMultiline, setIsMultiline] = React.useState(() => {
+    const s = String(text || '').trim();
+    return s.includes('\n');
+  });
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
+    const s = String(text || '').trim();
+    if (s.includes('\n')) {
+      setIsMultiline(true);
+      return undefined;
+    }
     const measure = () => {
-      const cs = window.getComputedStyle(el);
-      let lineHeight = parseFloat(cs.lineHeight);
-      if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-        lineHeight = (parseFloat(cs.fontSize) || 14) * 1.3;
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const rects = range.getClientRects();
+        if (rects.length <= 1) {
+          const isOverflowing = el.scrollWidth > el.clientWidth + 1;
+          setIsMultiline(isOverflowing);
+          return;
+        }
+        const firstTop = rects[0].top;
+        const wrapped = Array.from(rects).some(r => Math.abs(r.top - firstTop) > 6);
+        setIsMultiline(wrapped);
+      } catch (err) {
+        setIsMultiline(el.scrollWidth > el.clientWidth + 1);
       }
-      setIsMultiline(el.scrollHeight > lineHeight * 1.5);
     };
     measure();
+    const targetToObserve = el.parentElement || el;
     if (typeof ResizeObserver === 'function') {
-      const ro = new ResizeObserver(measure);
-      ro.observe(el);
+      let lastWidth = targetToObserve.clientWidth;
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const newWidth = entry.contentRect ? entry.contentRect.width : targetToObserve.clientWidth;
+          if (Math.abs(newWidth - lastWidth) >= 1) {
+            lastWidth = newWidth;
+            measure();
+          }
+        }
+      });
+      ro.observe(targetToObserve);
       return () => ro.disconnect();
     }
     return undefined;
@@ -134,20 +196,34 @@ export function useCapsuleAutoRadius(text) {
 // border-radius: var(--radius-full) inline.
 export function CapsuleTextBadge({ text, title, tag = 'span', style = null, className = '', onClick, children }) {
   const React = window.React;
-  const [ref, isMultiline] = useCapsuleAutoRadius(text);
-  if (!text && !children) return null;
+  const rawText = text != null ? String(text) : (typeof children === 'string' ? children : '');
+  const [ref, isMultiline] = useCapsuleAutoRadius(rawText);
+  if (!rawText && !children) return null;
+  const multilineClass = isMultiline ? 'is-multiline' : '';
+  const combinedClassName = [className, multilineClass].filter(Boolean).join(' ') || undefined;
   return /*#__PURE__*/React.createElement(tag, {
     ref,
-    title: title != null ? title : text,
-    className: className || undefined,
+    title: title != null ? title : (text || (typeof children === 'string' ? children : undefined)),
+    className: combinedClassName,
     onClick,
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      borderRadius: isMultiline ? '10px' : 'var(--radius-full)',
-      ...(style || {})
-    }
-  }, children || text);
+    style: Object.assign(
+      {
+        display: isMultiline ? 'inline-block' : 'inline-flex',
+        alignItems: isMultiline ? undefined : 'center',
+        borderRadius: isMultiline ? '10px' : 'var(--radius-full, 999px)',
+        boxSizing: 'border-box'
+      },
+      style || {},
+      isMultiline ? {
+        textAlign: 'left',
+        padding: '6px 14px',
+        lineHeight: '130%',
+        borderRadius: '10px',
+        wordBreak: 'break-word',
+        maxWidth: '100%'
+      } : {}
+    )
+  }, children != null ? children : text);
 }
 
 export function UrlCapsuleBadge({ url, style = null }) {
@@ -183,6 +259,13 @@ export function UrlCapsuleBadge({ url, style = null }) {
   }, href);
 }
 
+export function shortParticipantName(name) {
+  const value = String(name || '').trim();
+  // Role labels are not 성+이름. Slicing 시스템 → 스템.
+  if (value === '시스템' || value === '메시지') return value;
+  return /^[가-힣]{3,4}$/.test(value) ? value.slice(1) : value;
+}
+
 // The single shared participant-select control -- solid color pill (participant's own color as
 // background, white bold name, small ▼) that opens ChatParticipantSheet. This is the chat
 // composer's original look; memo composer/edit, the chat edit modal, and the comment composer
@@ -190,6 +273,7 @@ export function UrlCapsuleBadge({ url, style = null }) {
 // happen here. Never re-implement this button inline at a call site -- import and use this.
 export function ParticipantPickerButton({ participant, onClick, placeholder = '작성자 선택' }) {
   const React = window.React;
+  const label = shortParticipantName(participant?.name) || placeholder;
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -212,9 +296,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, participant?.name || placeholder, /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: 'var(--font-size-2xs)' }
-  }, "▼"));
+  }, label, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 14, direction: 'down' }));
 }
 
 // The single shared "참여자 뱃지" -- a solid pill showing a participant's name on their own color,
@@ -225,11 +307,21 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
 // 0.7rem there, 0.72rem elsewhere, all meant to be the exact same badge). Pass `children` only
 // when the badge needs more than the bare name (e.g. an inline remove button); otherwise it
 // renders participant.name.
-export function ParticipantBadge({ participant, style, className = '', children, ...rest }) {
+export function ParticipantBadge({ participant, style, className = '', asDot = false, children, ...rest }) {
   const React = window.React;
   if (!participant) return null;
-  const participantName = String(participant.name || '').trim();
-  const badgeName = /^[가-힣]{3,4}$/.test(participantName) ? participantName.slice(1) : participantName;
+  const badgeName = shortParticipantName(participant.name);
+  if (asDot) {
+    return /*#__PURE__*/React.createElement("span", {
+      className: `v2-author-dot participant-dot${className ? ' ' + className : ''}`,
+      role: "img",
+      tabIndex: 0,
+      "data-author-name": participant.name,
+      title: participant.name,
+      style: { backgroundColor: participant.color || '#94A3B8', ...style },
+      ...rest
+    });
+  }
   return /*#__PURE__*/React.createElement("span", {
     className: `participant-badge${className ? ' ' + className : ''}`,
     style: { backgroundColor: participant.color || '#94A3B8', color: '#FFFFFF', ...style },
@@ -260,6 +352,50 @@ export function DateCapsuleBadge({ date, style = null }) {
   }, label);
 }
 
+/** Shared ns-resize grip used above the chat composer and under the places map. */
+export function PanelResizeHandle({
+  label = '높이 조절',
+  className = '',
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onKeyDown,
+}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("div", {
+    className: `panel-resize-handle chat-composer-resize-handle${className ? ` ${className}` : ''}`,
+    role: "separator",
+    "aria-label": label,
+    "aria-orientation": "horizontal",
+    tabIndex: 0,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onKeyDown
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "14",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "lucide lucide-grip-horizontal",
+    "aria-hidden": "true"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "15", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "15", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "15", r: "1" })
+  ));
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SearchResultLogRow: SearchResultLogRow,
@@ -270,5 +406,7 @@ export function DateCapsuleBadge({ date, style = null }) {
     ParticipantPickerButton: ParticipantPickerButton,
     ParticipantBadge: ParticipantBadge,
     DateCapsuleBadge: DateCapsuleBadge,
+    PanelResizeHandle: PanelResizeHandle,
+    shortParticipantName: shortParticipantName,
   });
 }

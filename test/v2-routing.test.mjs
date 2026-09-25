@@ -6,10 +6,23 @@ import { photoLightbox, timestampMs } from '../src/ui/v2/view-data.js';
 import { resolveV2Destination, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
 
 const location = search => ({ pathname: '/calendar/', search });
-test('default routes ignore V2 tab/sub parameters', () => {
-  assert.equal(getInitialAppView(location('?id=example&tab=records&sub=memo')), 'calendar');
-  assert.equal(getInitialAppView(location('?view=chat&tab=records&sub=memo')), 'chat');
-  assert.equal(buildAppViewUrl(location('?id=example'), 'memo'), '/calendar/?id=example&view=memo');
+test('default (no shell param) behaves like V2 -- cutover, shell=v1 is the escape hatch', () => {
+  assert.equal(getInitialAppView(location('?id=example&tab=records&sub=memo')), 'memo');
+  assert.equal(getInitialAppView(location('?tab=chat')), 'chat');
+  const url = buildAppViewUrl(location('?id=example'), 'memo');
+  const params = new URL(url, 'https://example.test').searchParams;
+  assert.equal(params.get('tab'), 'memo');
+  assert.equal(params.has('sub'), false);
+  assert.equal(params.get('id'), 'example');
+});
+test('shell=v1 escape hatch restores legacy routing (V2 tab/sub ignored)', () => {
+  assert.equal(getInitialAppView(location('?shell=v1&id=example&tab=records&sub=memo')), 'calendar');
+  assert.equal(getInitialAppView(location('?shell=v1&view=chat&tab=records&sub=memo')), 'chat');
+  const url = buildAppViewUrl(location('?shell=v1&id=example'), 'memo');
+  const params = new URL(url, 'https://example.test').searchParams;
+  assert.equal(params.get('shell'), 'v1');
+  assert.equal(params.has('tab'), false);
+  assert.equal(params.get('view'), 'memo');
 });
 test('V2 first-class destinations use ?tab=memo|places (not records sub)', () => {
   assert.equal(getInitialAppView(location('?shell=v2&tab=memo')), 'memo');
@@ -69,6 +82,43 @@ test('timestamps normalize without turning Firestore seconds into 1970 dates', (
   assert.equal(timestampMs(null), 0);
 });
 
+test('V2 places screen does not reparent Leaflet map slots (removeChild crash)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(screens, /v2-places-legacy/);
+  assert.doesNotMatch(screens, /slots\.list \|\| slots\.map/);
+  assert.match(screens, /Same React element in two parents/);
+});
+
+test('V2 destination panes prefetch lazy UI and never stall on 불러오는 중 copy', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(shell, /function useLazyUi/);
+  assert.match(shell, /prefetchDestinationUi/);
+  assert.match(shell, /function HomePlaceCard/);
+  assert.match(shell, /homePlaceVisitLine/);
+  assert.match(shell, /TABLER_ICONS\.externalLink/);
+  assert.doesNotMatch(shell, /title: '메모 불러오는 중'/);
+  assert.doesNotMatch(shell, /title: '장소 불러오는 중'/);
+  assert.match(screens, /export function prefetchDestinationStyles/);
+});
+
+test('places map reuses the shared chat composer resize handle', async () => {
+  const { readFileSync } = await import('node:fs');
+  const places = readFileSync(new URL('../src/ui/ui-places.js', import.meta.url), 'utf8');
+  const widgets = readFileSync(new URL('../src/ui/ui-widgets.js', import.meta.url), 'utf8');
+  const chat = readFileSync(new URL('../src/ui/ui-chat-room.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/ui/v2/screens.css', import.meta.url), 'utf8');
+  assert.match(widgets, /export function PanelResizeHandle/);
+  assert.match(chat, /import \{ PanelResizeHandle \} from '\.\/ui-widgets\.js'/);
+  assert.match(places, /import \{ PanelResizeHandle \} from '\.\/ui-widgets\.js'/);
+  assert.match(places, /PanelResizeHandle/);
+  assert.match(places, /panel-resize-bar/);
+  assert.match(css, /\.places-category-sticky-tabs[\s\S]{0,160}padding:\s*0 !important/);
+  assert.match(css, /\.places-category-sticky-tabs[\s\S]{0,220}border-bottom:\s*none !important/);
+});
+
 test('V2 date modal opts into bento sheet chrome without changing default export signature defaults', async () => {
   const { readFileSync } = await import('node:fs');
   const modal = readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
@@ -103,7 +153,10 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /--v2-fs-md:\s*0\.90rem/);
   assert.match(design, /--v2-fs-title:\s*1\.2rem/);
 
-  assert.match(shell, /slice\(0, 9\)/);
+  assert.match(shell, /resolveHomeGalleryStripState/);
+  assert.match(shell, /limit:\s*9/);
+  assert.match(shell, /navigateV2Destination/);
+  assert.match(shell, /gallery-thumb/);
   assert.match(shell, /dday-participant-memos/);
   assert.match(shell, /participantMemosFor/);
   assert.match(shell, /day-bar-stack/);
@@ -111,18 +164,24 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /day-head-row/);
   assert.match(shell, /day-meeting-pill/);
   assert.match(shell, /computeFestivalBars/);
-  assert.match(shell, /festival-bar-desktop/);
-  assert.match(shell, /festival-bar-mobile/);
+  assert.match(shell, /ann-range/);
+  assert.match(shell, /is-start/);
+  assert.match(shell, /is-mid/);
+  assert.match(shell, /rowRangeDepth/);
   assert.match(shell, /chat-bubble-modules/);
   assert.match(shell, /ChatBubbleFrame/);
-  // V2 badge colors: 모임확정/일정·여행 = --cal-schedule; 기념일 = --cal-anniversary (pink)
+  // 모임확정 stays --cal-schedule. Anniversary bars use per-category colors,
+  // not one shared --cal-anniversary fill.
   assert.match(design, /bp-day-meeting-pill/);
   assert.match(design, /--cal-schedule:\s*#7C2FE5/);
   assert.match(design, /--cal-anniversary:\s*#F76AAD/);
   assert.match(design, /background:\s*var\(--cal-schedule/);
   assert.match(design, /background:\s*var\(--cal-anniversary/);
   assert.match(shell, /cal-schedule/);
-  assert.match(shell, /cal-anniversary/);
+  assert.match(shell, /ANNIVERSARY_BAR_COLORS/);
+  assert.match(shell, /anniversaryBarPaint/);
+  assert.match(shell, /event:\s*'#3B82F6'/);
+  assert.match(shell, /travel:\s*'#10B981'/);
   assert.match(shell, /dday-compact-prefix/);
   assert.doesNotMatch(design, /#F472B6/);
   assert.doesNotMatch(design, /background:\s*var\(--status-green/);
@@ -138,10 +197,12 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(screens, /placeholder: '장소 검색'/);
   assert.match(screens, /placeholder: '메모 검색'|메모 검색/);
   assert.match(screens, /Fab\(/);
-  assert.match(screens, /label: '메모 작성'/);
+  assert.match(screens, /label: '메모 등록'|label: '메모 작성'/);
   assert.match(screens, /label: '장소 등록'/);
-  assert.match(screens, /label: '지출 추가'/);
-  assert.match(screens, /label: '지도로 보기'|icon: 'map'/);
+  // Settlement compose moved off the purple FAB onto header IconButtons (정산 생성 /
+  // 정산 목록); the FAB is now the shared page menu, same as memo/places.
+  assert.match(screens, /label: '정산 생성'/);
+  assert.match(screens, /label: '지도보기'|label: '지도로 보기'|icon: 'map'/);
   assert.match(screens, /onShare/);
   assert.match(screens, /bp-composer-input|composer/);
   assert.match(screens, /대화 검색/);
@@ -154,4 +215,121 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(shell, /dday-participant-memos/);
   assert.match(styles, /chat-reply-quote-card/);
   assert.match(styles, /v2-records-media/);
+});
+
+// Regression: RenewalAppShell returns before CalendarApp's own withStickyVideo() wrapper (see
+// app-main.js's `if (renewalShellEl) return renewalShellEl;`), which is where v1 renders
+// ImageUploadOverlay/OperationProgressOverlay. v2 had no equivalent for a long stretch, so an
+// upload was actually running (shared upload code path with v1) with zero visual progress
+// feedback -- indistinguishable from a stalled/failed upload to whoever was watching it.
+test('V2 shell renders the same upload/operation progress overlays as v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /chatUploadProgress/, 'RenewalAppShell must accept chatUploadProgress as a prop');
+  assert.match(shell, /ImageUploadOverlay/, 'RenewalAppShell must render ImageUploadOverlay when uploading');
+  assert.match(shell, /OperationProgressOverlay/, 'RenewalAppShell must render OperationProgressOverlay too');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress/, 'CalendarApp must pass its live chatUploadProgress/operationProgress state into the v2 shell');
+});
+
+// Regression: the app-wide toast (success/error banner from showToast(), used by nearly every
+// action -- uploads, deletes, tag saves, shares, network status) renders via the SAME
+// withStickyVideo() tree as the overlays above (app-main.js: `toast && <div className="toast...">`).
+// v2 never reached it either, so every showToast() call already made from v2 screens was updating
+// state with nothing on screen to show it -- indistinguishable from the action silently no-oping.
+// Regression: ui-chat-room.js's "OO님에게 답장" reply-preview card (rendered as a plain child
+// of .chat-composer when chatReplyTarget is set) carries no className -- it's styled purely via
+// an inline --reply-accent custom property. extractChatSlots's className-based walk never
+// matched it, so slots.reply was always undefined; ChatScreen's composer clone() then replaced
+// the composer's children wholesale (resize, slots.reply, photos, files, ...), silently dropping
+// the reply banner and its cancel button even though chatReplyTarget/setChatReplyTarget kept
+// working and the reply still attached to the sent message. Users under ?shell=v2 had no way to
+// see or cancel a pending reply.
+test('extractChatSlots captures the reply-preview card by its --reply-accent marker', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shellNav = readFileSync(new URL('../src/ui/v2/shell-nav.js', import.meta.url), 'utf8');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(shellNav, /--reply-accent/, 'extractChatSlots must detect the reply card by its --reply-accent style marker (it has no className)');
+  assert.match(shellNav, /bag\.reply\s*=\s*node/, 'a matched reply card must be assigned to bag.reply');
+  assert.match(screens, /slots\.reply/, 'ChatScreen must place the captured reply slot back into the rebuilt composer');
+});
+
+test('V2 shell renders the same app-wide toast as v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /\btoast\b[\s\S]{0,40}dismissToast|dismissToast[\s\S]{0,40}\btoast\b/, 'RenewalAppShell must accept toast + dismissToast as props');
+  assert.match(shell, /className:\s*`toast \$\{/, 'RenewalAppShell must render the same .toast markup v1 uses');
+  // globalOverlays may grow (confirmDialog/setConfirmDialog were appended after toast);
+  // require toast+dismissToast in that object, not that they are the final keys before '}'.
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress,\s*toast,\s*dismissToast\b/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\bconfirmDialog,\s*setConfirmDialog\b/, 'CalendarApp must also pass confirmDialog into the v2 shell (anniversary delete etc.)');
+  assert.match(shell, /ConfirmDialog/, 'RenewalAppShell must mount ConfirmDialog when confirmDialog is set');
+});
+
+// Regression: NotificationPermissionHelpModal also lived only in withStickyVideo() /
+// sharedAppOverlays. V2 already wires openNotificationHelp into AppSettings / GlobalSearch,
+// but without remounting the modal, isNotificationHelpOpen updates with nothing on screen.
+// Permission-help only -- NotificationOnboardingModal is dead (setIsNotifOnboardingOpen(true)
+// has no callers) and is intentionally not revived here.
+test('V2 shell mounts NotificationPermissionHelpModal like v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /isNotificationHelpOpen/, 'RenewalAppShell must accept isNotificationHelpOpen as a prop');
+  assert.match(shell, /NotificationPermissionHelpModal/, 'RenewalAppShell must mount NotificationPermissionHelpModal when help is open');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\bisNotificationHelpOpen,\s*setIsNotificationHelpOpen\b/, 'CalendarApp must pass notification-help open state into the v2 shell');
+  assert.match(appMain, /onNotificationHelpRetry:\s*handleMainToggleNotifications/, 'CalendarApp must pass handleMainToggleNotifications as onNotificationHelpRetry');
+  assert.doesNotMatch(shell, /createElement\([^)]*NotificationOnboardingModal/, 'Do not revive dead NotificationOnboardingModal on v2 (no setIsNotifOnboardingOpen(true) callers)');
+});
+
+// Regression: BentoCalendarCard (the V2 캘린더 home tab) reimplements the whole month grid from
+// scratch instead of reusing ui-calendar-core.js's CalendarGrid (see the module doc comment
+// above it), so features CalendarGrid has never automatically carried over. One of those --
+// dragging a participant's availability dot onto a different date to move it, both via desktop
+// HTML5 drag-and-drop and a touch long-press-then-drag equivalent (native DnD never fires from
+// touch input) -- had no V2 equivalent at all: the dots were plain non-interactive <span>s and
+// the day-cell button had no onDragOver/onDrop, so the only way to move an availability entry
+// under ?shell=v2 was opening the date's detail modal and re-registering it by hand.
+test('V2 calendar home supports drag-to-move availability like v1\'s CalendarGrid', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shell, /handleMoveAvailability/, 'BentoCalendarCard must reach calendarContext.handleMoveAvailability, the same handler CalendarGrid uses');
+  assert.match(shell, /draggable:\s*true/, 'availability dots must be draggable, same as CalendarGrid\'s ParticipantBadge');
+  assert.match(shell, /onDrop:\s*event\s*=>/, 'day cells must accept a drop to complete the move');
+  assert.match(shell, /handleBadgeTouchStart/, 'a touch long-press-then-drag equivalent must exist for mobile, where native HTML5 DnD never fires');
+});
+
+
+test('V2 gallery/archive navigation writes one history entry (no records hub stop)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shell, /function navigateV2Destination/);
+  assert.match(shell, /never push the hub overview|Never push the hub overview|never push the records hub/i);
+  // Dual push pattern must be gone from onChangeView / selectSideItem.
+  assert.doesNotMatch(shell, /setActiveTab\('records'\);\s*setRecordsSubTab\('media'\)/);
+  assert.doesNotMatch(shell, /setActiveTab\('records'\);\s*setRecordsSubTab\(dest\.sub\)/);
+  assert.match(shell, /Bare records hub/);
+  assert.match(shell, /snap to calendar via replace|replace it with calendar/);
+});
+
+test('gallery thumb resolver module is the single render-resolution path', async () => {
+  const { readFileSync } = await import('node:fs');
+  const thumb = readFileSync(new URL('../src/core/gallery-thumb.js', import.meta.url), 'utf8');
+  const asset = readFileSync(new URL('../src/core/photo-asset.js', import.meta.url), 'utf8');
+  const paint = readFileSync(new URL('../src/ui/photo-asset-thumb.js', import.meta.url), 'utf8');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const gallery = readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
+  const archive = readFileSync(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
+  assert.match(thumb, /export function resolveGalleryThumbUrl/);
+  assert.match(thumb, /export function resolvePhotoAsset/);
+  assert.match(thumb, /export function selectGalleryPreviewPhotos/);
+  assert.match(thumb, /export function resolveHomeGalleryStripState/);
+  assert.match(asset, /export function canonicalPhotoAssetKey/);
+  assert.match(paint, /resolvePhotoAsset/);
+  assert.match(shell, /resolveHomeGalleryStripState/);
+  assert.match(shell, /PhotoAssetThumb/);
+  assert.match(gallery, /PhotoAssetThumb/);
+  assert.match(archive, /PhotoAssetThumb/);
+  assert.doesNotMatch(shell, /e\.currentTarget\.style\.opacity = '0'/);
 });

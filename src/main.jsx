@@ -1,5 +1,15 @@
 import './react-globals.js';
 import './app.css';
+import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
+import { installOverlayExitMotion } from './core/overlay-exit-motion.js';
+import { installFieldShape } from './core/field-shape.js';
+
+// A deploy while this tab was open leaves it asking for chunk names that no longer exist the
+// first time it opens a lazy screen; reload once to pick up the current build.
+const reloadForStaleChunk = installStaleChunkRecovery(window);
+function recoverStaleChunk(err) {
+  try { reloadForStaleChunk(err); } catch (_) {}
+}
 
 const BOOT_RETRY_KEY = 'gather_boot_auto_retry';
 const FIREBASE_SDK_VERSION = (() => {
@@ -163,6 +173,7 @@ function loadAdminUi() {
       import('./ui/ui-admin-dashboard.js')
     ]).catch(err => {
       adminUiLoadPromise = null;
+      recoverStaleChunk(err);
       throw err;
     });
   }
@@ -178,6 +189,7 @@ function loadManualUi() {
   if (!manualUiLoadPromise) {
     manualUiLoadPromise = import('./ui/ui-user-manual.js').catch(err => {
       manualUiLoadPromise = null;
+      recoverStaleChunk(err);
       throw err;
     });
   }
@@ -196,6 +208,7 @@ function loadEventUi() {
   if (!eventUiLoadPromise) {
     eventUiLoadPromise = import('./ui/ui-event-modals.js').catch(error => {
       eventUiLoadPromise = null;
+      recoverStaleChunk(error);
       throw error;
     });
   }
@@ -217,6 +230,7 @@ function loadChatUi() {
       import('./ui/ui-chat-room.js')
     ]).catch(err => {
       chatUiLoadPromise = null;
+      recoverStaleChunk(err);
       throw err;
     });
   }
@@ -239,6 +253,7 @@ function loadViewUi(view) {
   if (!viewUiLoadPromises.has(view)) {
     viewUiLoadPromises.set(view, loader().catch(err => {
       viewUiLoadPromises.delete(view);
+      recoverStaleChunk(err);
       throw err;
     }));
   }
@@ -256,6 +271,19 @@ async function boot() {
     // often, not less. Loading it first and alone most closely matches the original behavior
     // (a render-blocking <script> in <head>, which reliably worked) while still adding retries.
     await loadFirebaseSdk();
+    // P2-A: Firestore REST calls carry the anonymous user's ID token once sign-in completes.
+    // Installed before any data chunk runs; it passes requests through untouched until then.
+    const appAuth = await import('./core/app-auth.js');
+    appAuth.installFirestoreAuthFetch(window);
+    // Firestore listener guard (src/core/firestore-listener-guard.js): defer real unlistens so an
+    // identical query re-attached by the next effect reuses the target instead of racing it, and
+    // surface the SDK's unrecoverable "INTERNAL ASSERTION FAILED" once so the app can offer a reload.
+    const listenerGuard = await import('./core/firestore-listener-guard.js');
+    if (window.firebase && window.firebase.firestore) listenerGuard.installDeferredUnsubscribe(window.firebase.firestore);
+    listenerGuard.watchFirestoreAssertion(window, message => {
+      window.__gatherFirestoreBroken = message;
+      try { window.dispatchEvent(new CustomEvent('gather:firestore-broken', { detail: { message } })); } catch (_) {}
+    });
     await Promise.all([
       import('./core/app-constants.js'),
       import('./core/app-config.js'),
@@ -267,6 +295,14 @@ async function boot() {
       import('./core/app-notifications.js'),
       import('./core/firebase-services.js')
     ]);
+    // DateModal (tap a date) and Lightbox (open a photo) are ~300KB of source that the first
+    // screen never renders. Register placeholders that load the real chunk on first use, and
+    // prefetch both once the calendar is on screen (src/core/lazy-ui-proxy.js).
+    const { registerLazyUiComponents } = await import('./core/lazy-ui-proxy.js');
+    const prefetchLazyUi = registerLazyUiComponents(window.React, {
+      dateModal: { load: () => import('./ui/ui-date-modal.js'), components: ['DateModal'] },
+      lightbox: { load: () => import('./ui/ui-lightbox.js'), components: ['Lightbox', 'LightboxInfoPanel', 'LightboxTagPanel'] }
+    });
     await Promise.all([
       import('./ui/ui-icons.js'),
       import('./ui/ui-confirm-dialog.js'),
@@ -277,11 +313,9 @@ async function boot() {
       import('./ui/ui-side-menu.js'),
       import('./ui/ui-misc.js'),
       import('./ui/ui-place-register.js'),
-      import('./ui/ui-lightbox.js'),
       import('./ui/ui-remaining.js'),
       import('./ui/ui-summary-gallery.js'),
       import('./ui/ui-shared.js'),
-      import('./ui/ui-date-modal.js'),
       import('./ui/ui-calendar-core.js'),
       // ChatParticipantSheet (the actual participant-selection bottom sheet, vs. the button
       // that opens it) lives in this file, but it isn't chat-specific -- the memo composer/edit
@@ -320,6 +354,15 @@ async function boot() {
     // import) can safely assume window.firebase exists.
     await import('./core/app-main.js');
     if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
+    // Closing sheets/modals fade and slide out instead of vanishing in one frame (V2 only).
+    installOverlayExitMotion(document, { isEnabled: () => !!document.querySelector('.renewal-shell.v2-design') });
+    // Text fields: capsule when one line, rounded box sized to a wrapped placeholder (V2).
+    installFieldShape(document, { isEnabled: () => !!document.querySelector('.renewal-shell.v2-design') });
+    // Sign in after the first render so the auth SDK never delays the calendar. Failure is
+    // harmless in P2-A: the rules still accept unauthenticated requests.
+    setTimeout(() => { appAuth.startAnonymousAuth({ loadScript: src => loadScriptWithRetry(src, 15000) }); }, 0);
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => { prefetchLazyUi(); }, { timeout: 2500 });
+    else setTimeout(() => { prefetchLazyUi(); }, 1200);
     // The ready contract means app-main has bound all shared helpers and started the React tree,
     // not merely that its prerequisite chunks finished. Vite 8/Rolldown made the final dynamic
     // import boundary visible enough for tests and fast clients to observe the old premature flag.
@@ -359,3 +402,11 @@ async function boot() {
 }
 
 boot();
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', e => {
+    const d = e.target?.closest?.('[data-author-name]'), o = document.querySelector('.is-tooltip-open');
+    if (o && o !== d) o.classList.remove('is-tooltip-open');
+    if (d) d.classList.toggle('is-tooltip-open');
+  }, true);
+}

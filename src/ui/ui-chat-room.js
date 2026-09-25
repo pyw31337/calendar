@@ -4,6 +4,7 @@
 
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
 import { useChatTypingPresence } from '../core/chat-typing-presence.js';
+import { PanelResizeHandle } from './ui-widgets.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -462,6 +463,22 @@ export function ChatRoomView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Land on the newest message when this view first mounts, not wherever the message list's
+  // natural (top) scroll position happens to be. The V1 shell's own equivalent
+  // (app-main.js, gated on `activeView === 'chat'`) never fires here because the V2 shell
+  // tracks its own `activeTab` state instead of `activeView` (deliberately -- see
+  // buildRenewalChatContext's docblock) -- V2 chat therefore opened scrolled to the top of
+  // history until this ran. Mount-only (this component unmounts/remounts on every tab/view
+  // switch away from and back to chat, in both shells), so it never fights the "새로운 메시지"
+  // banner logic that intentionally does NOT auto-scroll for a message arriving while the user
+  // is reading older history.
+  React.useEffect(() => {
+    const container = chatMessagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    const t = setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    return () => clearTimeout(t);
+  }, []);
   const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0 || (chatFileAttachments && chatFileAttachments.length > 0));
   const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
   const handleSendPointerDown = (event) => {
@@ -528,11 +545,31 @@ export function ChatRoomView({
   React.useEffect(() => {
     const updateViewport = () => {
       if (!window.visualViewport) return;
+      const active = document.activeElement;
+      const isInputActive = !!(
+        active &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+        active.closest &&
+        (active.closest('.chat-room-container') || active.closest('.chat-composer'))
+      );
+      // If no input inside the chat is focused, the virtual keyboard is definitely not open.
+      // Reset viewportBottom to 0 to prevent mobile browser bottom toolbars/tab bars
+      // (e.g. Samsung Internet, Chrome Android) from causing a false positive keyboard offset.
+      if (!isInputActive) {
+        setViewportBottom(0);
+        return;
+      }
       // offsetTop is non-zero on iOS when the browser scrolls the page to keep the input
       // in view -- that scroll portion is NOT keyboard, so subtract it.
       const offsetTop = window.visualViewport.offsetTop || 0;
-      const kbHeight = window.innerHeight - window.visualViewport.height - offsetTop;
-      setViewportBottom(Math.max(0, kbHeight));
+      const diff = window.innerHeight - window.visualViewport.height - offsetTop;
+      // Real mobile virtual keyboards are at least ~120px tall. Small differences (< 120px)
+      // are browser chrome (address/tab bars) and must not shift the layout.
+      if (diff > 120) {
+        setViewportBottom(Math.round(diff));
+      } else {
+        setViewportBottom(0);
+      }
     };
     const onVpEvent = () => {
       if (vpRafRef.current) cancelAnimationFrame(vpRafRef.current);
@@ -557,16 +594,19 @@ export function ChatRoomView({
         if (related && related.closest && related.closest('.chat-composer')) {
           return;
         }
+        setIsInputFocused(false);
+        setViewportBottom(0);
         setTimeout(() => {
           const a = document.activeElement;
           if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT') && a.closest &&
               (a.closest('.chat-composer') || a.closest('.chat-room-container'))) {
             setIsInputFocused(true);
+            updateViewport();
             return;
           }
           setIsInputFocused(false);
-          setTimeout(updateViewport, 300);
-        }, 50);
+          setViewportBottom(0);
+        }, 60);
       }
     };
 
@@ -592,6 +632,11 @@ export function ChatRoomView({
   // when keyboard is up. On some Android browsers (Samsung Internet, Chrome), the keyboard
   // appears without a scroll event, so isHeaderVisible must be forced here too.
   React.useEffect(() => {
+    // Only follow layout growth while the reader is already on the newest
+    // messages. Hiding the composer while reading history used to set
+    // scrollTop = scrollHeight, which flipped the scroll direction and
+    // showed the chrome again on the next frame.
+    if (!isAtBottomRef.current) return;
     if (chatMessagesContainerRef.current) {
       const container = chatMessagesContainerRef.current;
       container.scrollTop = container.scrollHeight;
@@ -609,7 +654,12 @@ export function ChatRoomView({
   React.useEffect(() => {
     const el = chatComposerRef.current;
     if (!el) return;
-    const measure = () => setComposerHeight(Math.ceil(el.getBoundingClientRect().height));
+    const measure = () => {
+      const next = Math.ceil(el.getBoundingClientRect().height);
+      const root = el.closest && el.closest('.v2-chat');
+      if (root) root.style.setProperty('--v2-chat-composer-space', `${Math.max(next, 0)}px`);
+      setComposerHeight(prev => (Math.abs((prev || 0) - next) < 2 ? prev : next));
+    };
     measure();
     if (typeof ResizeObserver === 'function') {
       const observer = new ResizeObserver(measure);
@@ -1195,7 +1245,9 @@ export function ChatRoomView({
       flexDirection: 'column',
       width: '100%',
       maxWidth: '100%',
+      height: '100%',
       overflowX: 'hidden',
+      overflowY: 'hidden',
       zIndex: 1005,
       transition: 'bottom 0.12s ease-out'
     }
@@ -1332,7 +1384,7 @@ export function ChatRoomView({
       padding: '0 16px',
       zIndex: 1010,
       transition: 'transform 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+      transform: 'translateY(0)'
     }
   }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("div", {
     style: PAGE_HEADER_TITLE_STYLE
@@ -1591,12 +1643,8 @@ export function ChatRoomView({
     },
       /* 밈 키보드: 입력창 바로 위, 이모지 피커와 같은 자리 개념. 매칭된 해시태그가 있을 때만
          보인다 -- 평소엔 아무 자리도 차지하지 않는다. */
-      /*#__PURE__*/React.createElement("div", {
-        className: "chat-composer-resize-handle",
-        role: "separator",
-        "aria-label": "대화 입력창 높이 조절",
-        "aria-orientation": "horizontal",
-        tabIndex: 0,
+      /*#__PURE__*/React.createElement(PanelResizeHandle, {
+        label: "대화 입력창 높이 조절",
         onPointerDown: beginComposerResize,
         onPointerMove: moveComposerResize,
         onPointerUp: endComposerResize,
@@ -1606,17 +1654,7 @@ export function ChatRoomView({
           event.preventDefault();
           setComposerInputHeight(height => Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
-        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-        className: "lucide lucide-grip-horizontal",
-        "aria-hidden": "true"
-      }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "9", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "9", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "9", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "15", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "15", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "15", r: "1" }))),
+      }),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
         className: "chat-composer-meme-area",
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
@@ -1782,6 +1820,7 @@ export function ChatRoomView({
 
       /* Attached Images Preview (between Textarea and Action Row) */
       chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        className: "chat-composer-photos",
         style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
       }, chatImages.map((img, index) => /*#__PURE__*/React.createElement("div", {
         key: index,
@@ -1802,6 +1841,7 @@ export function ChatRoomView({
       })))) : null,
 
       chatFileAttachments && chatFileAttachments.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        className: "chat-composer-files",
         style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px', width: '100%' }
       }, chatFileAttachments.map((file, index) => /*#__PURE__*/React.createElement("div", {
         key: file.id || index,
@@ -1863,8 +1903,10 @@ export function ChatRoomView({
           /* Emoji Button */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
+            onMouseDown: e => e.preventDefault(),
             onClick: () => setIsEmojiPickerOpen(true),
             title: "이모티콘",
+            "aria-label": "이모티콘",
             style: {
               width: '32px',
               height: '32px',
@@ -1884,8 +1926,8 @@ export function ChatRoomView({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: () => docFileInputRefChat.current && docFileInputRefChat.current.click(),
-            title: "파일 업로드",
-            "aria-label": "파일 업로드",
+            title: "사진 또는 파일 첨부",
+            "aria-label": "사진 또는 파일 첨부",
             style: {
               width: '32px',
               height: '32px',
@@ -1915,57 +1957,12 @@ export function ChatRoomView({
             d: "m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"
           }))),
 
-          /* Keyboard show/hide toggle: blur the composer textarea to dismiss the OS virtual
-             keyboard without losing the draft, or refocus it to bring the keyboard back --
-             called from a click handler so the refocus still counts as a user gesture. */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => {
-              const el = chatTextareaRef.current;
-              if (!el) return;
-              if (isInputFocused) el.blur();
-              else el.focus();
-            },
-            title: isInputFocused ? "키보드 숨기기" : "키보드 보이기",
-            "aria-label": isInputFocused ? "키보드 숨기기" : "키보드 보이기",
-            style: {
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              border: '1px solid var(--border-subtle)',
-              backgroundColor: 'var(--bg-card)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              padding: 0,
-              color: 'var(--text-muted)'
-            }
-          }, /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg",
-            width: "18",
-            height: "18",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round"
-          },
-            /*#__PURE__*/React.createElement("rect", { x: "2", y: "6", width: "20", height: "13", rx: "2" }),
-            /*#__PURE__*/React.createElement("line", { x1: "6", y1: "10", x2: "6", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "10", y1: "10", x2: "10", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "14", y1: "10", x2: "14", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "18", y1: "10", x2: "18", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "8", y1: "15", x2: "16", y2: "15" })
-          )),
-
           /* Clipboard Paste Button (mobile has no Ctrl+V, so this reads the OS clipboard directly) */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: handleClickPasteImagesChat,
             title: "붙여넣기",
+            "aria-label": "붙여넣기",
             style: {
               width: '32px',
               height: '32px',
@@ -1998,6 +1995,8 @@ export function ChatRoomView({
             disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0 && !(chatFileAttachments && chatFileAttachments.length)),
             onPointerDown: handleSendPointerDown,
             onClick: handleSendClick,
+            "aria-label": "전송",
+            title: "전송",
             style: {
               height: '32px',
               padding: '0 16px',
@@ -2180,7 +2179,15 @@ export function ChatRoomView({
       onMenu: () => setIsChatSideMenuOpen(true),
       onSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
       onOpenGallery,
+      onOpenNotice: () => {
+        if (pinnedNotices.length > 0) setNoticePanelMode('list');
+        else {
+          setNoticeInput('');
+          setNoticePanelMode('add');
+        }
+      },
       isSearchOpen,
+      viewportBottom,
       slots: {},
     });
   }

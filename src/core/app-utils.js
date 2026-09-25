@@ -470,9 +470,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   }
 
   function getPlaceCategoryLabel(category) {
-    const name = sanitizeTextValue(category?.name || '기타', 24) || '기타';
-    const icon = getPlaceCategoryIcon(category);
-    return icon ? icon + '\u00a0\u00a0' + name : name;
+    return sanitizeTextValue(category?.name || '기타', 24) || '기타';
   }
 
 

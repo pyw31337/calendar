@@ -257,20 +257,32 @@ async function checkManifests(browser, baseUrl) {
 
 async function checkRenewalShellRoutes(browser, baseUrl) {
   const routes = [
-    ['', '캘린더'], ['&tab=chat', '대화'], ['&tab=records', '기록'],
+    ['', '캘린더'], ['&tab=chat', '대화'],
     ['&tab=memo', '메모'], ['&tab=places', '장소'],
     ['&tab=settlement', '정산'], ['&tab=more', '더보기']
   ];
-  // Chip-row subtabs keep role=tablist visible under 기록. memo/places are first-class
-  // ?tab= destinations (not records subs) and must not be clicked mid-loop — otherwise the
-  // next getByRole('tab') times out and the catch used to mislabel the failure as "V2 목적지".
-  const chipSubtabs = [['사진·영상', 'media'], ['보관함', 'archive'], ['콘텐츠', 'content']];
+  // Gallery / archive / content are destinations under ?tab=records&sub=.
+  // The old 기록 chip row (전체 / 사진·영상 / 보관함 / 콘텐츠) is hidden on those
+  // pages, and a bare ?tab=records hub is rewritten to the calendar so Back
+  // never stops on the overview. Assert that contract instead of clicking chips
+  // that are no longer rendered.
+  const recordDests = [
+    ['media', '갤러리'],
+    ['archive', '보관함'],
+    ['content', '컨텐츠'],
+  ];
   // Legacy ?tab=records&sub=memo|places bookmarks promote on load to tab=memo|places with sub cleared.
   const firstClassDests = [['places', '장소'], ['memo', '메모']];
   for (const viewport of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.hasTouch });
     const page = await context.newPage();
     try {
+      // Cutover check: the bare URL with no `shell` param must now render V2 by default
+      // (isRenewalShellEnabled: absent shell = V2, `?shell=v1` is the escape hatch).
+      await gotoBootReady(page, `${baseUrl}?id=cw`);
+      await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+      pass(`[${viewport.name}] 기본 URL(shell 파라미터 없음)도 V2 렌더`);
+
       for (const [suffix, label] of routes) {
         await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2${suffix}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
@@ -278,26 +290,29 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         if (overflow > 2) throw new Error(`가로 스크롤 ${overflow}px`);
         pass(`[${viewport.name}] V2 ${label}`);
       }
+
       await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
-      for (const [label, expected] of chipSubtabs) {
-        // Always land on 전체 first so the chip row is present even if a prior full-chrome
-        // navigation left it hidden.
-        const allTab = page.getByRole('tab', { name: '전체', exact: true });
-        if (await allTab.count()) {
-          await allTab.dispatchEvent('click');
-          await page.waitForTimeout(150);
-        } else {
-          await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
-        }
-        // The records panes intentionally overlap the tab strip while settling; dispatch the
-        // semantic click so this state-transition assertion is not dependent on hit-testing.
-        await page.getByRole('tab', { name: label, exact: true }).dispatchEvent('click');
-        // CI runners can spend a few seconds mounting the mobile records pane after the
-        // synthetic click. The route transition is the assertion; keep the timeout generous
-        // enough to avoid a false negative while still failing a genuinely broken navigation.
-        await page.waitForFunction(expectedSub => new URL(window.location.href).searchParams.get('sub') === expectedSub, expected, { timeout: 10000 });
+      await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+      const hub = new URL(page.url()).searchParams;
+      if (hub.get('tab') === 'records') {
+        throw new Error(`기록 허브가 남아 있음 sub=${hub.get('sub') || '(없음)'}`);
       }
-      pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
+      pass(`[${viewport.name}] V2 기록 허브는 캘린더로`);
+
+      for (const [sub, title] of recordDests) {
+        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${sub}`);
+        await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+        const params = new URL(page.url()).searchParams;
+        if (params.get('tab') !== 'records' || params.get('sub') !== sub) {
+          throw new Error(`${title} 진입 후 tab=${params.get('tab') || '(없음)'} sub=${params.get('sub') || '(없음)'}`);
+        }
+        await page.locator('.bp-header-title', { hasText: title }).first().waitFor({ state: 'visible', timeout: 10000 });
+        const tablistCount = await page.locator('.renewal-shell-subtab-row[role="tablist"]').count();
+        if (tablistCount !== 0) throw new Error(`${title}에서 기록 서브탭 행이 보이면 안 됨 (count=${tablistCount})`);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        if (overflow > 2) throw new Error(`${title} 가로 스크롤 ${overflow}px`);
+      }
+      pass(`[${viewport.name}] V2 갤러리/보관함/컨텐츠`);
 
       for (const [dest, label] of firstClassDests) {
         // Legacy bookmark URL — shell promotes to first-class tab and clears sub.
@@ -412,20 +427,22 @@ async function checkPhotoCommentIsolation(browser, baseUrl) {
 }
 
 async function checkDeferredManual(browser, baseUrl) {
-  const label = '사용자 매뉴얼 지연 chunk 로딩';
+  const label = '사용자 매뉴얼 메뉴 제거';
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
+    // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
+    await page.goto(`${baseUrl}?id=kkot&shell=v1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
     const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
     await menuButton.waitFor({ state: 'visible', timeout: 8000 });
     await menuButton.dispatchEvent('click');
     const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
     await menu.waitFor({ state: 'visible', timeout: 8000 });
-    await menu.locator('text=사용자 매뉴얼').first().click();
-    await page.locator('.manual-panel:visible').waitFor({ state: 'visible', timeout: 10000 });
-    pass(label);
+    const manualCount = await menu.locator('text=사용자 매뉴얼').count();
+    if (manualCount !== 0) fail(label, '사용자 매뉴얼 항목이 아직 사이드 메뉴에 있습니다.');
+    else pass(label);
   } catch (err) {
     fail(label, err.message);
   } finally {
@@ -438,7 +455,10 @@ async function checkMemoTagInput(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await gotoBootReady(page, `${baseUrl}?id=kkot&view=memo`);
+    // Cutover: default shell is now V2, whose extra chrome around the reused V1 memo
+    // composer makes the '닫기' button selector below match 2 elements instead of 1.
+    // shell=v1 keeps this check scoped to the legacy composer it was written against.
+    await gotoBootReady(page, `${baseUrl}?id=kkot&shell=v1&view=memo`);
     await page.getByText('새로운 메모를 남겨보세요...', { exact: true }).click();
 
     const participantButton = page.getByRole('button', { name: '작성자 선택' });
@@ -485,7 +505,9 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       else errors.push(err.message);
     });
     try {
-      await gotoBootReady(page, `${baseUrl}?id=kkot&view=settlement`);
+      // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
+      // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
+      await gotoBootReady(page, `${baseUrl}?id=kkot&shell=v1&view=settlement`);
 
       const editButton = page.locator('[data-settlement-edit-button="true"]').first();
       // Hosted runners may intentionally have no production settlement fixture. This is a
@@ -568,7 +590,9 @@ async function checkSideMenuNavigation(browser, baseUrl) {
         page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
         page.on('response', response => collectSameOriginAsset404(response, baseUrl, asset404s));
         try {
-          await gotoBootReady(page, `${baseUrl}?id=${calId}${suffix}`);
+          // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
+          // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
+          await gotoBootReady(page, `${baseUrl}?id=${calId}&shell=v1${suffix}`);
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
           // Mobile headers can still be settling after a view transition; dispatch the semantic

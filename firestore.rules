@@ -105,6 +105,10 @@ service cloud.firestore {
           // thumbUrls (see handleSaveImageTags in index.html) -- entered from the Lightbox's
           // image-info panel and searched from GlobalSearchModal.
           && (!('imageTags' in data) || (data.imageTags is list && data.imageTags.size() <= 50))
+          // imageTagMap is the durable asset-keyed counterpart to the legacy positional
+          // imageTags list. Keeping it bounded to the same maximum prevents tag associations
+          // from shifting when an earlier photo is deleted.
+          && (!('imageTagMap' in data) || (data.imageTagMap is map && data.imageTagMap.size() <= 50))
           // directMediaTags stores the same hashtag text for an image rendered from a pasted
           // URL in the chat text. New clients store it as a URL-hash keyed map so each direct
           // media item can have independent tags; legacy string values are still readable.
@@ -149,9 +153,10 @@ service cloud.firestore {
         );
       }
       function hasValidMessageMediaMetadataPatch() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'directMediaTags'])
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags'])
           && (!('imageShareUrls' in request.resource.data) || (request.resource.data.imageShareUrls is list && request.resource.data.imageShareUrls.size() <= 50))
           && (!('imageTags' in request.resource.data) || (request.resource.data.imageTags is list && request.resource.data.imageTags.size() <= 50))
+          && (!('imageTagMap' in request.resource.data) || (request.resource.data.imageTagMap is map && request.resource.data.imageTagMap.size() <= 50))
           && (!('directMediaTags' in request.resource.data) || (
             (request.resource.data.directMediaTags is string && request.resource.data.directMediaTags.size() <= 100)
             || (request.resource.data.directMediaTags is map && request.resource.data.directMediaTags.size() <= 50)
@@ -166,7 +171,7 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
           && request.resource.data.timestamp is number
@@ -178,7 +183,7 @@ service cloud.firestore {
           && hasValidReplyTo(request.resource.data)
           && hasValidFileAttachments(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
           && (
             hasValidMessageMediaMetadataPatch()
             || (
@@ -288,6 +293,7 @@ service cloud.firestore {
           && (!('imageUrls' in data) || (data.imageUrls is list && data.imageUrls.size() <= 50))
           && (!('thumbUrls' in data) || (data.thumbUrls is list && data.thumbUrls.size() <= 50))
           && (!('tags' in data) || (data.tags is list && data.tags.size() <= 50))
+          && (!('imageTagMap' in data) || (data.imageTagMap is map && data.imageTagMap.size() <= 50))
           && (!('comments' in data) || (data.comments is list && data.comments.size() <= 200))
           // Denormalized copy of the newest comment's createdAt (see 최근 활동 / RECENT_MEMO_ACTIVITY_WINDOW_MS
           // in ui-memo-view.js) so a memo with fresh activity can be queried without loading its

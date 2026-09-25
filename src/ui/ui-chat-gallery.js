@@ -3,6 +3,7 @@
  */
 
 import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -91,7 +92,7 @@ function getDirectMediaTagsForUrl(...args) {
 // external image links (see DirectChatMediaText's multi-image grid in ui-remaining.js) needs every
 // one of them to show up here too, not just the first, the same way a real multi-image upload
 // already does via getMessageImageEntries.
-function getAllDirectMediaImageEntries(msgLike) {
+function _getAllDirectMediaImageEntries(msgLike) {
   if (!msgLike?.text) return [];
   const declaredSource = String(msgLike?.uploadSource || '').trim().toLowerCase();
   const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
@@ -450,6 +451,16 @@ export function ChatGalleryModal({
       body.style.overflow = previousBodyOverflow;
     };
   }, [asPage]);
+  const [_v2GallerySlotTick, setV2GallerySlotTick] = React.useState(0);
+  React.useEffect(() => {
+    if (v2Embed && typeof document !== 'undefined') {
+      const el = document.getElementById('v2-gallery-header-tabs-slot');
+      if (el) setV2GallerySlotTick(t => t + 1);
+    }
+  }, [v2Embed]);
+  const v2GalleryTabsSlot = v2Embed && typeof document !== 'undefined'
+    ? document.getElementById('v2-gallery-header-tabs-slot')
+    : null;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
@@ -503,7 +514,6 @@ export function ChatGalleryModal({
   const DocumentLightbox = __comp.DocumentLightbox || __deps.DocumentLightbox;
   const collectChatFileAttachmentsFromMessages = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages);
         const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
     const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -652,15 +662,14 @@ export function ChatGalleryModal({
     // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
     // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
     // preview live the same way a fresh link normally would. Recognized image links are excluded
-    // here -- those belong to the 사진 tab only (see sharedPhotos below), not duplicated as a
-    // generic link card here too.
+    // In the gallery, all shared URLs belong to the 링크 tab.
     const list = [];
     const seen = new Set();
     (chatMessages || []).forEach(msg => {
       if (!msg.text) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(msg.text).forEach(info => {
-        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        if (!info.url || seen.has(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
         firstUrlSeen = true;
@@ -672,7 +681,7 @@ export function ChatGalleryModal({
       if (!body || isTombstone(memo)) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(body).forEach(info => {
-        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        if (!info.url || seen.has(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '', text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
         firstUrlSeen = true;
@@ -682,7 +691,7 @@ export function ChatGalleryModal({
       const body = [meeting?.note, meeting?.memo, meeting?.description, meeting?.text].filter(Boolean).join('\n');
       if (!body) return;
       extractAllUrlInfosLoose(body).forEach(info => {
-        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        if (!info.url || seen.has(info.url)) return;
         seen.add(info.url);
         list.push({
           url: info.url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
@@ -704,11 +713,10 @@ export function ChatGalleryModal({
           if (source === 'anniversary') return false;
           return !String(photo.sourceOwner || '').startsWith('anniversary:');
         })
-        // Meme keyboard stickers: same exclusion as composeGalleryPhotos below, but this branch
-        // reads the server-maintained photoIndex directly instead of going through it, so it
-        // needs its own check (see isMemeKeyboardPhotoEntry's comment for why uploadSource alone
-        // isn't reliable here).
+        // Meme keyboard stickers
         .filter(photo => !isMemeKeyboardPhotoEntry(photo))
+        // Photos tab must only contain real photos, not link URLs
+        .filter(photo => !photo.directMediaUrl)
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)
@@ -722,22 +730,49 @@ export function ChatGalleryModal({
             const match = owner.match(/^memo:([^:]+):/);
             if (match) messageId = match[1];
           }
-          // Client cannot write photoIndex. CF denorm can lag empty OR partial (e.g. only
-          // #260908 while message.imageTags still has the full save). Session sticky (verified
-          // save this tab) wins over stale in-memory imageTags (unpatched galleryLive) and
-          // empty/partial photoIndex; then the richer of local message/memo/meeting tags + index.
+          // Client cannot write photoIndex. CF denorm can lag, so the source document's
+          // asset-keyed tag state wins.  Do not combine it with a tag from a duplicate photo:
+          // deletion/dedup must never make another photo's tag appear here.
           const indexTags = String(photo.tags || '');
           let localTags = null;
+          let localTagsAreAuthoritative = false;
+          const getAssetMappedTags = row => {
+            const map = row?.imageTagMap;
+            const assetKey = String(photo?.assetKey || getPhotoAssetCommentKey(photo) || '');
+            if (map && typeof map === 'object' && !Array.isArray(map) && assetKey
+              && Object.prototype.hasOwnProperty.call(map, assetKey)) {
+              return { tags: String(map[assetKey] || ''), authoritative: true };
+            }
+            return null;
+          };
           if (messageId) {
             if (source === 'memo') {
               const memo = (memos || []).find(row => row && row.id === messageId);
-              if (memo && Array.isArray(memo.imageTags)) localTags = String(memo.imageTags[imageIndex] || '');
+              if (memo) {
+                const mapped = getAssetMappedTags(memo);
+                if (mapped) {
+                  localTags = mapped.tags;
+                  localTagsAreAuthoritative = mapped.authoritative;
+                } else if (Array.isArray(memo.imageTags) && Object.prototype.hasOwnProperty.call(memo.imageTags, imageIndex)) {
+                  localTags = String(memo.imageTags[imageIndex] || '');
+                  localTagsAreAuthoritative = true;
+                }
+              }
             } else if (photo.directMediaUrl) {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
               if (msg) localTags = String(getDirectMediaTagsForUrl(msg, photo.directMediaUrl) || '');
             } else {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
-              if (msg && Array.isArray(msg.imageTags)) localTags = String(msg.imageTags[imageIndex] || '');
+              if (msg) {
+                const mapped = getAssetMappedTags(msg);
+                if (mapped) {
+                  localTags = mapped.tags;
+                  localTagsAreAuthoritative = mapped.authoritative;
+                } else if (Array.isArray(msg.imageTags) && Object.prototype.hasOwnProperty.call(msg.imageTags, imageIndex)) {
+                  localTags = String(msg.imageTags[imageIndex] || '');
+                  localTagsAreAuthoritative = true;
+                }
+              }
             }
           }
           // Meeting album copies store durable tags on confirmedMeetings.photos[].tags. After
@@ -756,13 +791,10 @@ export function ChatGalleryModal({
                 }
                 return false;
               });
-              if (match && match.tags != null && String(match.tags)) {
-                localTags = localTags == null ? String(match.tags) : localTags;
-                // Prefer whichever local string is richer; resolveGalleryLightboxTags also merges
-                // against indexTags, but keep local itself non-empty when the meeting copy is.
-                const localCount = String(localTags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-                const meetingCount = String(match.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-                if (meetingCount > localCount) localTags = String(match.tags);
+              if (match && match.tags != null && !localTagsAreAuthoritative && localTags == null) {
+                // An album copy is a legacy fallback only.  Once the original message/memo
+                // owns an explicit map slot (including an empty slot), it must not be replaced.
+                localTags = String(match.tags || '');
                 break;
               }
             }
@@ -772,7 +804,7 @@ export function ChatGalleryModal({
             ...photo,
             messageId: messageId || photo.messageId,
             imageIndex
-          }, { localTags, indexTags });
+          }, { localTags, indexTags, localTagAuthoritative: localTagsAreAuthoritative });
           return {
             ...photo,
             source,
@@ -785,7 +817,7 @@ export function ChatGalleryModal({
     }
     const composed = composeGalleryPhotos({
       chatMessages, memos, calendar, isTombstone, getMessageImageEntries,
-      getAllDirectMediaImageEntries, getConfirmedMeetings, resolveMeetingPhotoDisplay,
+      getAllDirectMediaImageEntries: () => [], getConfirmedMeetings, resolveMeetingPhotoDisplay,
       isBrokenPhotoValue, getPhotoAssetCommentKey
     });
     const calendarId = calendar && calendar.id ? calendar.id : '';
@@ -845,6 +877,7 @@ export function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
   const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
+    if (photo.directMediaUrl) return false;
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
@@ -1150,7 +1183,8 @@ export function ChatGalleryModal({
     if (!pastePreview) return;
     const files = pastePreview.files;
     setPastePreview(null);
-    await uploadFiles(files);
+    const ok = await uploadFiles(files);
+    if (ok) setActiveTab('photos');
   };
   const handleCancelGatherPhotoPaste = () => setGatherPhotoPastePreview(null);
   const handleConfirmGatherPhotoPaste = async () => {
@@ -1389,15 +1423,58 @@ export function ChatGalleryModal({
     }
   };
   const uploadFiles = async files => {
-    if (!files.length || typeof onUploadImages !== 'function') return;
+    if (!files.length || typeof onUploadImages !== 'function') return false;
     setIsMenuOpen(false);
-    await Promise.resolve(onUploadImages(files));
-    setActiveTab('photos');
+    const result = await Promise.resolve(onUploadImages(files));
+    return result !== false;
   };
   const handleUploadChange = async event => {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
-    await uploadFiles(files);
+    if (!files.length) return;
+    const api = (typeof window !== 'undefined' && window.GATHER_CHAT_FILE_ATTACHMENTS) || {};
+    const classify = api.classifyChatComposerFiles;
+    if (typeof classify !== 'function') {
+      const ok = await uploadFiles(files);
+      if (ok) setActiveTab('photos');
+      return;
+    }
+    const { images, documents, rejected } = classify(files);
+    if (rejected && rejected.length && showToast) {
+      const videos = rejected.filter(item => item.reason === 'video').length;
+      const large = rejected.filter(item => item.reason === 'too-large').length;
+      const unsupported = rejected.filter(item => item.reason === 'unsupported').length;
+      const bits = [];
+      if (videos) bits.push('동영상은 올릴 수 없습니다');
+      if (large) bits.push('20MB를 넘는 파일은 제외했습니다');
+      if (unsupported) bits.push('지원하지 않는 형식은 제외했습니다');
+      if (bits.length) showToast(bits.join(' · '), 'info');
+    }
+    setIsMenuOpen(false);
+    let imageOk = false;
+    let fileOk = false;
+    if (images.length) imageOk = await uploadFiles(images);
+    if (documents.length && typeof api.uploadChatFileAttachments === 'function' && calendar && calendar.id && typeof onAddFiles === 'function') {
+      try {
+        const ready = await api.uploadChatFileAttachments(calendar.id, documents);
+        if (ready && ready.length) {
+          const saved = await onAddFiles(ready);
+          fileOk = saved !== false;
+          if (showToast && fileOk) {
+            showToast(saved === 'queued'
+              ? '네트워크가 불안정하여 파일을 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
+              : `파일 ${ready.length}개를 올렸습니다.`, saved === 'queued' ? 'info' : 'success');
+          }
+        }
+      } catch (err) {
+        console.error('gallery file upload failed', err);
+        if (showToast) showToast('파일 업로드에 실패했습니다.', 'error');
+      }
+    } else if (documents.length && showToast) {
+      showToast('파일 업로드를 사용할 수 없습니다.', 'error');
+    }
+    if (images.length && imageOk) setActiveTab('photos');
+    else if (fileOk) setActiveTab('files');
   };
 
   // 링크 tab's '추가'/'붙여넣기' -- unlike photos (uploaded as their own message), a "link" here
@@ -1422,8 +1499,9 @@ export function ChatGalleryModal({
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
       search: () => setIsSearchOpen(true),
-      uploadImage: () => { setActiveTab('photos'); handleUploadClick(); },
-      uploadFile: () => { setActiveTab('files'); handleUploadClick(); },
+      uploadMixed: () => handleUploadClick(),
+      uploadImage: () => handleUploadClick(),
+      uploadFile: () => handleUploadClick(),
       uploadLink: () => { setActiveTab('links'); setIsAddingLink(true); },
     });
     return () => onRegisterMenuActions(null);
@@ -1588,7 +1666,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelPastePreview
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
@@ -1630,7 +1708,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelGatherPhotoPaste
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
@@ -1680,7 +1758,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelGatherPhotosPaste
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -1723,7 +1801,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: () => setBulkShareResultUrl('')
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -1827,12 +1905,12 @@ export function ChatGalleryModal({
       ...commentIdentity,
       legacyKeys: [...(commentIdentity.legacyKeys || []), legacyMeetingKey].filter(Boolean)
     }, photoCommentCounts));
-    const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
+    const thumb = /*#__PURE__*/React.createElement(PhotoAssetThumb, {
       key: isBulkShareMode ? undefined : itemKey,
+      photo: photo,
+      isBroken: value => isBrokenPhotoValue(value),
       "data-photo-url": photo.full || photo.thumb,
       "data-message-id": photo.messageId || photo.sourceMessageId,
-      src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
-      fallbackSrc: (photo.full && String(photo.full)) || (photo.thumb && String(photo.thumb)) || '',
       alt: "공유사진",
       loading: "lazy",
       decoding: "async",
@@ -1840,7 +1918,7 @@ export function ChatGalleryModal({
       onClick: () => isBulkShareMode ? toggleBulkShareSelected(photoKey) : (setActiveLightbox && setActiveLightbox({
         urls: (lightboxItems || []).map(p => p.full),
         index: lightboxIndex >= 0 ? lightboxIndex : idx,
-        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys }))
+        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey }))
       })),
       onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {
@@ -2437,7 +2515,7 @@ export function ChatGalleryModal({
   /*#__PURE__*/React.createElement("input", {
     ref: uploadInputRef,
     type: "file",
-    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
+    accept: (typeof window !== 'undefined' && window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.CHAT_COMPOSER_ACCEPT) || "image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,application/pdf",
     multiple: true,
     onChange: handleUploadChange,
     style: { display: 'none' }
@@ -2562,51 +2640,40 @@ export function ChatGalleryModal({
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     } : { borderBottom: '1px solid var(--border-subtle)' },
     onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
-  }), asPage && !isMobile && /*#__PURE__*/React.createElement("div", {
-    className: "gallery-page-tabs",
-    style: {
-      display: 'flex', alignItems: 'center', padding: '0',
-      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
-      flexShrink: 0,
-      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
-      transition: 'transform 0.3s ease, top 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
+  }), (() => {
+    const tabsNode = asPage && /*#__PURE__*/React.createElement("div", {
+      className: isMobile ? "gallery-page-tabs-mobile" : "gallery-page-tabs",
+      style: {
+        display: 'flex', alignItems: 'center', padding: '0',
+        borderBottom: v2Embed ? 'none' : '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
+        flexShrink: 0,
+        width: '100%',
+        position: v2Embed ? 'relative' : 'fixed',
+        top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`,
+        left: v2Embed ? undefined : 0,
+        right: v2Embed ? undefined : 0,
+        zIndex: v2Embed ? 5 : 1009,
+        transition: v2Embed ? undefined : 'transform 0.3s ease, top 0.3s ease',
+        transform: v2Embed ? 'none' : (isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))')
+      }
+    },
+      UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+        ariaLabel: "갤러리 탭",
+        value: activeTab,
+        onChange: v => setGalleryTab(v),
+        style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
+        options: [
+          { value: 'photos', label: '사진', badge: displayPhotoTabCount },
+          { value: 'links', label: '링크', badge: filteredLinks.length },
+          { value: 'files', label: '파일', badge: filteredFiles.length }
+        ]
+      })
+    );
+    if (v2Embed && v2GalleryTabsSlot && window.ReactDOM?.createPortal) {
+      return window.ReactDOM.createPortal(tabsNode, v2GalleryTabsSlot);
     }
-  },
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "갤러리 탭",
-      value: activeTab,
-      onChange: v => setGalleryTab(v),
-      style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
-      options: [
-        { value: 'photos', label: '사진', badge: displayPhotoTabCount },
-        { value: 'links', label: '링크', badge: filteredLinks.length },
-        { value: 'files', label: '파일', badge: filteredFiles.length }
-      ]
-    })
-  ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
-    className: "gallery-page-tabs-mobile",
-    style: {
-      display: 'flex', alignItems: 'center', padding: '0',
-      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
-      flexShrink: 0,
-      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
-      transition: 'transform 0.3s ease, top 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
-    }
-  },
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "갤러리 탭",
-      value: activeTab,
-      onChange: v => setGalleryTab(v),
-      style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
-      options: [
-        { value: 'photos', label: '사진', badge: displayPhotoTabCount },
-        { value: 'links', label: '링크', badge: filteredLinks.length },
-        { value: 'files', label: '파일', badge: filteredFiles.length }
-      ]
-    })
-  ), /*#__PURE__*/React.createElement("div", {
+    return !v2Embed ? tabsNode : null;
+  })(), /*#__PURE__*/React.createElement("div", {
     ref: gridHostRef,
     className: asPage ? "gallery-page-scroll" : undefined,
     onScroll: asPage ? handleGalleryContentScroll : undefined,
@@ -2621,7 +2688,7 @@ export function ChatGalleryModal({
       padding: asPage
         ? (
             v2Embed
-              ? '12px 16px 16px 16px'
+              ? undefined
               : (
                   `calc(${(!isHeaderVisible
                     ? '12px'
@@ -2663,14 +2730,14 @@ export function ChatGalleryModal({
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerGalleryYear(y => y - 1)
-            }, "◀"),
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'left' })),
             /*#__PURE__*/React.createElement("span", {
               style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
             }, pickerGalleryYear, "년"),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerGalleryYear(y => y + 1)
-            }, "▶")
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'right' }))
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },

@@ -95,13 +95,58 @@ export function ResizableModalContainer({ className, style, children, ...props }
 
   const containerRef = React.useRef(null);
   const [dimensions, setDimensions] = React.useState(null); // { width, height }
+  const [moved, setMoved] = React.useState(null); // { left, top } after PC drag
   const isDraggingRef = React.useRef(false);
+  const dragModeRef = React.useRef(null); // 'se' | 'move' | 'resize-y'
   const startPosRef = React.useRef({ x: 0, y: 0 });
-  const startDimRef = React.useRef({ w: 0, h: 0 });
+  const startDimRef = React.useRef({ w: 0, h: 0, left: 0, top: 0 });
+
+  const isPcSheet = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches;
+
+  const getContainingBlockOffset = el => {
+    let parent = el ? (el.offsetParent || el.parentElement) : null;
+    while (parent && parent !== document.documentElement && parent !== document.body) {
+      const cs = window.getComputedStyle(parent);
+      if (
+        cs.transform !== 'none' ||
+        cs.perspective !== 'none' ||
+        cs.filter !== 'none' ||
+        cs.backdropFilter !== 'none' ||
+        cs.webkitBackdropFilter !== 'none' ||
+        cs.contain === 'paint' ||
+        cs.contain === 'strict' ||
+        cs.contain === 'layout'
+      ) {
+        const pRect = parent.getBoundingClientRect();
+        return { left: pRect.left, top: pRect.top };
+      }
+      parent = parent.parentElement;
+    }
+    return { left: 0, top: 0 };
+  };
+
+  const applyMovedStyle = (left, top) => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.style.setProperty('position', 'fixed', 'important');
+    el.style.setProperty('left', `${left}px`, 'important');
+    el.style.setProperty('top', `${top}px`, 'important');
+    el.style.setProperty('right', 'auto', 'important');
+    el.style.setProperty('bottom', 'auto', 'important');
+    el.style.setProperty('transform', 'none', 'important');
+    el.style.setProperty('margin', '0', 'important');
+  };
+  const applyHeightStyle = (height) => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.style.setProperty('height', `${height}px`, 'important');
+    el.style.setProperty('max-height', 'none', 'important');
+  };
 
   const handleMouseDown = e => {
     if (e.button !== 0) return; // Only left-click
     isDraggingRef.current = true;
+    dragModeRef.current = 'se';
     startPosRef.current = { x: e.clientX, y: e.clientY };
     const rect = containerRef.current.getBoundingClientRect();
     startDimRef.current = { w: rect.width, h: rect.height };
@@ -122,6 +167,15 @@ export function ResizableModalContainer({ className, style, children, ...props }
     if (!isDraggingRef.current) return;
     const deltaX = e.clientX - startPosRef.current.x;
     const deltaY = e.clientY - startPosRef.current.y;
+    if (dragModeRef.current === 'move') {
+      applyMovedStyle(startDimRef.current.left + deltaX, startDimRef.current.top + deltaY);
+      return;
+    }
+    if (dragModeRef.current === 'resize-y') {
+      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      applyHeightStyle(nextH);
+      return;
+    }
     setDimensions({
       width: Math.max(280, startDimRef.current.w + deltaX),
       height: Math.max(150, startDimRef.current.h + deltaY)
@@ -133,6 +187,15 @@ export function ResizableModalContainer({ className, style, children, ...props }
     if (e.cancelable) e.preventDefault();
     const deltaX = e.touches[0].clientX - startPosRef.current.x;
     const deltaY = e.touches[0].clientY - startPosRef.current.y;
+    if (dragModeRef.current === 'move') {
+      applyMovedStyle(startDimRef.current.left + deltaX, startDimRef.current.top + deltaY);
+      return;
+    }
+    if (dragModeRef.current === 'resize-y') {
+      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      applyHeightStyle(nextH);
+      return;
+    }
     setDimensions({
       width: Math.max(280, startDimRef.current.w + deltaX),
       height: Math.max(150, startDimRef.current.h + deltaY)
@@ -140,7 +203,19 @@ export function ResizableModalContainer({ className, style, children, ...props }
   };
 
   const handleMouseUp = () => {
+    if (dragModeRef.current === 'move' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const cb = getContainingBlockOffset(containerRef.current);
+      setMoved({ left: rect.left - cb.left, top: rect.top - cb.top });
+    }
+    if (dragModeRef.current === 'resize-y' && containerRef.current) {
+      setDimensions(prev => ({
+        width: (prev && prev.width) || containerRef.current.getBoundingClientRect().width,
+        height: containerRef.current.getBoundingClientRect().height
+      }));
+    }
     isDraggingRef.current = false;
+    dragModeRef.current = null;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
     const blockClick = ev => {
@@ -153,7 +228,19 @@ export function ResizableModalContainer({ className, style, children, ...props }
   };
 
   const handleTouchEnd = () => {
+    if (dragModeRef.current === 'move' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const cb = getContainingBlockOffset(containerRef.current);
+      setMoved({ left: rect.left - cb.left, top: rect.top - cb.top });
+    }
+    if (dragModeRef.current === 'resize-y' && containerRef.current) {
+      setDimensions(prev => ({
+        width: (prev && prev.width) || containerRef.current.getBoundingClientRect().width,
+        height: containerRef.current.getBoundingClientRect().height
+      }));
+    }
     isDraggingRef.current = false;
+    dragModeRef.current = null;
     document.removeEventListener('touchmove', handleTouchMove);
     document.removeEventListener('touchend', handleTouchEnd);
     const blockClick = ev => {
@@ -164,6 +251,56 @@ export function ResizableModalContainer({ className, style, children, ...props }
     document.addEventListener('click', blockClick, true);
     setTimeout(() => document.removeEventListener('click', blockClick, true), 0);
   };
+
+  const startHandleDrag = (clientX, clientY) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cb = getContainingBlockOffset(el);
+    const initialLeft = rect.left - cb.left;
+    const initialTop = rect.top - cb.top;
+    isDraggingRef.current = true;
+    startPosRef.current = { x: clientX, y: clientY };
+    startDimRef.current = { w: rect.width, h: rect.height, left: initialLeft, top: initialTop };
+    if (isPcSheet()) {
+      dragModeRef.current = 'move';
+      applyMovedStyle(initialLeft, initialTop);
+    } else {
+      dragModeRef.current = 'resize-y';
+    }
+  };
+  const onHandleMouseDown = e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startHandleDrag(e.clientX, e.clientY);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+  const onHandleTouchStart = e => {
+    e.stopPropagation();
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    startHandleDrag(t.clientX, t.clientY);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
+  React.useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return undefined;
+    const handles = root.querySelectorAll('.bp-sheet-handle, .v2-modal-drag-handle');
+    handles.forEach(handle => {
+      handle.addEventListener('mousedown', onHandleMouseDown);
+      handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+    });
+    return () => {
+      handles.forEach(handle => {
+        handle.removeEventListener('mousedown', onHandleMouseDown);
+        handle.removeEventListener('touchstart', onHandleTouchStart);
+      });
+    };
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -185,7 +322,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
       const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
       const maxPx = Math.max(180, Math.floor(isAdminSettings
-        ? Math.min(720, vvH - reserved)
+        ? Math.max(180, vvH - 8)
         : isMemoEdit
           ? Math.min(780, vvH - reserved)
         : Math.min(860, vvH - reserved)));
@@ -212,16 +349,29 @@ export function ResizableModalContainer({ className, style, children, ...props }
 
   const mergedStyle = {
     ...style,
-    position: 'relative',
+    position: moved ? 'fixed' : 'relative',
+    ...(moved ? { left: `${moved.left}px`, top: `${moved.top}px`, right: 'auto', bottom: 'auto', margin: 0, transform: 'none' } : {}),
     ...(dimensions ? { width: `${dimensions.width}px`, height: `${dimensions.height}px`, maxWidth: 'none', maxHeight: 'none' } : {})
   };
 
+  const hasOwnHandle = React.Children.toArray(children).some(child =>
+    child && child.props && typeof child.props.className === 'string' && child.props.className.includes('bp-sheet-handle')
+  );
+
   return /*#__PURE__*/React.createElement("div", {
     ref: containerRef,
-    className: className || "modal-container",
+    // Every resizable modal opts into the shared V2 responsive overlay module.
+    // The class is inert in the legacy shell and lets the V2 stylesheet provide
+    // one predictable PC-center/mobile-bottom-sheet contract without rewriting
+    // each modal implementation.
+    className: ["modal-container", "v2-responsive-modal", moved ? "is-sheet-moved" : "", className].filter(Boolean).join(" "),
     style: mergedStyle,
     ...props
   },
+    hasOwnHandle ? null : /*#__PURE__*/React.createElement("div", {
+      className: "bp-sheet-handle v2-modal-drag-handle",
+      "aria-hidden": true
+    }),
     children,
     /* Resize handle at bottom right */
     /*#__PURE__*/React.createElement("div", {
@@ -378,13 +528,12 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
   );
 }
 
-export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#7C3AED', variant = null }) {
+export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = 'var(--v2-primary, #7C3AED)', variant = null }) {
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
   // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
-  // horizontal padding so the active 2px underline can land on the container's bottom hairline
-  // (marginBottom: -1px below). Callers that nest tabs inside a padded header should move the
-  // padding onto the title row (or pass negative horizontal margins) so the bar stays full-bleed.
+  // horizontal padding. The active 2px underline stays inside the tab (margin 0) so it rests
+  // on top of the container hairline instead of hanging below it.
   const isFlush = variant === 'flush';
   return /*#__PURE__*/React.createElement('div', {
     className: `underline-tabs${isFlush ? ' underline-tabs--flush' : ''}${className ? ' ' + className : ''}`,
@@ -431,7 +580,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
         alignItems: 'center',
         justifyContent: 'center',
         gap: '6px',
-        marginBottom: '-1px',
+        marginBottom: '0',
         minWidth: 0
       }
     },
@@ -584,6 +733,7 @@ export function SegmentedToggle({ options, value, onChange, disabled, style, ari
   const safeOptions = Array.isArray(options) ? options : [];
   return /*#__PURE__*/React.createElement("div", {
     role: "tablist",
+    className: "segmented-toggle",
     "aria-label": ariaLabel,
     style: {
       display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
@@ -847,7 +997,7 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
       className: "modal-overlay",
       style: { zIndex: 12000, display: 'flex', alignItems: 'center', justifyContent: 'center' }
     },
-      /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
         className: "modal-container",
         style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       },
@@ -1345,8 +1495,14 @@ export function ToggleSwitch({ checked, onChange, label }) {
     "aria-checked": checked,
     "aria-label": label,
     onClick: onChange,
+    // The track is exactly the 20px knob + 2px on each side. Generic touch-target rules
+    // (e.g. `.modal-body button { min-height: 36px }`) stretched it into an oval on phones, so
+    // the size is pinned here and in the .toggle-switch CSS guard.
+    className: "toggle-switch",
     style: {
-      width: '44px', height: '24px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+      width: '44px', height: '24px', minHeight: '24px', maxHeight: '24px', minWidth: '44px',
+      boxSizing: 'border-box', lineHeight: 0, alignSelf: 'center', WebkitAppearance: 'none', appearance: 'none',
+      borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
       backgroundColor: checked ? 'var(--accent-primary)' : '#CBD5E1',
       position: 'relative', transition: 'background-color 0.2s ease', padding: 0, flexShrink: 0
     }

@@ -512,13 +512,17 @@ export function AdminModal({
     () => [...getCalendarActivityLogs(calendar)].sort((a, b) => b.timestamp - a.timestamp),
     [calendar.activityLogs]
   );
+  const recoveryTimelineLogs = React.useMemo(
+    () => activityLogsSorted.filter(log => !String(log.action || '').includes('tag')),
+    [activityLogsSorted]
+  );
 
   if (!calendar || !calendar.id) {
     return /*#__PURE__*/React.createElement("div", {
       className: "modal-overlay",
       onClick: onClose,
       style: { zIndex: 10000 }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container confirm-dialog-modal",
       style: { maxWidth: '360px', padding: '20px' }
     }, /*#__PURE__*/React.createElement("p", { style: { margin: 0 } }, "캘린더 데이터를 불러오는 중입니다."),
@@ -532,7 +536,7 @@ export function AdminModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container admin-settings-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'min(90vh, 720px)', maxHeight: 'min(720px, calc(100svh - 24px), calc(100vh - 24px))', borderRadius: 'var(--radius-md)', overflow: 'hidden' }
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'auto', maxHeight: 'calc(100dvh - 8px)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
@@ -603,9 +607,8 @@ export function AdminModal({
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(LogIcon, null)), "로그")
     ),
 
-    /* Modal Scrollable Body -- single scroll container shared by every tab, flush against the
-       modal's edges (no padding here) so the scrollbar always sits on the true boundary; each
-       tab's own content wrapper below carries the visible 16px padding instead. */
+    /* Modal Scrollable Body -- one scroll container. Tab wrappers stay flush (no extra
+       padding/card chrome) so the sheet can grow with the content up to the viewport. */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-body",
       style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0px' }
@@ -616,11 +619,11 @@ export function AdminModal({
       activeTab === 'settings' && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Grid split: Left is Calendar settings, Right is Poll management */
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', gap: '20px', flexDirection: 'column', padding: '16px' }
+          style: { display: 'flex', gap: '20px', flexDirection: 'column', padding: 0 }
         },
           /* Section 1: Calendar Profile & Participants */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
+            style: { backgroundColor: 'transparent' }
           },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "프로필 설정"),
 
@@ -719,11 +722,11 @@ export function AdminModal({
       /* TAB: POLL MANAGEMENT                       */
       /* ========================================== */
       activeTab === 'polls' && /*#__PURE__*/React.createElement("div", {
-        style: { padding: '16px' }
+        style: { padding: 0 }
       },
         /* Polls Creation & List */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
+          style: { backgroundColor: 'transparent' }
         },
           /* Header */
           /*#__PURE__*/React.createElement("div", {
@@ -781,7 +784,7 @@ export function AdminModal({
       /* TAB 3: POINT-IN-TIME LOG RECOVERY         */
       /* ========================================== */
       activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", {
-        style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+        style: { padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }
       },
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
@@ -840,16 +843,16 @@ export function AdminModal({
 
         /* Log Timeline for Point-in-Time Rollback */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
+          style: { backgroundColor: 'transparent', display: 'flex', flexDirection: 'column' }
         },
           /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "시점 복구 타임라인"),
 
           /* Timeline scroll container */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '360px', paddingRight: '4px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }
           },
-            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
-            activityLogsSorted.map(log => {
+            recoveryTimelineLogs.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
+            recoveryTimelineLogs.map(log => {
               const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
               const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
               const p = resolveParticipant(log, participantsMap);
@@ -865,14 +868,14 @@ export function AdminModal({
               }[log.action] || '활동';
 
               const actionBadgeColor = {
-                create: 'var(--status-green)', update: '#2563EB', delete: '#EF4444',
+                create: '#16A34A', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316',
                 expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
                 tag_add: '#6366F1', tag_remove: '#DC2626',
                 meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444',
                 memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444',
-                place_create: 'var(--status-green)', place_update: '#2563EB', place_delete: '#EF4444'
-              }[log.action] || 'var(--text-muted)';
+                place_create: '#16A34A', place_update: '#2563EB', place_delete: '#EF4444'
+              }[log.action] || '#64748B';
               const actionBadgeBg = `${actionBadgeColor}1F`;
 
               return /*#__PURE__*/React.createElement("div", {
@@ -885,10 +888,11 @@ export function AdminModal({
                 /*#__PURE__*/React.createElement("div", { className: "recent-log-left" },
                   /* Action Badge */
                   /*#__PURE__*/React.createElement("span", {
+                    className: "recent-log-action-badge",
                     style: {
                       fontSize: 'var(--font-size-xs)', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
                       backgroundColor: actionBadgeBg, color: actionBadgeColor, border: `1px solid ${actionBadgeColor}30`,
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap', flexShrink: 0
                     }
                   }, actionLabel),
                   /* User */
@@ -926,7 +930,7 @@ export function AdminModal({
     /* TAB 4: CHAT/SCHEDULE ACTIVITY AUDIT LOG    */
     /* ========================================== */
     activeTab === 'logs' && /*#__PURE__*/React.createElement("div", {
-      style: { padding: '16px' }
+      style: { padding: 0 }
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '12px' }
@@ -939,7 +943,6 @@ export function AdminModal({
             { id: 'all', label: '전체' },
             { id: 'schedule', label: '일정' },
             { id: 'place', label: '장소' },
-            { id: 'tag', label: '사진태그' },
             { id: 'expense', label: '정산' },
             { id: 'poll', label: '투표' },
             { id: 'memo', label: '메모' }
@@ -988,11 +991,11 @@ export function AdminModal({
           const logs = buildActivityLogsFromAvailabilities(calendar || {});
 
           const filteredLogs = logs.filter(log => {
+            if (String(log.action || '').includes('tag')) return false;
             if (logCategoryFilter !== 'all') {
               const act = log.action || '';
               if (logCategoryFilter === 'schedule' && !['create', 'update', 'delete', 'meeting_confirm', 'meeting_cancel'].includes(act)) return false;
               if (logCategoryFilter === 'place' && !['place_create', 'place_update', 'place_delete'].includes(act)) return false;
-              if (logCategoryFilter === 'tag' && !['tag_add', 'tag_remove'].includes(act)) return false;
               if (logCategoryFilter === 'expense' && !['expense_create', 'expense_update', 'expense_delete'].includes(act)) return false;
               if (logCategoryFilter === 'poll' && !['poll_create', 'poll_vote', 'poll_cancel'].includes(act)) return false;
               if (logCategoryFilter === 'memo' && !['memo_create', 'memo_update', 'memo_delete'].includes(act)) return false;
@@ -1042,7 +1045,7 @@ export function AdminModal({
               style: { fontSize: 'var(--font-size-md)', color: '#475569' }
             }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
               className: "recent-log-note",
-              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontStyle: 'italic' }
+              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontStyle: 'normal' }
             }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
               className: "recent-log-right"
             }, /*#__PURE__*/React.createElement("span", {
@@ -1460,10 +1463,10 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '440px' }
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }
   },
-    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
-      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' } },
+    /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement(SearchIcon, null), "통합검색"
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -1471,7 +1474,7 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
         style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
-    /*#__PURE__*/React.createElement("div", { className: "modal-body" },
+    /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
       /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', margin: '0 0 10px' } },
         "모든 캘린더의 일정, 대화, 투표, 사진 태그를 한번에 검색합니다."
       ),

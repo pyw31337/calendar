@@ -14,16 +14,24 @@
 // prevents an older PWA shell from surviving a deployment.
 const BUILD_SHA = '__BUILD_SHA__';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
+// Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
+// (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
+// This cache outlives deploys (it is not BUILD_SHA scoped) so revisits, reloads and the iOS
+// home-screen app -- whose HTTP cache is evicted aggressively -- reuse the bytes instead of
+// downloading them again: faster screens and less Storage egress.
+const MEDIA_CACHE = 'moyeora-media-v1';
+const MEDIA_CACHE_MAX_ENTRIES = 800;
+const MEDIA_CACHE_MAX_BYTES_PER_ITEM = 8 * 1024 * 1024;
 const STATIC_ASSETS = [
   'favicon.ico',
   'manifest.json',
   'manifest-kkot.json',
   'manifest-cw.json',
   'manifest-jhair.json',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-512-maskable.png',
-  'icons/apple-touch-icon.png'
+  'icons/icon-v5-192.png',
+  'icons/icon-v5-512.png',
+  'icons/icon-v5-512-maskable.png',
+  'icons/icon-v5-apple-touch.png'
 ];
 
 self.addEventListener('install', event => {
@@ -40,7 +48,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(names => Promise.all(names.filter(name => name !== STATIC_CACHE).map(name => caches.delete(name))))
+      .then(names => Promise.all(names.filter(name => name !== STATIC_CACHE && name !== MEDIA_CACHE).map(name => caches.delete(name))))
       .then(() => self.clients.claim())
   );
 });
@@ -74,6 +82,10 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(req.url);
+  if (isCacheableStorageMedia(req, url)) {
+    event.respondWith(serveStorageMedia(req));
+    return;
+  }
   const isStaticAsset = url.origin === self.location.origin && STATIC_ASSETS.some(asset => url.pathname.endsWith('/' + asset) || url.pathname.endsWith(asset));
   // Every file Vite emits into dist/assets/ is content-hashed (app-main-<hash>.js,
   // index-<hash>.js, vendor-react-dom-<hash>.js, ui-*-<hash>.js, index-<hash>.css, ...) -- a
@@ -85,6 +97,27 @@ self.addEventListener('fetch', event => {
   // 7 files under that prefix went uncached, so a reloaded offline PWA never actually booted.
   const isViteAsset = url.origin === self.location.origin && /\/assets\/[^/]+\.(?:js|css)$/.test(url.pathname);
   if (!isStaticAsset && !isViteAsset) return;
+
+  // The web app manifests decide the home-screen icon and name. Serving them cache-first meant
+  // "홈 화면에 추가" right after an icon change still installed the previous icon, so they are
+  // network-first and fall back to the cached copy only when offline.
+  if (/\/manifest(?:-[A-Za-z0-9_-]+)?\.json$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(req, { cache: 'no-store' });
+        if (res && res.ok) {
+          try {
+            const cache = await caches.open(STATIC_CACHE);
+            await cache.put(req, res.clone());
+          } catch (_) {}
+        }
+        return res;
+      } catch (e) {
+        return (await caches.match(req)) || Response.error();
+      }
+    })());
+    return;
+  }
 
   // Cache-first for the static set, with a background revalidation so an icon/manifest update
   // still reaches users on their next load rather than being stuck forever.
@@ -116,6 +149,58 @@ self.addEventListener('fetch', event => {
   })());
 });
 
+function isCacheableStorageMedia(req, url) {
+  // Range requests (video/audio seeking) stream partial content -- leave them to the network.
+  if (req.headers.has('range')) return false;
+  if (req.destination === 'video' || req.destination === 'audio') return false;
+  if (url.hostname === 'firebasestorage.googleapis.com') {
+    return /\/v0\/b\/[^/]+\/o\/.+/.test(url.pathname) && url.searchParams.get('alt') === 'media';
+  }
+  return false;
+}
+
+let mediaPutsSinceTrim = 0;
+async function trimMediaCache() {
+  try {
+    const cache = await caches.open(MEDIA_CACHE);
+    const keys = await cache.keys();
+    const excess = keys.length - MEDIA_CACHE_MAX_ENTRIES;
+    // keys() is in insertion order, so the oldest entries go first.
+    for (let i = 0; i < excess; i += 1) await cache.delete(keys[i]);
+  } catch (_) {}
+}
+
+async function serveStorageMedia(req) {
+  let cache = null;
+  try {
+    cache = await caches.open(MEDIA_CACHE);
+    const hit = await cache.match(req.url);
+    if (hit) return hit;
+  } catch (_) {}
+  // <img> requests are no-cors (opaque, unmeasurable and padded in quota), so fetch the same
+  // URL in CORS mode -- Firebase Storage answers with Access-Control-Allow-Origin: * -- and
+  // store a real, size-checked response. If CORS fails for any reason, fall back to the
+  // browser's original request untouched.
+  let res;
+  try {
+    res = await fetch(req.url, { mode: 'cors', credentials: 'omit' });
+  } catch (_) {
+    return fetch(req);
+  }
+  if (res && res.ok && res.status === 200 && res.type !== 'opaque' && cache) {
+    const length = Number(res.headers.get('content-length') || 0);
+    if (!length || length <= MEDIA_CACHE_MAX_BYTES_PER_ITEM) {
+      const copy = res.clone();
+      cache.put(req.url, copy).then(() => {
+        mediaPutsSinceTrim += 1;
+        if (mediaPutsSinceTrim >= 25) { mediaPutsSinceTrim = 0; return trimMediaCache(); }
+        return undefined;
+      }).catch(() => {});
+    }
+  }
+  return res;
+}
+
 // Push/notificationclick handling. Real push messages are sent by the onMessageCreate Cloud
 // Function (functions/index.js), which holds the VAPID private key and calls web-push's
 // sendNotification on every new chat message -- that function must be deployed separately
@@ -135,8 +220,8 @@ self.addEventListener('push', event => {
   const title = payload.title || '모여라 캘린더';
   const options = {
     body: payload.body || '',
-    icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    icon: 'icons/icon-v5-192.png',
+    badge: 'icons/icon-v5-192.png',
     tag: payload.tag || 'gather-push',
     renotify: true,
     data: payload.url || './',

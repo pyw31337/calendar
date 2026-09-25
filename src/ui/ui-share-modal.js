@@ -95,20 +95,18 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     }, [shareUrl]);
 
     return React.createElement('div', {
-      // "share-modal-overlay"/"-container" are extra modifier classes (ResizableModalContainer/
-      // .modal-overlay are shared by ~15 other modals) so the v2 backdrop-sheet treatment below
-      // targets only the share modal, not every other .modal-overlay in the app.
-      className: 'modal-overlay share-modal-overlay',
+      className: 'modal-overlay',
       onClick: onClose,
       style: { zIndex: 11000 }
     }, React.createElement(ResizableModalContainer, {
-      className: 'modal-container share-modal-container',
+      className: 'modal-container',
+      style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
       onClick: function (e) { e.stopPropagation(); }
     }, React.createElement('div', {
       className: 'modal-header',
-      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     }, React.createElement('h3', {
-      style: { fontSize: '1.1rem', fontWeight: 800 }
+      style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }
     }, shareTitle), React.createElement('button', {
       onClick: onClose,
       style: {
@@ -116,7 +114,8 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
         cursor: 'pointer', display: 'flex', alignItems: 'center'
       }
     }, React.createElement(SmallXIcon, { size: 20 }))), React.createElement('div', {
-      className: 'modal-body'
+      className: 'modal-body',
+      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }
     }, React.createElement('label', {
       style: { fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--text-muted)' }
     }, shareLabel), React.createElement('input', {

@@ -2,7 +2,7 @@
  * Anniversary / Settlement / Poll modals (P4-18)
  */
 
-import { calculateSettlementRows } from '../core/settlement-calculator.js';
+import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
 import { preserveAnniversaryCurationFields } from '../core/gallery-data.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -83,6 +83,13 @@ function formatDateWithDayName(...args) {
 function formatRegisteredAt(...args) {
   const f = __gatherUiDeps().formatRegisteredAt || GATHER_APP_UTILS.formatRegisteredAt;
   return typeof f === 'function' ? f(...args) : undefined;
+}
+// "2026-09-20" -> "09.20(일)" for the settlement day headers.
+function formatSettlementDayLabel(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr || ''));
+  if (!m) return String(dateStr || '');
+  const day = ['일', '월', '화', '수', '목', '금', '토'][new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay()];
+  return `${m[2]}.${m[3]}(${day})`;
 }
 function formatShortDateWithDayName(...args) {
   const f = __gatherUiDeps().formatShortDateWithDayName || GATHER_APP_UTILS.formatShortDateWithDayName;
@@ -647,6 +654,7 @@ export function AnniversaryModal({
         if (editingId === ann.id) {
           setEditingId(null);
           setNewTitle('');
+          setActiveTab('list');
         }
       } catch (err) {
         console.error('Anniversary delete error:', err);
@@ -823,9 +831,10 @@ export function AnniversaryModal({
     /*#__PURE__*/React.createElement("div", {
       style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
     },
+      /* Delete sits inside the edit form (left of 취소/수정 완료), not beside the pencil. */
       /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
         onEdit: () => handleEditClick(ann),
-        onDelete: () => handleDeleteAnniversary(ann)
+        showDelete: false
       })
     )
   );
@@ -943,7 +952,7 @@ export function AnniversaryModal({
     /* Modal Scrollable Body */
 
       /* Modal Body */
-      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', maxHeight: '65vh', overflowY: 'auto' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', overflowY: 'auto' } },
         /* TAB 1: List */
         activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px' }
@@ -1324,14 +1333,42 @@ export function AnniversaryModal({
             )
           ),
 
-          /* Save Button */
-          /*#__PURE__*/React.createElement("button", {
+          /* Save Button -- while editing: (left) 삭제 · (right) 취소 / 수정 완료 */
+          editingId ? /*#__PURE__*/React.createElement("div", {
+            className: "item-edit-actions-row",
+            style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }
+          },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn item-edit-delete-btn",
+              disabled: isSavingAnniversary,
+              onClick: () => {
+                const ann = (anniversaries || []).find(a => a && a.id === editingId);
+                if (ann) handleDeleteAnniversary(ann);
+              },
+              style: { marginRight: 'auto', padding: '10px 12px', background: 'none', border: 'none', color: 'var(--status-red, #DC2626)', fontWeight: 700, fontSize: 'var(--font-size-md)' }
+            }, "삭제"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action-outline",
+              disabled: isSavingAnniversary,
+              onClick: () => { setEditingId(null); setNewTitle(''); setActiveTab('list'); },
+              style: { padding: '10px 14px', fontSize: 'var(--font-size-md)' }
+            }, "취소"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-primary",
+              onClick: handleSaveAnniversary,
+              disabled: isSavingAnniversary,
+              style: { justifyContent: 'center', padding: '10px 14px', fontSize: 'var(--font-size-md)' }
+            }, isSavingAnniversary ? "저장 중..." : "수정 완료")
+          ) : /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "btn btn-primary",
             onClick: handleSaveAnniversary,
             disabled: isSavingAnniversary,
             style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: 'var(--font-size-md)', marginTop: '6px' }
-          }, isSavingAnniversary ? "저장 중..." : (editingId ? "기념일 수정 완료" : "기념일 등록"))
+          }, isSavingAnniversary ? "저장 중..." : "기념일 등록")
         ),
 
         /* TAB 3: Bulk Repeating Schedule Register */
@@ -1452,21 +1489,22 @@ export function AnniversaryModal({
         onClick: overlayOnClick,
         style: { zIndex: 11000 }
       }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-        className: "modal-container",
-        style: { maxWidth: '440px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+        className: "modal-container anniversary-settings-modal",
+        style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
+          className: "modal-header",
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+            style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
           }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
           }, /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }), /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }), /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }), /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })), "기념일 & 반복 일정 설정"),
           /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: requestClose,
-            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+            type: "button", onClick: requestClose, className: "modal-close-btn", "aria-label": "닫기",
+            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', padding: '4px' }
           }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
         ),
         anniversaryPanelInner
@@ -2240,10 +2278,22 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const listBoxH = 74 + itemRowUnits * ROW_H;
     const H = HEADER_H + 34 + summaryBoxH + 20 + bankBoxH + 20 + listBoxH + 50;
 
+    // The downloaded card follows the app theme: the dark V2 theme is black with the lime
+    // accent (same as the settlement page's top card); light keeps the original palette.
+    const isDarkTheme = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+    const P = isDarkTheme ? {
+      bg: '#0B0B0C', header: '#C9FD58', headerSub: 'rgba(10,10,10,0.72)', headerText: '#0A0A0A', headerAmount: '#0A0A0A',
+      box: '#161616', boxLine: '#2C2C2C', rowLine: '#242424', muted: '#A3A3A3', faint: '#8A8A8A',
+      text: '#E5E5E5', strong: '#F5F5F5', doneFill: '#2C2C2C', doneText: '#8A8A8A', red: '#F87171', green: '#4ADE80', onRed: '#FFFFFF'
+    } : {
+      bg: '#F5F3FF', header: '#4F46E5', headerSub: 'rgba(255,255,255,0.85)', headerText: '#FFFFFF', headerAmount: '#F0ABFC',
+      box: '#FFFFFF', boxLine: '#E2E8F0', rowLine: '#F1F5F9', muted: '#64748B', faint: '#94A3B8',
+      text: '#334155', strong: '#0F172A', doneFill: '#E2E8F0', doneText: '#64748B', red: '#DC2626', green: '#16A34A', onRed: '#FFFFFF'
+    };
     canvas.width = W;
     canvas.height = H;
     const hLine = (x1, x2, yy) => {
-      ctx.strokeStyle = '#F1F5F9';
+      ctx.strokeStyle = P.rowLine;
       ctx.beginPath();
       ctx.moveTo(x1, yy);
       ctx.lineTo(x2, yy);
@@ -2260,20 +2310,20 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ctx.closePath();
     };
 
-    ctx.fillStyle = '#F5F3FF';
+    ctx.fillStyle = P.bg;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = '#4F46E5';
+    ctx.fillStyle = P.header;
     ctx.fillRect(0, 0, W, HEADER_H);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillStyle = P.headerSub;
     ctx.font = '700 16px sans-serif';
     ctx.fillText(cardToEdit?.status === 'closed' ? '마감된 정산' : '진행중인 정산', PAD, 50);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = P.headerText;
     ctx.font = '900 30px sans-serif';
     ctx.fillText(fitText(title || '1/N 간편 송금', W - PAD * 2), PAD, 96);
     ctx.font = '700 17px sans-serif';
     ctx.fillText('총 지출', PAD, HEADER_H - 30);
-    ctx.fillStyle = '#F0ABFC';
+    ctx.fillStyle = P.headerAmount;
     ctx.font = '900 30px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(`${totalExpense.toLocaleString()}원`, W - PAD, HEADER_H - 26);
@@ -2282,18 +2332,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     let y = HEADER_H + 34;
 
     // 기준 분담금
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = P.box;
     ctx.fillRect(PAD, y, W - PAD * 2, summaryBoxH);
-    ctx.strokeStyle = '#E2E8F0';
+    ctx.strokeStyle = P.boxLine;
     ctx.strokeRect(PAD, y, W - PAD * 2, summaryBoxH);
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = P.muted;
     ctx.font = '700 14px sans-serif';
     const summaryLabel = `기준 분담금: 약 ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명)`;
     ctx.fillText(fitText(summaryLabel, W - PAD * 2 - 40), PAD + 20, y + 32);
 
     let rowY = y + 56;
     if (participantRows.length === 0) {
-      ctx.fillStyle = '#94A3B8';
+      ctx.fillStyle = P.faint;
       ctx.font = '500 14px sans-serif';
       ctx.fillText('등록된 참여자가 없습니다.', PAD + 20, rowY);
     } else {
@@ -2306,8 +2356,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         // pending-status colors.
         const memoText = (row.memo || '').trim();
         const isDone = memoText.includes('완료');
-        const rowTextColor = isDone ? '#64748B' : '#334155';
-        const amountColor = isDone ? '#64748B' : (isRefund ? '#16A34A' : '#DC2626');
+        const rowTextColor = isDone ? P.doneText : P.text;
+        const amountColor = isDone ? P.doneText : (isRefund ? P.green : P.red);
         hLine(PAD + 20, W - PAD - 20, rowY - 22);
         ctx.fillStyle = rowTextColor;
         ctx.font = '600 15px sans-serif';
@@ -2324,18 +2374,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         const badgeY = rowY - badgeH + 4;
         pillPath(badgeX, badgeY, badgeW, badgeH);
         if (isDone) {
-          ctx.fillStyle = '#E2E8F0';
+          ctx.fillStyle = P.doneFill;
           ctx.fill();
-          ctx.fillStyle = '#64748B';
+          ctx.fillStyle = P.muted;
         } else if (isRefund) {
-          ctx.strokeStyle = '#16A34A';
+          ctx.strokeStyle = P.green;
           ctx.lineWidth = 1;
           ctx.stroke();
-          ctx.fillStyle = '#16A34A';
+          ctx.fillStyle = P.green;
         } else {
-          ctx.fillStyle = '#DC2626';
+          ctx.fillStyle = P.red;
           ctx.fill();
-          ctx.fillStyle = '#FFFFFF';
+          ctx.fillStyle = P.onRed;
         }
         ctx.fillText(badgeText, badgeX + badgePadX, badgeY + 13);
 
@@ -2351,20 +2401,20 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     y += summaryBoxH + 20;
 
     // 송금계좌 정보
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = P.box;
     ctx.fillRect(PAD, y, W - PAD * 2, bankBoxH);
-    ctx.strokeStyle = '#E2E8F0';
+    ctx.strokeStyle = P.boxLine;
     ctx.strokeRect(PAD, y, W - PAD * 2, bankBoxH);
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = P.muted;
     ctx.font = '700 14px sans-serif';
     ctx.fillText('송금계좌 정보', PAD + 20, y + 30);
-    ctx.fillStyle = '#0F172A';
+    ctx.fillStyle = P.strong;
     ctx.font = '800 18px sans-serif';
     const cardImageAccountNumber = isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber;
     const bankLabel = `${bankName === '기타' ? (otherBankName || '기타') : bankName} ${cardImageAccountNumber || '계좌번호 미입력'}`;
     ctx.fillText(fitText(bankLabel, W - PAD * 2 - 40), PAD + 20, y + 60);
     if (depositorName) {
-      ctx.fillStyle = '#64748B';
+      ctx.fillStyle = P.muted;
       ctx.font = '500 14px sans-serif';
       ctx.fillText(`예금주: ${depositorName}`, PAD + 20, y + 86);
     }
@@ -2372,27 +2422,27 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     y += bankBoxH + 20;
 
     // 정산목록
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = P.box;
     ctx.fillRect(PAD, y, W - PAD * 2, listBoxH);
-    ctx.strokeStyle = '#E2E8F0';
+    ctx.strokeStyle = P.boxLine;
     ctx.strokeRect(PAD, y, W - PAD * 2, listBoxH);
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = P.muted;
     ctx.font = '700 14px sans-serif';
     ctx.fillText(`정산목록 (${items.length}건)`, PAD + 20, y + 30);
 
     let listRowY = y + 56;
     if (items.length === 0) {
-      ctx.fillStyle = '#94A3B8';
+      ctx.fillStyle = P.faint;
       ctx.font = '500 14px sans-serif';
       ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
     } else {
       items.forEach((item, itemIndex) => {
         const lines = itemLines[itemIndex];
         hLine(PAD + 20, W - PAD - 20, listRowY - 22);
-        ctx.fillStyle = '#334155';
+        ctx.fillStyle = P.text;
         ctx.font = '500 14px sans-serif';
         lines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + lineIndex * ROW_H));
-        ctx.fillStyle = '#DC2626';
+        ctx.fillStyle = P.red;
         ctx.font = '800 15px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, listRowY);
@@ -2401,7 +2451,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       });
     }
 
-    ctx.fillStyle = '#94A3B8';
+    ctx.fillStyle = P.faint;
     ctx.font = '500 12px sans-serif';
     ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, PAD, H - 24);
 
@@ -2442,6 +2492,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     UnderlineTabs
       ? React.createElement(UnderlineTabs, {
           ariaLabel: '정산 수정 탭',
+          variant: 'flush',
+          activeColor: 'var(--brand, #7C2FE5)',
           value: activeTab,
           onChange: v => setActiveTab(v),
           options: [
@@ -2461,8 +2513,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             'aria-selected': activeTab === tab,
             onClick: () => setActiveTab(tab),
             style: {
-              height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid #2563EB' : '2px solid transparent',
-              background: 'transparent', color: activeTab === tab ? '#2563EB' : 'var(--text-muted)',
+              height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--brand, #7C2FE5)' : '2px solid transparent',
+              background: 'transparent', color: activeTab === tab ? 'var(--brand, #7C2FE5)' : 'var(--text-muted)',
               fontSize: 'var(--font-size-base)', fontWeight: 800, cursor: 'pointer'
             }
           }, tab === 'general' ? '일반' : '정산'))
@@ -2512,13 +2564,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 React.createElement('button', {
                   type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                   disabled: !participantToAdd,
-                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: '#F1F5F9' }
                 }, '수정')
               )
               : React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                 disabled: !participantToAdd,
-                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: '#F1F5F9' }
               }, '추가')
           )
         ),
@@ -2543,7 +2595,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             getIndividualSettlementAmount(row.participantId) !== 0 && React.createElement('span', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, `${getIndividualSettlementAmount(row.participantId) < 0 ? '+' : '-'}${Math.abs(getIndividualSettlementAmount(row.participantId)).toLocaleString()}원`),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
-              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
+              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid var(--v2-line, #CBD5E1)', flexShrink: 0 }
             }, React.createElement(PencilIcon, { size: 12 })),
             React.createElement('button', {
               type: 'button', title: '참여자 삭제', 'aria-label': '참여자 삭제', onClick: () => handleRemoveParticipantRow(row.id),
@@ -2710,9 +2762,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             )
           ),
           autoPersonalItems.length > 0 && React.createElement('div', {
+            className: 'settlement-auto-note',
             style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 'var(--radius-md)', padding: '6px 10px' }
           }, `일정의 정산 탭에서 지출자를 지정한 ${autoPersonalItems.length}건이 자동으로 반영되었습니다.`),
           unresolvedAutoPayers.length > 0 && React.createElement('div', {
+            className: 'settlement-auto-warn',
             style: { fontSize: 'var(--font-size-sm)', color: '#DC2626', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)', padding: '6px 10px' }
           }, `${unresolvedAutoPayers.join(', ')}이(가) 이 정산 카드의 참여자 목록(일반 탭)에 없어 정산 금액에 반영되지 않았습니다. 참여자로 추가해 주세요.`),
 
@@ -2725,6 +2779,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === option.value) || { name: option.value, color: option.color };
               return React.createElement('div', {
                 key: option.value,
+                className: 'settlement-personal-total-row',
                 style: {
                   width: '100%', minWidth: 0, minHeight: '36px', padding: '6px 10px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
                   backgroundColor: '#F8FAFC', border: 'none', boxSizing: 'border-box'
@@ -2746,11 +2801,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === item.participantId) || { name: item.participantId };
               return React.createElement('div', {
                 key: `auto_${item.itemKey}`,
+                className: 'settlement-auto-item',
                 title: '이 항목은 일정의 정산 탭에서 관리됩니다.',
                 style: {
                   padding: '10px 12px 11px', borderRadius: 'var(--radius-md)',
                   backgroundColor: '#F8FAFC',
-                  border: '1px dashed #CBD5E1',
+                  border: '1px dashed var(--v2-line, #CBD5E1)',
                   display: 'flex', flexDirection: 'column', gap: '5px'
                 }
               },
@@ -2873,13 +2929,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         React.createElement('button', { type: 'button', onClick: () => setIsSettlementCardPreviewOpen(false), style: { border: 0, background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' } }, '✕')
       )
     ),
-    React.createElement('div', { className: 'modal-body', style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'linear-gradient(145deg, #EEF2FF, #FDF2F8)' } },
-      React.createElement('div', { style: { padding: '16px', borderRadius: '14px', background: 'linear-gradient(135deg, #4F46E5, #DB2777)', color: '#FFFFFF', boxShadow: '0 8px 20px rgba(79,70,229,0.18)' } },
+    React.createElement('div', { className: 'modal-body settlement-card-preview-body', style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'linear-gradient(145deg, #EEF2FF, #FDF2F8)' } },
+      React.createElement('div', { className: 'settlement-card-preview-hero', style: { padding: '16px', borderRadius: '14px', background: 'linear-gradient(135deg, #4F46E5, #DB2777)', color: '#FFFFFF', boxShadow: '0 8px 20px rgba(79,70,229,0.18)' } },
         React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', opacity: 0.82, marginBottom: '4px' } }, cardToEdit?.status === 'closed' ? '마감된 정산' : '진행중인 정산'),
         React.createElement('div', { style: { fontSize: '1.08rem', fontWeight: 900, marginBottom: '12px' } }, title || '1/N 간편 송금'),
         React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: '8px' } },
           React.createElement('span', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700 } }, '총 지출'),
-          React.createElement('strong', { style: { fontSize: '1.25rem', color: '#F0ABFC' } }, `${totalExpense.toLocaleString()}원`)
+          React.createElement('strong', { className: 'settlement-card-preview-total', style: { fontSize: '1.25rem', color: '#F0ABFC' } }, `${totalExpense.toLocaleString()}원`)
         )
       ),
       React.createElement('div', { style: { padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
@@ -2997,7 +3053,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge || (function () { return null; });
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar || (({ value, onChange, placeholder, trailing }) => /*#__PURE__*/React.createElement("div", { className: "inline-search-bar", style: { position: 'fixed', top: 'calc(56px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 1008, minHeight: '48px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' } }, /*#__PURE__*/React.createElement("input", { autoFocus: true, type: "text", value: value, onChange: onChange, placeholder: placeholder, style: { flex: 1, height: '36px', border: 'none', outline: 'none', borderRadius: 'var(--radius-full)', padding: '0 12px', background: 'var(--bg-primary)', color: 'var(--text-main)' } }), trailing));
   const SearchIcon = ({ size = 20 }) => /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }));
-  const CreateSettlementModalComp = __comp.CreateSettlementModal || CreateSettlementModal;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const [isSettlementListOpen, setIsSettlementListOpen] = React.useState(false);
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
@@ -3132,35 +3187,79 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     const items = meetingMatches ? row.items : row.items.filter(item => [item.label, item.category?.name, item.category?.id, item.url].filter(Boolean).join(' ').toLowerCase().includes(settlementSearchNeedle));
     return { ...row, items, expenseTotal: items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0), incomeTotal: items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0) };
   };
-    const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
+  // One item builder for both the ledger that is shown and the running balance behind it, so
+  // 잔액 always follows the exact on-screen order (saved `order`, then createdAt; carry-over last).
+  // The running balance used to be computed over an unsorted copy, so rows a user had reordered
+  // showed balances belonging to a different sequence.
+  const buildSettlementItems = meeting => orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
+    // Keep each entry's raw array position: CreateSettlementModal keys saved selections by it.
+    .map((expense, rawIndex) => ({ expense, rawIndex }))
+    .filter(({ expense }) => expense && !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+    .sort((a, b) => {
+      const aOrder = Number.isFinite(Number(a.expense.order)) ? Number(a.expense.order) : Number.POSITIVE_INFINITY;
+      const bOrder = Number.isFinite(Number(b.expense.order)) ? Number(b.expense.order) : Number.POSITIVE_INFINITY;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.expense.createdAt || 0) - (b.expense.createdAt || 0);
+    })
+    .map(({ expense, rawIndex }) => {
+      const amount = Number(expense.amount || 0);
+      const isIncome = isExpenseIncomeEntry(expense);
+      return {
+        ...expense,
+        amount,
+        isIncome,
+        category: getExpenseCategory(calendar, expense.categoryId),
+        label: getExpenseLabel(expense) || '정산 항목',
+        url: getExpenseUrl(expense),
+        // CreateSettlementModal persists this exact identity in checkedItemKeys. Keep it with
+        // the summary item so a saved payerId can be counted as that participant's prepayment.
+        settlementCardItemKey: `${meeting.date}_${expense.id || rawIndex}_${expense.amount || 0}`,
+        ledgerKey: `${meeting.date}|${expense.id || rawIndex}|${expense.createdAt || ''}|${amount}`
+      };
+    }));
+  const allTimeLedgerRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .map(meeting => {
-      const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
-        .map((expense, index) => {
-          const amount = Number(expense.amount || 0);
-          const isIncome = isExpenseIncomeEntry(expense);
-          return {
-            ...expense,
-            amount,
-            isIncome,
-            category: getExpenseCategory(calendar, expense.categoryId),
-            label: getExpenseLabel(expense) || '정산 항목',
-            url: getExpenseUrl(expense),
-            ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
-          };
-        }));
+      const items = buildSettlementItems(meeting);
       const expenseTotal = items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
-    .filter(row => row.items.length > 0)
+    .filter(row => row.items.length > 0);
+  const allTimeRows = allTimeLedgerRows
     .map(filterSettlementRow)
     .filter(row => row.items.length > 0);
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
+  // A settlement card can have both manually registered personal spending and
+  // selected shared expenses whose payerId says who fronted them. The editor
+  // already treats the latter as automatic personal prepayments; apply the
+  // same rule to the top-card summary so its numbers do not diverge.
+  const getCardPersonalTotals = card => {
+    const totals = new Map();
+    (Array.isArray(card?.personalExpenses) ? card.personalExpenses : []).forEach(item => {
+      const name = String(item?.participantId || '').trim();
+      if (!name) return;
+      const signedAmount = item?.signedAmount
+        ? (Number(item.amount) || 0)
+        : -Math.abs(Number(item?.amount) || 0);
+      totals.set(name, (totals.get(name) || 0) + signedAmount);
+    });
+    const selectedKeys = new Set([
+      ...(Array.isArray(card?.checkedItemKeys) ? card.checkedItemKeys : []),
+      ...Object.keys(card?.checkedItems || {})
+    ]);
+    if (selectedKeys.size === 0) return totals;
+    allTimeItems.forEach(item => {
+      const payerName = String(item?.payerId || '').trim();
+      if (!payerName || item.isIncome || item.isSelfPay || !selectedKeys.has(item.settlementCardItemKey)) return;
+      totals.set(payerName, (totals.get(payerName) || 0) - Math.abs(Number(item.amount) || 0));
+    });
+    return totals;
+  };
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
   // 자비부담(isSelfPay) stays visible in the ledger but never moves 공금 running balance.
-  allTimeItems.slice().reverse().forEach(item => {
+  // Balances run over the whole ledger (oldest first), never over a search-filtered subset.
+  allTimeLedgerRows.flatMap(row => row.items).reverse().forEach(item => {
     if (item.isSelfPay) {
       settlementBalanceByKey.set(item.ledgerKey, null);
       return;
@@ -3195,27 +3294,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .filter(meeting => activeTab === 'total' || meeting.date.startsWith(targetPrefix))
     .map(meeting => {
-      const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
-        .sort((a, b) => {
-          const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-          const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-          if (aOrder !== bOrder) return aOrder - bOrder;
-          return (a.createdAt || 0) - (b.createdAt || 0);
-        })
-        .map((expense, index) => {
-          const amount = Number(expense.amount || 0);
-          const isIncome = isExpenseIncomeEntry(expense);
-          return {
-            ...expense,
-            amount,
-            isIncome,
-            category: getExpenseCategory(calendar, expense.categoryId),
-            label: getExpenseLabel(expense) || '정산 항목',
-            url: getExpenseUrl(expense),
-            ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
-          };
-        }));
+      const items = buildSettlementItems(meeting);
       const expenseTotal = items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
@@ -3255,6 +3334,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
     { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
+  const isV2SettlementSurface = typeof renderV2 === 'function';
 
   // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
   // as a plain image and pasted into KakaoTalk/문자 without anyone needing app access. Shown in
@@ -3381,11 +3461,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
     }, /*#__PURE__*/React.createElement("strong", {
       style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }
-    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatShortDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null),
+      /* Short "09.20(일)" -- the month title above already carries the year, and the short
+         form never wraps beside the day total on a phone. */
+      /*#__PURE__*/React.createElement("span", { style: { whiteSpace: 'nowrap' } }, formatSettlementDayLabel(row.meeting.date))
+    ), /*#__PURE__*/React.createElement("span", {
       style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', whiteSpace: 'nowrap' }
     }, /*#__PURE__*/React.createElement("span", {
       // Capsule badge (not plain colored text) so this per-date total reads distinctly from the
       // plain +/- colored amounts on the expense rows below it.
+      className: `settlement-day-net${row.net < 0 ? ' is-negative' : ' is-positive'}`,
       style: {
         fontSize: 'var(--font-size-md)', fontWeight: 900, color: '#FFFFFF',
         backgroundColor: row.net < 0 ? '#DC2626' : 'var(--status-green)',
@@ -3401,6 +3486,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }));
 
   const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
+
+  const v2Shell = typeof document !== 'undefined' && !!document.querySelector('.renewal-shell.v2-design');
 
   const __settlementLegacyTree = /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-container",
@@ -3461,7 +3548,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   UnderlineTabs && /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-tabs",
     style: {
-      position: 'fixed', top: `calc(${isSettlementSearchOpen ? 108 : 60}px + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
+      position: v2Shell ? 'relative' : 'fixed',
+      top: v2Shell ? 0 : `calc(${isSettlementSearchOpen ? 108 : 60}px + env(safe-area-inset-top, 0px))`,
+      left: 0, right: 0, zIndex: 1009,
       width: '100%', backgroundColor: 'var(--bg-card)',
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 60px))'
@@ -3478,7 +3567,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
-    style: { flex: '1 1 auto', overflowY: 'auto', padding: `calc(${isSettlementSearchOpen ? 156 : 108}px + env(safe-area-inset-top, 0px)) 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px', minHeight: 0, overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }
+    style: { flex: '1 1 auto', overflowY: 'auto', padding: v2Shell ? '8px 16px 96px' : `calc(${isSettlementSearchOpen ? 156 : 108}px + env(safe-area-inset-top, 0px)) 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px', minHeight: 0, overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }
   },
     /* 1. Settlement Cards (Positioned ABOVE metrics grid) -- no cards means no section at all,
        not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards
@@ -3505,18 +3594,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 ? card.participants
                 : activeParticipants.map(participant => participant.name)).filter(Boolean)
           ));
-          const cardPersonalTotals = new Map();
-          (Array.isArray(card.personalExpenses) ? card.personalExpenses : []).forEach(item => {
-            const name = item?.participantId || '참여자';
-            // New records persist the explicit sign; legacy records represented every personal
-            // expense as a positive amount and therefore remain a subtraction. Keep this exact
-            // convention aligned with the settlement editor's personalExpenseTotals calculation
-            // so the card and popup cannot show different balances.
-            const signedAmount = item?.signedAmount
-              ? (Number(item.amount) || 0)
-              : -Math.abs(Number(item?.amount) || 0);
-            cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + signedAmount);
-          });
+          const cardPersonalTotals = getCardPersonalTotals(card);
           const cardParticipantMemos = new Map();
           (Array.isArray(card.participantRows) ? card.participantRows : []).forEach(row => {
             const memo = String(row?.memo || '').trim();
@@ -3528,6 +3606,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             cardPersonalTotals,
             card.depositorName
           );
+          const settlementTransfers = calculateSettlementTransfers(cardParticipantRows);
 
           return React.createElement("div", {
             key: card.id,
@@ -3546,7 +3625,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               handleOpenSettlementEditor(card);
             },
             style: {
-              background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
+              background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-mid), var(--settlement-hero-end))',
               border: 'none',
               borderRadius: '18px',
               padding: '14px 14px 12px',
@@ -3664,6 +3743,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 const personalTotal = cardPersonalTotals.get(row.name) || 0;
                 const personalMemo = cardParticipantMemos.get(row.name) || '';
                 const personalColor = (activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === row.name)?.color) || '#3B82F6';
+                const settlementLabel = row.amount < 0 ? '환급금' : row.amount > 0 ? (isV2SettlementSurface ? '정산금' : '분담금') : '정산 없음';
                 return React.createElement("div", {
                 key: `${card.id}_${row.name}_${index}`,
                 className: "settlement-person-card"
@@ -3674,15 +3754,31 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     style: { backgroundColor: personalColor }
                   }),
                   React.createElement("span", { className: "settlement-person-name-text" }, row.name),
-                  React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-mobile-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음')
+                  React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-mobile-badge${row.amount < 0 ? ' is-refund' : ''}` }, settlementLabel)
                 ),
                 React.createElement("strong", { className: `settlement-person-amount${row.amount < 0 ? ' is-refund' : ''}`, title: row.amount < 0 ? '공금에서 받을 환급금' : row.amount > 0 ? '공금에 납부할 분담금' : '정산할 금액 없음' },
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '+' : '-'}${Math.abs(row.amount).toLocaleString()}원`)
                 ),
-                personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `개인지출 ${Math.abs(personalTotal).toLocaleString()}원`),
+                isV2SettlementSurface
+                  ? React.createElement('span', { className: 'settlement-person-actual-paid' },
+                    '실제 지출 ',
+                    React.createElement('b', null, `${Math.max(0, Number(row.actualPaid) || 0).toLocaleString()}원`)
+                  )
+                  : personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `개인지출 ${Math.abs(personalTotal).toLocaleString()}원`),
                 personalMemo && React.createElement('span', { className: 'settlement-person-detail-capsule settlement-person-memo-capsule', title: personalMemo }, personalMemo)
                 );
-              }))
+              })),
+            isV2SettlementSurface && settlementTransfers.length > 0 && React.createElement(
+              'div',
+              { className: 'settlement-transfer-guide', 'aria-label': '정산 송금 안내' },
+              settlementTransfers.map((transfer, index) => React.createElement(
+                'span',
+                { key: `${transfer.from}_${transfer.to}_${index}` },
+                `${transfer.from} → ${transfer.to} `,
+                React.createElement('b', null, `${transfer.amount.toLocaleString()}원`),
+                ' 지급'
+              ))
+            )
 
           );
         })
@@ -3832,14 +3928,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerYear(y => y - 1)
-            }, "◀"),
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'left' })),
             /*#__PURE__*/React.createElement("span", {
               style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
             }, pickerYear, "년"),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerYear(y => y + 1)
-            }, "▶")
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'right' }))
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
@@ -4064,8 +4160,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   const color = typeof participant === 'object' ? participant?.color : null;
                   return React.createElement('span', {
                     key: `${card.id}_participant_${name}_${index}`,
-                    style: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 7px', borderRadius: 'var(--radius-full)', backgroundColor: color ? `${color}1A` : 'var(--border-subtle)', color: color || 'var(--text-main)', fontSize: 'var(--font-size-xs)', fontWeight: 700, whiteSpace: 'nowrap' }
-                  }, name);
+                    className: 'v2-author-dot',
+                    role: 'img',
+                    tabIndex: 0,
+                    'data-author-name': name,
+                    title: name,
+                    style: {
+                      display: 'inline-block',
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: color || 'var(--border-subtle)',
+                      flexShrink: 0
+                    }
+                  });
                 })
                 : React.createElement('span', null, '참여자 없음')
             ),
@@ -4077,7 +4185,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   ))),
 
   /* Create Settlement Layer Popup */
-  (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModalComp, {
+  // Mirrors the edit modal's fix below: use the local CreateSettlementModal directly
+  // instead of the `__comp.CreateSettlementModal` global-registry reference. liftOverlays()
+  // further down only lifts a node into the ReactDOM portal it needs when it recognizes it
+  // as an overlay, which it does by testing the rendered element's `type.name`/
+  // `type.displayName` against /Modal/ -- a minified production build's mangled function
+  // names can silently defeat that test, so the create-settlement popup would render (its
+  // own isCreateSettlementOpen/canUseSettlement gate all true, confirmed live) but never
+  // actually reach the DOM. The edit modal already avoids this by using the stable local
+  // reference; doing the same here fixes "정산 생성" not visibly doing anything on click.
+  (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModal, {
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
     onSave: async (newCard) => {
@@ -4159,22 +4276,62 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   );
 
   if (typeof renderV2 === 'function') {
-    return renderV2({
-      legacyView: __settlementLegacyTree,
-      calendar,
-      onBack,
-      onSearch: () => setIsSettlementSearchOpen(value => !value),
-      onShare: onOpenShare,
-      onMenu: () => setIsSettlementMenuOpen(true),
-      onCompose: () => {
-        if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
-        else setIsCreateSettlementOpen(true);
-      },
-      slots: {},
-    });
+    const lifted = [];
+    const liftOverlays = (node) => {
+      if (!node || !React.isValidElement(node)) return node;
+      const cls = String(node.props?.className || '');
+      const typeName = typeof node.type === 'function' ? (node.type.displayName || node.type.name || '') : '';
+      if (/modal-overlay|bottom-sheet-overlay|admin-side-menu-overlay/.test(cls) || /Modal/.test(typeName)) {
+        lifted.push(node);
+        return null;
+      }
+      const children = node.props?.children;
+      if (children == null) return node;
+      const list = React.Children.toArray(children);
+      let changed = false;
+      const next = [];
+      list.forEach(child => {
+        const stripped = liftOverlays(child);
+        if (stripped !== child) changed = true;
+        if (stripped != null && stripped !== false) next.push(stripped);
+      });
+      if (!changed) return node;
+      return React.cloneElement(node, null, ...next);
+    };
+    const legacyView = liftOverlays(__settlementLegacyTree);
+    const ReactDOM = window.ReactDOM;
+    const modalTree = lifted.length
+      ? (ReactDOM && typeof ReactDOM.createPortal === 'function'
+        ? ReactDOM.createPortal(React.createElement(React.Fragment, null, ...lifted), document.body)
+        : lifted)
+      : null;
+    return React.createElement(React.Fragment, null,
+      renderV2({
+        legacyView,
+        calendar,
+        onBack,
+        onSearch: () => setIsSettlementSearchOpen(value => !value),
+        onShare: onOpenShare,
+        onMenu: () => setIsSettlementMenuOpen(true),
+        onOpenCreate: handleOpenCreateSettlement,
+        onOpenList: () => { setIsSettlementMenuOpen(false); setIsSettlementListOpen(true); },
+        onCompose: () => {
+          if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+          else setIsCreateSettlementOpen(true);
+        },
+        slots: {},
+      }),
+      modalTree
+    );
   }
   return __settlementLegacyTree;
 }
+
+// SettlementSummaryModal's V2 path lifts overlays out of the legacy tree by testing
+// type.displayName/type.name against /Modal/ (liftOverlays). The production minifier renames
+// functions, so without an explicit displayName the 정산 생성/수정 popup is silently dropped
+// with the rest of the legacy tree and the header button appears to do nothing.
+CreateSettlementModal.displayName = 'CreateSettlementModal';
 
 export function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
   const React = window.React;
@@ -4398,12 +4555,13 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
-    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1.1rem', fontWeight: 800 }
+    style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }
   }, isEditing ? "\uD22C\uD45C \uC218\uC815" : "\uD22C\uD45C \uC0DD\uC131"), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }
   }, createdAtText && /*#__PURE__*/React.createElement("span", {
@@ -4415,9 +4573,11 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     },
     style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))), /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSubmit
+    onSubmit: handleSubmit,
+    style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
+    className: "modal-body",
+    style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px' }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: { display: 'block', fontSize: 'var(--font-size-base)', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
   }, "\uD22C\uD45C\uBA85"), /*#__PURE__*/React.createElement("input", {
@@ -4557,7 +4717,8 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       }
     }
     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
-    className: "modal-footer"
+    className: "modal-footer",
+    style: { flexShrink: 0, display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '12px 18px', borderTop: '1px solid var(--border-subtle)' }
   },
     isEditing && /*#__PURE__*/React.createElement("button", {
       type: "button",
