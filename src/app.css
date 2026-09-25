@@ -8181,3 +8181,10 @@ button.toggle-switch[role="switch"] {
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* Error screen reload button: when the whole shell has crashed, .renewal-shell is gone and the
+   html:has(.renewal-shell) Theme 2 tokens (--cta-fill) no longer apply -- pin lime/black for dark. */
+:root[data-theme="dark"] .error-fallback-container .error-fallback-reload {
+  background: #C9FD58 !important;
+  color: #0D0D0D !important;
+}
