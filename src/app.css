@@ -6891,15 +6891,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 
 /* Chat date divider */
-.renewal-shell-main.is-chat div:has(> span[style*="borderRadius: '12px'"]),
 .renewal-shell-main.is-chat div[style*="margin: 24px 0 16px"] {
   margin: 14px 0 10px !important;
 }
-.renewal-shell-main.is-chat div:has(> span[style*="borderRadius: '12px'"]) > div:first-child,
 .renewal-shell-main.is-chat div[style*="margin: 24px 0 16px"] > div:first-child {
   display: none !important;
 }
-.renewal-shell-main.is-chat div:has(> span[style*="borderRadius: '12px'"]) > span,
 .renewal-shell-main.is-chat div[style*="margin: 24px 0 16px"] > span {
   background: var(--bg-primary) !important;
   color: var(--text-light) !important;

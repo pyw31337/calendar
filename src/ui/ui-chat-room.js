@@ -703,8 +703,9 @@ export function ChatRoomView({
     const restore = textareaScrollRestoreRef.current;
     const el = chatTextareaRef.current;
     if (!restore || !el) return;
-    el.scrollTop = restore.keepBottom ? el.scrollHeight : restore.scrollTop;
     textareaScrollRestoreRef.current = null;
+    if (restore.scrollable === false) return;
+    el.scrollTop = restore.keepBottom ? el.scrollHeight : restore.scrollTop;
   }, [chatInput, memeMatches]);
 
   const docFileInputRefChat = React.useRef(null);
@@ -827,6 +828,18 @@ export function ChatRoomView({
   // Kakao-style reply quote card, rendered at the top of a bubble when msg.replyTo is set --
   // shows the quoted sender + a 1-2 line snippet of what they said, and jumps back to that
   // original bubble (scroll + highlight, paginating through older history if needed) on tap.
+  // The message list below is memoized (see renderedMessages) so typing, the typing indicator,
+  // composer resizes, header show/hide and popups no longer rebuild every bubble. Row buttons
+  // call through this ref so memoized rows always reach the latest handlers.
+  const chatRowCallbacksRef = React.useRef(null);
+  chatRowCallbacksRef.current = { handleStartReply, onEditMessage, setActiveLightbox, onActivateVideo, openDocumentLightbox, onJumpToChatMessage };
+  const chatRowCallbacks = React.useMemo(() => ({
+    startReply: (...args) => chatRowCallbacksRef.current.handleStartReply(...args),
+    editMessage: (msg) => { const f = chatRowCallbacksRef.current.onEditMessage; if (typeof f === 'function') f(msg); },
+    setActiveLightbox: (...args) => { const f = chatRowCallbacksRef.current.setActiveLightbox; return typeof f === 'function' ? f(...args) : undefined; },
+    onActivateVideo: (...args) => { const f = chatRowCallbacksRef.current.onActivateVideo; return typeof f === 'function' ? f(...args) : undefined; },
+    openDocumentLightbox: (...args) => { const f = chatRowCallbacksRef.current.openDocumentLightbox; return typeof f === 'function' ? f(...args) : undefined; },
+  }), []);
   const renderReplyQuoteCard = (replyTo) => {
     if (!replyTo) return null;
     const qp = participantsMap[replyTo.participantId];
@@ -834,7 +847,8 @@ export function ChatRoomView({
       className: "chat-reply-quote-card",
       onClick: e => {
         e.stopPropagation();
-        if (onJumpToChatMessage && replyTo.id) onJumpToChatMessage(replyTo.id);
+        const jump = chatRowCallbacksRef.current && chatRowCallbacksRef.current.onJumpToChatMessage;
+        if (jump && replyTo.id) jump(replyTo.id);
       },
       style: {
         display: 'flex',
@@ -865,6 +879,7 @@ export function ChatRoomView({
       }, replyQuoteLabel(replyTo))
     );
   };
+  const renderedMessages = React.useMemo(() => {
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
@@ -1013,7 +1028,7 @@ export function ChatRoomView({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "msg-actions-group",
-          onClick: () => handleStartReply(msg, msgImageCount, msgFileCount),
+          onClick: () => chatRowCallbacks.startReply(msg, msgImageCount, msgFileCount),
           title: "답장",
           style: {
             width: '24px',
@@ -1043,7 +1058,7 @@ export function ChatRoomView({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "msg-actions-group",
-          onClick: () => onEditMessage && onEditMessage(msg),
+          onClick: () => chatRowCallbacks.editMessage(msg),
           title: "편집",
           style: {
             width: '24px',
@@ -1099,7 +1114,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, false, openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, chatRowCallbacks.setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, chatRowCallbacks.onActivateVideo, false, chatRowCallbacks.openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -1157,7 +1172,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, false, openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, chatRowCallbacks.setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, chatRowCallbacks.onActivateVideo, false, chatRowCallbacks.openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -1203,11 +1218,22 @@ export function ChatRoomView({
         padding: '2px 0'
       }
     },
+      /* Timestamp first so it sits right beside the bubble; the reply button (hidden until
+         hover/tap) follows it instead of leaving an empty slot between bubble and time. */
+      /* Timestamp */
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--text-light)',
+          lineHeight: '1.25',
+          textAlign: 'left'
+        }
+      }, timeStr),
       /* Reply button (no edit/delete for other participants) */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "msg-actions-group",
-        onClick: () => handleStartReply(msg, msgImageCount, msgFileCount),
+        onClick: () => chatRowCallbacks.startReply(msg, msgImageCount, msgFileCount),
         title: "답장",
         style: {
           width: '24px',
@@ -1219,19 +1245,13 @@ export function ChatRoomView({
           color: 'var(--text-light)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-start'
+          justifyContent: 'center'
         }
-      }, /*#__PURE__*/React.createElement(ReplyIcon, { size: 15 })),
-      /* Timestamp */
-      /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 'var(--font-size-xs)',
-          color: 'var(--text-light)',
-          lineHeight: '1.25',
-          textAlign: 'left'
-        }
-      }, timeStr))]));
+      }, /*#__PURE__*/React.createElement(ReplyIcon, { size: 15 })))]));
   });
+  return renderedMessages;
+  // participantsMap is rebuilt from calendar.participants every render; key on the source.
+  }, [visibleChatMessages, calendar && calendar.participants, chatParticipantId, priorReadTimestamp, revealedMsgId, searchQuery, focusedMsgId, externalFocusMessageId, stickyVideoKey, chatRowCallbacks]);
   const __chatLegacyTree = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
     style: {
@@ -1441,7 +1461,13 @@ export function ChatRoomView({
       style: { width: '100%', resize: 'none', minHeight: '60px' },
       value: noticeInput,
       maxLength: 200,
-      autoFocus: true,
+      // Focus after the panel has painted and without scrolling: React's autoFocus scrolled the
+      // field into view synchronously, forcing a full chat relayout while the panel opened.
+      ref: el => {
+        if (!el || el.__noticeFocused) return;
+        el.__noticeFocused = true;
+        requestAnimationFrame(() => { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } });
+      },
       placeholder: "채팅방 상단에 고정할 공지를 입력하세요",
       onChange: e => { setNoticeInput(e.target.value); autoGrowTextarea(e.target, 200); }
     }),
@@ -1783,14 +1809,22 @@ export function ChatRoomView({
           textareaScrollRestoreRef.current = {
             scrollTop: textarea.scrollTop,
             keepBottom: distanceFromBottom < 24 || textarea.selectionStart >= textarea.value.length,
+            // Only a field with its own scrollbar can lose its scroll position on rerender;
+            // skipping the restore otherwise avoids a forced relayout after every keystroke.
+            scrollable: textarea.scrollHeight > textarea.clientHeight + 1,
           };
           setChatInput(e.target.value);
           announceTyping(e.target.value);
-          autoGrowTextarea(e.target, MAX_COMPOSER_INPUT_HEIGHT);
-          requestAnimationFrame(() => {
-            const nextHeight = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, e.target.scrollHeight + 4));
-            setComposerInputHeight(height => Math.max(height, nextHeight));
-          });
+          const grown = autoGrowTextarea(e.target, MAX_COMPOSER_INPUT_HEIGHT);
+          if (grown && typeof grown.contentHeight === 'number') {
+            const nextHeight = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, grown.contentHeight + 4));
+            setComposerInputHeight(height => (nextHeight > height ? nextHeight : height));
+          } else {
+            requestAnimationFrame(() => {
+              const nextHeight = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, e.target.scrollHeight + 4));
+              setComposerInputHeight(height => Math.max(height, nextHeight));
+            });
+          }
         },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {

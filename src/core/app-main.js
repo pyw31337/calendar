@@ -413,6 +413,24 @@ function App() {
   );
 }
 
+// localGalleryCount (CalendarApp) walks every photo of every meeting, message and memo. It ran on
+// every CalendarApp render -- every chat keystroke -- so the last result is reused until one of
+// its inputs (by identity) or the broken-photo list changes. A plain cache, not a hook, so
+// CalendarApp's hook order is untouched.
+let localGalleryCountCache = null;
+function cachedLocalGalleryCount(inputs, compute) {
+  const utils = (typeof window !== 'undefined' && window.GATHER_APP_UTILS) || {};
+  const broken = typeof utils.getPersistentBrokenPhotoUrls === 'function' ? utils.getPersistentBrokenPhotoUrls() : null;
+  const brokenSize = broken && typeof broken.size === 'number' ? broken.size : 0;
+  const cache = localGalleryCountCache;
+  if (cache && cache.brokenSize === brokenSize && cache.inputs.length === inputs.length
+    && cache.inputs.every((value, index) => value === inputs[index])) {
+    return cache.value;
+  }
+  const value = compute();
+  localGalleryCountCache = { inputs, brokenSize, value };
+  return value;
+}
 function CalendarApp() {
   const [activeCalId, setActiveCalId] = React.useState(() => {
     const requestedId = getCalendarIdFromURL();
@@ -6773,7 +6791,7 @@ function CalendarApp() {
       preloadedPhotoCommentsReady: preloadedPhotoCommentsReady
     }) : null
   );
-  const localGalleryCount = (() => {
+  const localGalleryCount = cachedLocalGalleryCount([activeCal, allChatMessages, chatMessages, memos], () => {
     const directUrls = new Set();
     const persistentBroken = (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls)
       ? window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls()
@@ -6830,7 +6848,7 @@ function CalendarApp() {
       });
     });
     return directUrls.size;
-  })();
+  });
 
   const navChatCount = (typeof visibleTotalChatCount === 'number' && visibleTotalChatCount >= 0)
     ? visibleTotalChatCount

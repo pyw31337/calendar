@@ -4668,3 +4668,17 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-card-preview-t
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-day-net.is-positive {
   color: #0A0A0A !important;
 }
+
+/* Chat reply/edit buttons: the icon sits dead centre in its 24px square. */
+html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group > svg {
+  display: block !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
