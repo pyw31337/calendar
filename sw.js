@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '46750432138ccd1285975d3c4a37dd5431ecd9a1';
+const BUILD_SHA = '350a2eacfd3f8e947d90a1d1251055d42987d26e';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
