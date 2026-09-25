@@ -2109,7 +2109,17 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     React.Children.toArray(__memoLegacyTree.props.children).forEach(node => {
       if (!node || !React.isValidElement(node)) return;
       const cls = String(node.props?.className || '');
-      if (/memo-view-header|memo-view-body|admin-side-menu-overlay/.test(cls)) return;
+      // The V2 screen renders its own list, but the legacy body also hosts the memo editor
+      // overlay (and other popups) next to that list -- keep those, drop only the list.
+      if (/memo-view-body/.test(cls)) {
+        React.Children.toArray(node.props.children).forEach(child => {
+          if (!child || !React.isValidElement(child)) return;
+          if (/memo-list-scroll/.test(String(child.props?.className || ''))) return;
+          lifted.push(child);
+        });
+        return;
+      }
+      if (/memo-view-header|admin-side-menu-overlay/.test(cls)) return;
       if (node.type === 'button') return;
       lifted.push(node);
     });
