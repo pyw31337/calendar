@@ -12,8 +12,16 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = 'e37ef69fca3c4b042c15cf148d246e548070e603';
+const BUILD_SHA = 'aae39c591e79be3a6bbb89ae8c6c367b9ec25046';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
+// Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
+// (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
+// This cache outlives deploys (it is not BUILD_SHA scoped) so revisits, reloads and the iOS
+// home-screen app -- whose HTTP cache is evicted aggressively -- reuse the bytes instead of
+// downloading them again: faster screens and less Storage egress.
+const MEDIA_CACHE = 'moyeora-media-v1';
+const MEDIA_CACHE_MAX_ENTRIES = 800;
+const MEDIA_CACHE_MAX_BYTES_PER_ITEM = 8 * 1024 * 1024;
 const STATIC_ASSETS = [
   'favicon.ico',
   'manifest.json',
@@ -40,7 +48,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(names => Promise.all(names.filter(name => name !== STATIC_CACHE).map(name => caches.delete(name))))
+      .then(names => Promise.all(names.filter(name => name !== STATIC_CACHE && name !== MEDIA_CACHE).map(name => caches.delete(name))))
       .then(() => self.clients.claim())
   );
 });
@@ -74,6 +82,10 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(req.url);
+  if (isCacheableStorageMedia(req, url)) {
+    event.respondWith(serveStorageMedia(req));
+    return;
+  }
   const isStaticAsset = url.origin === self.location.origin && STATIC_ASSETS.some(asset => url.pathname.endsWith('/' + asset) || url.pathname.endsWith(asset));
   // Every file Vite emits into dist/assets/ is content-hashed (app-main-<hash>.js,
   // index-<hash>.js, vendor-react-dom-<hash>.js, ui-*-<hash>.js, index-<hash>.css, ...) -- a
@@ -136,6 +148,58 @@ self.addEventListener('fetch', event => {
     }
   })());
 });
+
+function isCacheableStorageMedia(req, url) {
+  // Range requests (video/audio seeking) stream partial content -- leave them to the network.
+  if (req.headers.has('range')) return false;
+  if (req.destination === 'video' || req.destination === 'audio') return false;
+  if (url.hostname === 'firebasestorage.googleapis.com') {
+    return /\/v0\/b\/[^/]+\/o\/.+/.test(url.pathname) && url.searchParams.get('alt') === 'media';
+  }
+  return false;
+}
+
+let mediaPutsSinceTrim = 0;
+async function trimMediaCache() {
+  try {
+    const cache = await caches.open(MEDIA_CACHE);
+    const keys = await cache.keys();
+    const excess = keys.length - MEDIA_CACHE_MAX_ENTRIES;
+    // keys() is in insertion order, so the oldest entries go first.
+    for (let i = 0; i < excess; i += 1) await cache.delete(keys[i]);
+  } catch (_) {}
+}
+
+async function serveStorageMedia(req) {
+  let cache = null;
+  try {
+    cache = await caches.open(MEDIA_CACHE);
+    const hit = await cache.match(req.url);
+    if (hit) return hit;
+  } catch (_) {}
+  // <img> requests are no-cors (opaque, unmeasurable and padded in quota), so fetch the same
+  // URL in CORS mode -- Firebase Storage answers with Access-Control-Allow-Origin: * -- and
+  // store a real, size-checked response. If CORS fails for any reason, fall back to the
+  // browser's original request untouched.
+  let res;
+  try {
+    res = await fetch(req.url, { mode: 'cors', credentials: 'omit' });
+  } catch (_) {
+    return fetch(req);
+  }
+  if (res && res.ok && res.status === 200 && res.type !== 'opaque' && cache) {
+    const length = Number(res.headers.get('content-length') || 0);
+    if (!length || length <= MEDIA_CACHE_MAX_BYTES_PER_ITEM) {
+      const copy = res.clone();
+      cache.put(req.url, copy).then(() => {
+        mediaPutsSinceTrim += 1;
+        if (mediaPutsSinceTrim >= 25) { mediaPutsSinceTrim = 0; return trimMediaCache(); }
+        return undefined;
+      }).catch(() => {});
+    }
+  }
+  return res;
+}
 
 // Push/notificationclick handling. Real push messages are sent by the onMessageCreate Cloud
 // Function (functions/index.js), which holds the VAPID private key and calls web-push's
