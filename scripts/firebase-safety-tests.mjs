@@ -476,6 +476,8 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+// U10 (split-units): the chat message window moved out of CalendarApp into use-chat-message-window.js.
+const chatWindowSource = fs.readFileSync(new URL('../src/core/use-chat-message-window.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
@@ -622,8 +624,8 @@ const linkPreviewSource = fs.readFileSync(new URL('../src/core/app-link-preview.
 const linkPreviewHook = linkPreviewSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link preview render hook must not fetch external previews');
 assert(linkPreviewSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
-assert(/orderBy: 'timestamp', direction: 'desc', limit: chatLimit/.test(appMainSource), 'chat realtime listener must remain bounded to the recent chat window');
-assert(/Firestore gallery media subscription error/.test(appMainSource), 'gallery must keep a separate unscoped realtime media listener');
+assert(/orderBy: 'timestamp', direction: 'desc', limit: chatLimit/.test(chatWindowSource), 'chat realtime listener must remain bounded to the recent chat window');
+assert(/Firestore gallery media subscription error/.test(chatWindowSource), 'gallery must keep a separate unscoped realtime media listener');
 assert(/const PAGE_SIZE = 150/.test(appMainSource), 'chat preview fallback must page past a burst of hidden media uploads');
 assert(appMainSource.includes("uploadSource: 'chat'"), 'new chat writes must carry an explicit chat channel');
 

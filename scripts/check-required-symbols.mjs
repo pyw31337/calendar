@@ -36,8 +36,17 @@ const requiredInMain = [
   'PhotoGallery',
   'SummaryList',
   'fetchOlderChatMessages',
-  'subscribeMessages',
   'subscribePlaces'
+];
+
+// U10 moved the chat message window (live listener, gallery live window, watchdog, older
+// history) out of CalendarApp into use-chat-message-window.js, so the realtime chat
+// subscription is required there now.
+const chatWindow = readFileSync(resolve(root, 'src/core/use-chat-message-window.js'), 'utf8');
+const requiredInChatWindow = [
+  'subscribeMessages',
+  'fetchRecentChatMessages',
+  'fetchOlderChatMessages'
 ];
 
 const requiredInUtils = [
@@ -73,6 +82,12 @@ let failed = false;
 for (const name of requiredInMain) {
   if (!hasSymbol(main, name)) {
     console.error(`[check-required-symbols] MISSING in app-main.js: ${name}`);
+    failed = true;
+  }
+}
+for (const name of requiredInChatWindow) {
+  if (!hasSymbol(chatWindow, name)) {
+    console.error(`[check-required-symbols] MISSING in use-chat-message-window.js: ${name}`);
     failed = true;
   }
 }
