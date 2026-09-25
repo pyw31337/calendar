@@ -1009,7 +1009,7 @@ export function SummaryList({
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
     "data-no-press-feedback": true,
     style: {
-      color: '#7C3AED',
+      color: 'var(--v2-accent, #7C3AED)',
       marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -1384,6 +1384,19 @@ export function HistoryView({
     setSelectedMemoryGroupId(null);
     pushHistoryState(tab);
   };
+  // Leaving 보관함 drops its own URL params. Navigation elsewhere keeps the rest of the query, so
+  // a lingering historyTab=meetings made the next visit (from the side menu too) open on 지난모임
+  // instead of 추억. A deep link that already carries historyTab still opens that tab.
+  React.useEffect(() => () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('historyTab') && !params.has('memory')) return;
+      params.delete('historyTab');
+      params.delete('memory');
+      const qs = params.toString();
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+    } catch (_) {}
+  }, []);
   React.useEffect(() => {
     const handleHistoryPopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -2259,7 +2272,7 @@ export function HistoryView({
                   padding: '7px 10px', width: '100%', boxSizing: 'border-box'
                 }
               },
-                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: '#7C3AED' } }),
+                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: 'var(--v2-accent, #7C3AED)' } }),
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
                   mapUrl
                     ? /*#__PURE__*/React.createElement("a", {
@@ -2485,7 +2498,7 @@ export function HistoryView({
           onClick: handleAddPersonTagClick,
           style: {
             flexShrink: 0, height: '40px', padding: '0 16px', borderRadius: 'var(--radius-md)',
-            border: 'none', background: 'var(--accent-gradient)', color: '#fff',
+            border: 'none', background: 'var(--v2-accent-fill, var(--accent-gradient))', color: 'var(--v2-on-accent, #fff)',
             fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
             opacity: (isAddingPersonTag || !newPersonTag.trim()) ? 0.5 : 1
           }

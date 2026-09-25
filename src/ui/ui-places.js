@@ -1882,7 +1882,15 @@ export function PlacesView({
                         },
                         style: { width: '100%', height: '32px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
                       }),
-                      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } },
+                      /* Delete lives inside edit mode (left), away from 취소/수정 (right), so a
+                         stray tap on the row's only icon can never delete a memo. */
+                      /*#__PURE__*/React.createElement("div", { className: "item-edit-actions-row", style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+                        /*#__PURE__*/React.createElement("button", {
+                          type: "button",
+                          className: "item-edit-delete-btn",
+                          onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); handleDeletePlaceMemoEntry(place, entry); },
+                          style: { height: '28px', padding: '0 10px', marginRight: 'auto', borderRadius: 'var(--radius-sm)', border: 'none', background: 'none', color: 'var(--status-red, #DC2626)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' }
+                        }, "삭제"),
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
@@ -1920,11 +1928,7 @@ export function PlacesView({
                           /*#__PURE__*/React.createElement("button", {
                             type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                             style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
-                          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 })),
-                          /*#__PURE__*/React.createElement("button", {
-                            type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
-                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
-                          }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
+                          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
                         )
                       ),
                       /* Line 2: Memo note full width below */
@@ -1950,11 +1954,7 @@ export function PlacesView({
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-                    }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
-                    /*#__PURE__*/React.createElement("button", {
-                      type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
-                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-                    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
+                    }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
                   );
                 }),
                 hiddenCount > 0 && /*#__PURE__*/React.createElement("button", {
@@ -2176,6 +2176,8 @@ export function PlacesView({
       onSearch: (value) => { setListSearchQuery(value); setIsSearchOpen(true); },
       onCompose: () => { setEditingPlace(null); setIsRegisterOpen(true); },
       onToggleMap: () => setMapExpanded(v => !v),
+      // The header 지도보기 icon mirrors this state (the map's own resize handle toggles it too).
+      mapExpanded,
       slots: {},
     });
   }

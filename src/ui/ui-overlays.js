@@ -461,7 +461,7 @@ class AppErrorBoundary extends ReactComponentBase {
       React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
         React.createElement('button', {
           onClick: () => this.setState({ hasError: false, error: null }),
-          style: { padding: '8px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
+          style: { padding: '8px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid var(--v2-line, #CBD5E1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '다시 시도'),
         React.createElement('button', {
           onClick: () => window.location.reload(),
