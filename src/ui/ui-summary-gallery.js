@@ -351,7 +351,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left', width: '100%', ...style },
       onClick: () => setIsOpen(true)
     },
-      selected?.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: selected, name: selected.label, style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }) : /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected ? selected.label : placeholder),
+      selected?.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: selected, name: selected.label, style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }) : /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' } }, selected ? selected.label : placeholder),
       /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg",
         width: "18",
@@ -2498,7 +2498,7 @@ export function HistoryView({
           onClick: handleAddPersonTagClick,
           style: {
             flexShrink: 0, height: '40px', padding: '0 16px', borderRadius: 'var(--radius-md)',
-            border: 'none', background: 'var(--v2-accent-fill, var(--accent-gradient))', color: 'var(--v2-on-accent, #fff)',
+            border: 'none', background: 'var(--cta-fill, var(--accent-gradient))', color: 'var(--on-cta, #fff)',
             fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
             opacity: (isAddingPersonTag || !newPersonTag.trim()) ? 0.5 : 1
           }
@@ -5545,7 +5545,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               detailUrl ? /*#__PURE__*/React.createElement("a", {
                 href: detailUrl, target: "_blank", rel: "noopener noreferrer",
                 style: {
-                  display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
                   backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
                 }
               }, "자세히보기") : null
@@ -5662,7 +5662,7 @@ function SharedContentPreviewModal({ item, onClose }) {
           return /*#__PURE__*/React.createElement("a", {
             href: detailUrl, target: "_blank", rel: "noopener noreferrer",
             style: {
-              display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
               backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
             }
           }, "자세히보기");

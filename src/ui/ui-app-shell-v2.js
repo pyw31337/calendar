@@ -407,7 +407,8 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     return formatted.replace(/^\[?모임확정\]?\s*/u, '').trim() || String(primary.date);
   }, [primary?.date]);
 
-  if (!list.length) return React.createElement('p', { className: 'bp-empty-hero', 'aria-label': '가까운 확정 일정' }, '다가오는 확정 일정이 없습니다.');
+  // No upcoming confirmed meeting: show nothing (the hero just ends at the quick nav).
+  if (!list.length) return null;
 
   const firstPlaceName = primaryPlaces[0]
     ? String(primaryPlaces[0].name || primaryPlaces[0].alias || '').trim()

@@ -8,7 +8,7 @@
       --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
     }
     .v2-places * { box-sizing: border-box; }
-    .v2-places { margin: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
+    .v2-places { margin: 0; font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
     .v2-places button, .v2-places input { font-family: inherit; }
 
     .v2-places .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }

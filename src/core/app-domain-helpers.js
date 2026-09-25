@@ -1751,7 +1751,7 @@ function normalizeCalendarUrlParams(fallbackCalId = null) {
 const getAppBaseUrl = GATHER_APP_UTILS.getAppBaseUrl
   ? () => GATHER_APP_UTILS.getAppBaseUrl(window.location)
   : function getAppBaseUrl() {
-    let basePath = window.location.pathname.replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+    let basePath = window.location.pathname.replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
     if (!basePath.endsWith('/')) basePath += '/';
     return `${window.location.origin}${basePath}`;
   };

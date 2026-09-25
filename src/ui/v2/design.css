@@ -1,7 +1,7 @@
 /* v2-shell-structure: first-class memo/places destinations; Bento side-nav is source of IA. */
 /* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
 .renewal-shell.v2-design {
-  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+  --font-sans: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
   --renewal-page-max: 1600px;
   --v2-side-nav-width: 280px;
   /* Brand = vivid schedule purple (same family as --cal-schedule) */
@@ -1607,19 +1607,20 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* --------------------------------------------------------------------------
  * Side-nav mock parity (mock-chat-header-side.png)
  * Measured: brand top ~16–28px air; nav pitch ~44–48px; icons ~18px; labels ~14px.
- * Explicit px under .v2-design kills rem-drift from competing --v2-fs / font-size rules.
+ * Explicit sizes under .v2-design (with !important) kill drift from competing --v2-fs / font-size
+ * rules; they are rem so the 글자크기 setting (root font-size) scales the rail too.
  * IA: brand → primary → content/archive → settings/manual → footer (JS).
  * -------------------------------------------------------------------------- */
 .v2-design .bp-side-nav-head {
   padding: 24px 14px 12px !important;
 }
 .v2-design .bp-side-nav-brand-text {
-  font-size: 15px !important;
+  font-size: 0.9375rem !important;
   font-weight: 800 !important;
   line-height: 1.25;
 }
 .v2-design .bp-side-nav-cal-badge {
-  font-size: 10px !important;
+  font-size: 0.625rem !important;
   font-weight: 800 !important;
   line-height: 1.3 !important;
   padding: 2px 8px !important;
@@ -1632,7 +1633,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   padding: 4px 10px !important;
 }
 .v2-design .bp-side-nav-item {
-  font-size: 14px !important;
+  font-size: 0.875rem !important;
   /* Lighter than the active item's 800 (above) on purpose, so the active row reads as
    * both heavier text and a highlighted background. */
   font-weight: 500;
@@ -1657,31 +1658,31 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .bp-side-nav-item-meta,
 .v2-design .bp-side-nav-item-sub {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 /* Same spec as the name-style pills (cal-badge / chat-name-pill) -- was slightly smaller
  * (1px 6px vs 2px 7px), which read as an unrelated, differently-designed badge. */
 .v2-design .bp-side-nav-item-badge {
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 800;
   padding: 2px 7px;
   border-radius: 9999px;
 }
 .v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
 .v2-design .bp-side-nav-item-meta.chat-name-pill {
-  font-size: 10px !important;
+  font-size: 0.625rem !important;
   padding: 2px 7px !important;
 }
 .v2-design .bp-side-nav-date-chip {
-  font-size: 10px !important;
+  font-size: 0.625rem !important;
   padding: 2px 2px !important;
 }
 .v2-design .bp-side-nav-footer {
   padding: 10px 10px 16px;
 }
 .v2-design .bp-side-nav-collapse-btn {
-  font-size: 12px !important;
+  font-size: 0.75rem !important;
   padding: 8px;
   border-radius: 9999px;
   margin-top: 8px;
@@ -1706,10 +1707,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     gap: 8px !important;
   }
   .v2-design .bp-side-nav-brand-text {
-    font-size: 15px !important;
+    font-size: 0.9375rem !important;
   }
   .v2-design .bp-side-nav-item {
-    font-size: 14px !important;
+    font-size: 0.875rem !important;
     padding: 0 12px !important;
     margin: 0 !important;
     min-height: 44px !important;

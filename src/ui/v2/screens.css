@@ -362,7 +362,7 @@
   white-space: nowrap;
 }
 @media (max-width: 767px) {
-  .v2-design .bp-search-input { font-size: 16px; }
+  .v2-design .bp-search-input { font-size: max(16px, 1rem); }
 }
 
 /* Legacy bodies reserved top padding for fixed 56px headers — reclaim under sticky chrome */
@@ -2186,7 +2186,7 @@
 .v2-design .v2-page-header .bp-back-btn svg { width: 18px; height: 18px; }
 .v2-design .v2-page-header .bp-header-title {
   color: var(--v2-ink-2, #6b6580);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -2202,13 +2202,13 @@
   white-space: nowrap;
 }
 .v2-design .v2-page-header .bp-header-brand-mark {
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1;
 }
 .v2-design .v2-page-header .bp-header-brand-name {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1;
 }

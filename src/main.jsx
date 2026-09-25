@@ -29,7 +29,8 @@ const FIREBASE_SDK_VERSION = (() => {
 const firebaseScriptLoadPromises = new Map();
 
 function resolveFirebaseSdkUrl(src) {
-  const absolute = new URL(src, window.location.href);
+  // document.baseURI: under /app/<id>/ the page's <base> points vendor/ at the site root.
+  const absolute = new URL(src, document.baseURI || window.location.href);
   absolute.searchParams.set('v', FIREBASE_SDK_VERSION);
   return absolute.toString();
 }
