@@ -400,7 +400,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const editMemoTextareaRef = React.useRef(null);
   // editText gets set from an existing memo's text when 수정 is clicked (not just from typing),
   // so sizing needs to run on every editText change, not just once on mount.
-  React.useEffect(() => autoGrowTextarea(editMemoTextareaRef.current, 400), [editText]);
+  // Block body: autoGrowTextarea returns an object, which React would call as the cleanup.
+  React.useEffect(() => { autoGrowTextarea(editMemoTextareaRef.current, 400); }, [editText]);
   const [editColor, setEditColor] = React.useState('');
   const [editIsPinned, setEditIsPinned] = React.useState(false);
   const [editTags, setEditTags] = React.useState([]); // array of strings (tag tokens)

@@ -80,7 +80,9 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const memoTextareaRef = React.useRef(null);
   // This modal remounts fresh each time it opens (isRegisterOpen && <PlaceRegisterModal .../>),
   // so a mount-only effect is enough to size an existing place's memo correctly on open.
-  React.useEffect(() => autoGrowTextarea(memoTextareaRef.current, 480), []);
+  // Block body on purpose: autoGrowTextarea returns its measurement object, and an effect that
+  // returns a non-function makes React call it as the cleanup ("t is not a function" screen).
+  React.useEffect(() => { autoGrowTextarea(memoTextareaRef.current, 480); }, []);
   const [categoryId, setCategoryId] = React.useState(editingPlace ? editingPlace.categoryId : (categories[0]?.id || 'etc'));
   const [visitStatus, setVisitStatus] = React.useState(editingPlace ? editingPlace.visitStatus : 'visited');
   const [visitDate, setVisitDate] = React.useState(() => {
