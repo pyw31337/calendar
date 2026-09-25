@@ -35,8 +35,13 @@ if (!/base\.id !== next\.id/.test(mainAndData) || !/Calendar ID mismatch/.test(m
   fail('mergeCalendarRecord missing cross-calendar id guard');
 } else ok('mergeCalendarRecord refuses different calendar ids');
 
+// U10 moved the chat message window (and its per-calendar older-history reset) into
+// use-chat-message-window.js; the count/preview resets stay in app-main.
+const chatWindowSrc = readFileSync(resolve(root, 'src/core/use-chat-message-window.js'), 'utf8');
+for (const c of ['setOlderChatMessages([])', 'setGalleryLiveMessages([])']) {
+  if (!chatWindowSrc.includes(c)) fail('missing state clear in use-chat-message-window.js: ' + c);
+}
 for (const c of [
-  'setOlderChatMessages([])',
   'setTotalChatCount(null)',
   'setTotalMemoCount(null)',
   'setTotalGalleryCount(null)',
