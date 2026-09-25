@@ -26,7 +26,7 @@ export function SearchResultLogRow({ kindLabel, kindColor, badgeName, badgeColor
     className: "global-search-result",
     style: {
       display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
-      padding: '14px 16px', borderRadius: '14px', backgroundColor: '#F8FAFC', border: '1px solid var(--border-subtle)',
+      padding: '14px 16px', borderRadius: '14px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)',
       cursor: onClick ? 'pointer' : 'default', font: 'inherit'
     }
   },

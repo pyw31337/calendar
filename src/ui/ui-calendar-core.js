@@ -1753,7 +1753,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         decoding: 'async',
         "data-stop-card-open": true,
         onClick: (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } openMemoLightbox(0); },
-        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px', cursor: setActiveLightbox ? 'pointer' : undefined }
+        // Square like the multi-image grid tiles below (was a 140px-tall full-width strip that
+        // cropped most photos to a sliver).
+        style: { display: 'block', width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px', cursor: setActiveLightbox ? 'pointer' : undefined }
       });
     }
 
@@ -2129,7 +2131,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-sm)',
           padding: '6px 8px',
-          backgroundColor: '#fff',
+          backgroundColor: 'var(--bg-card)',
           color: 'var(--text-main)',
           outline: 'none',
           boxSizing: 'border-box'
@@ -2173,7 +2175,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
             style: {
               flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
-              backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
+              backgroundColor: 'var(--accent-primary)', color: 'var(--on-brand, #FFFFFF)', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
               cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
             }
           }, isSavingComment ? "저장 중…" : "저장")

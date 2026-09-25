@@ -2065,7 +2065,7 @@ export function HistoryView({
       const isCollapsed = collapsedMemoryDates.has(section.dateKey);
       return /*#__PURE__*/React.createElement("section", {
         key: section.dateKey,
-        style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: '#FFFFFF', marginBottom: '10px' }
+        style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-card)', marginBottom: '10px' }
       },
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
@@ -2078,7 +2078,7 @@ export function HistoryView({
           },
             /*#__PURE__*/React.createElement("span", {
               style: {
-                fontSize: 'var(--font-size-md)', fontWeight: 900, color: '#FFFFFF',
+                fontSize: 'var(--font-size-md)', fontWeight: 900, color: 'var(--on-status, #FFFFFF)',
                 backgroundColor: 'var(--status-green)', padding: '4px 10px', borderRadius: 'var(--radius-full)'
               }
             }, section.items.length),
@@ -3885,6 +3885,22 @@ function filterAndSortCultureItems(items, category) {
   });
 }
 
+// Keeps `isPinned` items first in their given order and shuffles the rest deterministically for
+// `seed` (a hash of seed+id, not Math.random per call), so re-renders with the same seed give the
+// same order and "더 보기" pages never repeat or skip an item.
+function pinAndShuffleCultureItems(items, isPinned, seed) {
+  const pinned = [];
+  const rest = [];
+  (items || []).forEach(item => (isPinned(item) ? pinned : rest).push(item));
+  const rank = (item) => {
+    let h = (seed ^ 0x9e3779b9) >>> 0;
+    const key = String(item && (item.id || item.title) || '');
+    for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
+    return h;
+  };
+  return pinned.concat(rest.map(item => ({ item, r: rank(item) })).sort((a, b) => a.r - b.r).map(entry => entry.item));
+}
+
 // 컨텐츠 상세의 "공유" 버튼/컨텐츠 등록의 "붙여넣기"가 쓰는 인코더/파서 -- 사진 공유와 같은
 // 원칙으로, 카드의 모든 필드(포스터~설명)를 URL 프래그먼트에 실어 보낸다. 복사 시점의 데이터를
 // 그대로 복제하는 개념이라, 공유한 뒤 원본을 수정/삭제해도 이미 붙여넣은 쪽에는 영향이 없다.
@@ -4694,6 +4710,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 한 번에 60개만 그리고 "더 보기"로 늘려가는 방식으로 초기 렌더 부담을 줄인다.
   const CULTURE_RENDER_PAGE_SIZE = 60;
   const [renderLimit, setRenderLimit] = React.useState(CULTURE_RENDER_PAGE_SIZE);
+  // One shuffle seed per tab mount: 문화행사's crawled list is shown in a fresh random order each
+  // visit (so thousands of shows all get exposure, not the same first 60), but stays put while
+  // the user scrolls, loads more, or toggles a checkbox.
+  const shuffleSeedRef = React.useRef(Math.floor(Math.random() * 0x7fffffff));
   // 필터가 바뀌면(지역/카테고리) 보여줄 항목 자체가 달라지므로 페이지 크기를 처음부터 다시 센다.
   React.useEffect(() => {
     setRenderLimit(CULTURE_RENDER_PAGE_SIZE);
@@ -4909,7 +4929,24 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
 
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
-  const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
+  const lifecycleSorted = filterAndSortCultureItems(mergedItems, anniversaryCategory);
+  // 문화행사: 개별등록 and 캘린더연동 (already added to this calendar) stay pinned on top in date
+  // order; every other crawled show is shuffled.
+  let lifecycleItems = lifecycleSorted;
+  if (anniversaryCategory === 'event') {
+    // Same matching as findRegisteredAnniversary (source id, own id, or same-category title),
+    // indexed once instead of scanning every anniversary for each of ~4k items.
+    const linkedIds = new Set();
+    const linkedTitles = new Set();
+    (anniversaries || []).forEach(a => {
+      if (!a) return;
+      if (a.cultureSourceId) linkedIds.add(a.cultureSourceId);
+      if (a.id) linkedIds.add(a.id);
+      if (a.category === anniversaryCategory && a.title) linkedTitles.add(String(a.title).trim());
+    });
+    const isPinned = item => !!(item && (item.isCustomRegistered || linkedIds.has(item.id) || linkedTitles.has(String(item.title || '').trim())));
+    lifecycleItems = pinAndShuffleCultureItems(lifecycleSorted, isPinned, shuffleSeedRef.current);
+  }
   const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
 
   const renderEmptyGrid = (msg, chips = null) => /*#__PURE__*/React.createElement("div", {
@@ -5439,7 +5476,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                       disabled: isSavingMemo,
                       style: {
                         flex: 1, padding: '10px', borderRadius: 'var(--radius-md)', border: 'none',
-                        backgroundColor: 'var(--accent-primary)', color: '#fff', fontWeight: 800,
+                        backgroundColor: 'var(--accent-primary)', color: 'var(--on-brand, #fff)', fontWeight: 800,
                         fontSize: 'var(--font-size-md)', cursor: isSavingMemo ? 'wait' : 'pointer',
                         opacity: isSavingMemo ? 0.6 : 1
                       }

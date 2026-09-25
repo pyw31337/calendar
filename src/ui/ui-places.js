@@ -803,7 +803,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 
   if (loadError) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', backgroundColor: '#F1F5F9' }
+      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', backgroundColor: 'var(--bg-primary)' }
     }, "지도를 불러오지 못했습니다.");
   }
 
@@ -1900,7 +1900,7 @@ export function PlacesView({
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleSavePlaceMemoEntry(place, entry); },
                           disabled: !editingMemoEntryText.trim(),
-                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: 'var(--on-brand, #FFFFFF)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
                         }, "수정")
                       )
                     );

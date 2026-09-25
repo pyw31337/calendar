@@ -112,7 +112,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       }, /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid var(--status-green)', background: '#ECFDF5', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: 'var(--status-green)', fontWeight: 900, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'var(--status-green)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 900, whiteSpace: 'nowrap' }
+        style: { padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'var(--status-green)', color: 'var(--on-status, #FFFFFF)', fontSize: 'var(--font-size-sm)', fontWeight: 900, whiteSpace: 'nowrap' }
       }, "전원")), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
       }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {

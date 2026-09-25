@@ -425,7 +425,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         },
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: '#92400E', lineHeight: 1.45 } }, `기존 ${duplicatePlace.alias || duplicatePlace.name} 과 동일한 업체입니다. 병합하시겠습니까?`),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', marginTop: '7px' } },
-            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' } }, '병합'),
+            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--accent-primary)', color: 'var(--on-brand, #fff)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' } }, '병합'),
             /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' } }, '별도 등록')
           )
         ),
