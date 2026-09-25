@@ -647,6 +647,7 @@ export function AnniversaryModal({
         if (editingId === ann.id) {
           setEditingId(null);
           setNewTitle('');
+          setActiveTab('list');
         }
       } catch (err) {
         console.error('Anniversary delete error:', err);
@@ -823,9 +824,10 @@ export function AnniversaryModal({
     /*#__PURE__*/React.createElement("div", {
       style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
     },
+      /* Delete sits inside the edit form (left of 취소/수정 완료), not beside the pencil. */
       /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
         onEdit: () => handleEditClick(ann),
-        onDelete: () => handleDeleteAnniversary(ann)
+        showDelete: false
       })
     )
   );
@@ -1324,14 +1326,42 @@ export function AnniversaryModal({
             )
           ),
 
-          /* Save Button */
-          /*#__PURE__*/React.createElement("button", {
+          /* Save Button -- while editing: (left) 삭제 · (right) 취소 / 수정 완료 */
+          editingId ? /*#__PURE__*/React.createElement("div", {
+            className: "item-edit-actions-row",
+            style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }
+          },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn item-edit-delete-btn",
+              disabled: isSavingAnniversary,
+              onClick: () => {
+                const ann = (anniversaries || []).find(a => a && a.id === editingId);
+                if (ann) handleDeleteAnniversary(ann);
+              },
+              style: { marginRight: 'auto', padding: '10px 12px', background: 'none', border: 'none', color: 'var(--status-red, #DC2626)', fontWeight: 700, fontSize: 'var(--font-size-md)' }
+            }, "삭제"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action-outline",
+              disabled: isSavingAnniversary,
+              onClick: () => { setEditingId(null); setNewTitle(''); setActiveTab('list'); },
+              style: { padding: '10px 14px', fontSize: 'var(--font-size-md)' }
+            }, "취소"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-primary",
+              onClick: handleSaveAnniversary,
+              disabled: isSavingAnniversary,
+              style: { justifyContent: 'center', padding: '10px 14px', fontSize: 'var(--font-size-md)' }
+            }, isSavingAnniversary ? "저장 중..." : "수정 완료")
+          ) : /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "btn btn-primary",
             onClick: handleSaveAnniversary,
             disabled: isSavingAnniversary,
             style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: 'var(--font-size-md)', marginTop: '6px' }
-          }, isSavingAnniversary ? "저장 중..." : (editingId ? "기념일 수정 완료" : "기념일 등록"))
+          }, isSavingAnniversary ? "저장 중..." : "기념일 등록")
         ),
 
         /* TAB 3: Bulk Repeating Schedule Register */
@@ -2515,13 +2545,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 React.createElement('button', {
                   type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                   disabled: !participantToAdd,
-                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: '#F1F5F9' }
                 }, '수정')
               )
               : React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                 disabled: !participantToAdd,
-                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: '#F1F5F9' }
               }, '추가')
           )
         ),
@@ -2546,7 +2576,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             getIndividualSettlementAmount(row.participantId) !== 0 && React.createElement('span', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, `${getIndividualSettlementAmount(row.participantId) < 0 ? '+' : '-'}${Math.abs(getIndividualSettlementAmount(row.participantId)).toLocaleString()}원`),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
-              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
+              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid var(--v2-line, #CBD5E1)', flexShrink: 0 }
             }, React.createElement(PencilIcon, { size: 12 })),
             React.createElement('button', {
               type: 'button', title: '참여자 삭제', 'aria-label': '참여자 삭제', onClick: () => handleRemoveParticipantRow(row.id),
@@ -2753,7 +2783,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 style: {
                   padding: '10px 12px 11px', borderRadius: 'var(--radius-md)',
                   backgroundColor: '#F8FAFC',
-                  border: '1px dashed #CBD5E1',
+                  border: '1px dashed var(--v2-line, #CBD5E1)',
                   display: 'flex', flexDirection: 'column', gap: '5px'
                 }
               },

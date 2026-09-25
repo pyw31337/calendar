@@ -458,7 +458,7 @@ export function DateModal({
 
   const selectedPart = activeParticipants.find(p => p.id === participantId);
   const selectedPartName = selectedPart ? selectedPart.name : '';
-  const selectedPartColor = selectedPart ? selectedPart.color : '#94A3B8';
+  const selectedPartColor = selectedPart ? selectedPart.color: '#94A3B8';
 
   // Place state
   const [placeQuery, setPlaceQuery] = React.useState('');
@@ -2632,7 +2632,7 @@ export function DateModal({
             backgroundColor: 'rgba(239, 68, 68, 0.06)',
             color: 'rgb(239, 68, 68)'
           } : {
-            border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: '#7C3AED'
+            border: '1.5px solid var(--v2-accent-line, #C4B5FD)', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: 'var(--v2-accent, #7C3AED)'
           })
         }
       }, (!isConfirmed && isAllAvailable)

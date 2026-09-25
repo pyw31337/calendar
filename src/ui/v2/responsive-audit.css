@@ -450,7 +450,7 @@
 .renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] {
   min-height: 50px;
   padding: 0 !important;
-  color: #6b6580 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
   font-size: 0.8rem !important;
   font-weight: 800 !important;
   border-bottom-color: transparent !important;
@@ -484,7 +484,7 @@
   min-height: 32px;
   padding: 6px 12px !important;
   background: #f7f6fa !important;
-  color: #6b6580 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
   font-size: 0.72rem !important;
   font-weight: 800 !important;
 }
@@ -501,7 +501,7 @@
 }
 
 .renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
-  color: #6b6580 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
   border-radius: 7px !important;
 }
 
@@ -789,7 +789,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 999px !important;
   background: var(--bg-card) !important;
-  color: #6b6580 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
   box-shadow: none !important;
 }
 
@@ -853,7 +853,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
-  color: #6b6580 !important;
+  color: var(--v2-ink-2, #6b6580) !important;
   font-size: .76rem !important;
   line-height: 1.5 !important;
   margin-bottom: 10px !important;

@@ -708,7 +708,8 @@ export function MemoScreen(p) {
 /* -------------------------------------------------------------------------- */
 
 export function PlacesScreen(p) {
-  const [mapOpen, setMapOpen] = window.React.useState(p.mapOpenDefault !== false);
+  // The map starts closed (gray 지도보기 icon); the toggle opens it (purple) and closes it again.
+  const [mapOpen, setMapOpen] = window.React.useState(p.mapOpenDefault === true);
   // Search starts closed — the header search icon toggles the input row into view.
   const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
   const toggleSearch = () => setIsSearchOpen(v => !v);
@@ -722,7 +723,7 @@ export function PlacesScreen(p) {
     h(IconButton, {
       label: '지도보기',
       icon: 'map',
-      active: mapOpen,
+      active: typeof p.mapExpanded === 'boolean' ? p.mapExpanded : mapOpen,
       onClick: () => {
         setMapOpen(value => !value);
         if (p.onToggleMap) p.onToggleMap();
@@ -797,7 +798,7 @@ export function PlacesScreen(p) {
       h(
         'div',
         { className: 'v2-dest-controls bp-cat-filter-row', 'aria-label': '장소 분류' },
-        [{ id: 'all', name: '전체', color: '#1e1b2e' }, ...(p.categories || [])].map(category =>
+        [{ id: 'all', name: '전체', color: 'var(--v2-ink-1, #1e1b2e)' }, ...(p.categories || [])].map(category =>
           h(
             'button',
             {
@@ -1061,7 +1062,7 @@ export function SettlementScreen(p) {
                     style:
                       card.status === 'closed'
                         ? undefined
-                        : { color: '#6b6580', background: '#fafafc' },
+                        : { color: 'var(--v2-ink-2, #6b6580)', background: '#fafafc' },
                   },
                   card.status === 'closed' ? '정산 완료' : '진행중'
                 )
@@ -1550,12 +1551,12 @@ function makeTabbedScreen(name, title) {
         typeof p.onOpenRegion === 'function' && h(IconButton, { label: '지역설정', icon: 'map2', onClick: p.onOpenRegion }),
         typeof p.onOpenRegister === 'function' && h(IconButton, { label: '컨텐츠 등록', icon: 'scriptPlus', onClick: p.onOpenRegister }),
         typeof p.onSetGridCols === 'function' && h(IconButton, {
-          // Single toggle instead of two separate grid/list buttons -- the icon shows the view
-          // it switches TO (list icon while already in grid view, and vice versa), same as the
-          // 지도보기 map toggle: active (purple) reflects the current mode, here "grid view on".
-          label: p.gridCols === '1' ? '그리드뷰로 전환' : '리스트뷰로 전환',
-          icon: p.gridCols === '1' ? 'layoutColumns' : 'layoutRows',
-          active: p.gridCols !== '1',
+          // One toggle whose icon shows the CURRENT layout: two columns (dual view, the default)
+          // until pressed, then the single-column icon. It is a mode switch, not an on/off
+          // control, so it stays the neutral gray header icon in both states.
+          label: p.gridCols === '1' ? '싱글뷰 (눌러서 듀얼뷰로)' : '듀얼뷰 (눌러서 싱글뷰로)',
+          icon: p.gridCols === '1' ? 'layoutRows' : 'layoutColumns',
+          active: false,
           onClick: () => p.onSetGridCols(p.gridCols === '1' ? '2' : '1'),
         }),
       ])

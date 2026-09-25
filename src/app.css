@@ -167,7 +167,7 @@
 :root[data-theme="dark"] .date-item-badge.is-confirmed {
   background: #3B1E69 !important;
   color: #E9D5FF !important;
-  border: 1px solid #8B5CF6 !important;
+  border: 1px solid var(--v2-accent, #8B5CF6) !important;
 }
 :root[data-theme="dark"] .date-item-badge.is-available {
   background: #1D315C !important;
@@ -610,7 +610,7 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
 .gallery-comment-heartbeat::before {
   z-index: 1;
   box-sizing: border-box;
-  border: 2px solid #7C3AED;
+  border: 2px solid var(--v2-accent, #7C3AED);
   box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.35);
   animation-name: gallery-comment-border-flash;
 }
@@ -1585,7 +1585,7 @@ button, input, textarea, select {
 .btn-action-outline,
 .btn.btn-action-outline {
   background: #F1F5F9 !important;
-  border: 1px solid #CBD5E1 !important;
+  border: 1px solid var(--v2-line, #CBD5E1) !important;
   color: #0F172A !important;
   box-shadow: none;
 }
@@ -2211,8 +2211,8 @@ select.form-select {
 }
 
 @keyframes cell-glow-confirmed {
-  0% { border-color: #7C3AED; box-shadow: 0 0 1px rgba(124, 58, 237, 0.12), inset 0 0 3px rgba(124, 58, 237, 0.1); }
-  100% { border-color: #A78BFA; box-shadow: 0 0 9px rgba(167, 139, 250, 0.42), inset 0 0 6px rgba(167, 139, 250, 0.25); }
+  0% { border-color: var(--v2-accent, #7C3AED); box-shadow: 0 0 1px rgba(124, 58, 237, 0.12), inset 0 0 3px rgba(124, 58, 237, 0.1); }
+  100% { border-color: var(--v2-accent-line, #A78BFA); box-shadow: 0 0 9px rgba(167, 139, 250, 0.42), inset 0 0 6px rgba(167, 139, 250, 0.25); }
 }
 :root[data-theme="dark"] .day-cell.other-month {
   background: rgba(27, 37, 64, 0.34);
@@ -2409,12 +2409,12 @@ select.form-select {
   background: var(--bg-card);
 }
 .poll-option-row.is-confirmed-winner {
-  border: 1px solid #8B5CF6;
+  border: 1px solid var(--v2-accent, #8B5CF6);
   background: #F5F3FF;
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
 }
 :root[data-theme="dark"] .poll-option-row.is-confirmed-winner {
-  border-color: #A78BFA;
+  border-color: var(--v2-accent-line, #A78BFA);
   background: rgba(139, 92, 246, 0.16);
   box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.12);
 }
@@ -3433,7 +3433,7 @@ select.form-select {
   100% { transform: translateY(0); }
 }
 .chat-search-focused-bubble {
-  border: 1.5px solid #7C3AED !important;
+  border: 1.5px solid var(--v2-accent, #7C3AED) !important;
   background-color: rgba(124, 58, 237, 0.06) !important;
   animation: chat-search-shake 0.72s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
@@ -3444,7 +3444,7 @@ select.form-select {
   transform: none !important;
 }
 .place-card-row.is-focused {
-  border: 1px solid #8B5CF6 !important;
+  border: 1px solid var(--v2-accent, #8B5CF6) !important;
   box-shadow: none !important;
   background-color: rgba(139, 92, 246, 0.08) !important;
 }
@@ -3599,7 +3599,7 @@ select.form-select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--v2-line, #E2E8F0);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   background-color: #F8FAFC;
@@ -3912,7 +3912,7 @@ select.form-select {
   }
 }
 .admin-metric-card {
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--v2-line, #E2E8F0);
   border-radius: var(--radius-md);
   padding: 16px 12px;
   background-color: #F8FAFC;
@@ -4448,7 +4448,7 @@ select.form-select {
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
 }
 .date-item-btn.confirmed-meeting-card .memo-capsule-badge:not(.is-past) {
-  color: #1e1b2e;
+  color: var(--v2-ink-1, #1e1b2e);
 }
 /* Place box inside a confirmed-meeting card keeps no drop shadow at all. */
 .date-item-btn.confirmed-meeting-card .place-memo-stack,
@@ -4611,7 +4611,7 @@ select.form-select {
   :root[data-theme="dark"] .date-item-badge.is-confirmed {
     background: #3B1E69 !important;
     color: #E9D5FF !important;
-    border: 1px solid #8B5CF6 !important;
+    border: 1px solid var(--v2-accent, #8B5CF6) !important;
   }
   :root[data-theme="dark"] .date-item-badge.is-available {
     background: #1D315C !important;
@@ -6727,7 +6727,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-home-hero .dday-compact:active { transform: scale(.98); }
 .renewal-home-hero .dday-compact-badge {
-  background: rgba(255,255,255,.95); color: #7C3AED; font-weight: 900; font-size: 1.1rem; line-height: 1;
+  background: rgba(255,255,255,.95); color: var(--v2-accent, #7C3AED); font-weight: 900; font-size: 1.1rem; line-height: 1;
   padding: 6px 10px; border-radius: 9999px; flex-shrink: 0; letter-spacing: -.02em;
   animation: renewal-dday-heartbeat .75s ease-in-out infinite; transform-origin: center;
 }
@@ -6750,7 +6750,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-hero .dday-expanded-tag { display: inline-flex; align-items: center; background: rgba(255,255,255,.28); border-radius: 9999px; padding: 3px 9px; font-size: .62rem; font-weight: 700; }
 .renewal-home-hero .dday-expanded-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 .renewal-home-hero .dday-collapse-btn { flex-shrink: 0; background: rgba(255,255,255,.24); border: none; color: #fff; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; }
-.renewal-home-hero .dday-expanded-badge, .renewal-home-hero .dday-view-btn { background: var(--bg-card); color: #7C3AED; font-weight: 800; border-radius: 9999px; }
+.renewal-home-hero .dday-expanded-badge, .renewal-home-hero .dday-view-btn { background: var(--bg-card); color: var(--v2-accent, #7C3AED); font-weight: 800; border-radius: 9999px; }
 .renewal-home-hero .dday-expanded-badge { font-size: .62rem; padding: 3px 8px; }
 .renewal-home-hero .dday-view-btn { border: 0; font-size: .66rem; padding: 6px 12px; white-space: nowrap; cursor: pointer; }
 
@@ -6787,7 +6787,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   padding: 5px 12px; cursor: pointer; transition: all .15s ease;
 }
 .renewal-shell-main.is-records .renewal-shell-subtab-item.is-active {
-  background: var(--brand-soft); border-color: #7C3AED; color: #7C3AED; font-weight: 800;
+  background: var(--brand-soft); border-color: var(--v2-accent, #7C3AED); color: var(--v2-accent, #7C3AED); font-weight: 800;
 }
 
 /* Centered fixed viewport positioning matching Claude Full references */
@@ -6949,7 +6949,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   display: flex !important;
   flex-direction: column !important;
   gap: 1px !important;
-  border-left: 2.5px solid #7C3AED !important;
+  border-left: 2.5px solid var(--v2-accent, #7C3AED) !important;
   background: var(--brand-soft) !important;
   border-radius: 0 8px 8px 0 !important;
   padding: 4px 8px !important;
@@ -6959,7 +6959,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-chat .chat-reply-quote-author {
   font-size: 0.6rem !important;
   font-weight: 800 !important;
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
 }
 .renewal-shell-main.is-chat .chat-reply-quote-text {
   font-size: 0.66rem !important;
@@ -7001,7 +7001,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-shell-main.is-chat .chat-composer textarea:focus,
 .renewal-shell-main.is-chat .chat-composer input[type="text"]:focus {
-  border-color: #7C3AED !important;
+  border-color: var(--v2-accent, #7C3AED) !important;
   background: var(--bg-card) !important;
   outline: none !important;
 }
@@ -7050,8 +7050,8 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-records .tag-chip.is-selected,
 .renewal-shell-main.is-records [data-tag-chip].is-selected {
   background: var(--brand-soft);
-  border-color: #7C3AED;
-  color: #7C3AED;
+  border-color: var(--v2-accent, #7C3AED);
+  color: var(--v2-accent, #7C3AED);
 }
 .renewal-shell-main.is-records .memo-card-hover {
   background: var(--bg-card) !important;
@@ -7063,11 +7063,11 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   position: relative !important;
 }
 .renewal-shell-main.is-records .memo-card-hover .memo-card-pin-btn {
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
   opacity: 0.8 !important;
 }
 .renewal-shell-main.is-records .memo-tag {
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
   font-weight: 700 !important;
   font-size: 0.66rem !important;
 }
@@ -7080,7 +7080,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-shell-main.is-records .memo-comment-send {
   background: var(--brand-soft) !important;
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
   font-weight: 800 !important;
   font-size: 0.68rem !important;
   border: none !important;
@@ -7100,7 +7100,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   height: 90px !important;
   min-height: 90px !important;
   border-radius: 12px !important;
-  background: linear-gradient(135deg, #E9E5F7, #F3EEFF) !important;
+  background: linear-gradient(135deg, var(--v2-surface-2, #E9E5F7), var(--v2-tint-soft, #F3EEFF)) !important;
   overflow: hidden !important;
 }
 .renewal-shell-main.is-records .places-list-toolbar { padding: 10px 14px; background: var(--bg-primary); }
@@ -7155,7 +7155,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-records .place-visit-count {
   font-size: 0.68rem !important;
   font-weight: 700 !important;
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
 }
 .renewal-shell-main.is-records .place-last-visit {
   font-size: 0.66rem !important;
@@ -7205,7 +7205,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-settlement .settlement-card-badge {
   font-size: 0.62rem !important;
   font-weight: 800 !important;
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
   background: var(--brand-soft) !important;
   padding: 2px 8px !important;
   border-radius: 9999px !important;
@@ -7219,13 +7219,13 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-settlement .settlement-total-card {
   background: var(--brand-soft) !important;
   border-color: #E9D5FF !important;
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
 }
 .renewal-shell-main.is-settlement .settlement-share-btn {
   width: 100% !important;
   margin-top: 12px !important;
   background: var(--brand-soft) !important;
-  color: #7C3AED !important;
+  color: var(--v2-accent, #7C3AED) !important;
   font-weight: 800 !important;
   font-size: 0.76rem !important;
   border: none !important;
@@ -7471,7 +7471,7 @@ body:has(.v2-design) {
   padding: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
-  color: #7c3aed !important;
+  color: var(--v2-accent, #7c3aed) !important;
   opacity: 0.8 !important;
   flex-shrink: 0 !important;
   align-items: center !important;
@@ -7502,7 +7502,7 @@ body:has(.v2-design) {
 .bento-card .more-link:hover,
 .renewal-shell-main.is-calendar .renewal-home-summary-heading button:hover,
 .more-link:hover {
-  color: #7c3aed !important;
+  color: var(--v2-accent, #7c3aed) !important;
 }
 
 .renewal-shell-main.is-calendar .renewal-home-chat-list { display: flex; flex-direction: column; gap: 12px; }
@@ -7513,9 +7513,9 @@ body:has(.v2-design) {
   flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 18px; padding: 2px 7px; border-radius: 9999px; color: #fff; font-size: .6rem; font-weight: 800; white-space: nowrap;
 }
 .renewal-home-chat-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-.renewal-home-chat-image { width: 92px; height: 130px; object-fit: cover; border: 2px solid #a78bfa; border-radius: 12px; background: #e9e5f7; }
-.renewal-home-chat-reply { display: flex; flex-direction: column; width: min(210px, 100%); margin-bottom: 4px; padding: 4px 8px; border-left: 2.5px solid #7c3aed; border-radius: 0 8px 8px 0; background: var(--brand-soft); }
-.renewal-home-chat-reply strong { color: #7c3aed; font-size: .6rem; }
+.renewal-home-chat-image { width: 92px; height: 130px; object-fit: cover; border: 2px solid var(--v2-accent-line, #a78bfa); border-radius: 12px; background: var(--v2-surface-2, #e9e5f7); }
+.renewal-home-chat-reply { display: flex; flex-direction: column; width: min(210px, 100%); margin-bottom: 4px; padding: 4px 8px; border-left: 2.5px solid var(--v2-accent, #7c3aed); border-radius: 0 8px 8px 0; background: var(--brand-soft); }
+.renewal-home-chat-reply strong { color: var(--v2-accent, #7c3aed); font-size: .6rem; }
 .renewal-home-chat-reply span { color: var(--text-muted); font-size: .66rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .renewal-shell-main.is-calendar .renewal-home-chat-text { color: var(--text-main); font-size: .76rem; line-height: 1.4; white-space: normal; }
 .renewal-shell-main.is-calendar .renewal-home-chat-time { margin-top: 3px; color: var(--text-light); font-size: .6rem; }
@@ -7534,7 +7534,7 @@ body:has(.v2-design) {
 .renewal-home-memo-preview small { margin-top: 2px; color: var(--text-muted); font-size: .64rem; line-height: 1.35; }
 .renewal-home-memo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 10px; }
 .renewal-home-memo-meta b { padding: 2px 7px; border-radius: 9999px; color: #fff; font-size: .58rem; }
-.renewal-home-memo-meta em { color: #7c3aed; font-size: .62rem; font-style: normal; font-weight: 700; }
+.renewal-home-memo-meta em { color: var(--v2-accent, #7c3aed); font-size: .62rem; font-style: normal; font-weight: 700; }
 
 .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery { padding: 28px 0 0 !important; overflow: hidden; }
 .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery .renewal-home-summary-heading { padding: 0 14px; }
@@ -7558,7 +7558,7 @@ body:has(.v2-design) {
   border: 0 !important;
   padding: 0 !important;
   border-radius: 6px !important;
-  background: #ECEAF5 !important;
+  background: var(--v2-surface-2, #ECEAF5) !important;
   cursor: pointer !important;
   display: block !important;
   box-sizing: border-box !important;
@@ -7608,7 +7608,7 @@ body:has(.v2-design) {
   animation-duration: 2.8s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-delay: inherit;
 }
 .renewal-shell-main.is-calendar .gallery-comment-heartbeat::before {
-  z-index: 1; box-sizing: border-box; border: 2px solid #7c3aed;
+  z-index: 1; box-sizing: border-box; border: 2px solid var(--v2-accent, #7c3aed);
   box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.35); animation-name: gallery-comment-border-flash;
 }
 .renewal-shell-main.is-calendar .gallery-comment-heartbeat::after { z-index: 2; background: var(--bg-card); animation-name: gallery-comment-white-flash; }
@@ -7618,7 +7618,7 @@ body:has(.v2-design) {
 .renewal-home-place-copy { display: block; min-width: 0; }
 .renewal-home-place-tags { display: flex; gap: 4px; margin-bottom: 6px; }
 .renewal-home-place-tags em { padding: 2px 6px; border-radius: 9999px; background: #f1f5f9; color: var(--text-muted); font-size: .58rem; font-style: normal; font-weight: 800; }
-.renewal-home-place-tags em.is-planned { background: var(--brand-soft); color: #7c3aed; }
+.renewal-home-place-tags em.is-planned { background: var(--brand-soft); color: var(--v2-accent, #7c3aed); }
 .renewal-home-place-tags em.is-visited { background: #ecfdf5; color: #059669; }
 .renewal-shell-main.is-calendar .renewal-home-place-card strong { color: var(--text-main); font-size: .8rem; }
 .renewal-shell-main.is-calendar .renewal-home-place-card small { margin-top: 2px; color: var(--text-muted); font-size: .68rem; }
@@ -7690,9 +7690,9 @@ body:has(.v2-design) {
 .side-nav.is-open { transform: translateX(0); }
 .side-nav-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 14px 8px; flex-shrink: 0; }
 .side-nav-brand { font-weight: 800; font-size: 0.98rem; color: var(--text-main); display: flex; align-items: center; gap: 7px; overflow: hidden; }
-.side-nav-brand svg { color: #7c3aed; flex-shrink: 0; }
+.side-nav-brand svg { color: var(--v2-accent, #7c3aed); flex-shrink: 0; }
 .side-nav-close-btn { background: none; border: none; color: var(--text-muted); padding: 5px; display: inline-flex; cursor: pointer; border-radius: 6px; flex-shrink: 0; }
-.side-nav-close-btn:hover { background: var(--bg-primary); color: #7c3aed; }
+.side-nav-close-btn:hover { background: var(--bg-primary); color: var(--v2-accent, #7c3aed); }
 .side-nav-group { padding: 4px 10px; border-top: 1px solid var(--border-subtle); }
 .side-nav-group:first-of-type { border-top: none; }
 .side-nav-footer { padding: 8px 10px 16px; border-top: 1px solid var(--border-subtle); margin-top: auto; flex-shrink: 0; }
@@ -7701,7 +7701,7 @@ body:has(.v2-design) {
   padding: 9px 10px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; margin: 2px 0;
 }
 .side-nav-item:hover { background: var(--bg-primary); }
-.side-nav-item.is-active { background: var(--brand-soft); color: #7c3aed; }
+.side-nav-item.is-active { background: var(--brand-soft); color: var(--v2-accent, #7c3aed); }
 .side-nav-item-icon { display: inline-flex; flex-shrink: 0; }
 .side-nav-item-title { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .side-nav-item-meta {
@@ -7716,19 +7716,19 @@ body:has(.v2-design) {
 }
 .side-nav-manual-banner:hover { background: #ede4ff; }
 .side-nav-manual-banner-icon-wrap {
-  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: var(--bg-card); color: #7c3aed;
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: var(--bg-card); color: var(--v2-accent, #7c3aed);
   display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(30,27,46,0.1);
 }
 .side-nav-manual-banner-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.side-nav-manual-banner-title { font-weight: 800; font-size: 0.82rem; color: #7c3aed; }
+.side-nav-manual-banner-title { font-weight: 800; font-size: 0.82rem; color: var(--v2-accent, #7c3aed); }
 .side-nav-manual-banner-sub { font-size: 0.66rem; font-weight: 600; color: var(--text-muted); margin-top: 1px; }
-.side-nav-manual-banner-chevron { flex-shrink: 0; color: #7c3aed; opacity: 0.7; display: flex; }
+.side-nav-manual-banner-chevron { flex-shrink: 0; color: var(--v2-accent, #7c3aed); opacity: 0.7; display: flex; }
 .side-nav-collapse-btn {
   display: none; width: 100%; align-items: center; justify-content: center; gap: 6px; margin-top: 6px;
   background: none; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 7px;
   font-weight: 700; font-size: 0.72rem; color: var(--text-muted); cursor: pointer;
 }
-.side-nav-collapse-btn:hover { background: var(--bg-primary); color: #7c3aed; }
+.side-nav-collapse-btn:hover { background: var(--bg-primary); color: var(--v2-accent, #7c3aed); }
 
 @media (min-width: 768px) {
   .renewal-shell-main.is-calendar > .renewal-home-hero,

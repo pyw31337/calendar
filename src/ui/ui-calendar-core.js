@@ -970,7 +970,7 @@ export function CalendarGrid({
           }
         }, cornerText, isHoliday && isConfirmed ? /*#__PURE__*/React.createElement("span", {
           style: {
-            color: '#7C3AED'
+            color: 'var(--v2-accent, #7C3AED)'
           }
         }, "·확정") : null)
       ),
@@ -1569,7 +1569,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   // 'page' = memo-page standard module; 'preview' = main-screen section customization.
   const isPreview = variant === 'preview';
@@ -2068,11 +2067,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
+        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
       );
         }
       })),
@@ -2146,6 +2141,21 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           onClick: () => setIsCommentPartOpen(true)
         }),
         /*#__PURE__*/React.createElement("div", { className: "comment-composer-buttons" },
+          /* Editing an existing comment: 삭제 sits here (left of 취소/저장) instead of as a
+             trash icon beside every comment. */
+          editingCommentId && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "item-edit-delete-btn",
+            onClick: e => {
+              const target = comments.find(c => c.id === editingCommentId);
+              if (target) handleDeleteComment(e, target);
+            },
+            style: {
+              flexShrink: 0, height: '30px', padding: '0 10px', marginRight: 'auto', borderRadius: 'var(--radius-sm)',
+              border: 'none', background: 'none', color: 'var(--status-red, #DC2626)',
+              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
+            }
+          }, "삭제"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: handleCancelComment,
@@ -2614,9 +2624,9 @@ export function GlobalSearchModal({
   const SEARCH_KIND = {
     schedules: { label: '일정', color: 'var(--v2-primary, #7C2FE5)' },
     chat: { label: '채팅', color: '#2563EB' },
-    photos: { label: '사진', color: '#8B5CF6' },
+    photos: { label: '사진', color: 'var(--v2-accent, #8B5CF6)' },
     places: { label: '장소', color: '#0D9488' },
-    tags: { label: '사진 태그', color: '#7C3AED' },
+    tags: { label: '사진 태그', color: 'var(--v2-accent, #7C3AED)' },
     expenses: { label: '정산', color: '#DC2626' },
     memos: { label: '메모', color: '#CA8A04' },
     content: { label: '콘텐츠', color: '#EA580C' }

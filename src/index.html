@@ -20,6 +20,10 @@
          for "홈 화면에 추가" instead of the manifest, which put the transparent favicon on the
          home screen. Home-screen icons come from manifest*.json / apple-touch-icon. -->
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v3-32.png" />
+    <!-- 96px transparent M: large enough that mobile browsers (tab strip, history) use it
+         instead of borrowing the filled apple-touch/manifest icon, still well below the
+         192px they take for a home-screen shortcut. -->
+    <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-v3-96.png" />
     <link rel="icon" href="favicon.ico" />
     <meta name="theme-color" content="#4F46E5" />
     <meta name="mobile-web-app-capable" content="yes" />
