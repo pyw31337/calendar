@@ -1981,7 +1981,8 @@
 
 /* Legacy memo cards → MemoFull left-accent + denser internal rhythm */
 .v2-design .v2-memo .memo-card-hover,
-.v2-design .v2-memo-card-wrap .memo-card-hover {
+.v2-design .v2-memo-card-wrap .memo-card-hover,
+.v2-design .v2-home-memo-module .memo-card-hover {
   padding: 12px !important;
   border-radius: 0 14px 14px 0 !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -1991,7 +1992,8 @@
 }
 
 .v2-design .v2-memo .memo-card-hover [style*="marginBottom"],
-.v2-design .v2-memo-card-wrap .v2-memo-text {
+.v2-design .v2-memo-card-wrap .v2-memo-text,
+.v2-design .v2-home-memo-module .memo-card-hover [style*="marginBottom"] {
   margin-bottom: 8px !important;
 }
 

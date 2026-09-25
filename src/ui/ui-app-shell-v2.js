@@ -1374,17 +1374,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
-  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
-  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
-  const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
-  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
-  const [commentOpenId, setCommentOpenId] = React.useState(null);
-  const [commentDraft, setCommentDraft] = React.useState('');
-  const [commentParticipantId, setCommentParticipantId] = React.useState('');
-  const [commentParticipantOpen, setCommentParticipantOpen] = React.useState(false);
-  const [commentSaving, setCommentSaving] = React.useState(false);
-  const [openVideoByUrl, setOpenVideoByUrl] = React.useState({});
+  const MemoShareModal = __comp.MemoShareModal || __deps.MemoShareModal;
+  const ReactDOM = window.ReactDOM;
+  const memoDateProps = calendarContext?.dateModalProps || {};
+  const [sharingMemo, setSharingMemo] = React.useState(null);
   const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
   // Match the legacy main-screen CommentsSection: preserve the live feed order, remove
   // gallery/meeting upload documents, then show the latest three rows. The previous V2
@@ -1479,7 +1472,6 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   );
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const onMemoCommentsChange = calendarContext?.onMemoCommentsChange || window.__gatherV2MemoCommentsChange;
-  const commentParticipant = participants.find(participant => participant.id === commentParticipantId) || participants[0] || null;
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
   const displayName = row => authorFor(row, participants).name;
   const displayColor = row => authorFor(row, participants).color;
@@ -1488,10 +1480,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     const d = dateValue(value);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
-  const formatShortDateTime = value => {
-    const d = dateValue(value);
-    return Number.isNaN(d.getTime()) ? '' : `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}(${['일','월','화','수','목','금','토'][d.getDay()]}) ${formatTime(value)}`;
-  };
+
   return React.createElement('div', { className: bentoClass('renewal-home-summary bento-grid') },
     React.createElement('div', { className: bentoClass('renewal-home-summary-section bento-card wide enter'), style: { animationDelay: '0.04s' } },
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
@@ -1500,41 +1489,56 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
         const goChat = event => {
+          // Link cards, file cards, players and images inside the bubble keep their own tap.
+          if (event?.target?.closest?.('a, button, video, audio, img, input, textarea, [data-stop-card-open], .chat-file-attachment-card')) return;
           event?.stopPropagation?.();
           onChangeView?.('chat');
         };
-        return React.createElement('button', {
-          type: 'button',
+        const renderBody = __deps.renderChatMessageBody || window.GATHER_APP_UTILS?.renderChatMessageBody;
+        // The chat room's own body renderer: uploaded images, file previews, and link previews
+        // (a URL whose card loaded is hidden from the text), so home shows what the room shows.
+        const sharedBody = typeof renderBody === 'function'
+          ? renderBody(m, calendarContext?.setActiveLightbox, { maxWidth: '200px', maxHeight: '160px', isMiniChat: true }, '', null, null, true)
+          : null;
+        return React.createElement('div', {
+          role: 'button',
+          tabIndex: 0,
           className: 'v2-home-chat-row',
           key: m.id || i,
           onClick: goChat,
+          onKeyDown: event => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onChangeView?.('chat'); }
+          },
         },
           React.createElement(NameColorPill, { name: displayName(m), color: displayColor(m) }),
           React.createElement('div', { className: 'v2-home-chat-bubble-wrap' },
-            React.createElement('div', { className: 'v2-home-chat-bubble' },
+            React.createElement('div', { className: `v2-home-chat-bubble${sharedBody ? ' has-shared-body' : ''}` },
               m.replyTo && React.createElement(ReplyQuote, {
                 author: shortParticipantName(m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
                 text: m.replyTo.text || '사진',
               }),
-              image && React.createElement('img', {
-                className: 'v2-home-chat-image',
-                src: image,
-                alt: '',
-                loading: 'lazy',
-                onClick: (event) => {
-                  event.stopPropagation();
-                  const urls = (Array.isArray(m.imageUrls) && m.imageUrls.length)
-                    ? m.imageUrls
-                    : [m.imageUrl || image].filter(Boolean);
-                  if (!urls.length || typeof calendarContext.setActiveLightbox !== 'function') return;
-                  calendarContext.setActiveLightbox({
-                    urls,
-                    index: 0,
-                    meta: urls.map(() => ({ timestamp: m.timestamp, messageId: m.id, source: 'chat' })),
-                  });
-                },
-              }),
-              (m.text || m.content) && React.createElement('span', { className: 'v2-home-chat-text' }, String(m.text || m.content))
+              sharedBody || React.createElement(React.Fragment, null,
+                image && React.createElement('img', {
+                  className: 'v2-home-chat-image',
+                  src: image,
+                  alt: '',
+                  loading: 'lazy',
+                  onClick: (event) => {
+                    event.stopPropagation();
+                    const urls = (Array.isArray(m.imageUrls) && m.imageUrls.length)
+                      ? m.imageUrls
+                      : [m.imageUrl || image].filter(Boolean);
+                    if (!urls.length || typeof calendarContext.setActiveLightbox !== 'function') return;
+                    calendarContext.setActiveLightbox({
+                      urls,
+                      index: 0,
+                      meta: urls.map(() => ({ timestamp: m.timestamp, messageId: m.id, source: 'chat' })),
+                    });
+                  },
+                }),
+                (m.text || m.content) && React.createElement('span', { className: 'v2-home-chat-text' }, String(m.text || m.content))
+              )
             )
           ),
           // Real ChatRoomView bubbles show only the timestamp by default -- the reply/edit
@@ -1549,208 +1553,53 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
     ),
-        React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
-      memos.length ? React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-bubble-memo-list` }, memos.map((memo, i) => {
-        const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
-        const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
-        const memoMeta = formatShortDateTime(memo.updatedAt ?? memo.createdAt);
-        const extractFirstUrl = __deps.extractFirstUrl;
-        const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
-        const memoFirstUrl = typeof extractFirstUrl === 'function' ? extractFirstUrl(memo.text || '') : '';
-        const memoPreviewUrls = memoFirstUrl ? [memoFirstUrl] : [];
-        if (typeof extractAllUrlInfosLoose === 'function') {
-          extractAllUrlInfosLoose(memo.text || '').forEach(info => {
-            if (info?.url && !memoPreviewUrls.includes(info.url)) memoPreviewUrls.push(info.url);
-          });
-        }
-        const memoDisplayText = memo.text && memoPreviewUrls.length
-          ? String(memo.text).replace(memoPreviewUrls[0], '').replace(/\s+$/, '').trim()
-          : String(memo.text || memo.content || memo.description || '');
-        // 홈 화면에서 "지금 어디서 활동이 일어나는지" 바로 보여야 바로 피드백을 달아줄 수 있다는
-        // 요구사항 -- 메모에 댓글이 달리면 최신 댓글을 미리보기로 바로 노출한다(전체보기 없이도
-        // 반응이 왔다는 걸 즉시 알 수 있게).
-        const memoComments = Array.isArray(memo.comments) ? memo.comments : [];
-        // Same fold rule as every memo card (MemoCommentFold, ui-calendar-core.js).
-        const MemoCommentFold = window.GATHER_UI_COMPONENTS?.MemoCommentFold;
-        const renderMemoComment = (comment, commentIndex) => React.createElement('div', { className: 'v2-bubble-comment-preview', key: comment.id || commentIndex },
-              React.createElement('span', {
-                className: 'v2-author-dot v2-bubble-comment-author',
-                role: 'img',
-                'data-author-name': participantFor(comment)?.name || '댓글',
-                title: participantFor(comment)?.name || '댓글',
-                onClick: e => e.stopPropagation(),
-                style: { backgroundColor: participantFor(comment)?.color || '#94A3B8' }
-              }),
-              React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || ''))
-        );
+    React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
+      memos.length ? React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-home-memo-module` }, memos.map((memo, i) => {
+        const MemoCard = window.GATHER_UI_COMPONENTS?.MemoCard;
+        const openMemo = () => {
+          // The app's jump helper carries the memo id through to MemoView and applies the
+          // focused-card treatment there (a bare tab change would lose which memo it was).
+          if (typeof calendarContext?.onOpenMemo === 'function') calendarContext.onOpenMemo(memo);
+          else onChangeView?.('memo');
+        };
+        const color = displayColor(memo);
+        // Same module, same frame and same classes as the memo page (screens.js MemoScreen), so
+        // images, link/video previews, files, tags and the comment fold all render identically.
         return React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
-          name: displayName(memo),
-          color: displayColor(memo),
-          /* The home memo card follows the memo-page card contract: author is
-             not a separate chat pill; timestamp lives in the footer next to 댓글. */
+          name: null,
+          color,
           meta: null,
-          className: 'v2-home-memo-bubble',
-          surfaceAs: 'div',
-          surfaceProps: {
-            className: 'v2-home-memo-bubble-surface',
-            style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) },
-            onClick: event => {
-              if (event.target.closest?.('button,textarea,input,select')) return;
-              // Use the app's existing jump helper rather than merely changing
-              // tabs: it carries the memo id through to MemoView and applies
-              // the established focused-card treatment there.
-              if (typeof calendarContext?.onOpenMemo === 'function') calendarContext.onOpenMemo(memo);
-              else onChangeView?.('memo');
-            },
-          },
-        },
-          React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
-          memoDisplayText && React.createElement('span', { className: 'v2-bubble-summary' }, memoDisplayText),
-          memoPreviewUrls.length > 0 && React.createElement('div', { className: 'v2-bubble-preview-list', onClick: event => event.stopPropagation() },
-            memoPreviewUrls.map((url, urlIndex) => {
-              const cachedData = (Array.isArray(memo.linkPreviews) && memo.linkPreviews.find(item => item?.url === url))
-                || (memo.linkPreview && (memo.linkPreview.url === url || urlIndex === 0) ? memo.linkPreview : null);
-              const mediaInfo = typeof __deps.getDirectChatMediaInfo === 'function' ? __deps.getDirectChatMediaInfo(url) : null;
-              const isVideo = !!(mediaInfo?.playsInline);
-              const isOpen = !!openVideoByUrl[url];
-              return React.createElement(React.Fragment, { key: url },
-                LinkPreviewCard ? React.createElement(LinkPreviewCard, {
-                  url, cachedData, stretch: true, noBorder: true,
-                  fallbackTitle: urlIndex === 0 ? (memo.title || '') : ''
-                }) : preview && React.createElement('span', { className: 'v2-bubble-preview' },
-                  preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
-                  React.createElement('span', null, React.createElement('strong', { className: bentoClass('memo-link-title') }, preview.title || '링크 미리보기'))
-                ),
-                isVideo && React.createElement('button', {
-                  type: 'button', className: 'v2-memo-video-toggle',
-                  onClick: () => setOpenVideoByUrl(prev => ({ ...prev, [url]: !prev[url] }))
-                }, isOpen ? '영상 닫기' : React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } }, React.createElement(window.GATHER_UI_COMPONENTS.PlayIcon, { size: 14 }), '영상 바로보기')),
-                isVideo && isOpen && ClickToPlayVideoCard && React.createElement(ClickToPlayVideoCard, {
-                  url, mediaInfo, cachedData
-                })
-              );
-            })
-          ),
-          (tags.length > 0 || displayColor(memo)) ? React.createElement('span', { className: 'v2-bubble-tags' },
-            displayColor(memo) ? React.createElement('span', {
-              className: 'v2-author-dot v2-memo-author-dot',
-              role: 'img',
-              'data-author-name': displayName(memo) || '작성자',
-              'aria-label': `${displayName(memo) || '작성자'} 작성자`,
-              title: displayName(memo) || '작성자',
-              onClick: e => e.stopPropagation(),
-              style: { backgroundColor: displayColor(memo) }
-            }) : null,
-            tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
-          ) : null,
-          memoComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
-            MemoCommentFold
-              ? React.createElement(MemoCommentFold, { comments: memoComments, renderComment: renderMemoComment, forceExpanded: commentOpenId === memo.id })
-              : memoComments.map(renderMemoComment),
-          ) : null,
-          React.createElement('div', { className: 'v2-bubble-comment-footer' },
-            React.createElement('span', { className: 'v2-bubble-comment-count' }, memoMeta || ''),
-            React.createElement('button', {
-              type: 'button',
-              className: 'v2-bubble-comment-action',
-              onClick: event => {
-                event.stopPropagation();
-                setCommentOpenId(prev => {
-                  const next = prev === memo.id ? null : memo.id;
-                  if (next !== memo.id) { setCommentDraft(''); setCommentParticipantId(''); }
-                  return next;
-                });
-              },
-              'aria-expanded': commentOpenId === memo.id,
-              'aria-label': memoComments.length ? `댓글 ${memoComments.length}개` : '댓글',
-            },
-              React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
-                React.createElement('path', { d: 'M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z' })
-              ),
-              memoComments.length > 0 ? `댓글 ${memoComments.length}` : '댓글'
-            ),
-          ),
-          commentOpenId === memo.id && React.createElement('form', {
-            className: 'comment-composer',
-            style: { marginTop: '8px' },
-            onSubmit: async event => {
-              event.preventDefault();
-              event.stopPropagation();
-              const text = commentDraft.trim();
-              if (!text || typeof onMemoCommentsChange !== 'function' || commentSaving) return;
-              const participantId = commentParticipantId || participants[0]?.id || '';
-              const nextComments = [...memoComments, {
-                id: `memo_comment_${Date.now()}`,
-                participantId,
-                text,
-                createdAt: Date.now(),
-              }];
-              setCommentSaving(true);
-              try {
-                const result = await onMemoCommentsChange(memo, nextComments);
-                if (result !== false) {
-                  setCommentDraft('');
-                  setCommentOpenId(null);
-                }
-              } finally {
-                setCommentSaving(false);
-              }
-            },
-          },
-            AutoGrowTextarea && React.createElement(AutoGrowTextarea, {
-              className: 'comment-composer-input',
-              value: commentDraft,
-              onChange: event => setCommentDraft(event.target.value),
-              onClick: event => event.stopPropagation(),
-              placeholder: '댓글을 입력하세요...',
-              rows: 1,
-              minHeight: 30,
-              maxHeight: 200,
-              style: {
-                width: '100%', fontSize: '0.8rem', border: '1px solid #1e1b2e0f',
-                borderRadius: 'var(--radius-sm)', padding: '6px 8px', backgroundColor: '#fff',
-                color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box'
-              },
-            }),
-            React.createElement('div', { className: 'comment-composer-footer' },
-              ParticipantPickerButton && React.createElement(ParticipantPickerButton, {
-                participant: commentParticipant && {
-                  ...commentParticipant,
-                  name: shortParticipantName(commentParticipant.name),
-                },
-                onClick: () => setCommentParticipantOpen(true),
-              }),
-              React.createElement('div', { className: 'comment-composer-buttons' },
-                React.createElement('button', {
-                  type: 'button',
-                  onClick: event => { event.stopPropagation(); setCommentDraft(''); setCommentOpenId(null); },
-                  style: {
-                    flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #1e1b2e0f', backgroundColor: 'var(--bg-card)',
-                    color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
-                  }
-                }, '취소'),
-                React.createElement('button', {
-                  type: 'submit', disabled: commentSaving || !commentDraft.trim() || !commentParticipant,
-                  style: {
-                    flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
-                    backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
-                    cursor: commentSaving ? 'wait' : 'pointer', opacity: (commentDraft.trim() && commentParticipant && !commentSaving) ? 1 : 0.5
-                  }
-                }, commentSaving ? '저장 중…' : '저장')
-              )
-            )
-          ),
-          commentParticipantOpen && ChatParticipantSheet && React.createElement(ChatParticipantSheet, {
+          className: 'v2-memo-card-wrap',
+          'data-v2-memo-id': memo.id,
+          surfaceClassName: 'v2-memo-bubble-surface',
+          surfaceProps: { style: { '--memo-author-color': color } },
+        }, MemoCard
+          ? React.createElement(MemoCard, {
+            memo,
             calendar: calendarContext?.calendar,
-            selectedId: commentParticipant?.id,
-            onSelect: id => { setCommentParticipantId(id); setCommentParticipantOpen(false); },
-            onClose: () => setCommentParticipantOpen(false),
+            variant: 'v2-page',
+            onOpenEdit: openMemo,
+            onTogglePin: () => memoDateProps?.onToggleMemoPin?.(memo),
+            onShare: () => setSharingMemo(memo),
+            onSelectTag: () => openMemo(),
+            onCommentsChange: next => (typeof onMemoCommentsChange === 'function' ? onMemoCommentsChange(memo, next) : false),
+            onRequestConfirm: memoDateProps?.onRequestConfirm,
+            showToast: memoDateProps?.showToast,
+            setActiveLightbox: calendarContext?.setActiveLightbox,
+            effectivePinned: !!memo.isPinned,
           })
-        );
+          : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모'));
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
+    sharingMemo && MemoShareModal && ReactDOM?.createPortal
+      ? ReactDOM.createPortal(React.createElement(MemoShareModal, {
+        memo: sharingMemo,
+        calendarId: calendarContext?.calendar?.id,
+        onClose: () => setSharingMemo(null),
+        showToast: memoDateProps?.showToast,
+      }), document.body)
+      : null,
     React.createElement(HomeSummarySection, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
       homeGalleryStrip.state === 'loading'
         ? React.createElement('div', {

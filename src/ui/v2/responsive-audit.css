@@ -51,7 +51,8 @@
  * navigation.  Make the destination unambiguous without inventing a second
  * memo detail component. */
 .v2-design .v2-memo .chat-search-focused-bubble,
-.v2-design .v2-memo .v2-memo-card-is-focused > .v2-bubble-surface {
+.v2-design .v2-memo .v2-memo-card-is-focused > .v2-bubble-surface,
+.v2-design .v2-home-memo-module .v2-memo-card-is-focused > .v2-bubble-surface {
   border: 2px solid rgba(124, 47, 229, 0.72) !important;
   background: rgba(124, 47, 229, 0.075) !important;
   box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.12), var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
@@ -814,14 +815,14 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 /* Memo-page cards use the home memo card's visual contract exactly: same
  * surface, title/meta rhythm, plain purple tags, hidden writer capsule, and
  * compact soft-purple comment rows. Interactivity remains on live MemoCard. */
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract {
   background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-bubble-surface {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -829,11 +830,11 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   overflow: visible !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract {
   padding: 14px 16px !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-title {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-title, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-title {
   color: var(--text-main) !important;
   font-size: 1rem !important;
   font-weight: 800 !important;
@@ -841,7 +842,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   margin-bottom: 3px !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-meta, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta {
   display: block !important;
   margin-bottom: 9px !important;
   padding-bottom: 8px !important;
@@ -852,7 +853,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   line-height: 1.2 !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-body, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-body {
   color: var(--v2-ink-2, #6b6580) !important;
   font-size: .76rem !important;
   line-height: 1.5 !important;
@@ -860,7 +861,9 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-author-pill,
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-author-dot {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-author-dot,
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-author-pill,
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-author-dot {
   display: inline-block !important;
   width: 8px !important;
   height: 8px !important;
@@ -881,13 +884,13 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   flex-shrink: 0 !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags, .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags {
   gap: 5px !important;
   margin-top: 4px !important;
   align-items: center !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot) {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot), .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot) {
   display: inline !important;
   padding: 0 !important;
   border: 0 !important;
@@ -900,13 +903,15 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments,
-.renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments {
+.renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments,
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments {
   gap: 4px !important;
   margin-top: 8px !important;
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div,
-.renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments > div {
+.renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments > div,
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments > div {
   gap: 8px !important;
   padding: 7px 10px !important;
   border: 0 !important;
@@ -915,7 +920,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer,
-.renewal-shell.v2-design .date-modal-memo-list .memo-card-comment-footer {
+.renewal-shell.v2-design .date-modal-memo-list .memo-card-comment-footer,
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .memo-card-comment-footer {
   margin-top: 8px !important;
   padding-top: 0 !important;
 }

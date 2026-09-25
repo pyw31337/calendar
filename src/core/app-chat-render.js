@@ -360,7 +360,50 @@ function tokenizeRichFieldText(text) {
   return tokens;
 }
 
+// Site-wide rule: a URL in any text field shows as a link preview card first; once that card
+// has loaded, the raw URL text is hidden (the card is the tap target). Until then -- or when no
+// preview exists -- the URL stays visible as the gray capsule badge.
+function TextWithLinkPreviews({ text, options }) {
+  const tokens = tokenizeRichFieldText(text);
+  const urls = [];
+  tokens.forEach(tok => { if (tok.type === 'url' && tok.value && !urls.includes(tok.value)) urls.push(tok.value); });
+  const [ready, setReady] = React.useState(() => new Set());
+  const onStatus = React.useCallback((url, status) => {
+    setReady(prev => {
+      const want = status === 'success';
+      if (want === prev.has(url)) return prev;
+      const next = new Set(prev);
+      if (want) next.add(url); else next.delete(url);
+      return next;
+    });
+  }, []);
+  const LinkPreviewCard = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard;
+  const badges = renderTextWithUrlBadgeOnly(text, options, ready);
+  if (!LinkPreviewCard) return badges;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "text-with-link-previews",
+    style: { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px', minWidth: 0, maxWidth: '100%' }
+  },
+    badges,
+    urls.map(url => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      key: url,
+      url,
+      stretch: true,
+      onStatusChange: status => onStatus(url, status)
+    }))
+  );
+}
+
 function renderTextWithUrlBadge(text, options = null) {
+  const tokens = tokenizeRichFieldText(text);
+  if (tokens.length === 0) return null;
+  if (!(options && options.linkPreview === false) && tokens.some(tok => tok.type === 'url')) {
+    return /*#__PURE__*/React.createElement(TextWithLinkPreviews, { text, options });
+  }
+  return renderTextWithUrlBadgeOnly(text, options, null);
+}
+
+function renderTextWithUrlBadgeOnly(text, options = null, hiddenUrls = null) {
   const tokens = tokenizeRichFieldText(text);
   if (tokens.length === 0) return null;
   const stackUrl = !options || options.stackUrl !== false;
@@ -368,6 +411,7 @@ function renderTextWithUrlBadge(text, options = null) {
   const urlRow = [];
   tokens.forEach((tok, idx) => {
     if (tok.type === 'url') {
+      if (hiddenUrls && hiddenUrls.has(tok.value)) return;
       urlRow.push(/*#__PURE__*/React.createElement(UrlCapsuleBadge, {
         key: `u-${idx}-${tok.value}`,
         url: tok.value,
