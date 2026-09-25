@@ -361,8 +361,19 @@ function deduplicateCalendarPlaces(places) {
   return mergedList;
 }
 
+// Normalizing + de-duplicating places runs on every app render (chat keystrokes included);
+// the result only depends on the places array itself, so reuse it per array.
+const calendarPlacesCache = new WeakMap();
 function getCalendarPlaces(calendar) {
-  return deduplicateCalendarPlaces(normalizePlaces(calendar?.places));
+  const raw = calendar?.places;
+  if (raw && typeof raw === 'object') {
+    const cached = calendarPlacesCache.get(raw);
+    if (cached) return cached;
+    const result = deduplicateCalendarPlaces(normalizePlaces(raw));
+    calendarPlacesCache.set(raw, result);
+    return result;
+  }
+  return deduplicateCalendarPlaces(normalizePlaces(raw));
 }
 // Unions the calendar document's own embedded places (legacy entries, and anything not yet
 // backfilled into the subcollection) with places fetched from the places subcollection -- same
@@ -2250,15 +2261,72 @@ function removeFirstUrl(...args) {
 // inside a fixed-height box. Resets to 'auto' first so shrinking text (e.g. deleting a pasted
 // paragraph) shrinks the box back down too, not just grows it. maxHeight keeps a very long paste
 // from pushing the rest of the form off-screen -- past that point it scrolls internally as before.
+// Off-screen twin used to measure a textarea's natural height. Measuring on the real field
+// (height:auto -> read scrollHeight -> set height) forced a synchronous relayout of everything
+// around it on every keystroke -- in the chat room that was the whole message list. The twin is
+// absolutely positioned and contained, so measuring it only lays out itself, and the real field
+// is touched only when its height actually changes (a new line), not on every character.
+const AUTO_GROW_COPIED_STYLES = [
+  'boxSizing', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontStretch', 'letterSpacing',
+  'lineHeight', 'textTransform', 'textIndent', 'wordSpacing', 'whiteSpace', 'wordBreak', 'overflowWrap',
+  'tabSize', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth',
+  'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderTopStyle', 'borderRightStyle',
+  'borderBottomStyle', 'borderLeftStyle', 'minHeight', 'maxHeight'
+];
+let autoGrowMirror = null;
+function measureTextareaNaturalHeight(el) {
+  if (typeof document === 'undefined' || !document.body || !el.isConnected || typeof getComputedStyle !== 'function') return null;
+  const width = el.getBoundingClientRect().width;
+  if (!(width > 0)) return null;
+  if (!autoGrowMirror || !autoGrowMirror.isConnected) {
+    autoGrowMirror = document.createElement('textarea');
+    autoGrowMirror.setAttribute('aria-hidden', 'true');
+    autoGrowMirror.setAttribute('tabindex', '-1');
+    autoGrowMirror.readOnly = true;
+    const st = autoGrowMirror.style;
+    st.position = 'absolute';
+    st.top = '0';
+    st.left = '-10000px';
+    st.visibility = 'hidden';
+    st.pointerEvents = 'none';
+    st.overflow = 'hidden';
+    st.contain = 'layout style paint';
+    st.resize = 'none';
+    st.margin = '0';
+    document.body.appendChild(autoGrowMirror);
+  }
+  const cs = getComputedStyle(el);
+  const mst = autoGrowMirror.style;
+  AUTO_GROW_COPIED_STYLES.forEach(prop => { mst[prop] = cs[prop]; });
+  mst.width = `${width}px`;
+  mst.height = 'auto';
+  const rows = el.rows || 2;
+  if (autoGrowMirror.rows !== rows) autoGrowMirror.rows = rows;
+  autoGrowMirror.value = el.value;
+  return { scrollHeight: autoGrowMirror.scrollHeight, offsetHeight: autoGrowMirror.offsetHeight };
+}
 function autoGrowTextarea(el, maxHeight = 480) {
   if (!el) return;
-  el.style.overflowX = 'hidden';
-  el.style.overflowY = 'hidden';
-  el.style.height = 'auto';
-  const scrollHeight = el.scrollHeight;
-  const next = Math.min(maxHeight, Math.max(scrollHeight, el.offsetHeight || 0));
-  el.style.height = `${next}px`;
-  el.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+  const measured = measureTextareaNaturalHeight(el);
+  if (!measured) {
+    el.style.overflowX = 'hidden';
+    el.style.overflowY = 'hidden';
+    el.style.height = 'auto';
+    const scrollHeight = el.scrollHeight;
+    const next = Math.min(maxHeight, Math.max(scrollHeight, el.offsetHeight || 0));
+    el.style.height = `${next}px`;
+    el.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+    return;
+  }
+  const { scrollHeight } = measured;
+  const nextPx = Math.min(maxHeight, Math.max(scrollHeight, measured.offsetHeight || 0));
+  const next = `${nextPx}px`;
+  const overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+  if (el.style.overflowX !== 'hidden') el.style.overflowX = 'hidden';
+  if (el.style.height !== next) el.style.height = next;
+  if (el.style.overflowY !== overflowY) el.style.overflowY = overflowY;
+  // Callers can reuse the measurement instead of reading el.scrollHeight (another forced layout).
+  return { height: nextPx, contentHeight: scrollHeight };
 }
 
 // Chat-image/direct-media detection + small generic utils, moved here (rather than kept as

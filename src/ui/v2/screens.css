@@ -289,8 +289,7 @@
 .v2-design .v2-chat .v2-chat-message-content > div[style*="border-top"] { display: none; }
 
 /* Date divider pills */
-.v2-design .v2-chat-legacy div[style*="margin: 24px 0 16px"] > span,
-.v2-design .v2-chat-legacy div:has(> span[style*="borderRadius"]) > span {
+.v2-design .v2-chat-legacy div[style*="margin: 24px 0 16px"] > span {
   background: var(--bg-primary) !important; color: var(--v2-ink-3, #83798f) !important;
   font-size: var(--font-size-2xs) !important; font-weight: 700 !important;
   padding: 4px 12px !important; border-radius: 9999px !important;
@@ -1903,8 +1902,7 @@
 }
 
 /* Date divider — ChatFull 14/10 → slight denser */
-.v2-design .v2-chat-legacy div[style*="margin: 24px 0 16px"],
-.v2-design .v2-chat .chat-messages-scroll > div:has(> span[style*="borderRadius"]) {
+.v2-design .v2-chat-legacy div[style*="margin: 24px 0 16px"] {
   padding: 10px 0 8px !important;
   margin: 0 !important;
 }
