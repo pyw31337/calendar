@@ -22,7 +22,7 @@
     .v2-memo .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
     .v2-memo .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
     .v2-memo .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
-    .v2-memo .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
+    .v2-memo .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: var(--on-brand, white); border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
 
     .v2-memo .bp-search-row { margin-top: 10px; position: relative; }
     .v2-memo .bp-search-input { width: 100%; border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 9px 14px 9px 34px; font-size: 0.78rem; background: var(--bg-primary); color: var(--text-main); }

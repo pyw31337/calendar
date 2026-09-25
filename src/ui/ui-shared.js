@@ -1075,7 +1075,7 @@ export function AdminLoginGate({ children }) {
     className: "admin-login-gate",
     style: {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      backgroundColor: '#F8FAFC', padding: '20px'
+      backgroundColor: 'var(--bg-primary)', padding: '20px'
     }
   },
     /*#__PURE__*/React.createElement("form", {

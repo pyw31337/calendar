@@ -571,7 +571,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
               style: {
                 width: '18px', height: '18px', border: 0, borderRadius: '50%', padding: 0, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'var(--accent-primary)', color: '#fff', flexShrink: 0
+                backgroundColor: 'var(--accent-primary)', color: 'var(--on-brand, #fff)', flexShrink: 0
               }
             }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 9 }) : "×")))
         ),

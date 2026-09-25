@@ -17,6 +17,12 @@
   --accent-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
 
   --status-green: #16A34A;
+  /* Ink for text/icons painted ON a --status-green / brand fill. White on the light theme's
+     deep green/purple; the dark theme's fills are bright (#4ADE80, V2 lime #C9FD58), so they
+     flip to near-black there. Every "fill = brand/status-green" rule reads these instead of a
+     literal #fff (test/on-brand-ink-guard.test.mjs). */
+  --on-status: #FFFFFF;
+  --on-brand: #FFFFFF;
 
   /* Semantic status tokens: each pairs a "soft" surface/border used by day-cell states,
      date-item-btn tint variants, and btn-danger -- previously these were separate literal
@@ -188,6 +194,7 @@
 }
 :root[data-theme="dark"] {
   --status-green: #4ADE80;
+  --on-status: #0D0D0D;
   --bg-primary: #0D0D0D;
   --bg-secondary: #131313;
   --bg-card: #131313;
@@ -249,6 +256,7 @@
      *dark* accent-secondary value) paired with the light --surface-confirmed background --
      an existing mismatch, not something introduced here; see the note to the user about it. */
   --status-green: #16A34A;
+  --on-status: #FFFFFF;
   --surface-success: #ECFDF5;
   --surface-confirmed: #FAF5FF;
   --border-confirmed: #9333EA;
@@ -2531,8 +2539,8 @@ select.form-select {
   height: 17px;
   border: 0;
   border-radius: 50%;
-  background: #FFFFFF;
-  color: #0F172A;
+  background: var(--bg-card);
+  color: var(--text-main);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2772,7 +2780,7 @@ select.form-select {
 .gallery-pagination-button.is-active {
   border-color: var(--accent-primary);
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--on-brand, white);
 }
 
 .gallery-pagination-button:disabled {
@@ -2868,7 +2876,9 @@ select.form-select {
   flex-shrink: 0;
 }
 .comment-composer-input {
-  background-color: #fff !important;
+  /* Token, not #fff: a literal white here (with !important) left the memo comment field white
+     in dark mode. --bg-card is #FFFFFF in the light theme, so light mode is unchanged. */
+  background-color: var(--bg-card) !important;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -4232,7 +4242,7 @@ select.form-select {
   font-weight: 700; cursor: pointer;
 }
 .region-filter-chip.is-active {
-  background: var(--accent-primary); border-color: var(--accent-primary); color: #FFFFFF;
+  background: var(--accent-primary); border-color: var(--accent-primary); color: var(--on-brand, white);
 }
 .region-filter-chip-count {
   padding: 1px 6px; border-radius: var(--radius-full); background: rgba(100, 116, 139, 0.14);
@@ -4270,7 +4280,7 @@ select.form-select {
 .region-selection-badge-remove {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 18px; height: 18px; min-height: 0 !important; padding: 0; border: none; border-radius: 50%;
-  background: var(--accent-primary); color: #fff; cursor: pointer;
+  background: var(--accent-primary); color: var(--on-brand, white); cursor: pointer;
 }
 
 /* Search field + GPS "현재 위치로 검색" icon button inside RegionFilterBackdrop. */
@@ -4288,7 +4298,7 @@ select.form-select {
 /* RegionFilterBackdrop's fixed footer "지역 저장" button (see .bottom-sheet-footer). */
 .region-filter-save-btn {
   width: 100%; padding: 13px; border: none; border-radius: var(--radius-md);
-  background: var(--accent-primary); color: #fff; font-size: var(--font-size-base); font-weight: 800;
+  background: var(--accent-primary); color: var(--on-brand, white); font-size: var(--font-size-base); font-weight: 800;
   cursor: pointer;
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
@@ -4898,7 +4908,7 @@ select.form-select {
   flex: 7 1 0;
   border: 1px solid var(--accent-primary);
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--on-brand, white);
 }
 .meme-preview-actions button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
@@ -5955,6 +5965,18 @@ textarea.form-input {
   color: #FFFFFF;
   border-color: rgba(255, 255, 255, 0.12);
 }
+/* Success toasts sit on the dark theme's bright green/lime (--status-green: #4ADE80 in V1 dark,
+   #C9FD58 in V2 Theme 2) -- white text there is 1.2-1.8:1 and unreadable, so they take the
+   dark ink every other lime fill uses (--on-status, defined with --status-green above). */
+:root[data-theme="dark"] .toast.is-success {
+  color: var(--on-status);
+  border-color: transparent;
+}
+:root[data-theme="dark"] .toast.is-success .toast-action {
+  color: #0D0D0D;
+  border-color: rgba(0, 0, 0, 0.35);
+  background-color: rgba(0, 0, 0, 0.08);
+}
 [data-theme="dark"] .url-capsule-badge,
 :root[data-theme="dark"] .url-capsule-badge {
   background: #1A1A1A !important; color: #A5B4FC !important; border-color: #312E81 !important;
@@ -6292,6 +6314,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   --brand: #7C3AED;
   --brand-soft: #F3EEFF;
   --status-green: #16A34A;
+  --on-status: #FFFFFF;
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 8px;
@@ -6453,7 +6476,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell .day-number-today {
   position: relative;
   background: var(--brand) !important;
-  color: #fff !important;
+  color: var(--on-brand, white) !important;
   box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4) !important;
 }
 .renewal-shell .day-number-today::after {
@@ -6565,7 +6588,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .chat-typing-row-self { justify-content: flex-end; }
 .external-media-fallback { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-muted); font-size: var(--font-size-sm); text-decoration: none; }
 .external-media-fallback:hover { color: var(--brand); border-color: var(--brand); }
-.external-media-fallback .external-media-retry { border: 0; border-radius: var(--radius-sm); padding: 4px 8px; background: var(--brand); color: #fff; font-size: var(--font-size-xs); cursor: pointer; }
+.external-media-fallback .external-media-retry { border: 0; border-radius: var(--radius-sm); padding: 4px 8px; background: var(--brand); color: var(--on-brand, white); font-size: var(--font-size-xs); cursor: pointer; }
 .external-media-fallback a:focus-visible, .external-media-fallback .external-media-retry:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 55%, #fff); outline-offset: 2px; }
 .chat-typing-name {
   flex-shrink: 0;
@@ -7404,7 +7427,7 @@ body:has(.v2-design) {
 .renewal-shell-main.is-calendar .day-num { font-size: 0.66rem; font-weight: 700; color: var(--text-main, #1E1B2E); }
 .renewal-shell-main.is-calendar .day-cell.other-month .day-num { color: var(--text-light, #83798F); opacity: 0.5; }
 .renewal-shell-main.is-calendar .day-cell.today .day-num {
-  position: relative; background: var(--brand, #7C3AED); color: #fff; border-radius: 50%; width: 16px; height: 16px;
+  position: relative; background: var(--brand, #7C3AED); color: var(--on-brand, white); border-radius: 50%; width: 16px; height: 16px;
   display: flex; align-items: center; justify-content: center; font-size: 0.62rem; z-index: 1;
 }
 .renewal-shell-main.is-calendar .day-cell.today .day-num::after {

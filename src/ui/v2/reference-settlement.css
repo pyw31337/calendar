@@ -19,7 +19,7 @@
     .v2-settlement .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
     .v2-settlement .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
     .v2-settlement .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
-    .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
+    .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: var(--on-brand, white); border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
 
     .v2-settlement .bp-content { padding: 14px; }
     .v2-settlement .bp-month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; }

@@ -2564,13 +2564,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 React.createElement('button', {
                   type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                   disabled: !participantToAdd,
-                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: '#F1F5F9' }
+                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: 'var(--bg-primary)' }
                 }, '수정')
               )
               : React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                 disabled: !participantToAdd,
-                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: '#F1F5F9' }
+                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid var(--v2-line, #CBD5E1)', backgroundColor: 'var(--bg-primary)' }
               }, '추가')
           )
         ),
@@ -2650,7 +2650,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               style: {
                 position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--status-green)', color: '#FFFFFF',
+                width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--status-green)', color: 'var(--on-status, #FFFFFF)',
                 fontSize: 'var(--font-size-sm)', fontWeight: 900, pointerEvents: 'none'
               }
             }, '✓')
@@ -2782,7 +2782,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 className: 'settlement-personal-total-row',
                 style: {
                   width: '100%', minWidth: 0, minHeight: '36px', padding: '6px 10px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                  backgroundColor: '#F8FAFC', border: 'none', boxSizing: 'border-box'
+                  backgroundColor: 'var(--bg-primary)', border: 'none', boxSizing: 'border-box'
                 }
               },
                 ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { fontSize: 'var(--font-size-sm)', flex: '0 1 auto', minWidth: 0 } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, `● ${option.value}`),
@@ -2805,7 +2805,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 title: '이 항목은 일정의 정산 탭에서 관리됩니다.',
                 style: {
                   padding: '10px 12px 11px', borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#F8FAFC',
+                  backgroundColor: 'var(--bg-primary)',
                   border: '1px dashed var(--v2-line, #CBD5E1)',
                   display: 'flex', flexDirection: 'column', gap: '5px'
                 }

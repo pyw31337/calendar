@@ -2378,7 +2378,7 @@ export function ChatGalleryModal({
               },
                 /*#__PURE__*/React.createElement("span", {
                   style: {
-                    fontSize: 'var(--font-size-md)', fontWeight: 900, color: '#FFFFFF',
+                    fontSize: 'var(--font-size-md)', fontWeight: 900, color: 'var(--on-status, #FFFFFF)',
                     backgroundColor: 'var(--status-green)', padding: '4px 10px', borderRadius: 'var(--radius-full)'
                   }
                 }, section.items.length),

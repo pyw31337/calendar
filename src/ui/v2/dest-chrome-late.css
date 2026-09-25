@@ -826,7 +826,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .renewal-shell.v2-design .v2-settlement [data-settlement-edit-button="true"],
 .v2-design .v2-settlement [data-settlement-edit-button="true"] {
   background: var(--brand, #7C2FE5) !important;
-  color: #fff !important;
+  color: var(--on-brand, white) !important;
   margin-top: 0 !important;
 }
 .v2-design .v2-settlement .settlement-person-card {
@@ -1178,7 +1178,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 }
 .v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected {
   background: var(--brand, #7C2FE5) !important;
-  color: #fff !important;
+  color: var(--on-brand, white) !important;
   border: 0 !important;
   box-shadow: none !important;
 }
@@ -1244,7 +1244,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 }
 .v2-design .v2-content .culture-grid-cols-btn.is-active {
   background: var(--brand, #7C2FE5) !important;
-  color: #fff !important;
+  color: var(--on-brand, white) !important;
 }
 
 /* ---- Archive / people / meetings: kill leftover header air ---- */
@@ -4262,8 +4262,11 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 
 /* Theme 2 page-level fixes found by scanning every V2 page (light theme untouched):
    solid confirmed-date cells, black text on every lime fill, lime visited-place tags. */
+/* Same shape as the light theme's confirmed cell (design.css: pale brand at the top fading to
+   the card color by 80%) -- a soft lime wash at the top fading into the black card, instead of
+   one flat tint filling the whole cell. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-confirmed {
-  background: var(--brand-soft) !important;
+  background: linear-gradient(180deg, rgba(201, 253, 88, 0.32) 0%, var(--bg-card) 80%) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill *,
@@ -4294,6 +4297,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] body,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
   --status-green: #C9FD58;
+  --on-status: #0D0D0D;
   --settlement-hero-text: #0D0D0D;
   --settlement-hero-muted: rgba(13, 13, 13, 0.72);
   --settlement-hero-surface: #0D0D0D;
@@ -4681,4 +4685,11 @@ html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group > svg {
   display: block !important;
   margin: 0 !important;
   flex: 0 0 auto !important;
+}
+
+/* Side menu "사용 설명서" banner: its icon disc was literal white (reference-home.css) on the dark
+   lime-tinted banner. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-manual-banner-icon-wrap {
+  background: var(--bg-primary) !important;
+  box-shadow: none !important;
 }

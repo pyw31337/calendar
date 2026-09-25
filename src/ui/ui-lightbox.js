@@ -325,7 +325,7 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
             disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
             style: {
               flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
-              backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
+              backgroundColor: 'var(--accent-primary)', color: 'var(--on-brand, #FFFFFF)', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
               cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
             }
           }, isSavingComment ? "저장 중…" : "저장")

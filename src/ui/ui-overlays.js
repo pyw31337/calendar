@@ -422,6 +422,18 @@ class AppErrorBoundary extends ReactComponentBase {
   }
   componentDidCatch(error, errorInfo) {
     console.error('Uncaught UI Error captured by AppErrorBoundary:', error, errorInfo);
+    // React swallows render errors caught here, so window 'error' never fires and the client_error
+    // collector (app-main.js) never saw them -- a "t is not a function" screen reached users with
+    // no trace in the logs. Re-emit it with the first stack frame and the nearest components.
+    try {
+      const frame = String(error && error.stack || '').split('\n').find(line => /\.js/.test(line)) || '';
+      const components = String(errorInfo && errorInfo.componentStack || '')
+        .split('\n').map(line => line.trim().replace(/^at\s+/, '').split(' ')[0]).filter(Boolean).slice(0, 4).join('<');
+      window.dispatchEvent(new ErrorEvent('error', {
+        message: `[boundary] ${error && error.message || error} {${components}}`,
+        filename: frame.replace(/^\s*at\s+/, '').replace(/^.*?\((.*)\)$/, '$1').slice(-120)
+      }));
+    } catch (_) {}
     if (isUnrecoverableFirestoreError(error) && typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
       // Guards against a tight reload loop if the corrupted state somehow survives the reload
       // (e.g. a network-level issue reproducing the same SDK error immediately) -- but a real,
@@ -461,7 +473,7 @@ class AppErrorBoundary extends ReactComponentBase {
       React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
         React.createElement('button', {
           onClick: () => this.setState({ hasError: false, error: null }),
-          style: { padding: '8px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid var(--v2-line, #CBD5E1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
+          style: { padding: '8px 16px', background: 'var(--bg-primary)', color: 'var(--text-muted)', border: '1px solid var(--v2-line, #CBD5E1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '다시 시도'),
         React.createElement('button', {
           onClick: () => window.location.reload(),

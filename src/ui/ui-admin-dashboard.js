@@ -2301,7 +2301,7 @@ export function AdminDashboard({ initialCalendars }) {
                             "aria-hidden": true,
                             style: {
                               position: 'absolute', top: '4px', right: '4px', width: '18px', height: '18px', borderRadius: '50%',
-                              backgroundColor: 'var(--status-green)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800,
+                              backgroundColor: 'var(--status-green)', color: 'var(--on-status, #fff)', fontSize: 'var(--font-size-2xs)', fontWeight: 800,
                               display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }
                           }, "✓")

@@ -26,6 +26,18 @@ for (const [name, scope, output] of [
       return value.startsWith(scope) ? value : `${scope} ${value}`;
     });
   });
+  // Brand/status-green fills take --on-brand/--on-status ink instead of a literal white: the dark
+  // theme's fills are bright lime, where white text is unreadable (test/on-brand-ink-guard.test.mjs).
+  css.walkRules(rule => {
+    let fill = '';
+    rule.walkDecls(/^background(-color)?$/, decl => { fill = decl.value; });
+    if (!fill || /gradient/i.test(fill)) return;
+    const ink = /var\(--status-green\b/.test(fill) ? '--on-status' : (/var\(--(brand|v2-primary|accent-primary)\b/.test(fill) ? '--on-brand' : '');
+    if (!ink) return;
+    rule.walkDecls('color', decl => {
+      if (/^(#fff(fff)?|white)$/i.test(decl.value.trim())) decl.value = `var(${ink}, white)`;
+    });
+  });
   css.walkDecls(decl => {
     if (/animation/.test(decl.prop)) {
       decl.value = decl.value.replace(/[a-zA-Z][\w-]*/g, word => animations.get(word) || word);

@@ -15,6 +15,7 @@ import {
   V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination,
 } from './v2/shell-nav.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
+import { syncThemeColor } from './v2/theme-color-sync.js';
 
 const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
 
@@ -2888,6 +2889,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // bypassed here.  It preserves the exact home memo selected during the tab
   // handoff, even before the outer app has a chance to rebuild its contexts.
   const [homeFocusedMemo, setHomeFocusedMemo] = React.useState(null);
+
+  // Status-bar tint follows theme + page (theme-color-sync.js).
+  React.useEffect(() => syncThemeColor(activeTab === DEFAULT_TAB), [activeTab]);
 
   React.useEffect(() => {
     document.documentElement.classList.add('v2-html-active');
