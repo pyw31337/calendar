@@ -2135,6 +2135,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       calendar,
       allMemos: memos || [],
       memos: memos || [],
+      // The V2 screen renders "메모 더 보기" from these; without them the list stopped at the
+      // first page (20) and older memos were unreachable from the memo page.
+      hasMoreMemos: !!hasMoreMemos,
+      onLoadMoreMemos,
       focusedMemo: sharedMemo || null,
       renderCard: (memo) => /*#__PURE__*/React.createElement(MemoCard, {
         memo,
