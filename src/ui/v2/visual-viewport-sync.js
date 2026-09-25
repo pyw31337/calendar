@@ -14,7 +14,22 @@
   // no browser chrome, so the screen height for the current orientation is the real app height.
   // Only trusted when the window spans the full screen width and the shortfall is a status bar
   // (<= 100px) -- an iPad split-view window is narrower/shorter and keeps its reported size.
+  // iOS WebKit only. Android home-screen apps (Chrome/Samsung Internet/Whale WebAPKs) report
+  // innerHeight correctly, and their screen.height also counts the status and navigation bars
+  // (~50-100px), so applying this there made the shell taller than the window and pushed the
+  // bottom of every page -- the menu FAB, the chat composer -- under the navigation bar.
+  const isIOSWebKit = (() => {
+    try {
+      const nav = window.navigator || {};
+      const ua = String(nav.userAgent || '');
+      if (/Android/i.test(ua)) return false;
+      return /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && Number(nav.maxTouchPoints) > 1);
+    } catch (_) {
+      return false;
+    }
+  })();
   const standaloneScreenHeight = (layoutH) => {
+    if (!isIOSWebKit) return 0;
     try {
       const standalone = window.navigator.standalone === true
         || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);

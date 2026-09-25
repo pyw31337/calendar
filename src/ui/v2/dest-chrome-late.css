@@ -2464,7 +2464,9 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
 .v2-design .bp-menu-fab {
   position: fixed !important;
   right: 20px !important;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  /* + the measured bottom-toolbar gap (app-browser-ui-state.js), as screens.css does: Samsung
+     Internet/Chrome/Whale's bottom bar covers the page without touching the safe-area inset. */
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--v2-toolbar-bottom-offset, 0px)) !important;
   width: 52px !important;
   height: 52px !important;
   min-width: 52px !important;
