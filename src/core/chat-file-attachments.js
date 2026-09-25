@@ -6,7 +6,8 @@ export const MAX_CHAT_FILE_BYTES = 20 * 1024 * 1024;
 export const MAX_CHAT_FILE_ATTACHMENTS = 20;
 
 export const CHAT_DOCUMENT_EXTENSIONS = Object.freeze([
-  'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'csv', 'rtf'
+  'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'csv', 'rtf',
+  'hwp', 'hwpx', 'odt', 'ods', 'odp', 'md', 'tsv', 'json', 'log'
 ]);
 
 export const CHAT_DOCUMENT_MIME_TYPES = Object.freeze([
@@ -32,7 +33,7 @@ export const CHAT_IMAGE_EXTENSIONS = Object.freeze([
 
 /** Single paperclip picker: images + documents (images route to photo pipeline). */
 export const CHAT_COMPOSER_ACCEPT = [
-  '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.csv', '.rtf',
+  ...CHAT_DOCUMENT_EXTENSIONS.map(ext => `.${ext}`),
   ...CHAT_DOCUMENT_MIME_TYPES,
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'image/*'
 ].join(',');
@@ -49,6 +50,15 @@ const EXT_MIME = Object.freeze({
   txt: 'text/plain',
   csv: 'text/csv',
   rtf: 'application/rtf',
+  hwp: 'application/vnd.hancom.hwp',
+  hwpx: 'application/vnd.hancom.hwpx',
+  odt: 'application/vnd.oasis.opendocument.text',
+  ods: 'application/vnd.oasis.opendocument.spreadsheet',
+  odp: 'application/vnd.oasis.opendocument.presentation',
+  md: 'text/markdown',
+  tsv: 'text/tab-separated-values',
+  json: 'text/plain',
+  log: 'text/plain',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -158,9 +168,17 @@ export function isPdfAttachment(attachment) {
   return mime === 'application/pdf' || ext === 'pdf';
 }
 
+// Mirrors the chat-file contentType allowlist in storage.rules: anything else (application/json,
+// application/x-hwp, ...) would be rejected on upload, so it is stored under a permitted type.
+const STORAGE_ALLOWED_MIME = /^(image\/.+|application\/pdf|application\/msword|application\/vnd\..+|application\/rtf|text\/.+|application\/octet-stream)$/;
+
+export function isStorageAllowedChatMime(mime) {
+  return STORAGE_ALLOWED_MIME.test(String(mime || '').trim().toLowerCase());
+}
+
 export function guessMimeForFile(file) {
   const type = String(file?.type || '').trim().toLowerCase();
-  if (type && type !== 'application/octet-stream') return type;
+  if (type && type !== 'application/octet-stream' && isStorageAllowedChatMime(type)) return type;
   const ext = getFileExtension(file?.name);
   return EXT_MIME[ext] || 'application/octet-stream';
 }

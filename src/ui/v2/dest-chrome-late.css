@@ -260,7 +260,8 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-summary,
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-text,
 .v2-design .v2-memo-card-body,
-.v2-design .v2-memo .v2-memo-card-body {
+.v2-design .v2-memo .v2-memo-card-body,
+.v2-design .v2-home-memo-module .v2-memo-card-body {
   display: block !important;
   white-space: pre-wrap !important;
   overflow-wrap: anywhere !important;
@@ -551,12 +552,14 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 }
 
 .v2-design .v2-home-memo-bubble .v2-memo-card-meta,
-.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
+.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-meta,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta {
   display: none !important;
 }
 .v2-design .v2-bubble-comment-badge,
 .v2-design .v2-memo .memo-card-comment-badge,
-.v2-design .date-modal-memo-list .memo-card-comment-badge {
+.v2-design .date-modal-memo-list .memo-card-comment-badge,
+.v2-design .v2-home-memo-module .memo-card-comment-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -942,7 +945,8 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .bp-expense-cat-chip,
 .v2-design .bp-tag-chip,
 .v2-design .region-selection-badges-row > button,
-.v2-design .region-filter-reset-btn {
+.v2-design .region-filter-reset-btn,
+.v2-design .v2-home-memo-module .memo-card-comment-badge {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -975,7 +979,8 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 
 /* Memo card containers suppress the external name pill; author dot is rendered inside the card before tags */
 .v2-design .v2-home-memo-bubble > .v2-name-pill,
-.v2-design .v2-memo .v2-memo-card-wrap > .v2-name-pill {
+.v2-design .v2-memo .v2-memo-card-wrap > .v2-name-pill,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-name-pill {
   display: none !important;
 }
 

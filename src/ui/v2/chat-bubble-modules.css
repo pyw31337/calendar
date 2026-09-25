@@ -5,7 +5,8 @@
 
 .v2-design .v2-bubble-frame,
 .v2-chat .v2-bubble-frame,
-.v2-memo .v2-bubble-frame {
+.v2-memo .v2-bubble-frame,
+.v2-design .v2-home-memo-module .v2-bubble-frame {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -17,7 +18,8 @@
 
 .v2-design .v2-name-pill,
 .v2-chat .v2-name-pill,
-.v2-memo .v2-name-pill {
+.v2-memo .v2-name-pill,
+.v2-design .v2-home-memo-module .v2-name-pill {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
@@ -35,7 +37,8 @@
 
 .v2-design .v2-bubble-surface,
 .v2-chat .v2-bubble-surface,
-.v2-memo .v2-bubble-surface {
+.v2-memo .v2-bubble-surface,
+.v2-design .v2-home-memo-module .v2-bubble-surface {
   background: var(--bg-card);
   border-radius: 14px;
   border: 1px solid var(--v2-card-border, #eceaf5);
@@ -49,7 +52,8 @@
 
 .v2-design button.v2-bubble-surface,
 .v2-chat button.v2-bubble-surface,
-.v2-memo button.v2-bubble-surface {
+.v2-memo button.v2-bubble-surface,
+.v2-design .v2-home-memo-module button.v2-bubble-surface {
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -57,14 +61,16 @@
 
 .v2-design .v2-bubble-surface:focus-visible,
 .v2-chat .v2-bubble-surface:focus-visible,
-.v2-memo .v2-bubble-surface:focus-visible {
+.v2-memo .v2-bubble-surface:focus-visible,
+.v2-design .v2-home-memo-module .v2-bubble-surface:focus-visible {
   outline: 2px solid var(--brand, #7C2FE5);
   outline-offset: 2px;
 }
 
 .v2-design .v2-reply-quote,
 .v2-chat .v2-reply-quote,
-.v2-memo .v2-reply-quote {
+.v2-memo .v2-reply-quote,
+.v2-design .v2-home-memo-module .v2-reply-quote {
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -80,7 +86,8 @@
 
 .v2-design .v2-reply-quote-author,
 .v2-chat .v2-reply-quote-author,
-.v2-memo .v2-reply-quote-author {
+.v2-memo .v2-reply-quote-author,
+.v2-design .v2-home-memo-module .v2-reply-quote-author {
   font-size: 0.6rem;
   font-weight: 800;
   color: var(--brand, #7C2FE5);
@@ -88,7 +95,8 @@
 
 .v2-design .v2-reply-quote-text,
 .v2-chat .v2-reply-quote-text,
-.v2-memo .v2-reply-quote-text {
+.v2-memo .v2-reply-quote-text,
+.v2-design .v2-home-memo-module .v2-reply-quote-text {
   font-size: 0.66rem;
   color: var(--text-muted, #6B7280);
   overflow: hidden;
@@ -98,7 +106,8 @@
 
 .v2-design .v2-bubble-meta,
 .v2-chat .v2-bubble-meta,
-.v2-memo .v2-bubble-meta {
+.v2-memo .v2-bubble-meta,
+.v2-design .v2-home-memo-module .v2-bubble-meta {
   font-size: 0.6rem;
   font-weight: 600;
   color: var(--text-light, #9CA3AF);
@@ -267,7 +276,8 @@
   font-weight: 500;
 }
 .v2-design .v2-memo .memo-card-comment-count,
-.v2-design .date-modal-memo-list .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
+.v2-design .date-modal-memo-list .memo-card-comment-count,
+.v2-design .v2-home-memo-module .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-action {
   display: inline-flex;
   align-items: center;
@@ -284,7 +294,8 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-action:hover { text-decoration: underline; }
 /* The full V2 memo page uses the same quiet count/action footer without changing V1. */
 .v2-design .v2-memo .memo-card-comment-footer,
-.v2-design .date-modal-memo-list .memo-card-comment-footer {
+.v2-design .date-modal-memo-list .memo-card-comment-footer,
+.v2-design .v2-home-memo-module .memo-card-comment-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -295,9 +306,11 @@
   font-weight: 500;
 }
 .v2-design .v2-memo .memo-card-comment-count,
-.v2-design .date-modal-memo-list .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
+.v2-design .date-modal-memo-list .memo-card-comment-count,
+.v2-design .v2-home-memo-module .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
 .v2-design .v2-memo .memo-card-comment-footer .memo-card-comment-toggle,
-.v2-design .date-modal-memo-list .memo-card-comment-footer .memo-card-comment-toggle {
+.v2-design .date-modal-memo-list .memo-card-comment-footer .memo-card-comment-toggle,
+.v2-design .v2-home-memo-module .memo-card-comment-footer .memo-card-comment-toggle {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -317,21 +330,23 @@
 }
 
 /* Memo screen cards wrapped as chat bubbles */
-.v2-memo .v2-memo-card-wrap.v2-bubble-frame {
+.v2-memo .v2-memo-card-wrap.v2-bubble-frame, .v2-design .v2-home-memo-module .v2-memo-card-wrap.v2-bubble-frame {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
 }
 
-.v2-memo .v2-memo-card-wrap .v2-bubble-surface {
+.v2-memo .v2-memo-card-wrap .v2-bubble-surface, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-bubble-surface {
   /* Live MemoCard keeps its handlers; surface is the visual shell */
   padding: 0;
   overflow: hidden;
 }
 
 .v2-memo .v2-memo-card-wrap .v2-bubble-surface > .memo-card-hover,
-.v2-memo .v2-memo-card-wrap .v2-bubble-surface > [class*="memo-card"] {
+.v2-memo .v2-memo-card-wrap .v2-bubble-surface > [class*="memo-card"],
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-bubble-surface > .memo-card-hover,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-bubble-surface > [class*="memo-card"] {
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   border-radius: 14px !important;
   border-left: none !important;
@@ -339,9 +354,9 @@
 
 /* Shared memo-card contract. The live MemoCard keeps its behaviour and inline handlers;
    this module owns the visual rhythm used by both the home preview and the memo page. */
-.v2-memo .v2-memo-card-wrap > .v2-name-pill { display: none; }
-.v2-memo .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+.v2-memo .v2-memo-card-wrap > .v2-name-pill, .v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-name-pill { display: none; }
+.v2-memo .v2-memo-card-wrap > .v2-bubble-meta, .v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
+.v2-memo .v2-memo-card-wrap .v2-memo-card-contract, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract {
   background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-left: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -349,22 +364,22 @@
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   padding: 14px 16px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-title {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-title, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-title {
   font-size: 1rem !important;
   line-height: 1.25 !important;
   margin-bottom: 3px !important;
   padding-right: 30px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-meta, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta {
   display: none;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-body {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-body, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-body {
   font-size: .76rem !important;
   color: var(--v2-ink-2, #6b6580) !important;
   line-height: 1.5 !important;
   margin-bottom: 10px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-tags {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-tags, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags {
   gap: 5px !important;
   margin-top: 4px !important;
 }
@@ -374,26 +389,29 @@
   gap: 16px !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle,
-.v2-design .date-modal-memo-list .v2-memo-card-tags > .memo-card-comment-toggle {
+.v2-design .date-modal-memo-list .v2-memo-card-tags > .memo-card-comment-toggle,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
   display: none !important;
 }
 .v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle,
-.v2-design .date-modal-memo-list .memo-card-comment-footer > .memo-card-comment-toggle {
+.v2-design .date-modal-memo-list .memo-card-comment-footer > .memo-card-comment-toggle,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   padding: 3px 2px !important;
 }
-.v2-design .v2-memo .comment-composer .participant-picker-button {
+.v2-design .v2-memo .comment-composer .participant-picker-button, .v2-design .v2-home-memo-module .comment-composer .participant-picker-button {
   height: auto !important;
   padding: 6px 10px !important;
   font-size: .7rem !important;
 }
-.v2-design .v2-memo .comment-composer-buttons button {
+.v2-design .v2-memo .comment-composer-buttons button, .v2-design .v2-home-memo-module .comment-composer-buttons button {
   font-size: .7rem !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle),
-.v2-design .date-modal-memo-list .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
+.v2-design .date-modal-memo-list .v2-memo-card-tags > button:not(.memo-card-comment-toggle),
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
   border-radius: 999px;
   background: var(--brand-soft, #f3eeff) !important;
   color: var(--brand, #7c2fe5) !important;
@@ -402,7 +420,9 @@
   font-weight: 700 !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-author-pill,
-.v2-memo .v2-memo-card-wrap .v2-memo-author-dot {
+.v2-memo .v2-memo-card-wrap .v2-memo-author-dot,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-author-pill,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-author-dot {
   display: inline-block !important;
   width: 8px !important;
   height: 8px !important;
@@ -423,13 +443,15 @@
   flex-shrink: 0 !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-comments,
-.v2-design .date-modal-memo-list .v2-memo-card-comments {
+.v2-design .date-modal-memo-list .v2-memo-card-comments,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments {
   margin-top: 8px !important;
   padding-top: 0 !important;
   border-top: 0 !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div,
-.v2-design .date-modal-memo-list .v2-memo-card-comments > div {
+.v2-design .date-modal-memo-list .v2-memo-card-comments > div,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments > div {
   background: var(--brand-soft, #f3eeff);
   border-radius: 10px !important;
   border-top: 0 !important;

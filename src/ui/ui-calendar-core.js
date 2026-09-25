@@ -2063,7 +2063,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }),
         /*#__PURE__*/React.createElement("span", {
           style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
-        }, comment.text),
+        }, typeof (window.GATHER_UI_DEPS || {}).renderTextWithUrlBadge === 'function'
+          ? window.GATHER_UI_DEPS.renderTextWithUrlBadge(comment.text)
+          : comment.text),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }

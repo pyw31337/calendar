@@ -1358,8 +1358,8 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
   return body;
 }
 
-// Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
-// itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
+// Registers sw.js, which caches static assets (icons/manifests/hashed chunks) and uploaded Storage media
+// -- never index.html itself, since this app deliberately serves its HTML as no-cache (see sw.js). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
