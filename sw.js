@@ -28,10 +28,10 @@ const STATIC_ASSETS = [
   'manifest-kkot.json',
   'manifest-cw.json',
   'manifest-jhair.json',
-  'icons/icon-v5-192.png',
-  'icons/icon-v5-512.png',
-  'icons/icon-v5-512-maskable.png',
-  'icons/icon-v5-apple-touch.png'
+  'icons/icon-v6-192.png',
+  'icons/icon-v6-512.png',
+  'icons/icon-v6-512-maskable.png',
+  'icons/icon-v6-apple-touch.png'
 ];
 
 self.addEventListener('install', event => {
@@ -220,8 +220,8 @@ self.addEventListener('push', event => {
   const title = payload.title || '모여라 캘린더';
   const options = {
     body: payload.body || '',
-    icon: 'icons/icon-v5-192.png',
-    badge: 'icons/icon-v5-192.png',
+    icon: 'icons/icon-v6-192.png',
+    badge: 'icons/icon-v6-192.png',
     tag: payload.tag || 'gather-push',
     renotify: true,
     data: payload.url || './',
