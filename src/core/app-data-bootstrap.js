@@ -177,21 +177,14 @@ export function subscribeFirestoreForegroundRecovery({
   if (typeof document === 'undefined' || !activeCalId) return () => {};
   let lastVisibleAt = 0;
   let deferredRefreshId = null;
-  const refresh = (eventName = 'foreground') => {
+  const refresh = () => {
     if (document.visibilityState !== 'visible' || isSavingRef.current) return;
     const now = Date.now();
     if (now - lastVisibleAt < 1200) return;
     lastVisibleAt = now;
-    const firebaseDb = typeof getFirebaseDb === 'function' ? getFirebaseDb() : null;
-    // WebKit can assert when enableNetwork() is called while an existing Listen stream is
-    // being torn down during a pageshow/navigation cycle. Firestore reconnects its stream
-    // automatically, so skip the explicit toggle there and retain it for other browsers.
-    const userAgent = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
-    const isAppleWebKit = /AppleWebKit/i.test(userAgent)
-      && !/(Chrome|Chromium|Edg|OPR|Whale|SamsungBrowser)/i.test(userAgent);
-    if (!isAppleWebKit && firebaseDb && typeof firebaseDb.enableNetwork === 'function') {
-      firebaseDb.enableNetwork().catch(error => console.warn(`Firestore network resume notice (${eventName}):`, error));
-    }
+    // No firebaseDb.enableNetwork() here: on a live stream it re-sends every target and the
+    // backend answers "Target ID already exists", killing all listeners (see app-firebase-data.js).
+    // Re-attaching the listeners (the token bump) is safe and is what actually recovers.
     setCloudReloadToken(token => token + 1);
   };
   const onVisibility = () => refresh('visibilitychange');
