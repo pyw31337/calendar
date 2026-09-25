@@ -412,6 +412,35 @@ const ReactComponentBase = (typeof React !== 'undefined' && React.Component) ? R
 function isUnrecoverableFirestoreError(error) {
   return /INTERNAL ASSERTION FAILED/i.test(String(error?.message || error || ''));
 }
+// "화면 섹션" error screen: counts down and reloads by itself. A reload fixes almost every case a
+// user can hit here (stale chunk after a deploy, a corrupted Firestore client, a render bug that
+// only a fresh mount avoids). If the screen comes back within AUTO_RELOAD_COOLDOWN_MS of the last
+// automatic reload, the error is persistent -- stop counting and leave the buttons, so it can
+// never become a reload loop.
+const AUTO_RELOAD_SECONDS = 5;
+const AUTO_RELOAD_COOLDOWN_MS = 30000;
+const AUTO_RELOAD_KEY = 'gather_boundary_auto_reload_at';
+function readLastAutoReload() {
+  try { return Number(window.sessionStorage.getItem(AUTO_RELOAD_KEY) || 0); } catch (_) { return 0; }
+}
+function ErrorAutoReloadNotice() {
+  const React = window.React;
+  const [armed] = React.useState(() => Date.now() - readLastAutoReload() > AUTO_RELOAD_COOLDOWN_MS);
+  const [left, setLeft] = React.useState(AUTO_RELOAD_SECONDS);
+  React.useEffect(() => {
+    if (!armed) return undefined;
+    const id = setInterval(() => setLeft(n => Math.max(0, n - 1)), 1000);
+    return () => clearInterval(id);
+  }, [armed]);
+  React.useEffect(() => {
+    if (!armed || left > 0) return;
+    try { window.sessionStorage.setItem(AUTO_RELOAD_KEY, String(Date.now())); } catch (_) {}
+    window.location.reload();
+  }, [armed, left]);
+  return React.createElement('p', { style: { margin: '0 0 14px', color: 'var(--text-muted)', fontSize: '0.8rem' } },
+    armed ? `${left}초 후 자동으로 새로고침합니다.` : '같은 오류가 반복되고 있어요. 잠시 후 새로고침해 주세요.');
+}
+
 class AppErrorBoundary extends ReactComponentBase {
   constructor(props) {
     super(props);
@@ -470,12 +499,14 @@ class AppErrorBoundary extends ReactComponentBase {
       React.createElement('div', { style: { fontSize: '2.5rem', marginBottom: '12px' } }, '⚠️'),
       React.createElement('h3', { style: { marginBottom: '8px', color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 700 } }, '화면 섹션을 불러오는 중 오류가 발생했습니다.'),
       React.createElement('p', { style: { marginBottom: '16px', color: 'var(--text-muted)', fontSize: '0.875rem', wordBreak: 'break-word' } }, (this.state.error && this.state.error.message) || '알 수 없는 오류가 발생했습니다.'),
+      React.createElement(ErrorAutoReloadNotice, null),
       React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
         React.createElement('button', {
           onClick: () => this.setState({ hasError: false, error: null }),
           style: { padding: '8px 16px', background: 'var(--bg-primary)', color: 'var(--text-muted)', border: '1px solid var(--v2-line, #CBD5E1)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '다시 시도'),
         React.createElement('button', {
+          className: 'error-fallback-reload',
           onClick: () => window.location.reload(),
           style: { padding: '8px 16px', background: 'var(--cta-fill, #4F46E5)', color: 'var(--on-cta, #FFFFFF)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '새로고침')
