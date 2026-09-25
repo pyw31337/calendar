@@ -1360,18 +1360,15 @@ async function checkFirebaseStorageHealth() {
   return !isStorageDisabled;
 }
 
-// Mobile browsers aggressively suspend a backgrounded tab's network activity, and Firestore's
-// realtime "listen" stream can come back stale/dead when the tab is foregrounded again. We only
-// force a reconnect after the tab returns to the foreground. Do NOT disable Firestore while the
-// tab is hidden: in Safari/Whale/Samsung-style mobile lifecycles, the browser can freeze before
-// the matching enableNetwork() runs, which briefly makes the app look like every calendar record
-// vanished. Keeping the last usable snapshot visible is more important than background thrift.
-if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || !firebaseDb) return;
-    firebaseDb.enableNetwork().catch(() => {});
-  });
-}
+// No enableNetwork() on foreground. The network is never disabled (disabling it while hidden
+// made records look deleted when a mobile browser froze before re-enabling), so the call was
+// meant as a "kick" for a stale stream -- but on a live stream it makes the SDK re-send every
+// active target, the backend rejects them with "Target ID already exists", and every realtime
+// listener (chat, memos, places, confirmed meetings...) dies until a reload. Production logged
+// ~400 of these realtime_fallback:already-exists bursts, one per foreground. Reproduced headless
+// with a hidden->visible cycle: 8 listener failures with the call, 0 without. The SDK restarts
+// its own streams after a network loss, and subscribeFirestoreForegroundRecovery
+// (app-data-bootstrap.js) still re-attaches listeners and refreshes over REST on resume.
 
 async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIMEOUT_MS) {
   if (!isAllowedCalendarId(calId)) return null;
