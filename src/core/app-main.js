@@ -192,11 +192,11 @@ import {
 } from './app-domain-helpers.js';
 import { rebuildCalendarToTimestamp } from './app-admin-restore.js';
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
-import { createPhotoCommentStore } from './photo-comment-store.js';
-import { useGalleryPhotoIndex, invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload } from './photo-index.js';
+import { invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { useChatMessageWindow } from './use-chat-message-window.js';
 import { useMemoCollections } from './use-memo-collections.js';
+import { useGalleryIndexBindings } from './use-gallery-index-bindings.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import {
   todayUploadTagOptions,
@@ -289,7 +289,6 @@ import {
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
-  fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
   fetchMemePoolRest,
   writeCollectionDocumentWithFallback,
@@ -854,16 +853,7 @@ function CalendarApp() {
     setConfirmedMeetingsSubcollection([]);
     setPlacesSubcollection([]);
   }, [activeCalId]);
-  // 사진별 댓글 개수(라이트박스 댓글 뱃지용) -- 사진의 mediaKey/refKey를 문서 id로 쓰는
-  // calendars/cal_{id}/photoComments 컬렉션을 그대로 구독한다. 댓글이 실제로 달린 사진만
-  // 문서가 존재하므로(빈 배열은 안 씀) 컬렉션 크기가 항상 작게 유지된다 -- see the realtime
-  // listener below.
-  const [photoCommentCounts, setPhotoCommentCounts] = React.useState({});
-  const [preloadedPhotoComments, setPreloadedPhotoComments] = React.useState({});
-  const [preloadedPhotoCommentsReady, setPreloadedPhotoCommentsReady] = React.useState(false);
-  // The badge subscription already receives every small photoComments document. Retain the
-  // comment arrays too, so opening a lightbox does not perform several serial document reads.
-  const photoCommentStoreRef = React.useRef(null);
+  // photoCommentCounts / preloadedPhotoComments / photoCommentStoreRef: useGalleryIndexBindings (U12).
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -946,9 +936,12 @@ function CalendarApp() {
     scrollToSection,
     resetMainHeader
   } = useMainHeaderState({ React, activeView, isMainSideMenuOpen });
-  const galleryPhotoIndex = useGalleryPhotoIndex({
-    React, calendarId: activeCalId, activeView,
-    projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
+  const {
+    galleryPhotoIndex, photoCommentCounts, setPhotoCommentCounts,
+    preloadedPhotoComments, setPreloadedPhotoComments, preloadedPhotoCommentsReady, photoCommentStoreRef
+  } = useGalleryIndexBindings({
+    React, activeCalId, activeView,
+    firebaseDb, getFirebaseDb: () => firebaseDb, firebaseConnectionVersion
   });
   const {
     chatMessages, setChatMessages, setGalleryLiveMessages,
@@ -2161,40 +2154,7 @@ function CalendarApp() {
     };
   }, [activeCalId]);
 
-  // 사진 댓글 개수 실시간 구독 -- 썸네일 우측 상단 뱃지(캘린더 일정/갤러리 등)에 쓰인다. 댓글이
-  // 실제로 달린 사진만 문서가 존재하므로 컬렉션 자체가 작게 유지되어, 전체 스냅샷을 그대로
-  // 구독해도(개별 문서 get을 여러 번 하는 대신) 부담이 적다. 썸네일에 뱃지가 실제로 보이는
-  // 화면(캘린더/갤러리/보관함)에서만 구독한다.
-  const needsPhotoCommentCounts = React.useMemo(
-    () => activeView === 'calendar' || activeView === 'gallery' || activeView === 'history',
-    [activeView]
-  );
-  // Reset comment caches only when the calendar changes — not on every gallery/calendar hop
-  // (that wipe made every thumbnail badge flash `0` until the next snapshot).
-  React.useEffect(() => {
-    setPhotoCommentCounts({});
-    setPreloadedPhotoComments({});
-    setPreloadedPhotoCommentsReady(false);
-  }, [activeCalId]);
-  React.useEffect(() => {
-    if (!activeCalId || !needsPhotoCommentCounts) return;
-    const store = createPhotoCommentStore({
-      calendarId: activeCalId, db: firebaseDb, projectId: firebaseConfig.projectId,
-      decodeDocument: firestoreDocumentToJs, fetchCountsRest: fetchPhotoCommentCountsRest,
-      // Gallery thumbnails still need comment badges; keep bulk hydration on.
-      enableBulkHydration: true
-    });
-    photoCommentStoreRef.current = store;
-    const stop = store.start(state => {
-      setPhotoCommentCounts(state.counts || {});
-      setPreloadedPhotoComments(state.commentsByKey || {});
-      setPreloadedPhotoCommentsReady(Boolean(state.ready));
-    });
-    return () => {
-      stop();
-      if (photoCommentStoreRef.current === store) photoCommentStoreRef.current = null;
-    };
-  }, [activeCalId, needsPhotoCommentCounts, firebaseDb, firebaseConnectionVersion]);
+  // Photo comment counts / preloaded comments subscription: useGalleryIndexBindings.
 
   // Memo pagination, the needsMemoCollection gate and the memo listeners: useMemoCollections.
   // 보관함 인물/추억 탭의 사진 목록용 memo 스냅샷 -- 위 needsMemoCollection에 'history'를 넣어 실시간

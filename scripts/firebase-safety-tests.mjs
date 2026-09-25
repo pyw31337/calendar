@@ -478,6 +478,7 @@ assert(writeQueueSource.includes("await deferOperation(operation, new Error('대
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
 // U10 (split-units): the chat message window moved out of CalendarApp into use-chat-message-window.js.
 const chatWindowSource = fs.readFileSync(new URL('../src/core/use-chat-message-window.js', import.meta.url), 'utf8');
+const galleryIndexSource = fs.readFileSync(new URL('../src/core/use-gallery-index-bindings.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
@@ -505,13 +506,13 @@ assert(imageTagSaveSource.includes('requestedIndex != null && !meta.meetingDate'
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
-assert(appMainSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
+assert(galleryIndexSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
 assert(appMainSource.includes('meetingsHydrated'), 'settlement nav badge must wait for meetings hydration');
-assert(appMainSource.includes('enableBulkHydration: true'), 'photo comment badges must bulk-hydrate on gallery too');
+assert(galleryIndexSource.includes('enableBulkHydration: true'), 'photo comment badges must bulk-hydrate on gallery too');
 assert(!/needsPlacesData = React\.useMemo\(\s*\(\) => activeView === 'calendar'/.test(appMainSource), 'places/meetings must stay subscribed beyond calendar/places/settlement/history');
 assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'history' \|\| activeView === 'content'/.test(appMainSource), 'custom contents must stay subscribed beyond history/content');
-assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloadedPhotoComments\(\{\}\);/.test(appMainSource), 'photo comment counts must not wipe to empty on every view remount');
-assert(appMainSource.includes('useGalleryPhotoIndex'), 'gallery must consume the canonical server-maintained photo index');
+assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloadedPhotoComments\(\{\}\);/.test(appMainSource + galleryIndexSource), 'photo comment counts must not wipe to empty on every view remount');
+assert(galleryIndexSource.includes('useGalleryPhotoIndex') && appMainSource.includes('useGalleryIndexBindings'), 'gallery must consume the canonical server-maintained photo index');
 assert(appMainSource.includes("galleryPhotoIndex.status === 'fallback' ? null : []"), 'gallery must not present a partial local archive while the canonical index is loading or failed');
 assert(chatGallerySource.includes('사진 목록 다시 불러오기'), 'failed canonical gallery reads must expose an explicit retry action');
 assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');

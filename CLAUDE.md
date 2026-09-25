@@ -71,7 +71,8 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
    시작해"처럼 유닛을 콕 집은 지시가 있어야 한다.
    **U10(`useChatMessageWindow`)은 2026-09-25 사용자의 "U10 시작해"로 완료됐다**
    (`src/core/use-chat-message-window.js`). **U11(`useMemoCollections`)도 같은 날 "U11 시작해"로
-   완료됐다** (`src/core/use-memo-collections.js`). U12~U14는 여전히 유닛별 승인이 필요하다.
+   완료됐다** (`src/core/use-memo-collections.js`). **U12(`useGalleryIndexBindings`)도 같은 날 "U12 시작해"로
+   완료됐다** (`src/core/use-gallery-index-bindings.js`). U13~U14는 여전히 유닛별 승인이 필요하다.
 
 이 두 가지를 빼면, 이 리팩터 계획 범위 안에서는 더 옮길 게 없다. **다만 이건 "이 계획이
 다뤘던 것"에 한정된 얘기고, 저장소 전체에 대한 포괄적 코드 감사는 아니다** — 이 계획 밖의
@@ -87,7 +88,7 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 - **`assets/*`를 라이브 배포 변경으로 착각해서 고치지 않는다.**
 - **Firestore/Storage 규칙을 에뮬레이터나 targeted live smoke 없이 바꾸지 않는다.**
 - **데이터 모델을 백업/복구 리허설 없이 바꾸지 않는다.**
-- U12~U14는 위에서 설명한 대로 사용자 승인 없이 시작하지 않는다 (U10·U11은 완료).
+- U13~U14는 위에서 설명한 대로 사용자 승인 없이 시작하지 않는다 (U10·U11·U12는 완료).
 
 ## 코드를 옮기거나 고칠 때 지키는 검증 절차
 
