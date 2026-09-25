@@ -69,10 +69,16 @@
 }
 .v2-design .v2-dialog-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 
-/* PageHeader owns the shared icon language; destination-specific buttons stay local. */
+/* PageHeader owns the shared icon language; destination-specific buttons stay local.
+ * --v2-toolbar-bottom-offset is written by useBrowserUiCompatibility (app-browser-ui-state.js)
+ * from the VisualViewport API -- it measures whatever bottom chrome (a browser's own dynamic
+ * toolbar on Android Chrome/Samsung Internet/Whale, or a software keyboard) is currently
+ * occluding, in every browser that exposes visualViewport, so this is not iOS-only like
+ * env(safe-area-inset-bottom) is; it defaults to 0px where unset/unsupported. */
 .v2-design .v2-fullscreen .bp-fab,
 .v2-design .v2-chat .bp-fab {
-  position: fixed; right: max(20px, calc(50% - 240px + 20px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  position: fixed; right: max(20px, calc(50% - 240px + 20px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px) + var(--v2-toolbar-bottom-offset, 0px));
   width: 52px; height: 52px; border-radius: 50%;
   background: var(--v2-primary, var(--brand, #7C2FE5)); color: #fff;
   border: 1px solid rgba(255,255,255,0.28);
@@ -653,16 +659,24 @@
   }
 }
 
-/* FAB sits in pane corner, not centered on 480px column */
+/* FAB sits in pane corner, not centered on 480px column.
+ * position:fixed (not absolute) on purpose: these dest panes are full-bleed against the
+ * viewport's right edge (see dest-layout.css), so right:20px lands in the same spot either
+ * way, but absolute anchored it to the pane element's own box -- whose height tracks its
+ * scrollable CONTENT, not the visible viewport, so the FAB drifted down to real content-bottom
+ * (usually off-screen) instead of staying pinned to the visible corner while scrolling, and
+ * that stale ancestor-height math is what let Android Chrome/Samsung Internet/Whale's dynamic
+ * bottom toolbar clip it. Fixed positioning plus the measured --v2-toolbar-bottom-offset
+ * (see the .v2-chat rule above) is robust to that regardless of ancestor sizing. */
 .v2-design .v2-fullscreen .bp-fab,
 .v2-design .v2-dest-page .bp-fab,
 .v2-design .v2-gallery .bp-fab,
 .v2-design .v2-settlement .bp-fab,
 .v2-design .v2-memo .bp-fab,
 .v2-design .v2-places .bp-fab {
-  position: absolute;
+  position: fixed;
   right: 20px;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px) + var(--v2-toolbar-bottom-offset, 0px));
   z-index: 8;
 }
 
