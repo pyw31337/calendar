@@ -38,6 +38,15 @@ for (const [name, scope, output] of [
       if (/^(#fff(fff)?|white)$/i.test(decl.value.trim())) decl.value = `var(${ink}, white)`;
     });
   });
+  // Literal purple hover shades (#6D28D9) would flash purple over the dark theme's lime buttons;
+  // --cta-fill-hover is defined for Theme 2 only (dest-chrome-late.css), light keeps the literal.
+  css.walkRules(rule => {
+    if (!/:hover|:active/.test(rule.selector)) return;
+    rule.walkDecls(/^background(-color)?$/, decl => {
+      const m = decl.value.trim().match(/^(#6D28D9|#7C3AED|#7C2FE5)$/i);
+      if (m) decl.value = `var(--cta-fill-hover, ${m[1]})`;
+    });
+  });
   css.walkDecls(decl => {
     if (/animation/.test(decl.prop)) {
       decl.value = decl.value.replace(/[a-zA-Z][\w-]*/g, word => animations.get(word) || word);

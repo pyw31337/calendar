@@ -1378,7 +1378,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   text-align: left;
   cursor: pointer;
 }
-.v2-design .bp-side-nav-global-search:hover { background: #6d28d9; }
+.v2-design .bp-side-nav-global-search:hover { background: var(--cta-fill-hover, #6d28d9); }
 .v2-design .bp-side-nav-global-search-icon { display: inline-flex; flex: 0 0 auto; }
 .v2-design .bp-side-nav-global-search-icon svg { width: 20px; height: 20px; }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {

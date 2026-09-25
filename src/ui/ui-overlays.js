@@ -65,7 +65,7 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
     /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', lineHeight: 1.45 } },
       `${clamped}%${remainingText ? ` · ${remainingText}` : ''}${hasQueue ? ' · 순차 저장 중' : ''}`),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: 'var(--cta-fill, #4F46E5)', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )
   ));
 }
@@ -107,7 +107,7 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
       `${clamped}%${remainingText ? ` · ${remainingText}` : ''}`),
     fileName && /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, fileName),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: 'var(--cta-fill, #4F46E5)', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )
   ));
 }
@@ -477,7 +477,7 @@ class AppErrorBoundary extends ReactComponentBase {
         }, '다시 시도'),
         React.createElement('button', {
           onClick: () => window.location.reload(),
-          style: { padding: '8px 16px', background: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
+          style: { padding: '8px 16px', background: 'var(--cta-fill, #4F46E5)', color: 'var(--on-cta, #FFFFFF)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '새로고침')
       )
       );

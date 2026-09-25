@@ -109,7 +109,7 @@ export function UpdateAvailableBanner() {
         type: "button",
         onClick: reloadForLatestBuild,
         style: {
-          backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--cta-fill, #4F46E5)', color: 'var(--on-cta, #FFFFFF)', border: 'none', borderRadius: 'var(--radius-md)',
           padding: '6px 14px', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
         }
       }, "새로고침"),

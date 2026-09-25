@@ -5252,7 +5252,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               className: "culture-registered-badge",
               title: "캘린더 등록됨",
               "aria-label": "캘린더 등록됨",
-              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
+              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null)
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
@@ -5546,7 +5546,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 href: detailUrl, target: "_blank", rel: "noopener noreferrer",
                 style: {
                   display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+                  backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
                 }
               }, "자세히보기") : null
             );
@@ -5663,7 +5663,7 @@ function SharedContentPreviewModal({ item, onClose }) {
             href: detailUrl, target: "_blank", rel: "noopener noreferrer",
             style: {
               display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-              backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+              backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
             }
           }, "자세히보기");
         })()
