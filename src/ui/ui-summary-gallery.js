@@ -3809,6 +3809,9 @@ function normalizeMovieSubGenre(rawSubGenre) {
   return prioritized || buckets[0];
 }
 
+// One shared collator: String#localeCompare builds a fresh one per call, which dominates a
+// 4k-item sort that runs on every list render.
+const CULTURE_TITLE_COLLATOR = new Intl.Collator('ko');
 function filterAndSortCultureItems(items, category) {
   // festival / event(문화행사) / sports: 목록에서는 종료일이 지난 항목을 모두 숨긴다
   // (포털·개별등록·캘린더 연동 orphan 동일). 데이터 자체는 지우지 않는다 -- 개별등록/연동은
@@ -3831,7 +3834,31 @@ function filterAndSortCultureItems(items, category) {
     if (!end) return true;
     return end >= today;
   });
-  if (category === 'festival' || category === 'event') return visible;
+  if (category === 'festival' || category === 'event') {
+    // Used to return the feed's own order (whatever Culture Flow's sources happened to emit),
+    // so a show closing tomorrow could sit hundreds of cards below one opening next year.
+    // 개별등록 first (unchanged), then 진행중 by 종료 임박, then 예정 by 시작일, then
+    // OPEN RUN/기간 없음; ties by title.
+    const rank = (item) => {
+      const start = cultureItemDay(item);
+      const end = cultureItemEndDay(item);
+      if (!start && !end) return [3, '9999-12-31'];
+      if (start && start > today) return [2, start];
+      return [1, end || '9999-12-31'];
+    };
+    return visible
+      .map((item, index) => ({ item, index, rank: rank(item) }))
+      .sort((a, b) => {
+        const aCustom = a.item && a.item.isCustomRegistered ? 0 : 1;
+        const bCustom = b.item && b.item.isCustomRegistered ? 0 : 1;
+        if (aCustom !== bCustom) return aCustom - bCustom;
+        if (a.rank[0] !== b.rank[0]) return a.rank[0] - b.rank[0];
+        if (a.rank[1] !== b.rank[1]) return a.rank[1] < b.rank[1] ? -1 : 1;
+        const byTitle = CULTURE_TITLE_COLLATOR.compare(String(a.item.title || ''), String(b.item.title || ''));
+        return byTitle || a.index - b.index;
+      })
+      .map(entry => entry.item);
+  }
   // movie: 「상영중」 first, then by release/start date ascending so future releases sink.
   // sports (and any other non-festival/event caller): keep near-today proximity sort.
   if (category === 'movie') {

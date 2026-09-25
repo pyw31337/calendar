@@ -2,8 +2,8 @@ name: Culture Performances Daily Sync
 
 # Pulls the culture-portal+kopis+interpark+timeticket+yes24-exclusive, festival, and sports
 # (야구/축구/농구/배구/핸드볼) slices of Culture Flow's public performances feed once a day and
-# commits normalized snapshots to public-vite/data/culture-performances.json,
-# public-vite/data/culture-festivals.json, and public-vite/data/culture-sports.json. See
+# commits normalized snapshots to public-vite/data/culture-{performances,festivals,sports,movies}.json
+# (movies was written but never added here, so the 영화 tab sat on a stale snapshot). See
 # scripts/sync-culture-performances.mjs for why this never touches any of these files on a
 # failed/suspicious fetch (Culture Flow is a separate project we don't control the release
 # cadence of).
@@ -30,12 +30,15 @@ jobs:
         run: node scripts/sync-culture-performances.mjs
       - name: Commit if changed
         run: |
-          if git diff --quiet -- public-vite/data/culture-performances.json public-vite/data/culture-festivals.json public-vite/data/culture-sports.json; then
-            echo "No change in culture performances/festivals/sports snapshots."
+          if git diff --quiet -- 'public-vite/data/culture-*.json'; then
+            echo "No change in culture snapshots."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public-vite/data/culture-performances.json public-vite/data/culture-festivals.json public-vite/data/culture-sports.json
-          git commit -m "chore: daily culture performances/festivals/sports snapshot sync"
+          git add -- 'public-vite/data/culture-*.json'
+          git commit -m "chore: daily culture performances/festivals/sports/movies snapshot sync"
+          # main can move while the sync runs (a merged PR); only data files changed here, so a
+          # rebase onto the new tip is conflict-free.
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push
