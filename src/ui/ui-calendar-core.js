@@ -2507,6 +2507,10 @@ export function GlobalSearchModal({
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const formatChatFileSize = __deps.formatChatFileSize
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.formatChatFileSize);
+  const getChatFileTypeLabel = __deps.getChatFileTypeLabel
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.getChatFileTypeLabel);
 
   const [query, setQuery] = React.useState(initialQuery);
   const inputRef = React.useRef(null);
@@ -2601,6 +2605,7 @@ export function GlobalSearchModal({
     { key: 'tags', label: '사진 태그', count: (matches.tags || []).length },
     { key: 'expenses', label: '정산', count: (matches.expenses || []).length },
     { key: 'memos', label: '메모', count: (matches.memos || []).length },
+    { key: 'files', label: '파일', count: (matches.files || []).length },
     { key: 'content', label: '콘텐츠', count: contentMatches.length }
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
@@ -2616,7 +2621,7 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, contentMatches.length]);
+  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, (matches.files || []).length, contentMatches.length]);
 
   const finishPick = React.useCallback((next) => {
     if (typeof next === 'function') next();
@@ -2631,6 +2636,7 @@ export function GlobalSearchModal({
     tags: { label: '사진 태그', color: 'var(--v2-accent, #7C3AED)' },
     expenses: { label: '정산', color: '#DC2626' },
     memos: { label: '메모', color: '#CA8A04' },
+    files: { label: '파일', color: '#4B5563' },
     content: { label: '콘텐츠', color: '#EA580C' }
   };
 
@@ -2709,6 +2715,16 @@ export function GlobalSearchModal({
       thumb: item.thumb,
       onClick: () => finishPick(() => onOpenImage?.(item.messageId, item.imageIndex, item.directMediaUrl)),
       sortStamp: String(item.timestamp || 0).padStart(14, '0')
+    }));
+    (matches.files || []).forEach(item => rows.push({
+      id: `file_${item.messageId}_${item.id}`,
+      kind: 'files',
+      pathLabel: item.participantName || '',
+      title: item.name || '파일',
+      meta: [typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel(item) : '', typeof formatChatFileSize === 'function' ? formatChatFileSize(item.size) : ''].filter(Boolean).join(' · '),
+      timeStr: formatLogTimestamp(item.uploadedAt),
+      onClick: () => finishPick(() => onOpenChatMessage?.(item.messageId)),
+      sortStamp: String(item.uploadedAt || 0).padStart(14, '0')
     }));
     contentMatches.forEach(item => {
       const venue = item.venue && item.venue !== '장소 확인 필요' ? item.venue : '';
@@ -2809,7 +2825,7 @@ export function GlobalSearchModal({
         type: "text",
         className: "form-input",
         style: { width: '100%' },
-        placeholder: "일정, 채팅, 사진, 장소, 정산, 메모 검색...",
+        placeholder: "일정, 채팅, 사진, 장소, 정산, 메모, 파일 검색...",
         value: query,
         onChange: e => setQuery(e.target.value)
       }),

@@ -92,7 +92,7 @@ export function formatLogTimestamp(ts) {
 // GlobalSearchModal (single active calendar) and AdminUnifiedSearchResultsView (looped across
 // every calendar) so the two search surfaces can never drift out of sync on matching rules.
 export function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = Infinity) {
-  if (!cal || !q) return { schedules: [], chat: [], photos: [], places: [], expenses: [], memos: [] };
+  if (!cal || !q) return { schedules: [], chat: [], photos: [], places: [], expenses: [], memos: [], files: [] };
   const take = items => Number.isFinite(limit) ? items.slice(0, limit) : items;
   const participantsMap = getActiveParticipants(cal).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
   const expenseCategoriesMap = getExpenseCategories(cal).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
@@ -154,7 +154,23 @@ export function computeCalendarSearchMatches(cal, chatMessages, memoList, q, lim
     )
     .map(memo => ({ ...memo, participantName: participantsMap[memo.participantId]?.name || '알수없음', participantColor: participantsMap[memo.participantId]?.color || '#94A3B8' }));
 
-  return { schedules, chat, photos: take(photos), places, tags: take(tags), expenses: take(expenses), memos };
+  const files = [];
+  (chatMessages || []).forEach(msg => {
+    (msg.fileAttachments || []).forEach(file => {
+      if ((file.name || '').toLowerCase().includes(q) || (file.tags || '').toLowerCase().includes(q)) {
+        files.push({
+          ...file,
+          messageId: msg.id,
+          uploadedAt: file.uploadedAt || msg.timestamp,
+          participantName: participantsMap[msg.participantId]?.name || '알수없음',
+          participantColor: participantsMap[msg.participantId]?.color || '#94A3B8'
+        });
+      }
+    });
+  });
+  files.sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
+
+  return { schedules, chat, photos: take(photos), places, tags: take(tags), expenses: take(expenses), memos, files: take(files) };
 }
 
 // Builds the citizen-facing calendar URL that actually shows a given search result's real
@@ -171,6 +187,9 @@ export function getAdminSearchResultTargetUrl(type, item) {
     params.set('view', 'chat');
     params.set('msg', item.messageId);
     params.set('img', String(item.imageIndex));
+  } else if (type === 'files') {
+    params.set('view', 'chat');
+    params.set('msg', item.messageId);
   } else if (type === 'memos') {
     params.set('view', 'memo');
   }
