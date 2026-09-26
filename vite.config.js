@@ -31,6 +31,10 @@ const mapVendorModule = id => (
 
 const chunkGroups = [
   { name: 'vendor-map', test: mapVendorModule, priority: 50 },
+  // exifr is imported dynamically (on first photo upload, app-image-pipeline.js). Without its
+  // own group it lands in the catch-all `vendor` chunk next to React's scheduler, which the
+  // entry preloads -- dragging ~75KB of EXIF parsing into every first visit.
+  { name: 'vendor-exifr', test: id => id.includes('node_modules') && /[\\/]exifr[\\/]/.test(id), priority: 46 },
   { name: 'vendor-react-dom', test: id => id.includes('node_modules') && id.includes('react-dom'), priority: 45 },
   { name: 'vendor-react', test: id => id.includes('node_modules') && id.includes('react'), priority: 40 },
   { name: 'ui-admin', test: /[\\/]ui[\\/]ui-admin-/, priority: 35 },
