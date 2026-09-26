@@ -493,7 +493,12 @@ async function extractPhotoMetadata(file) {
   if (!file) return null;
   const exifr = await loadExifr();
   if (typeof exifr?.parse !== 'function') return null;
-  const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'latitude', 'longitude'] });
+  // `latitude`/`longitude` are values exifr COMPUTES from the raw GPS tags -- they are not tags
+  // themselves, so picking only them made exifr skip the GPS block and never return a position
+  // (no photo ever got a location tag). Pick the raw GPS tags; exifr then adds latitude/longitude.
+  const exif = await exifr.parse(file, {
+    pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef']
+  });
   if (!exif) return null;
   const result = {};
   const date = exif.DateTimeOriginal || exif.CreateDate;
