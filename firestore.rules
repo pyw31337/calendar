@@ -152,8 +152,14 @@ service cloud.firestore {
           && data.replyTo.imageCount is number && data.replyTo.imageCount >= 0 && data.replyTo.imageCount <= 50
         );
       }
+      // Per-photo GPS ({ <assetKey>: { lat, lng } }) written right after an upload (src/core/photo-geo.js)
+      // so 보관함 > 장소 can file photos by where they were taken. Capped like imageTagMap.
+      function hasValidImageGeoMap(data) {
+        return !('imageGeoMap' in data) || (data.imageGeoMap is map && data.imageGeoMap.size() <= 50);
+      }
       function hasValidMessageMediaMetadataPatch() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags'])
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'imageGeoMap'])
+          && hasValidImageGeoMap(request.resource.data)
           && (!('imageShareUrls' in request.resource.data) || (request.resource.data.imageShareUrls is list && request.resource.data.imageShareUrls.size() <= 50))
           && (!('imageTags' in request.resource.data) || (request.resource.data.imageTags is list && request.resource.data.imageTags.size() <= 50))
           && (!('imageTagMap' in request.resource.data) || (request.resource.data.imageTagMap is map && request.resource.data.imageTagMap.size() <= 50))
@@ -171,7 +177,8 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'imageTagMap', 'imageGeoMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
+          && hasValidImageGeoMap(request.resource.data)
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
           && request.resource.data.timestamp is number
@@ -183,7 +190,8 @@ service cloud.firestore {
           && hasValidReplyTo(request.resource.data)
           && hasValidFileAttachments(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'imageTagMap', 'imageGeoMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
+          && hasValidImageGeoMap(request.resource.data)
           && (
             hasValidMessageMediaMetadataPatch()
             || (

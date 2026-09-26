@@ -51,3 +51,20 @@ test('cover photos prefer camera shots over screenshots', async () => {
   const ordered = orderCoverPhotos([{ id: 'shot', tags: '#260920' }, { id: 'cam', tags: '260920 갤럭시Z폴드2 서준' }, { id: 'ip', tags: '아이폰17' }]);
   assert.deepEqual(ordered.map(p => p.id), ['cam', 'ip', 'shot']);
 });
+
+test('GPS position files a photo under the nearest registered place, even without tags', async () => {
+  const { buildPlacePhotoGroups } = await import('../src/ui/archive-place-groups.js');
+  const geoPlaces = [
+    { id: 'g1', name: '서울랜드', lat: 37.4344, lng: 127.0205, visits: [] },
+    { id: 'g2', name: '과천과학관', lat: 37.4378, lng: 126.9990, visits: ['2026-09-26'] }
+  ];
+  const photos = [
+    { id: 'near', tags: '#260926', latitude: 37.43366, longitude: 127.02008 },
+    { id: 'far', tags: '#260926 아이폰17', latitude: 35.1, longitude: 129.0 }
+  ];
+  const { groups } = buildPlacePhotoGroups({ places: geoPlaces, photos, getPhotoDates, doesPlaceMatchDate });
+  const byId = Object.fromEntries(groups.map(g => [g.place.id, g.photos.map(p => p.id)]));
+  assert.deepEqual(byId.g1, ['near'], 'GPS wins over the date rule (g2 is the only place visited that day)');
+  assert.deepEqual(byId.g2, ['far'], 'no nearby place: falls back to the date rule');
+  assert.equal(groups.find(g => g.place.id === 'g1').byGeo, 1);
+});
