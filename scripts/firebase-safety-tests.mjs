@@ -479,6 +479,7 @@ const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.
 // U10 (split-units): the chat message window moved out of CalendarApp into use-chat-message-window.js.
 const chatWindowSource = fs.readFileSync(new URL('../src/core/use-chat-message-window.js', import.meta.url), 'utf8');
 const galleryIndexSource = fs.readFileSync(new URL('../src/core/use-gallery-index-bindings.js', import.meta.url), 'utf8');
+const photoActionsSource = fs.readFileSync(new URL('../src/core/app-calendar-photo-actions.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
@@ -912,9 +913,9 @@ assert(!summaryGallerySource.includes("color: 'var(--accent-primary)', fontWeigh
   assert(parseGatherPlacesClipboardText(`https://x.test/#gatherPlaces=${badKindB64}`) === null, 'wrong kind must be rejected even under the places prefix');
 }
 assert(appMainSource.includes('handleDeleteGalleryFiles') && appMainSource.includes('handleDeleteGalleryLinks'), 'gallery bulk delete must persist file and gallery-link removals');
-assert(appMainSource.includes('remainingFiles'), 'photo delete must keep leftover fileAttachments on the same message');
+assert(photoActionsSource.includes('remainingFiles'), 'photo delete must keep leftover fileAttachments on the same message');
 assert(appMainSource.includes('removeGalleryArchiveMessage'), 'deleting a gallery message must drop it from the in-memory archive');
-assert(appMainSource.includes('dropPhotoFromGalleryIndex'), 'gallery photo delete must hide the row before photoIndex CF catches up');
+assert(photoActionsSource.includes('dropPhotoFromGalleryIndex'), 'gallery photo delete must hide the row before photoIndex CF catches up');
 const galleryBulkDeleteSource = fs.readFileSync(new URL('../src/core/gallery-bulk-delete.js', import.meta.url), 'utf8');
 assert(galleryBulkDeleteSource.includes("path.indexOf('chatFiles/' + activeCalId + '/') !== 0"), 'file storage delete must stay inside the active calendar prefix');
 assert(galleryBulkDeleteSource.includes("sourceMessage.uploadSource !== 'gallery'"), 'gallery link delete must not strip chat/memo/meeting body URLs');
