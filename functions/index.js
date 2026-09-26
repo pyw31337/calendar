@@ -161,7 +161,15 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     // Previously memo index rows left messageId empty, so gallery→lightbox tag save was a no-op.
     const messageId = (sourceType === 'message' || sourceType === 'memo') ? sourceId : '';
     const imageIndex = Number.isInteger(photo?.index) ? photo.index : index;
+    // Per-photo GPS written by the client after upload (src/core/photo-geo.js), keyed like
+    // imageTagMap. Copied onto the index row so 보관함 > 장소 can file the photo by distance.
+    const geo = data.imageGeoMap && typeof data.imageGeoMap === 'object' ? data.imageGeoMap[assetKey] : null;
+    const geoLat = Number(geo && geo.lat);
+    const geoLng = Number(geo && geo.lng);
+    const hasGeo = Number.isFinite(geoLat) && Number.isFinite(geoLng) && Math.abs(geoLat) <= 90 && Math.abs(geoLng) <= 180
+      && !(geoLat === 0 && geoLng === 0);
     entries.push({
+      ...(hasGeo ? { latitude: geoLat, longitude: geoLng } : {}),
       assetKey,
       full,
       thumb,

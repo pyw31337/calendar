@@ -23,7 +23,7 @@
     "ops:media-audit": "node scripts/firebase-media-audit.mjs",
     "ops:integrity-audit": "node scripts/audit-media-integrity.mjs",
     "ops:integrity-repair": "node scripts/repair-media-integrity.mjs",
-    "test:functions:emulator": "npx --yes firebase-tools@14 emulators:exec --project demo-moyeora --only firestore,storage \"node --test functions/test/media-commands.emulator.test.js\"",
+    "test:functions:emulator": "npx --yes firebase-tools@14 emulators:exec --project demo-moyeora --only firestore,storage \"node --test functions/test/media-commands.emulator.test.js functions/test/rules-image-geo.emulator.test.js\"",
     "ops:gallery-contract-audit": "node scripts/firebase-gallery-contract-audit.mjs",
     "ops:repair-meeting-photo-refs": "node scripts/firebase-repair-meeting-photo-refs.mjs",
     "ops:export": "node scripts/firebase-export-prod.mjs",

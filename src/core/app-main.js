@@ -22,6 +22,7 @@ import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { createImageTagSaveHandler } from './app-image-tag-save.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
+import { buildImageGeoMap, persistImageGeoMap } from './photo-geo.js';
 import { renderCalendarViews } from './app-calendar-views.js';
 import { syncAssetTagsInMeetings } from './media-reference-integrity.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
@@ -2834,6 +2835,8 @@ function CalendarApp() {
           if (i === 0) firstSentMessageId = sent.id || null;
           if (sent.id) sentMessagesForOptimisticInsert.push({ ...messageData, id: sent.id });
           if (sent.queued) sendWasQueued = true;
+          // GPS per photo (보관함 > 장소), best effort after the message is saved -- photo-geo.js.
+          else if (sent.id) void persistImageGeoMap({ db: firebaseDb, calendarId: activeCalId, docId: sent.id, geoMap: buildImageGeoMap(chunkImages) });
         }
         ok = true;
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
@@ -3002,6 +3005,7 @@ function CalendarApp() {
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
         if (sent.queued) anyQueued = true;
+        else if (sent.id) void persistImageGeoMap({ db: firebaseDb, calendarId: activeCal.id, docId: sent.id, geoMap: buildImageGeoMap(chunkImages) });
         // Same reasoning as handleSendChatMessage's optimistic insert -- the gallery grid reads
         // from this same chatMessages state, and waiting on the realtime listener alone left a
         // freshly-pasted/uploaded photo invisible in the grid until a manual reload.
@@ -4403,6 +4407,7 @@ function CalendarApp() {
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장', { documentId: messageOperationId });
         if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
         const newMessageId = sent.id;
+        if (!sent.queued) void persistImageGeoMap({ db: firebaseDb, calendarId: activeCal.id, docId: newMessageId, geoMap: buildImageGeoMap(chunkImages) });
         const photoIdPrefix = `photo_${activeCal.id}_${dateStr}_${now}_${i}`;
         chunkImages.forEach((img, idx) => {
           const photoId = `${photoIdPrefix}_${idx}_${Math.random().toString(36).slice(2, 7)}`;

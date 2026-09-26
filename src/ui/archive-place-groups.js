@@ -2,6 +2,9 @@
  * 보관함 "장소" 탭: groups archive photos by the calendar's registered places (장소 탭).
  *
  * A photo belongs to a place by, in order:
+ *   0. its GPS position (photoIndex latitude/longitude, from the message's imageGeoMap --
+ *      src/core/photo-geo.js) within ~200m of the place, which also covers places registered
+ *      after the upload;
  *   1. a tag naming the place -- typed by hand, or added automatically at upload when the photo's
  *      GPS position is within ~200m of the place (photo-metadata-tags.js, nearestPlaceForCoords);
  *   2. its date: when every date the photo carries (meeting date / date hashtags) points at
@@ -12,6 +15,8 @@
  *
  * Pure (no window/React) so it can be unit-tested.
  */
+
+import { nearestPlaceForCoords } from '../core/photo-metadata-tags.js';
 
 const MIN_PARTIAL_MATCH_LENGTH = 2;
 
@@ -83,6 +88,7 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
     key: placeKey(place, index),
     place,
     photos: [],
+    byGeo: 0,
     byTag: 0,
     byDate: 0,
     lastDate: ''
@@ -104,6 +110,13 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
   (Array.isArray(photos) ? photos : []).forEach(photo => {
     if (!photo) return;
     const dates = Array.from(new Set((datesOf(photo) || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')))));
+    const nearest = nearestPlaceForCoords(photo.latitude, photo.longitude, groups.map(group => ({ lat: group.place.lat, lng: group.place.lng, group })));
+    if (nearest) {
+      nearest.group.photos.push(photo);
+      nearest.group.byGeo += 1;
+      dates.forEach(date => noteDate(nearest.group, date));
+      return;
+    }
     const tagged = groups.filter(group => photoMatchesPlaceTag(photo, group.place));
     if (tagged.length) {
       tagged.forEach(group => {
