@@ -10,6 +10,8 @@ const css = readFileSync(resolve(root, 'src/app.css'), 'utf8');
 const shareModal = readFileSync(resolve(root, 'src/ui/ui-share-modal.js'), 'utf8');
 const places = readFileSync(resolve(root, 'src/ui/ui-places.js'), 'utf8');
 const main = readFileSync(resolve(root, 'src/core/app-main.js'), 'utf8');
+// U14 moved CalendarApp's view JSX (the per-activeView branches) into app-calendar-views.js.
+const calendarViews = readFileSync(resolve(root, 'src/core/app-calendar-views.js'), 'utf8');
 const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
 
 let failed = false;
@@ -42,7 +44,7 @@ if (!main.includes("const withStickyVideo")) fail('withStickyVideo wrapper missi
 else if (!main.includes('Shared Lightbox host') || !main.includes('createElement(Lightbox')) {
   fail('withStickyVideo must mount shared Lightbox when activeLightbox is set');
 } else ok('shared Lightbox host in withStickyVideo');
-if (!main.includes("if (activeView === 'gallery')")) fail('gallery view branch missing');
+if (!calendarViews.includes("if (activeView === 'gallery')")) fail('gallery view branch missing');
 else ok('gallery view branch present');
 
 if (!css.includes('--radius-md') && !css.includes('--radius-sm') && !css.includes('--radius-full')) {

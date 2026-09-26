@@ -9,7 +9,7 @@
 3. `src/ui/*.js` (동적 import, 병렬)
 4. `src/core/app-main.js` → 정적으로 `app-domain-helpers.js`, `app-firebase-data.js`를 import한 뒤 `window.__gatherStartApp()` 실행
 
-`CalendarApp`의 채팅 메시지 창(실시간 구독·갤러리 라이브 창·워치독·이전 메시지)은 U10에서 `src/core/use-chat-message-window.js`(`useChatMessageWindow`)로 분리됐다 — `app-main.js`가 정적으로 import한다. 메모 목록 창(페이지네이션·고정/최근댓글/최신순 구독)은 U11에서 `src/core/use-memo-collections.js`(`useMemoCollections`)로 분리됐다. 갤러리 인덱스 바인딩(서버 photoIndex·사진 댓글 개수/미리 받은 댓글 구독)은 U12에서 `src/core/use-gallery-index-bindings.js`(`useGalleryIndexBindings`)로 분리됐다. 사진 삭제·교체·댓글 저장과 점프 핸들러는 U13에서 `src/core/app-calendar-photo-actions.js`(`createCalendarPhotoActions`, 훅이 아닌 렌더마다 호출되는 팩토리)로 분리됐다.
+`CalendarApp`의 채팅 메시지 창(실시간 구독·갤러리 라이브 창·워치독·이전 메시지)은 U10에서 `src/core/use-chat-message-window.js`(`useChatMessageWindow`)로 분리됐다 — `app-main.js`가 정적으로 import한다. 메모 목록 창(페이지네이션·고정/최근댓글/최신순 구독)은 U11에서 `src/core/use-memo-collections.js`(`useMemoCollections`)로 분리됐다. 갤러리 인덱스 바인딩(서버 photoIndex·사진 댓글 개수/미리 받은 댓글 구독)은 U12에서 `src/core/use-gallery-index-bindings.js`(`useGalleryIndexBindings`)로 분리됐다. 사진 삭제·교체·댓글 저장과 점프 핸들러는 U13에서 `src/core/app-calendar-photo-actions.js`(`createCalendarPhotoActions`, 훅이 아닌 렌더마다 호출되는 팩토리)로 분리됐다. 뷰 JSX(`?shell=v1` 화면 분기와 메인 달력 화면)는 U14에서 `src/core/app-calendar-views.js`(`renderCalendarViews`, 컴포넌트가 아닌 렌더 함수)로 분리됐다.
 
 `app-domain-helpers.js`(도메인 순수 함수)와 `app-firebase-data.js`(Firestore 읽기/쓰기/구독)는 2단계 배치에 포함되지 않고, `app-main.js`가 정적으로 import하면서 함께 번들된다 — `app-main.js`가 원래 하나였던 파일을 이후 리팩터로 분리한 결과다.
 

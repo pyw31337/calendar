@@ -6,7 +6,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const files = ['src/core/app-utils.js', 'src/ui/ui-share-modal.js', 'src/core/app-main.js'];
+const files = ['src/core/app-utils.js', 'src/ui/ui-share-modal.js', 'src/core/app-main.js', 'src/core/app-calendar-views.js'];
 let failed = false;
 
 for (const rel of files) {
