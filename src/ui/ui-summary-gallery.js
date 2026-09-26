@@ -9,6 +9,9 @@ import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
+import { buildPlacePhotoGroups, orderCoverPhotos } from './archive-place-groups.js';
+
+const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 
 function ArchivePhotoThumb({ photo }) {
   const React = window.React;
@@ -1345,7 +1348,7 @@ export function HistoryView({
     onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions]);
-  const VALID_HISTORY_TABS = ['meetings', 'memories', 'people'];
+  const VALID_HISTORY_TABS = ['meetings', 'memories', 'people', 'places'];
   // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
   // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
   // 재진입 시 그대로 복원했지만, 그러면 지난모임 탭을 보다 나간 사용자는 계속 지난모임이
@@ -1599,7 +1602,7 @@ export function HistoryView({
       indexedMeetingDatesKeyRef.current = '';
       return;
     }
-    if (historyTab !== 'memories' && historyTab !== 'people') return;
+    if (historyTab !== 'memories' && historyTab !== 'people' && historyTab !== 'places') return;
     const dateSet = new Set();
     const pushRange = (startRaw, endRaw) => {
       const start = String(startRaw || '').slice(0, 10);
@@ -1686,13 +1689,15 @@ export function HistoryView({
       .sort((a, b) => (Number(b.timestamp || 0) - Number(a.timestamp || 0)));
   }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
+  // 장소 탭: a place group's key, PLACE_UNCLASSIFIED_KEY for "분류 필요", or null (the place grid).
+  const [selectedPlaceKey, setSelectedPlaceKey] = React.useState(null);
   // Selecting a different person tag (or leaving the detail view) must not leave a stale rename
   // draft armed for whichever tag comes next.
   React.useEffect(() => {
     setIsEditingPersonTagLabel(false);
     setEditPersonTagLabelDraft('');
   }, [selectedPersonTag]);
-  React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
+  React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); setSelectedPlaceKey(null); }, [historyTab]);
   const [memoryViewMode, setMemoryViewMode] = React.useState('all');
   const [collapsedMemoryDates, setCollapsedMemoryDates] = React.useState(() => new Set());
   // A confirmed-meeting card with 2+ registered places shows only the most recent one by
@@ -1811,6 +1816,43 @@ export function HistoryView({
     () => getPhotosForTagLabel(selectedPersonTag),
     [getPhotosForTagLabel, selectedPersonTag]
   );
+  // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
+  // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
+  const placePhotoGroups = React.useMemo(() => buildPlacePhotoGroups({
+    places: getCalendarPlaces(calendar),
+    photos: historyPhotoEntries,
+    getPhotoDates: photo => {
+      const dates = parseHistoryDateTokens(photo?.tags || '');
+      const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(meetingDate) ? [meetingDate, ...dates] : dates;
+    },
+    doesPlaceMatchDate
+  }), [calendar, historyPhotoEntries]);
+  const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
+    ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
+    : null;
+  React.useEffect(() => {
+    // The selected place vanished (deleted, or its last photo re-tagged away) -- back to the grid.
+    if (selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY && !selectedPlaceGroup) setSelectedPlaceKey(null);
+    if (selectedPlaceKey === PLACE_UNCLASSIFIED_KEY && !placePhotoGroups.unclassifiedCount) setSelectedPlaceKey(null);
+  }, [selectedPlaceKey, selectedPlaceGroup, placePhotoGroups.unclassifiedCount]);
+  // Same photo cell as the 인물 detail grid (comment badge + heartbeat), for the 장소 tab.
+  const renderArchivePhotoGrid = (photos, keyPrefix) => /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
+  }, photos.map((photo, idx) => {
+    const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
+    const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+    return /*#__PURE__*/React.createElement("button", {
+      key: photo.mediaKey || photo.refKey || `${keyPrefix}_${idx}`,
+      type: "button",
+      className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
+      onClick: () => openHistoryLightbox(photos, idx),
+      style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
+    },
+      /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
+      PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
+    );
+  }));
   // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
   // 넘겨서, 공유 라이트박스 호스트(app-main.js)가 받는 meta가 비어 태그 입력/삭제/교체 등 표준
   // 라이트박스 기능이 전혀 동작하지 않았다. PhotoGallery와 동일하게 이 탭 전용 라이트박스를
@@ -2183,6 +2225,7 @@ export function HistoryView({
     options: [
       { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
       { value: 'people', label: '인물', badge: personTagChips.length },
+      { value: 'places', label: '장소', badge: placePhotoGroups.groups.length },
       { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
     ]
   })
@@ -2641,6 +2684,105 @@ export function HistoryView({
               PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
             );
           })
+          )
+    )),
+
+    // 장소 목록: 등록된 장소마다 그 장소로 분류된 사진을 모은 칸(인물 탭과 같은 벤또 그리드).
+    historyTab === 'places' && !selectedPlaceKey && /*#__PURE__*/React.createElement("div", {
+      className: "history-page-scroll",
+      onScroll: handleHistoryScroll,
+      style: historyScrollStyle
+    }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-places-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
+      /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+        "장소 탭에 등록한 장소별로 사진을 모아요. 사진 위치가 장소 근처이거나 #장소이름 태그가 있으면 그 장소로, 그날 방문한 장소가 한 곳뿐이면 그 장소로 분류돼요."
+      ),
+      placePhotoGroups.groups.length === 0 && !placePhotoGroups.unclassifiedCount
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "아직 장소로 분류된 사진이 없어요. 장소 탭에 방문 날짜와 함께 장소를 등록해 보세요.")
+        : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
+            placePhotoGroups.groups.map(group => /*#__PURE__*/React.createElement("button", {
+              key: group.key,
+              type: "button",
+              onClick: () => setSelectedPlaceKey(group.key),
+              "aria-label": `${group.place.alias || group.place.name} 사진 ${group.photos.length}장`,
+              className: 'archive-photo-cell',
+              style: {
+                position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                border: 'none', padding: 0, cursor: 'pointer', backgroundColor: '#475569'
+              }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(group.photos) }),
+              /*#__PURE__*/React.createElement("div", {
+                style: {
+                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                  display: 'flex', flexDirection: 'column', gap: '1px', textAlign: 'left'
+                }
+              },
+                /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, group.place.alias || group.place.name),
+                /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.lastDate) || '방문일 미정')
+              )
+            )),
+            placePhotoGroups.unclassifiedCount > 0 && /*#__PURE__*/React.createElement("button", {
+              key: PLACE_UNCLASSIFIED_KEY,
+              type: "button",
+              onClick: () => setSelectedPlaceKey(PLACE_UNCLASSIFIED_KEY),
+              "aria-label": `분류 필요 사진 ${placePhotoGroups.unclassifiedCount}장`,
+              className: 'archive-photo-cell',
+              style: {
+                position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                border: '1px dashed var(--border-subtle)', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-secondary, #F1F5F9)'
+              }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(placePhotoGroups.unclassifiedCount)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(placePhotoGroups.unclassified.flatMap(bucket => bucket.photos)) }),
+              /*#__PURE__*/React.createElement("div", {
+                style: {
+                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                  display: 'flex', flexDirection: 'column', gap: '1px', textAlign: 'left'
+                }
+              },
+                /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, "분류 필요"),
+                /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, "하루에 여러 곳을 간 날")
+              )
+            )
+          )
+    )),
+    // 장소 상세: 한 장소의 사진 모음, 또는 "분류 필요"(날짜별 후보 장소와 함께).
+    historyTab === 'places' && !!selectedPlaceKey && /*#__PURE__*/React.createElement("div", {
+      className: "history-page-scroll",
+      onScroll: handleHistoryScroll,
+      style: historyScrollStyle
+    }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-places-detail", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '12px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setSelectedPlaceKey(null), "aria-label": "장소 목록으로",
+          style: {
+            width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+          }
+        }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } },
+            selectedPlaceGroup ? (selectedPlaceGroup.place.alias || selectedPlaceGroup.place.name) : '분류 필요'),
+          selectedPlaceGroup && selectedPlaceGroup.place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selectedPlaceGroup.place.address)
+        )
+      ),
+      selectedPlaceGroup
+        ? renderArchivePhotoGrid(selectedPlaceGroup.photos, 'place')
+        : /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+              "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 사진을 열고 #장소이름 태그를 달면 그 장소로 옮겨져요."),
+            placePhotoGroups.unclassified.map(bucket => /*#__PURE__*/React.createElement("div", {
+              key: bucket.date, style: { display: 'flex', flexDirection: 'column', gap: '6px' }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)' } },
+                `${formatHistoryDate(bucket.date) || bucket.date} · ${bucket.photos.length}장`),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+                `후보: ${bucket.candidates.map(place => `#${String(place.alias || place.name).replace(/\s+/g, '')}`).join(' ')}`),
+              renderArchivePhotoGrid(bucket.photos, `unclassified_${bucket.date}`)
+            ))
           )
     )),
 

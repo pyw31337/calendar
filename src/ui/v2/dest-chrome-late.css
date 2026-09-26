@@ -1256,7 +1256,9 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 }
 .v2-design .v2-archive .history-page-scroll > div:first-child,
 .v2-design .v2-archive .v2-archive-people-stack,
-.v2-design .v2-archive .v2-archive-people-detail {
+.v2-design .v2-archive .v2-archive-people-detail,
+.v2-design .v2-archive .v2-archive-places-stack,
+.v2-design .v2-archive .v2-archive-places-detail {
   padding-top: 4px !important;
   padding-bottom: 4px !important;
   gap: 8px !important;
