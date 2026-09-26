@@ -2,6 +2,8 @@
  * Lightbox + LightboxInfoPanel (P4-3).
  */
 
+import { resolveLightboxPhotoOrigin } from './lightbox-photo-origin.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -1154,13 +1156,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     // and eagerly firing a count() query for every photo as the user swipes past it (most of
     // which never get a second look) added real extra Firestore traffic for no visible benefit.
     if (!showInfo) return;
-    if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo' || currentMeta.meetingDate) return;
-    if (currentMeta.uploadSource === 'gallery') return; // uses the photo-ordinal fetch below instead
-    // 'meeting'-uploadSource photos are hidden from the chat feed (see ChatRoomView's render
-    // filter), so a chat ordinal for them is never shown/clickable -- no point fetching it.
-    if (currentMeta.uploadSource === 'meeting') return;
+    // Only chat-origin photos show "채팅 #n" (gallery uses the photo-ordinal fetch below; meeting
+    // uploads are hidden from the chat feed, so a chat ordinal for them is never shown).
+    const origin = resolveLightboxPhotoOrigin(currentMeta);
+    if (!origin || origin.kind !== 'chat') return;
     if (typeof onGetChatMessageOrdinal !== 'function') return;
-    const key = currentMeta.messageId;
+    const key = origin.messageId;
     const ts = currentMeta.timestamp;
     if (!key || !ts || chatOrdinalFetchedRef.current.has(key)) return;
     chatOrdinalFetchedRef.current.add(key);
@@ -1218,21 +1219,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       return `일정 ${yy}.${mm}.${dd}(${dayName})`;
     };
 
-    let targetMeetingDate = currentMeta.meetingDate || (currentMeta.photoId && currentMeta.photoId.match(/\d{4}-\d{2}-\d{2}/)?.[0]);
-    if (!targetMeetingDate && currentMeta.tags) {
-      const dateMatch = String(currentMeta.tags).match(/(?:#|^|\s)(20\d{2}-\d{2}-\d{2}|\d{6})(?:\s|$)/);
-      if (dateMatch) {
-        const rawToken = dateMatch[1];
-        if (rawToken.length === 6) {
-          targetMeetingDate = `20${rawToken.slice(0, 2)}-${rawToken.slice(2, 4)}-${rawToken.slice(4, 6)}`;
-        } else {
-          targetMeetingDate = rawToken;
-        }
-      }
-    }
+    // The label follows how the photo was uploaded, not its date tag -- see lightbox-photo-origin.js.
+    const origin = resolveLightboxPhotoOrigin(currentMeta);
+    const msgId = origin.messageId;
 
-    if (currentMeta.source === 'meeting' || currentMeta.uploadSource === 'meeting' || targetMeetingDate) {
-      const dateStr = targetMeetingDate || (currentMeta.timestamp ? new Date(currentMeta.timestamp).toISOString().slice(0, 10) : (typeof getTodayYmd === 'function' ? getTodayYmd() : ''));
+    if (origin.kind === 'meeting') {
+      const dateStr = origin.meetingDate || (typeof getTodayYmd === 'function' ? getTodayYmd() : '');
       const label = formatScheduleLabel(dateStr) || `일정 ${dateStr || ''}`;
       return {
         label: label,
@@ -1240,25 +1232,22 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       };
     }
 
-    if (currentMeta.source === 'memo') {
-      const msgId = currentMeta.messageId || currentMeta.sourceMessageId;
+    if (origin.kind === 'memo') {
       return {
         label: '메모',
         onClick: (onJumpToMemo && msgId) ? () => { closeLightbox(); onJumpToMemo(msgId); } : null
       };
     }
 
-    if (currentMeta.uploadSource === 'gallery' || currentMeta.source === 'gallery') {
+    if (origin.kind === 'gallery') {
       const galleryKey = currentMeta.messageId != null ? `${currentMeta.messageId}_${currentMeta.imageIndex || 0}` : null;
       const galleryOrdinal = galleryKey != null ? galleryOrdinalCache[galleryKey] : null;
-      const msgId = currentMeta.messageId != null ? currentMeta.messageId : currentMeta.sourceMessageId;
       return {
         label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리',
         onClick: (onJumpToGallery && (msgId != null || currentUrl)) ? () => { closeLightbox(); onJumpToGallery(msgId, currentMeta.imageIndex, currentUrl); } : null
       };
     }
 
-    const msgId = currentMeta.messageId != null ? currentMeta.messageId : currentMeta.sourceMessageId;
     const ordinal = msgId != null ? chatOrdinalCache[msgId] : null;
     return {
       label: typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅',
