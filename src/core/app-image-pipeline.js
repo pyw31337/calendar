@@ -6,7 +6,6 @@ import {
 import { reverseGeocodeCoords } from './app-place-search.js';
 import { firebaseConfig, isStorageDisabled, ensureFirebaseStorageReady, checkFirebaseStorageHealth, writeCollectionDocumentWithFallback, fetchMessageRest } from './app-firebase-data.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
-import exifr from 'exifr';
 
 // Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
 // global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
@@ -479,9 +478,27 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 // from one place does not issue one request per image.
 const photoLocationCache = new Map();
 let photoLocationRequestAt = 0;
+// exifr (~75KB) is only needed once someone actually uploads a photo, so it is loaded on first
+// use instead of riding in the boot bundle every visitor downloads before the first screen.
+let exifrModulePromise = null;
+function loadExifr() {
+  if (!exifrModulePromise) {
+    exifrModulePromise = import('exifr')
+      .then(mod => mod?.default || mod)
+      .catch(err => { exifrModulePromise = null; throw err; });
+  }
+  return exifrModulePromise;
+}
 async function extractPhotoMetadata(file) {
-  if (!file || typeof exifr?.parse !== 'function') return null;
-  const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'latitude', 'longitude'] });
+  if (!file) return null;
+  const exifr = await loadExifr();
+  if (typeof exifr?.parse !== 'function') return null;
+  // `latitude`/`longitude` are values exifr COMPUTES from the raw GPS tags -- they are not tags
+  // themselves, so picking only them made exifr skip the GPS block and never return a position
+  // (no photo ever got a location tag). Pick the raw GPS tags; exifr then adds latitude/longitude.
+  const exif = await exifr.parse(file, {
+    pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef']
+  });
   if (!exif) return null;
   const result = {};
   const date = exif.DateTimeOriginal || exif.CreateDate;

@@ -28,6 +28,8 @@ const BUDGETS = [
 // page-load cost, which is what this budget exists to guard. Reported separately below for
 // visibility, but excluded from TOTAL_JS_MAX_BYTES.
 const LAZY_CHUNK_PATTERNS = [
+  // exifr: dynamic import on the first photo upload only (app-image-pipeline.js loadExifr).
+  /^vendor-exifr-.*\.js$/,
   /^vendor-map-.*\.js$/,
   /^maplibre-gl-worker-.*\.js$/,
   /^ui-admin-.*\.js$/,
