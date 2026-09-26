@@ -166,7 +166,7 @@ safety 테스트: JPEG 경로, chunk 바이트, GPS 없을 때 날짜태그, des
 
 ## 로그 (2026-09-12 최신화)
 
-U0~U13은 완료됐다. U8과 U14는 아래 이유로 보류/금지 상태 그대로다 — 자세한 내용은
+U0~U14는 완료됐다(U10~U14 전부). U8만 아래 이유로 보류/금지 상태 그대로다 — 자세한 내용은
 루트 `CLAUDE.md` 참고.
 
 | 유닛 | 상태 | PR | 비고 |
@@ -196,9 +196,9 @@ U0~U13은 완료됐다. U8과 U14는 아래 이유로 보류/금지 상태 그�
 | U9i | 완료 | #590 |  |
 | U9j | 완료 | #591 |  |
 | U10 | 완료 | (이 PR) | 2026-09-25 사용자 "U10 시작해". `useChatMessageWindow` → `src/core/use-chat-message-window.js`: 채팅 상태, 실시간 구독, 갤러리 라이브 창, 워치독, 이전 메시지 페이지, `chatMessagesContainerRef`. 동작 불변(기존 빌드와 헤드리스 비교: 홈 미리보기·채팅 53→129 페이지·딥링크·갤러리 썸네일 98개 동일). 미리보기 복구 루프와 로컬 patch/upsert/remove는 CalendarApp에 남음 |
-| U11 | 완료 | #794 | 2026-09-25 사용자 "U11 시작해". `useMemoCollections` → `src/core/use-memo-collections.js`: memos/memosLimit/hasMoreMemos 상태, 캘린더 전환 시 페이지 크기 초기화, needsMemoCollection 게이트, 고정/최근댓글/최신순 메모 구독 3종. 동작 불변(기존 빌드와 헤드리스 비교: 홈 메모 미리보기·메모 페이지 목록·갤러리 썸네일 동일). 로컬 patch/upsert/remove, 공유 메모 단건 조회, 보관함 REST 스냅샷은 CalendarApp에 남음 |
-| U12 | 완료 | #799 | 2026-09-25 사용자 "U12 시작해". `useGalleryIndexBindings` → `src/core/use-gallery-index-bindings.js`: 서버 photoIndex(`useGalleryPhotoIndex`) 호출, 사진 댓글 개수/미리 받은 댓글 상태·ready 플래그·store ref, 캘린더 전환 시 초기화, 캘린더/갤러리/보관함에서만 도는 photoComments 구독. 동작 불변(기존 빌드와 헤드리스 비교: 갤러리 썸네일 집합·댓글 뱃지 7개 숫자·라이트박스 첫 댓글 표시 동일, 34화면 오류 0). 태그 저장 패치(app-image-tag-save.js), 사진 삭제 patchItems, handleSavePhotoComments는 CalendarApp에 남음 |
-| U13 | 완료 | (이 PR) | 2026-09-26 사용자 "U13 시작해". `createCalendarPhotoActions(deps)` → `src/core/app-calendar-photo-actions.js`: 일정/채팅/메모 사진 삭제·교체, 라이트박스 단일 디스패치(handleDeletePhoto/handleReplacePhoto), 참조 확인 후 Storage 삭제, 사진 댓글 저장, 점프 핸들러(채팅/메모/메모태그/장소/갤러리/일정). 훅이 아닌 팩토리 — 원래 선언 자리에서 매 렌더 호출해 같은 렌더 값을 캡처. 이 코드가 쓰던 훅(chatMessagesRef, galleryChatMessagesRef, memosRef, findChatMessageById, handleFetchPhotoComments)은 CalendarApp에 남겨 주입. 동작 불변(기존 빌드와 헤드리스 비교: 갤러리 사진 10장 라이트박스·삭제/편집 버튼·출처 라벨·출처 점프 결과·삭제 확인창 동일, 쓰기 요청 0, 34화면 오류 0). app-main 8,497 → 7,474줄 |
-| U14 | **금지** | | 뷰 JSX — 사용자 명시 승인 전 시작 금지 |
+| U11 | 완료 | #794 | 2026-09-25 사용자 "U11 시작해". 2026-09-26 사용자 실기기 "통과". `useMemoCollections` → `src/core/use-memo-collections.js`: memos/memosLimit/hasMoreMemos 상태, 캘린더 전환 시 페이지 크기 초기화, needsMemoCollection 게이트, 고정/최근댓글/최신순 메모 구독 3종. 동작 불변(기존 빌드와 헤드리스 비교: 홈 메모 미리보기·메모 페이지 목록·갤러리 썸네일 동일). 로컬 patch/upsert/remove, 공유 메모 단건 조회, 보관함 REST 스냅샷은 CalendarApp에 남음 |
+| U12 | 완료 | #799 | 2026-09-25 사용자 "U12 시작해". 2026-09-26 사용자 실기기 "통과". `useGalleryIndexBindings` → `src/core/use-gallery-index-bindings.js`: 서버 photoIndex(`useGalleryPhotoIndex`) 호출, 사진 댓글 개수/미리 받은 댓글 상태·ready 플래그·store ref, 캘린더 전환 시 초기화, 캘린더/갤러리/보관함에서만 도는 photoComments 구독. 동작 불변(기존 빌드와 헤드리스 비교: 갤러리 썸네일 집합·댓글 뱃지 7개 숫자·라이트박스 첫 댓글 표시 동일, 34화면 오류 0). 태그 저장 패치(app-image-tag-save.js), 사진 삭제 patchItems, handleSavePhotoComments는 CalendarApp에 남음 |
+| U13 | 완료 | #800 | 2026-09-26 사용자 "U13 시작해". `createCalendarPhotoActions(deps)` → `src/core/app-calendar-photo-actions.js`: 일정/채팅/메모 사진 삭제·교체, 라이트박스 단일 디스패치(handleDeletePhoto/handleReplacePhoto), 참조 확인 후 Storage 삭제, 사진 댓글 저장, 점프 핸들러(채팅/메모/메모태그/장소/갤러리/일정). 훅이 아닌 팩토리 — 원래 선언 자리에서 매 렌더 호출해 같은 렌더 값을 캡처. 이 코드가 쓰던 훅(chatMessagesRef, galleryChatMessagesRef, memosRef, findChatMessageById, handleFetchPhotoComments)은 CalendarApp에 남겨 주입. 동작 불변(기존 빌드와 헤드리스 비교: 갤러리 사진 10장 라이트박스·삭제/편집 버튼·출처 라벨·출처 점프 결과·삭제 확인창 동일, 쓰기 요청 0, 34화면 오류 0). app-main 8,497 → 7,474줄 |
+| U14 | 완료 | (이 PR) | 2026-09-26 사용자 "U14 시작해". 뷰 JSX → `src/core/app-calendar-views.js`(`renderCalendarViews(deps)`): V2 셸이 가져가지 않을 때(`?shell=v1`) 그리는 chat/settlement/memo/gallery/places/history/content 분기와 메인 달력 화면 전체. 컴포넌트가 아닌 렌더 함수라 React 트리가 그대로(추가 레이어/리마운트 없음), 훅 없음. CalendarApp 값 199개 + UI 컴포넌트 별칭 26개를 주입(파서로 전수 추출, 모두 호출 지점보다 먼저 선언). 동작 불변(기존 빌드와 `?shell=v1` 8화면 헤드리스 비교: 7화면 텍스트·DOM 구조 해시 일치, 홈은 실시간 데이터 타이밍 차이로 두 빌드 모두 같은 두 상태를 번갈아 보임). check-design-rules/check-share-urls가 새 파일도 검사하도록 확장. app-main 7,474 → 6,554줄 |
 
 `app-main.js`: 12,065줄(U0 기준) → 8,838줄. 최상위 REAL(비-CalendarApp) 선언 30개 → 15개.

@@ -480,6 +480,7 @@ const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.
 const chatWindowSource = fs.readFileSync(new URL('../src/core/use-chat-message-window.js', import.meta.url), 'utf8');
 const galleryIndexSource = fs.readFileSync(new URL('../src/core/use-gallery-index-bindings.js', import.meta.url), 'utf8');
 const photoActionsSource = fs.readFileSync(new URL('../src/core/app-calendar-photo-actions.js', import.meta.url), 'utf8');
+const calendarViewsSource = fs.readFileSync(new URL('../src/core/app-calendar-views.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
@@ -514,7 +515,7 @@ assert(!/needsPlacesData = React\.useMemo\(\s*\(\) => activeView === 'calendar'/
 assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'history' \|\| activeView === 'content'/.test(appMainSource), 'custom contents must stay subscribed beyond history/content');
 assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloadedPhotoComments\(\{\}\);/.test(appMainSource + galleryIndexSource), 'photo comment counts must not wipe to empty on every view remount');
 assert(galleryIndexSource.includes('useGalleryPhotoIndex') && appMainSource.includes('useGalleryIndexBindings'), 'gallery must consume the canonical server-maintained photo index');
-assert(appMainSource.includes("galleryPhotoIndex.status === 'fallback' ? null : []"), 'gallery must not present a partial local archive while the canonical index is loading or failed');
+assert(calendarViewsSource.includes("galleryPhotoIndex.status === 'fallback' ? null : []"), 'gallery must not present a partial local archive while the canonical index is loading or failed');
 assert(chatGallerySource.includes('사진 목록 다시 불러오기'), 'failed canonical gallery reads must expose an explicit retry action');
 assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');
 assert(chatGallerySource.includes('gallery-pagination'), 'large galleries must render bounded 100-photo pagination');
@@ -609,7 +610,7 @@ assert(imageTagSaveSource.includes('invalidatePhotoIndexCache(activeCalId)'), 't
 assert(imageTagSaveSource.includes("requirePersisted: true"), 'lightbox tag/comment writes must require durable persistence, not queue success');
 assert(lightboxSource.includes('[photoCommentKey]: previous'), 'failed comment saves must roll back optimistic lightbox state');
 assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
-assert(appMainSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
+assert(calendarViewsSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
 assert(lightboxSource.includes('mobileStageHeightPx'), 'mobile lightbox image stage must size to the fitted photo height');
 assert(!/height: isDesktop \? '82vh' : '56dvh'/.test(lightboxSource), 'mobile lightbox must not reserve a fixed 56dvh image frame that gaps above comments');
