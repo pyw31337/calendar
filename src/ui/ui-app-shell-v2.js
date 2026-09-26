@@ -3014,6 +3014,132 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   };
   const V2Lightbox = bindUiComponentAliases(React).Lightbox;
 
+  // Lightbox 출처 jumps. The lightbox props used to be CalendarApp's own handleJumpTo* helpers,
+  // which switch CalendarApp's legacy `activeView` / open its legacy DateModal -- state this shell
+  // never renders -- so tapping 출처 only closed the lightbox. These route through this shell's
+  // own tab + shared DateModal state instead, then focus (scroll + shake) the target once the
+  // destination has mounted it.
+  const liveJumpRef = React.useRef({});
+  liveJumpRef.current = {
+    chatRoomProps: chatContext?.chatRoomProps || {},
+    focusChatMessage: moreContext?.focusChatMessage,
+    memos: recordsContext?.memoProps?.memos || [],
+    showToast: v2RecordsContext.showToast,
+  };
+  const shakeElement = (el) => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('chat-search-focused-bubble');
+    void el.offsetWidth;
+    el.classList.add('chat-search-focused-bubble');
+    setTimeout(() => el.classList.remove('chat-search-focused-bubble'), 2200);
+  };
+  // Polls until `find()` returns an element (the destination tab mounts lazily), then shakes it.
+  const focusWhenMounted = (find, { timeoutMs = 3000 } = {}) => new Promise(resolve => {
+    const startedAt = Date.now();
+    const tick = () => {
+      const el = find();
+      if (el) { shakeElement(el); resolve(true); return; }
+      if (Date.now() - startedAt >= timeoutMs) { resolve(false); return; }
+      setTimeout(tick, 120);
+    };
+    setTimeout(tick, 60);
+  });
+  // The lightbox closes itself with history.back() (it pushed an entry when it opened). That
+  // popstate lands AFTER a synchronous jump and this shell re-reads the tab from the URL on
+  // popstate -- so an immediate tab switch was undone and the viewer stayed on the gallery.
+  // Navigate only once the lightbox's history entry has been popped.
+  const afterLightboxHistorySettles = (navigate) => {
+    if (!(window.history.state && window.history.state.__moyeoraLightbox)) { navigate(); return; }
+    let done = false;
+    const run = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('popstate', onPop);
+      setTimeout(navigate, 0);
+    };
+    const onPop = () => run();
+    window.addEventListener('popstate', onPop);
+    setTimeout(run, 500);
+  };
+  // A jump to another tab leaves the shared DateModal behind (it renders over every tab), so a
+  // jump that started inside it would land underneath it -- close it first.
+  const closeSharedDateModal = () => {
+    setDateModalDate(null);
+    setDateModalTab(null);
+    setDateModalSearchFocus(null);
+  };
+  const jumpToMeetingDateFromLightbox = (dateStr, initialTab = null) => {
+    if (!dateStr) return;
+    setActiveV2Lightbox(null);
+    afterLightboxHistorySettles(() => {
+      setActiveTab('calendar');
+      setDateModalSearchFocus(null);
+      setDateModalTab(initialTab || null);
+      setDateModalDate(dateStr);
+    });
+  };
+  const jumpToChatMessageFromLightbox = (messageId) => {
+    if (!messageId) return;
+    setActiveV2Lightbox(null);
+    afterLightboxHistorySettles(() => { closeSharedDateModal(); startChatJump(messageId); });
+  };
+  const startChatJump = (messageId) => {
+    onChangeView('chat');
+    const tryFocus = () => {
+      const focus = liveJumpRef.current.focusChatMessage;
+      return typeof focus === 'function' && focus(messageId);
+    };
+    (async () => {
+      // Wait for the chat tab to mount its bubbles; the message is usually in the live window.
+      for (let waited = 0; waited < 3000; waited += 150) {
+        if (tryFocus()) return;
+        await new Promise(r => setTimeout(r, 150));
+      }
+      // Older than the loaded window: page back (like the legacy jump did) until it shows up.
+      for (let i = 0; i < 40 && liveJumpRef.current.chatRoomProps.hasMoreOlderChat; i += 1) {
+        const loadOlder = liveJumpRef.current.chatRoomProps.onLoadOlderChat;
+        if (typeof loadOlder !== 'function') break;
+        await Promise.resolve(loadOlder());
+        await new Promise(r => setTimeout(r, 150));
+        if (tryFocus()) return;
+      }
+      liveJumpRef.current.showToast?.('메시지를 찾을 수 없습니다.', 'error');
+    })();
+  };
+  const jumpToMemoFromLightbox = (memoId) => {
+    const id = typeof memoId === 'string' ? memoId : memoId?.id;
+    if (!id) return;
+    setActiveV2Lightbox(null);
+    afterLightboxHistorySettles(() => {
+      closeSharedDateModal();
+      const memo = liveJumpRef.current.memos.find(m => m && m.id === id);
+      if (memo) {
+        onOpenMemoFromHome(memo);
+      } else {
+        // Not in the loaded page: the legacy helper fetches it by id into sharedMemo, which the
+        // memo page shows (MemoScreen adds a focused memo outside the current page to the list).
+        recordsContext?.memoProps?.onOpenMemo?.(id);
+        setActiveTab('memo');
+      }
+      focusWhenMounted(() => [...document.querySelectorAll('[data-v2-memo-id]')]
+        .find(el => el.getAttribute('data-v2-memo-id') === String(id)), { timeoutMs: 5000 });
+    });
+  };
+  const jumpToGalleryFromLightbox = (messageId, imageIndex, imageUrl) => {
+    setActiveV2Lightbox(null);
+    afterLightboxHistorySettles(() => { closeSharedDateModal(); focusGalleryPhoto(messageId, imageUrl); });
+  };
+  const focusGalleryPhoto = (messageId, imageUrl) => {
+    navigateV2Destination('gallery', { push: true, setTab: setActiveTabState, setSub: setRecordsSubTabState });
+    focusWhenMounted(() => {
+      const byUrl = imageUrl
+        ? [...document.querySelectorAll('[data-photo-url]')].find(el => el.getAttribute('data-photo-url') === String(imageUrl))
+        : null;
+      if (byUrl) return byUrl;
+      return messageId ? document.querySelector(`[data-message-id="${String(messageId).replace(/"/g, '')}"]`) : null;
+    });
+  };
+
   // Shared by the 더보기 list AND any other pane (e.g. ChatPane's "앱 설정" entry) that needs to
   // open one of the 4 real 더보기 modals directly, without going through the 더보기 tab's own list.
   const openMoreModalById = (id) => {
@@ -3525,10 +3651,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onSearchTag: v2RecordsContext.historyProps?.onSearchTag,
       onDeletePhoto: v2RecordsContext.historyProps?.onDeletePhoto,
       onReplacePhoto: v2RecordsContext.historyProps?.onReplacePhoto,
-      onJumpToChatMessage: v2RecordsContext.historyProps?.onJumpToChatMessage,
-      onJumpToMemo: v2RecordsContext.historyProps?.onJumpToMemo,
-      onJumpToMeetingDate: v2RecordsContext.historyProps?.onJumpToMeetingDate,
-      onJumpToGallery: () => { navigateV2Destination('gallery', { push: true, setTab: setActiveTabState, setSub: setRecordsSubTabState }); },
+      onJumpToChatMessage: jumpToChatMessageFromLightbox,
+      onJumpToMemo: jumpToMemoFromLightbox,
+      onJumpToMeetingDate: jumpToMeetingDateFromLightbox,
+      onJumpToGallery: jumpToGalleryFromLightbox,
       onGetChatMessageOrdinal: v2RecordsContext.historyProps?.onGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: v2RecordsContext.historyProps?.onGetGalleryPhotoOrdinal,
       onRequestConfirm: v2RecordsContext.historyProps?.onRequestConfirm,

@@ -3,6 +3,7 @@
  */
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -926,6 +927,19 @@ export function DateModal({
     const extra = Object.values(fetchedSourceMessages);
     return extra.length === 0 ? chatMessages : [...(chatMessages || []), ...extra];
   }, [chatMessages, fetchedSourceMessages]);
+  // Upload source of the message an album reference points at: the loaded source message's own
+  // uploadSource, else what its id says (chat_/gallery_/meeting_), else 'meeting' (no source
+  // message at all -- a standalone 일정 photo).
+  const resolveAlbumSourceUpload = (photo) => {
+    const sourceId = photo?.sourceMessageId || photo?.messageId || '';
+    if (!sourceId) return 'meeting';
+    const sourceMessage = (chatMessagesWithFetchedSources || []).find(m => m && m.id === sourceId);
+    if (sourceMessage) {
+      const declared = String(sourceMessage.uploadSource || '').toLowerCase();
+      return ['gallery', 'meeting', 'memo'].includes(declared) ? declared : 'chat';
+    }
+    return inferUploadSourceFromMessageId(sourceId) || 'meeting';
+  };
 
   // Query the server by the date tag immediately. The date photo list must not depend on the
   // user opening Gallery or loading older chat pages first.
@@ -3478,7 +3492,10 @@ export function DateModal({
                   timestamp: p.createdAt,
                   tags: p.tags,
                   source: p.source || 'meeting',
-                  uploadSource: p.uploadSource || (p.source === 'chat-tag' ? 'chat' : 'meeting'),
+                  // A date-linked album entry (sourceMessageId) is only a reference: the photo's real
+                  // origin is its source message -- a chat/gallery upload, or a 일정 upload -- so the
+                  // Lightbox's 출처 row names (and jumps to) that, not "일정" for every album photo.
+                  uploadSource: p.uploadSource || (p.source === 'chat-tag' ? 'chat' : resolveAlbumSourceUpload(p)),
                   messageId: p.sourceMessageId || p.messageId,
                   imageIndex: p.sourceImageIndex ?? p.imageIndex,
                   sourceMessageId: p.sourceMessageId,
