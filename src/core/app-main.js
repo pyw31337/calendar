@@ -21,6 +21,7 @@ import {
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { createImageTagSaveHandler } from './app-image-tag-save.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
+import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { renderCalendarViews } from './app-calendar-views.js';
 import { syncAssetTagsInMeetings } from './media-reference-integrity.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
@@ -1252,6 +1253,10 @@ function CalendarApp() {
   // chat notifications (sender shows "알수없음", title stays the old name) until activeCalId
   // itself changes. Mirrors the chatParticipantIdRef pattern used the same way above.
   const activeCalRef = React.useRef(activeCal);
+  // Photo uploads tag the registered place they were taken at (GPS within ~200m) -- keep the
+  // tagger on the ACTIVE calendar's places only (photo-metadata-tags.js setPhotoTagPlaces).
+  const activeCalPlaces = activeCal && activeCal.places;
+  React.useEffect(() => { setPhotoTagPlaces(activeCalPlaces); }, [activeCalPlaces]);
   React.useEffect(() => { activeCalRef.current = activeCal; }, [activeCal]);
 
   // Lightweight client-side error monitoring: without this, a bug that fails silently in

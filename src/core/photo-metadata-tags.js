@@ -373,6 +373,43 @@ export function mergeLocationResults(primary = null, secondary = null) {
   };
 }
 
+// The active calendar's registered places (장소 탭), so an upload whose GPS position is next to one
+// of them gets that place's name as a tag -- which is what files the photo under that place in
+// 보관함 > 장소 (src/ui/archive-place-groups.js). CalendarApp keeps this in sync with the active
+// calendar; it never holds another calendar's places.
+const PLACE_MATCH_MAX_METERS = 200;
+let registeredPlaces = [];
+
+export function setPhotoTagPlaces(places) {
+  registeredPlaces = (Array.isArray(places) ? places : [])
+    .filter(place => place && !place.deletedAt && String(place.name || '').trim()
+      && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng)))
+    .map(place => ({ name: String(place.name).trim(), lat: Number(place.lat), lng: Number(place.lng) }));
+}
+
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const toRad = deg => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export function nearestPlaceForCoords(lat, lng, places = registeredPlaces, maxMeters = PLACE_MATCH_MAX_METERS) {
+  const latN = Number(lat);
+  const lngN = Number(lng);
+  if (!Number.isFinite(latN) || !Number.isFinite(lngN) || (latN === 0 && lngN === 0)) return null;
+  let best = null;
+  (Array.isArray(places) ? places : []).forEach(place => {
+    const pLat = Number(place?.lat);
+    const pLng = Number(place?.lng);
+    if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) return;
+    const meters = distanceMeters(latN, lngN, pLat, pLng);
+    if (meters <= maxMeters && (!best || meters < best.meters)) best = { place, meters };
+  });
+  return best ? best.place : null;
+}
+
 export function buildMetadataTags(metadata, scheduledDateOrOptions = '') {
   const options = typeof scheduledDateOrOptions === 'string'
     ? { scheduledDate: scheduledDateOrOptions }
@@ -391,6 +428,10 @@ export function buildMetadataTags(metadata, scheduledDateOrOptions = '') {
   if (/^\d{4}-\d{2}-\d{2}$/.test(captured)) {
     addTag(tags, dateStrToCompactHashtag(captured));
   }
+
+  // A registered place right where the photo was taken beats the generic reverse-geocoded names.
+  const nearbyPlace = nearestPlaceForCoords(metadata?.latitude, metadata?.longitude, options.places || registeredPlaces);
+  if (nearbyPlace) addTag(tags, nearbyPlace.name);
 
   const locationTags = Array.isArray(metadata?.locationTags) ? metadata.locationTags : [];
   locationTags.forEach(tag => addTag(tags, tag));
