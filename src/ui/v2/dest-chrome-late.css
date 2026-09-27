@@ -924,6 +924,15 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   --v2-badge-pad-x: 8px;
   --v2-badge-fs: 0.68rem;
   --v2-chip-h: 32px;
+  /* Event-sheet tabs use body-size labels; their populated state is a compact, shared dot. */
+  --v2-event-sheet-tab-label-fs: 0.9rem;
+  --v2-tab-status-dot-size: 6px;
+  --v2-tab-status-dot-offset-block-start: -3px;
+  --v2-tab-status-dot-offset-inline-end: -9px;
+  --v2-tab-status-dot-ring-width: 2px;
+  /* The calendar rail's D-day is status text, not a capsule badge. */
+  --v2-side-nav-calendar-dday-fs: var(--v2-badge-fs);
+  --v2-side-nav-calendar-dday-weight: 800;
 }
 .v2-design .v2-name-pill,
 .v2-design .bp-chat-name-pill,
@@ -936,8 +945,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .bp-comment-badge,
 .v2-design .bp-settlement-card-badge,
 .v2-design .bp-side-nav-cal-badge,
-.v2-design .bp-side-nav-calendar-dday-badge,
-.v2-design .underline-tabs [role="tab"] > span,
+.v2-design .underline-tabs [role="tab"] > .underline-tabs-count,
 .v2-design .section-count-badge,
 .v2-design .participant-badge,
 .v2-design .status-badge,
@@ -963,14 +971,48 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   text-align: center;
 }
 
-/* Calendar's only live rail status: a nearest confirmed-meeting D-day. */
+/* Calendar's only live rail status: a nearest confirmed-meeting D-day.  It intentionally
+ * reads as purple text (no fill, border, or pill geometry), unlike action/count badges. */
 .v2-design .bp-side-nav-calendar-dday-badge {
-  min-width: 34px;
-  margin-left: auto !important;
-  background: var(--brand) !important;
-  color: var(--on-brand) !important;
+  margin-left: auto;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--brand, #7C2FE5);
+  font-size: var(--v2-side-nav-calendar-dday-fs);
+  font-weight: var(--v2-side-nav-calendar-dday-weight);
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* A label is distinct from the optional numeric count.  This prevents the 22px badge spec
+ * from shrinking the actual tab names inside a date/event sheet. */
+.v2-design .underline-tabs-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+.v2-design .bp-event-sheet .underline-tabs.underline-tabs--flush .underline-tabs-label {
+  font-size: var(--v2-event-sheet-tab-label-fs);
+}
+.v2-design .bp-event-sheet .underline-tabs-label.has-status-dot::after {
+  content: '';
+  position: absolute;
+  top: var(--v2-tab-status-dot-offset-block-start);
+  right: var(--v2-tab-status-dot-offset-inline-end);
+  width: var(--v2-tab-status-dot-size);
+  height: var(--v2-tab-status-dot-size);
+  border-radius: 50%;
+  background: var(--brand, #7C2FE5);
+  box-shadow: 0 0 0 var(--v2-tab-status-dot-ring-width) var(--bg-card);
 }
 
 /* Name pills: same geometry, white type on participant color. */
@@ -1138,13 +1180,13 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] {
   color: var(--brand, #7C2FE5) !important;
 }
-.v2-design .v2-content .underline-tabs [role="tab"] > span,
-.v2-design .v2-archive .underline-tabs [role="tab"] > span {
+.v2-design .v2-content .underline-tabs [role="tab"] > .underline-tabs-count,
+.v2-design .v2-archive .underline-tabs [role="tab"] > .underline-tabs-count {
   background: var(--v2-surface-2, #eceaf5) !important;
   color: var(--v2-ink-2, #6b6580) !important;
 }
-.v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"] > span,
-.v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] > span {
+.v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"] > .underline-tabs-count,
+.v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] > .underline-tabs-count {
   background: color-mix(in srgb, var(--brand, #7C2FE5) 14%, var(--bg-card)) !important;
   color: var(--brand, #7C2FE5) !important;
 }
@@ -4386,8 +4428,8 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
   color: var(--text-muted) !important;
 }
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] > span,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-archive .underline-tabs [role="tab"] > span {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] > .underline-tabs-count,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-archive .underline-tabs [role="tab"] > .underline-tabs-count {
   background: var(--bg-secondary) !important;
   color: var(--text-muted) !important;
 }

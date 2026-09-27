@@ -280,7 +280,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
         ...tabTextStyle
       }
     }, tab.label, count > 0 && /*#__PURE__*/React.createElement("span", {
-        className: countBadgeClassName || undefined,
+        className: `underline-tabs-count${countBadgeClassName ? ` ${countBadgeClassName}` : ''}`,
         style: {
           display: 'inline-flex',
           alignItems: 'center',
