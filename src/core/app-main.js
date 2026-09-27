@@ -35,6 +35,7 @@ import {
   isHeicFile,
   buildMetadataTags,
   forgetPreprocessedImages,
+  rememberKnownImageFingerprints,
   processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles,
   uploadInlineChatImageToStorage, readClipboardImageFiles,
@@ -955,6 +956,18 @@ function CalendarApp() {
     React, activeCalId, activeView, isGlobalSearchOpen,
     firebaseDb, getFirebaseDb: () => firebaseDb, firebaseConnectionVersion
   });
+  // Persisted fingerprints cover already-rendered media immediately; the image pipeline also
+  // hydrates the full, field-masked archive before a new upload, so pagination cannot make an
+  // older duplicate look new.
+  React.useEffect(() => {
+    const activeCalendar = (calendars || []).find(calendar => calendar?.id === activeCalId);
+    const fingerprints = [
+      ...(allChatMessages || []).flatMap(message => Array.isArray(message?.imageFingerprints) ? message.imageFingerprints : []),
+      ...(memos || []).flatMap(memo => Array.isArray(memo?.imageFingerprints) ? memo.imageFingerprints : []),
+      ...(activeCalendar?.anniversaries || []).flatMap(anniversary => (anniversary?.photos || []).map(photo => photo?.fingerprint))
+    ];
+    rememberKnownImageFingerprints(activeCalId, fingerprints);
+  }, [activeCalId, allChatMessages, memos, calendars]);
   const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
     allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
@@ -2802,6 +2815,12 @@ function CalendarApp() {
         // unavailable) keep their full quality -- instead the batch is split across multiple
         // chat messages if needed so no single message can exceed Firestore's 1MiB/doc limit.
         const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
+        if (resolvedImages.duplicateIndexes?.length) {
+          showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
+        }
+        if (resolvedImages.length === 0) {
+          throw new Error('이미 업로드된 사진입니다. 새 사진을 선택해 주세요.');
+        }
         const chunks = chunkResolvedImagesForMessages(resolvedImages);
         const baseTimestamp = Date.now();
         for (let i = 0; i < chunks.length; i++) {
@@ -2821,6 +2840,7 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
+            imageFingerprints: chunkImages.map(r => r.fingerprint || ''),
             // Always persist the upload-date tag when optional metadata parsing returns no tags.
             imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions()) || withUploadDateTag('')),
             timestamp: baseTimestamp + i,
@@ -2976,6 +2996,13 @@ function CalendarApp() {
           label: '갤러리 사진 업로드 중...'
         });
       });
+      if (resolvedImages.duplicateIndexes?.length) {
+        showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
+      }
+      if (resolvedImages.length === 0) {
+        showToast('새로 업로드할 사진이 없습니다. 기존 사진과 동일한 파일입니다.', 'info', 5000);
+        return false;
+      }
       const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
       let anyQueued = false;
@@ -2996,6 +3023,7 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
+          imageFingerprints: chunkImages.map(r => r.fingerprint || ''),
           imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions()) || withUploadDateTag('')),
           timestamp: now + i,
           // Distinguishes gallery uploads so the Lightbox can show their source accurately.
@@ -3365,9 +3393,11 @@ function CalendarApp() {
         ? editingMessage.imageUrls
         : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []);
       const originalTags = Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [];
+      const originalFingerprints = Array.isArray(editingMessage.imageFingerprints) ? editingMessage.imageFingerprints : [];
       const consumedOriginalIndexes = new Set();
-      const nextImageTags = (newImages || []).map(img => {
-        if (!img.isExisting) return '';
+      const nextImageTags = resolvedImages.map(resolved => {
+        const img = (newImages || [])[resolved.sourceIndex];
+        if (!img?.isExisting) return '';
         // Two intentionally duplicated uploads can have the same URL. Match each occurrence
         // once in source order instead of repeatedly taking indexOf's first slot, otherwise the
         // first photo's tag gets copied to every duplicate while editing.
@@ -3375,6 +3405,19 @@ function CalendarApp() {
         if (originalIdx >= 0) consumedOriginalIndexes.add(originalIdx);
         return originalIdx >= 0 ? (originalTags[originalIdx] || '') : '';
       });
+      const nextImageFingerprints = resolvedImages.map(resolved => {
+        if (resolved.fingerprint) return resolved.fingerprint;
+        const source = (newImages || [])[resolved.sourceIndex];
+        if (!source?.isExisting) return '';
+        const originalIdx = originalUrls.findIndex(url => url === source.original);
+        return originalIdx >= 0 ? (originalFingerprints[originalIdx] || '') : '';
+      });
+      // chunkResolvedImagesForMessages returns slices of these exact resolved-image objects.
+      // Retain per-image tags/fingerprints by object identity when an edit has to be split into
+      // several Firestore documents; otherwise every photo after the first document loses its
+      // tag payload and can subsequently inherit a neighbour's tag during another edit.
+      const tagByResolvedImage = new Map(resolvedImages.map((resolved, index) => [resolved, nextImageTags[index] || '']));
+      const fingerprintByResolvedImage = new Map(resolvedImages.map((resolved, index) => [resolved, nextImageFingerprints[index] || '']));
 
       const incomingFiles = Array.isArray(nextFileAttachments) ? nextFileAttachments : (editingMessage.fileAttachments || []);
       let uploadedFileAttachments = incomingFiles.filter(f => f && f.url && !f.file);
@@ -3390,7 +3433,8 @@ function CalendarApp() {
         thumbUrl: firstChunk[0]?.thumbUrl || '',
         imageUrls: firstChunk.map(r => r.imageUrl),
         thumbUrls: firstChunk.map(r => r.thumbUrl),
-        imageTags: nextImageTags.slice(0, firstChunk.length),
+        imageTags: firstChunk.map(resolved => tagByResolvedImage.get(resolved) || ''),
+        imageFingerprints: firstChunk.map(resolved => fingerprintByResolvedImage.get(resolved) || ''),
         linkPreview: linkPreview || null,
         fileAttachments: uploadedFileAttachments
       };
@@ -3404,6 +3448,7 @@ function CalendarApp() {
         imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
         thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
         imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
+        imageFingerprints: Array.isArray(editingMessage.imageFingerprints) ? editingMessage.imageFingerprints : [],
         imageTagMap: editingMessage.imageTagMap && typeof editingMessage.imageTagMap === 'object' && !Array.isArray(editingMessage.imageTagMap) ? editingMessage.imageTagMap : {},
         linkPreview: editingMessage.linkPreview || null,
         participantId: editingMessage.participantId
@@ -3437,10 +3482,12 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
+            imageTags: chunkImages.map(resolved => tagByResolvedImage.get(resolved) || ''),
+            imageFingerprints: chunkImages.map(resolved => fingerprintByResolvedImage.get(resolved) || ''),
             imageTagMap: reconcileMessageImageTagMap({
               imageUrls: chunkImages.map(r => r.imageUrl),
               thumbUrls: chunkImages.map(r => r.thumbUrl),
-              imageTags: chunkImages.map(() => '')
+              imageTags: chunkImages.map(resolved => tagByResolvedImage.get(resolved) || '')
             }),
             timestamp: baseTimestamp + i
           }, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
@@ -4399,6 +4446,7 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
+          imageFingerprints: chunkImages.map(r => r.fingerprint || ''),
           imageTags: chunkImages.map(img => buildMetadataTags(img.metadata, dateStr)),
           timestamp: now + i,
           uploadSource: 'meeting'

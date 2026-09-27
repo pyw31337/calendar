@@ -363,7 +363,6 @@ export function DateModal({
     const label = encodeURIComponent(place.alias || place.name || '장소');
     return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
   };
-    const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
       const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
     const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
@@ -2126,11 +2125,11 @@ export function DateModal({
     onChange: (id) => setActiveTab(id),
     style: { backgroundColor: 'var(--bg-card)', width: '100%', borderBottom: '1px solid var(--border-subtle)' },
     options: [
-      { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
-      { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
-      { value: 'settlement', label: /*#__PURE__*/React.createElement(React.Fragment, null, "정산", /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })) },
-      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingImages.length })) },
-      { value: 'memo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "메모", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateTaggedMemos.length })) }
+      { value: 'participant', label: '참석', badge: dateEntries.length, badgeMode: 'dot' },
+      { value: 'meeting', label: '장소', badge: registeredPlaces.length, badgeMode: 'dot' },
+      { value: 'settlement', label: '정산', badge: expenses.length, badgeMode: 'dot' },
+      { value: 'photo', label: '사진', badge: visibleMeetingImages.length, badgeMode: 'dot' },
+      { value: 'memo', label: '메모', badge: dateTaggedMemos.length, badgeMode: 'dot' }
     ]
   }), /*#__PURE__*/React.createElement("form", {
     style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },

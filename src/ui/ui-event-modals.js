@@ -503,11 +503,12 @@ export function AnniversaryModal({
         annData.photos = (resolvedPhotos || [])
           .filter(Boolean)
           .map((p, idx) => {
-            const formPhoto = photos[idx] || null;
+            const formPhoto = photos[p.sourceIndex ?? idx] || null;
             const prev = prevPhotos.find(op => op && (op.url === p.imageUrl || op.thumbUrl === p.thumbUrl || op.url === formPhoto?.original))
               || prevPhotos[idx]
               || null;
             const out = { url: p.imageUrl, thumbUrl: p.thumbUrl };
+            if (p.fingerprint) out.fingerprint = p.fingerprint;
             const tags = (formPhoto && formPhoto.tags) || (prev && prev.tags) || '';
             if (tags) out.tags = tags;
             const photoId = (formPhoto && formPhoto.photoId) || (prev && prev.id) || '';
@@ -2213,12 +2214,19 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   // shared outside the app without anyone needing account access.
   const handleDownloadSettlementCardImage = () => {
     const items = Object.values(checkedItems);
+    // Draw in the established 720px design coordinate system, then export at 1280px.  Scaling
+    // the canvas (rather than stretching a finished data URL) keeps text, rules and badges
+    // sharp in the downloaded image on both Retina phones and desktop messengers.
     const W = 720;
+    const EXPORT_W = 1280;
+    const EXPORT_SCALE = EXPORT_W / W;
     const PAD = 40;
     const HEADER_H = 190;
     const ROW_H = 40;
     const summaryBoxH = 74 + Math.max(1, participantRows.length) * ROW_H;
-    const bankBoxH = depositorName ? 108 : 86;
+    const cleanAccountDigits = String(accountNumber || '').replace(/[^0-9]/g, '');
+    const hasTransferAccount = cleanAccountDigits.length >= 8;
+    const bankBoxH = hasTransferAccount ? (depositorName ? 108 : 86) : 0;
 
     // Height depends on how many lines each item's label wraps to, which needs a live 2D
     // context to measure -- create the canvas at a placeholder height first, measure, then
@@ -2273,10 +2281,29 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     };
 
     ctx.font = '500 14px sans-serif';
-    const itemLines = items.map(item => wrapText(`${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`, 420));
-    const itemRowUnits = items.length === 0 ? 1 : itemLines.reduce((sum, lines) => sum + Math.max(1, lines.length), 0);
+    const participantColorByName = new Map(participantPickerOptions.map(option => [option.value, option.color || '#64748B']));
+    const formatExpenseDateParts = (dateStr) => {
+      const full = formatShortDateWithDay(dateStr);
+      const match = String(full || '').match(/^(.*?)\s*(\([^)]*\))$/);
+      return match ? { date: match[1], day: match[2] } : { date: full || '', day: '' };
+    };
+    const imageItems = items.map(item => {
+      const parts = formatExpenseDateParts(item.date);
+      const payer = String(item.payerId || item.participantId || '').trim();
+      const payerColor = participantColorByName.get(payer) || '#64748B';
+      ctx.font = '500 14px sans-serif';
+      return {
+        item,
+        parts,
+        payer,
+        payerColor,
+        labelLines: wrapText(item.label || '정산 항목', 420)
+      };
+    });
+    const itemRowUnits = imageItems.length === 0 ? 1 : imageItems.reduce((sum, entry) => sum + 1 + Math.max(1, entry.labelLines.length), 0);
     const listBoxH = 74 + itemRowUnits * ROW_H;
-    const H = HEADER_H + 34 + summaryBoxH + 20 + bankBoxH + 20 + listBoxH + 50;
+    const bankSectionSpace = hasTransferAccount ? bankBoxH + 20 : 0;
+    const H = HEADER_H + 34 + summaryBoxH + 20 + bankSectionSpace + listBoxH + 50;
 
     // The downloaded card follows the app theme: the dark V2 theme is black with the lime
     // accent (same as the settlement page's top card); light keeps the original palette.
@@ -2290,8 +2317,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       box: '#FFFFFF', boxLine: '#E2E8F0', rowLine: '#F1F5F9', muted: '#64748B', faint: '#94A3B8',
       text: '#334155', strong: '#0F172A', doneFill: '#E2E8F0', doneText: '#64748B', red: '#DC2626', green: '#16A34A', onRed: '#FFFFFF'
     };
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = EXPORT_W;
+    canvas.height = Math.ceil(H * EXPORT_SCALE);
+    ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
     const hLine = (x1, x2, yy) => {
       ctx.strokeStyle = P.rowLine;
       ctx.beginPath();
@@ -2400,26 +2428,28 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
     y += summaryBoxH + 20;
 
-    // 송금계좌 정보
-    ctx.fillStyle = P.box;
-    ctx.fillRect(PAD, y, W - PAD * 2, bankBoxH);
-    ctx.strokeStyle = P.boxLine;
-    ctx.strokeRect(PAD, y, W - PAD * 2, bankBoxH);
-    ctx.fillStyle = P.muted;
-    ctx.font = '700 14px sans-serif';
-    ctx.fillText('송금계좌 정보', PAD + 20, y + 30);
-    ctx.fillStyle = P.strong;
-    ctx.font = '800 18px sans-serif';
-    const cardImageAccountNumber = isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber;
-    const bankLabel = `${bankName === '기타' ? (otherBankName || '기타') : bankName} ${cardImageAccountNumber || '계좌번호 미입력'}`;
-    ctx.fillText(fitText(bankLabel, W - PAD * 2 - 40), PAD + 20, y + 60);
-    if (depositorName) {
+    // An empty account must not create a misleading "계좌번호 미입력" block in a shared
+    // image.  The account section is omitted entirely until a valid transfer number exists.
+    if (hasTransferAccount) {
+      ctx.fillStyle = P.box;
+      ctx.fillRect(PAD, y, W - PAD * 2, bankBoxH);
+      ctx.strokeStyle = P.boxLine;
+      ctx.strokeRect(PAD, y, W - PAD * 2, bankBoxH);
       ctx.fillStyle = P.muted;
-      ctx.font = '500 14px sans-serif';
-      ctx.fillText(`예금주: ${depositorName}`, PAD + 20, y + 86);
+      ctx.font = '700 14px sans-serif';
+      ctx.fillText('송금계좌 정보', PAD + 20, y + 30);
+      ctx.fillStyle = P.strong;
+      ctx.font = '800 18px sans-serif';
+      const cardImageAccountNumber = isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber;
+      const bankLabel = `${bankName === '기타' ? (otherBankName || '기타') : bankName} ${cardImageAccountNumber}`;
+      ctx.fillText(fitText(bankLabel, W - PAD * 2 - 40), PAD + 20, y + 60);
+      if (depositorName) {
+        ctx.fillStyle = P.muted;
+        ctx.font = '500 14px sans-serif';
+        ctx.fillText(`예금주: ${depositorName}`, PAD + 20, y + 86);
+      }
+      y += bankBoxH + 20;
     }
-
-    y += bankBoxH + 20;
 
     // 정산목록
     ctx.fillStyle = P.box;
@@ -2436,18 +2466,34 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ctx.font = '500 14px sans-serif';
       ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
     } else {
-      items.forEach((item, itemIndex) => {
-        const lines = itemLines[itemIndex];
+      imageItems.forEach(({ item, parts, payer, payerColor, labelLines }) => {
         hLine(PAD + 20, W - PAD - 20, listRowY - 22);
+        let textX = PAD + 20;
+        ctx.fillStyle = P.text;
+        ctx.font = '600 14px sans-serif';
+        ctx.fillText(parts.date, textX, listRowY);
+        textX += ctx.measureText(parts.date).width + 5;
+        if (parts.day) {
+          ctx.fillStyle = payerColor;
+          ctx.font = '800 16px sans-serif';
+          ctx.fillText(parts.day, textX, listRowY);
+          textX += ctx.measureText(parts.day).width + 7;
+        }
+        if (payer) {
+          ctx.fillStyle = payerColor;
+          ctx.font = '800 14px sans-serif';
+          const payerText = `${payer} /`;
+          ctx.fillText(payerText, textX, listRowY);
+        }
         ctx.fillStyle = P.text;
         ctx.font = '500 14px sans-serif';
-        lines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + lineIndex * ROW_H));
+        labelLines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + (lineIndex + 1) * ROW_H));
         ctx.fillStyle = P.red;
         ctx.font = '800 15px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, listRowY);
         ctx.textAlign = 'left';
-        listRowY += ROW_H * Math.max(1, lines.length);
+        listRowY += ROW_H * (1 + Math.max(1, labelLines.length));
       });
     }
 
@@ -3608,22 +3654,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           );
           const settlementTransfers = calculateSettlementTransfers(cardParticipantRows);
 
-          return React.createElement("div", {
+          return React.createElement("article", {
             key: card.id,
-            role: 'button',
-            tabIndex: 0,
             title: '정산 수정',
-            'aria-label': '정산 수정',
             'data-settlement-edit-button': 'true',
             // Open only on click -- see the settlement-list-card button's comment below for why
             // an early pointerup/mousedown handler here would race the editor's self-closing
             // full-viewport overlay and close the modal within the same click gesture.
             onClick: () => handleOpenSettlementEditor(card),
-            onKeyDown: event => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              handleOpenSettlementEditor(card);
-            },
             style: {
               background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-mid), var(--settlement-hero-end))',
               border: 'none',
@@ -3639,6 +3677,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               cursor: 'pointer'
             }
           },
+            // The summary contains its own copy-account/menu controls, so a focusable card
+            // wrapper would create nested interactive controls. Keep one explicit keyboard
+            // action for opening this settlement editor instead.
+            React.createElement("button", {
+              type: 'button',
+              'aria-label': `${card.title || '정산'} 수정`,
+              onClick: event => { event.stopPropagation(); handleOpenSettlementEditor(card); },
+              style: {
+                position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px',
+                overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0
+              }
+            }, '정산 수정'),
             /* Card Header: status top-left, title/account below. */
             React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', position: 'relative' }

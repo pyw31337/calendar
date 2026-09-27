@@ -1606,6 +1606,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       homeGalleryStrip.state === 'loading'
         ? React.createElement('div', {
           className: bentoClass('renewal-home-photo-strip thumb-grid is-loading'),
+          role: 'status',
           'aria-busy': 'true',
           'aria-label': '갤러리 불러오는 중',
         }, Array.from({ length: 9 }, (_, i) => React.createElement('div', {

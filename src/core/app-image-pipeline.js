@@ -225,6 +225,40 @@ function resetHeic2anyLoader() {
   window.heic2any = null;
 }
 
+// A filename, MIME type, size, and EXIF fields are useful diagnostics, but none of them is a
+// safe duplicate key on its own: a user can rename a photo, a messenger can rewrite its MIME,
+// and two different frames can share every EXIF value.  Keep that descriptor for traceability,
+// then use a SHA-256 of the original bytes as the actual identity.  This intentionally happens
+// before any resize/re-encode, so the same original is recognised even when a browser would
+// produce slightly different compressed JPEG bytes on a later upload.
+function imageFingerprintFallback(file, metadata, sniffed) {
+  const name = String(file?.name || '').trim().toLowerCase();
+  const type = String(sniffed?.mime || file?.type || '').trim().toLowerCase();
+  const capturedAt = String(metadata?.capturedAt || '').trim();
+  const device = String(metadata?.device || '').trim().toLowerCase();
+  const coordinates = Number.isFinite(Number(metadata?.latitude)) && Number.isFinite(Number(metadata?.longitude))
+    ? `${Number(metadata.latitude).toFixed(6)},${Number(metadata.longitude).toFixed(6)}`
+    : '';
+  return [name, type, Number(file?.size) || 0, Number(file?.lastModified) || 0, capturedAt, device, coordinates].join('|');
+}
+
+async function buildImageFingerprint(file, metadata, sniffed) {
+  const fallback = imageFingerprintFallback(file, metadata, sniffed);
+  try {
+    if (file?.arrayBuffer && globalThis.crypto?.subtle?.digest) {
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      if (hex) return { value: `sha256:${hex}`, strength: 'content', fallback };
+    }
+  } catch (error) {
+    // A file can disappear while an iOS share sheet is closing.  The descriptor fallback still
+    // prevents an immediate identical retry from being uploaded twice; never fail a valid photo
+    // merely because the optional fingerprint read lost its source handle.
+    console.warn('Image fingerprint digest unavailable; using descriptor fallback.', error);
+  }
+  return { value: `descriptor:${fallback}`, strength: 'descriptor', fallback };
+}
+
 async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
   // Messengers often rewrite the bytes (JPEG/HEIC) while keeping a .png name or a wrong MIME.
   // Sniff the header so decode/encode follow the real format instead of the filename.
@@ -232,6 +266,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
   const workingFile = withCorrectedImageFile(file, sniffed) || file;
   let sourceBlob = workingFile;
   const metadata = await extractPhotoMetadata(workingFile).catch(() => null);
+  const imageFingerprint = await buildImageFingerprint(workingFile, metadata, sniffed);
   let img = null;
   const treatAsHeic = isHeicFile(workingFile) || sniffed?.kind === 'heic';
 
@@ -455,6 +490,10 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
         thumbnailBlob: thumbBlob,
         needsBase64Fallback: preferStorage,
         metadata,
+        // Persisted beside the eventual URL in the message/memo record.  Tags and comments are
+        // still keyed to their asset URL; this field is only for duplicate prevention.
+        fingerprint: imageFingerprint.value,
+        fingerprintStrength: imageFingerprint.strength,
         _objectUrls: objectUrls
       });
     };
@@ -605,6 +644,103 @@ function revokeCompressedObjectUrls(compressed) {
 // full-size blobs.
 const imagePreprocessCache = new Map();
 const IMAGE_PREPROCESS_CACHE_LIMIT = 80;
+// The page hydrates this index from already-saved message and memo records.  It is deliberately
+// calendar-scoped: the same stock photo may be useful in two different family calendars, while a
+// second copy in one calendar only creates another gallery asset with ambiguous tags/comments.
+const knownImageFingerprintsByCalendar = new Map();
+const KNOWN_IMAGE_FINGERPRINT_LIMIT = 6000;
+const fingerprintIndexHydrationByCalendar = new Map();
+
+function normalizeImageFingerprint(value) {
+  const fingerprint = String(value || '').trim();
+  return /^(?:sha256|descriptor):.+$/i.test(fingerprint) ? fingerprint : '';
+}
+
+function rememberKnownImageFingerprints(calendarId, values) {
+  const id = String(calendarId || '').trim();
+  if (!id) return;
+  const next = new Set(knownImageFingerprintsByCalendar.get(id) || []);
+  Array.from(values || []).forEach(value => {
+    const fingerprint = normalizeImageFingerprint(value);
+    if (fingerprint) next.add(fingerprint);
+  });
+  // Preserve the most recently seen values without allowing a long-running gallery session to
+  // grow without bound.  A server reload rebuilds the complete index from persisted data.
+  while (next.size > KNOWN_IMAGE_FINGERPRINT_LIMIT) next.delete(next.values().next().value);
+  knownImageFingerprintsByCalendar.set(id, next);
+}
+
+function getKnownImageFingerprintSet(calendarId) {
+  return knownImageFingerprintsByCalendar.get(String(calendarId || '').trim()) || new Set();
+}
+
+function readFirestoreFingerprintValues(document) {
+  const values = document?.fields?.imageFingerprints?.arrayValue?.values;
+  return Array.isArray(values)
+    ? values.map(value => value?.stringValue || '').filter(Boolean)
+    : [];
+}
+
+// The normal chat and gallery windows are deliberately paginated, so they cannot be the sole
+// source of truth for duplicate detection.  Before a first upload in a calendar, retrieve only
+// the fingerprint field from every message/memo document.  This is a Firestore field mask (not
+// the actual image URL/base64 payload), is cached for the tab lifetime, and lets an old gallery
+// photo be recognised even if it is outside the current scroll window.
+async function hydrateKnownImageFingerprintsForCalendar(calendarId) {
+  const id = String(calendarId || '').trim();
+  if (!id || fingerprintIndexHydrationByCalendar.has(id)) {
+    return fingerprintIndexHydrationByCalendar.get(id) || Promise.resolve();
+  }
+  const projectId = String(firebaseConfig?.projectId || '').trim();
+  if (!projectId || typeof fetch !== 'function') return Promise.resolve();
+  const work = (async () => {
+    const fetchCollection = async collection => {
+      let pageToken = '';
+      do {
+        const params = new URLSearchParams({ pageSize: '300' });
+        params.append('mask.fieldPaths', 'imageFingerprints');
+        if (pageToken) params.set('pageToken', pageToken);
+        const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(id)}/${collection}?${params.toString()}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`fingerprint index ${collection} status ${response.status}`);
+        const payload = await response.json();
+        (payload.documents || []).forEach(document => rememberKnownImageFingerprints(id, readFirestoreFingerprintValues(document)));
+        pageToken = payload.nextPageToken || '';
+      } while (pageToken);
+    };
+    await Promise.all([fetchCollection('messages'), fetchCollection('memos')]);
+  })().catch(error => {
+    // Do not turn a read-only duplicate check into an upload blocker.  The selection-level hash
+    // dedupe still runs and any loaded records remain in the local index.
+    console.warn('Image fingerprint index hydration skipped:', error);
+  });
+  fingerprintIndexHydrationByCalendar.set(id, work);
+  return work;
+}
+
+function selectNonDuplicateCompressedImages(calendarId, compressedList) {
+  const known = getKnownImageFingerprintSet(calendarId);
+  const seen = new Set(known);
+  const accepted = [];
+  const duplicateIndexes = [];
+  Array.from(compressedList || []).forEach((item, index) => {
+    // Existing assets are an edit form's own retained slots, not uploads.  They must never be
+    // filtered even though their fingerprint can already appear in the saved-record index.
+    if (item?.isExisting) {
+      accepted.push({ item, index });
+      return;
+    }
+    const fingerprint = normalizeImageFingerprint(item?.fingerprint);
+    if (fingerprint && seen.has(fingerprint)) {
+      duplicateIndexes.push(index);
+      return;
+    }
+    if (fingerprint) seen.add(fingerprint);
+    accepted.push({ item, index });
+  });
+  return { accepted, duplicateIndexes };
+}
+
 function getImagePreprocessCacheKey(file) {
   if (!file) return '';
   return [file.name || '', file.size || 0, file.lastModified || 0, file.type || ''].join('::');
@@ -713,7 +849,23 @@ async function processImageFilesSequentially(files, onProgress) {
 
   await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
   if (onProgress) onProgress({ current: list.length, total: list.length, fileName: null, pct: 100, remainingSec: 0 });
-  return { succeeded: succeeded.filter(Boolean), failed };
+  // File pickers and share sheets can hand us the exact same byte stream twice (especially when
+  // a single photo is selected from both "recent" and "files").  Filter after preprocessing so
+  // every format, including HEIC converted for preview, has the same original-byte identity.
+  const batchFingerprints = new Set();
+  const duplicates = [];
+  const uniqueSucceeded = succeeded.filter((item, index) => {
+    if (!item) return false;
+    const fingerprint = normalizeImageFingerprint(item.fingerprint);
+    if (!fingerprint || !batchFingerprints.has(fingerprint)) {
+      if (fingerprint) batchFingerprints.add(fingerprint);
+      return true;
+    }
+    duplicates.push({ fileName: list[index]?.name || '', fingerprint });
+    revokeCompressedObjectUrls(item);
+    return false;
+  });
+  return { succeeded: uniqueSucceeded, failed, duplicates };
   } finally {
     releaseMediaUploadWakeLock();
   }
@@ -803,7 +955,7 @@ async function appendChatImageFiles({
   }
 
   setImageProcessing({ current: 0, total: filesToProcess.length });
-  const { succeeded, failed } = await processImageFilesSequentially(
+  const { succeeded, failed, duplicates } = await processImageFilesSequentially(
     filesToProcess,
     progress => setImageProcessing(progress)
   );
@@ -815,10 +967,13 @@ async function appendChatImageFiles({
     console.error('Image compression failed for:', failed.map(f => f.fileName));
     if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
   } else if (succeeded.length > 0 && showToast) {
-    showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+    const duplicateSuffix = duplicates?.length ? ` · 중복 ${duplicates.length}장 제외` : '';
+    showToast(`${succeeded.length}장 첨부완료${duplicateSuffix}`, 'success', 3000);
+  } else if (duplicates?.length && showToast) {
+    showToast(`이미 선택한 사진과 같은 ${duplicates.length}장을 제외했습니다.`, 'info', 4000);
   }
 
-  return { handled: true, succeeded: succeeded.length, failed: failed.length };
+  return { handled: true, succeeded: succeeded.length, failed: failed.length, duplicates: duplicates?.length || 0 };
 }
 
 function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
@@ -1106,7 +1261,7 @@ const IMAGE_UPLOAD_REUSE_WINDOW_MS = 30 * 60 * 1000;
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
   const reusable = compressed?.uploadedUrls;
   if (reusable && Date.now() - reusable.uploadedAt < IMAGE_UPLOAD_REUSE_WINDOW_MS) {
-    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, metadata: compressed?.metadata || null };
+    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
   }
   try {
     const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
@@ -1115,7 +1270,7 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
         compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, uploadedAt: Date.now() };
       }
       revokeCompressedObjectUrls(compressed);
-      return { ...uploaded, metadata: compressed?.metadata || null };
+      return { ...uploaded, metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
     }
   } catch (e) {
     if (options.requireStorage) {
@@ -1148,7 +1303,8 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
     return {
       imageUrl: original || thumbnail,
       thumbUrl: thumbnail || original,
-      metadata: compressed?.metadata || null
+      metadata: compressed?.metadata || null,
+      fingerprint: compressed?.fingerprint || ''
     };
   }
   throw new Error('이미지 처리 중 오류가 발생했습니다.');
@@ -1157,20 +1313,28 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
 async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
   await acquireMediaUploadWakeLock();
   try {
-  const uploadIndexes = compressedList
-    .map((c, idx) => ({ c, idx }))
-    .filter(({ c }) => !c.isExisting);
+  await hydrateKnownImageFingerprintsForCalendar(calendarId);
+  const { accepted, duplicateIndexes } = selectNonDuplicateCompressedImages(calendarId, compressedList);
+  const uploadIndexes = accepted.filter(({ item }) => !item.isExisting);
 
   await checkFirebaseStorageHealth().catch(() => false);
   if (uploadIndexes.length === 0) {
-    if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: compressedList.length, total: compressedList.length });
-    return Promise.all(compressedList.map((c) =>
-      Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
-    ));
+    if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: accepted.length, total: accepted.length });
+    const existingResults = accepted.map(({ item, index }) => ({
+      imageUrl: item.original,
+      thumbUrl: item.thumbnail,
+      metadata: item.metadata || null,
+      fingerprint: item.fingerprint || '',
+      isExisting: true,
+      sourceIndex: index
+    }));
+    Object.defineProperty(existingResults, 'failed', { value: [], enumerable: false, configurable: true });
+    Object.defineProperty(existingResults, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
+    return existingResults;
   }
 
   const startedAt = Date.now();
-  const total = compressedList.length;
+  const total = accepted.length;
   let compressionDone = 0;
   let currentIndex = 0;
 
@@ -1200,29 +1364,29 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     reportUploadProgress();
   };
 
-  const results = new Array(compressedList.length);
+  const results = new Array(accepted.length);
   let uploadCursor = 0;
-  const UPLOAD_CONCURRENCY = getAdaptiveMediaUploadConcurrency(compressedList.length, typeof navigator !== 'undefined' ? navigator : {});
+  const UPLOAD_CONCURRENCY = getAdaptiveMediaUploadConcurrency(accepted.length, typeof navigator !== 'undefined' ? navigator : {});
   const failed = [];
 
   async function uploadWorker() {
     while (true) {
       const idx = uploadCursor++;
-      if (idx >= compressedList.length) return;
+      if (idx >= accepted.length) return;
       currentIndex = idx + 1;
-      const c = compressedList[idx];
+      const { item: c, index: originalIndex } = accepted[idx];
       if (c.isExisting) {
         compressionDone++;
         reportCompressionProgress();
-        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail };
+        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail, metadata: c.metadata || null, fingerprint: c.fingerprint || '', isExisting: true, sourceIndex: originalIndex };
       } else {
         let result = null;
         try {
-          result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
-        } catch (error) { if (!options.continueOnError) throw error; failed.push({ index: idx, error }); if (typeof options.onItemError === 'function') options.onItemError({ index: idx, error, item: c }); }
+          result = await resolveImageUrls(calendarId, c, originalIndex, onBytes, uploadFn, options);
+        } catch (error) { if (!options.continueOnError) throw error; failed.push({ index: originalIndex, error }); if (typeof options.onItemError === 'function') options.onItemError({ index: originalIndex, error, item: c }); }
         compressionDone++;
         reportCompressionProgress();
-        results[idx] = result;
+        results[idx] = result ? { ...result, sourceIndex: originalIndex } : null;
       }
     }
   }
@@ -1230,6 +1394,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => uploadWorker()));
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
   Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
+  Object.defineProperty(results, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
   return results;
   } finally {
     releaseMediaUploadWakeLock();
@@ -1370,6 +1535,7 @@ export {
   loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
   imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
+  buildImageFingerprint, rememberKnownImageFingerprints, hydrateKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
   acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
   uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles,

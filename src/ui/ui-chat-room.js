@@ -1671,6 +1671,9 @@ export function ChatRoomView({
          보인다 -- 평소엔 아무 자리도 차지하지 않는다. */
       /*#__PURE__*/React.createElement(PanelResizeHandle, {
         label: "대화 입력창 높이 조절",
+        value: composerInputHeight,
+        min: 44,
+        max: MAX_COMPOSER_INPUT_HEIGHT,
         onPointerDown: beginComposerResize,
         onPointerMove: moveComposerResize,
         onPointerUp: endComposerResize,
@@ -1784,6 +1787,7 @@ export function ChatRoomView({
       /* Textarea at top */
       /*#__PURE__*/React.createElement("textarea", {
         ref: chatTextareaRef,
+        "aria-label": "메시지 입력",
         placeholder: "메시지를 입력하세요...",
         value: chatInput,
         maxLength: 5000,
@@ -1905,6 +1909,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("input", {
         ref: docFileInputRefChat,
         type: "file",
+        "aria-label": "사진 또는 파일 첨부",
         accept: chatComposerAccept,
         multiple: true,
         style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },

@@ -610,11 +610,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       // exactly the same module chat uses -- see resolveMemoImageBatch/resolveImageBatch)
       let uploadedUrls = Array.isArray(sourceMemo?.imageUrls) ? sourceMemo.imageUrls.slice() : [];
       let uploadedThumbs = Array.isArray(sourceMemo?.thumbUrls) ? sourceMemo.thumbUrls.slice() : [];
+      let uploadedFingerprints = Array.isArray(sourceMemo?.imageFingerprints) ? sourceMemo.imageFingerprints.slice() : [];
       if (newImages.length > 0) {
         setNewUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, newImages, setNewUploadProgress);
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
+        uploadedFingerprints = resolved.map(r => r.fingerprint || '');
       }
 
       // Link previews are hydrated in the background; a third-party scraper must not delay save.
@@ -628,6 +630,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         text,
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
+        imageFingerprints: uploadedFingerprints,
         color: sourceMemo?.color || newColor,
         isPinned: sourceMemo?.isPinned ?? newIsPinned,
         tags: tagsArray,
@@ -711,11 +714,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       // module chat's edit flow uses (see resolveMemoImageBatch/resolveImageBatch).
       let uploadedUrls = [];
       let uploadedThumbs = [];
+      let uploadedFingerprints = [];
       if (editImages.length > 0) {
         setEditUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, editImages, setEditUploadProgress);
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
+        uploadedFingerprints = resolved.map(r => r.fingerprint || '');
       }
 
       // Save tags formatted back to database (prepend '#' prefix if needed)
@@ -733,6 +738,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         text: editText.trim(),
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
+        imageFingerprints: uploadedFingerprints,
         color: editColor,
         isPinned: editIsPinned,
         tags: tagsArray,
@@ -860,6 +866,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const currentImgs = (memo.imageUrls || []).map((url, idx) => ({
       original: url,
       thumbnail: memo.thumbUrls?.[idx] || url,
+      fingerprint: memo.imageFingerprints?.[idx] || '',
       isExisting: true
     }));
     setEditImages(currentImgs);

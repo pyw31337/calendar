@@ -473,7 +473,10 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         iconAnchor: [PLACE_MARKER_SIZE / 2, PLACE_MARKER_SIZE / 2],
         popupAnchor: [0, -PLACE_MARKER_SIZE / 2]
       });
-      const marker = L.marker([place.lat, place.lng], { icon });
+      const marker = L.marker([place.lat, place.lng], {
+        icon,
+        title: `${place.alias || place.name || '등록 장소'} 지도에서 보기`
+      });
       if (place.id) markersByIdRef.current.set(place.id, marker);
       // Read back by the cluster group's iconCreateFunction above when a cluster collapses down
       // to just this one marker, so it can render the same category badge instead of a "1".
@@ -1570,6 +1573,9 @@ export function PlacesView({
       },
         /*#__PURE__*/React.createElement(PanelResizeHandle, {
           label: mapExpanded ? '지도 축소' : '지도 높이 조절',
+          value: mapHeight,
+          min: 160,
+          max: Math.max(160, window.innerHeight - 220),
           onPointerDown: beginMapResize,
           onPointerMove: moveMapResize,
           onPointerUp: endMapResize,
@@ -1709,16 +1715,16 @@ export function PlacesView({
           const memoWithoutDate = memoEntries.filter(e => !e.date).map(e => e.note).join('\n');
           const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
           const isChecked = isBulkShareMode && selectedBulkShareKeys.has(place.id);
-          return /*#__PURE__*/React.createElement("div", {
+          return /*#__PURE__*/React.createElement("article", {
             key: place.id,
             // Same purple-border + up/down-shake "you were just brought here" treatment used
             // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
             className: "place-card-row" + (isPlaceFocused && !isBulkShareMode ? " is-focused chat-search-focused-bubble" : ""),
             "data-place-id": place.id,
             "data-no-press-feedback": true,
-            role: isBulkShareMode ? "checkbox" : "button",
+            role: isBulkShareMode ? "checkbox" : undefined,
             "aria-checked": isBulkShareMode ? !!isChecked : undefined,
-            tabIndex: 0,
+            tabIndex: isBulkShareMode ? 0 : undefined,
             onClickCapture: e => {
               if (isBulkShareMode) {
                 e.preventDefault();
@@ -1729,7 +1735,7 @@ export function PlacesView({
               if (e.target && typeof e.target.closest === 'function' && e.target.closest('button, input, textarea, select')) return;
               handleSelectPlaceOnMap(place);
             },
-            onKeyDown: (e) => {
+            onKeyDown: !isBulkShareMode ? undefined : (e) => {
               if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -1748,6 +1754,18 @@ export function PlacesView({
               transition: 'border-color 0.15s ease, background-color 0.15s ease'
             }
           },
+            // Non-bulk cards include edit/link controls, so the clickable card surface cannot
+            // also be a focusable role=button. Provide a separate, screen-reader keyboard path
+            // while the article itself retains its familiar pointer interaction.
+            !isBulkShareMode && /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              "aria-label": `${place.alias || place.name || '장소'} 지도에서 보기`,
+              onClick: event => { event.stopPropagation(); handleSelectPlaceOnMap(place); },
+              style: {
+                position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px',
+                overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0
+              }
+            }, "지도에서 보기"),
             isBulkShareMode && (EditSelectCheckbox
               ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onCard" })
               : /*#__PURE__*/React.createElement("span", {

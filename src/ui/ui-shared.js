@@ -555,10 +555,24 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
     const isActive = value === id;
     const label = typeof opt.label === 'function' ? opt.label(isActive) : opt.label;
     const badge = opt.badge;
+    const isDotBadge = opt.badgeMode === 'dot';
     // Content search (and similar) fades tabs with 0 hits so empty categories read as inactive
     // without removing them from the bar -- mirrors the muted empty-state copy inside those tabs.
     const isFaded = !!opt.faded;
-    const showBadge = badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0'));
+    const showBadge = badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0')) && (!isDotBadge || Number(badge) > 0);
+    const labelWithOptionalDot = isDotBadge
+      ? /*#__PURE__*/React.createElement('span', {
+        style: { position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
+      },
+        label,
+        showBadge ? /*#__PURE__*/React.createElement('span', {
+          'aria-hidden': 'true',
+          // Match the app's compact status-dot scale (8px), but attach it to the text's
+          // upper-right corner so a populated tab reads as a notification rather than a count.
+          style: { position: 'absolute', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--v2-primary, #7C3AED)', top: '-4px', right: '-9px', boxShadow: '0 0 0 2px var(--bg-card)' }
+        }) : null
+      )
+      : label;
     return /*#__PURE__*/React.createElement('button', {
       key: String(id),
       type: 'button',
@@ -584,8 +598,8 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
         minWidth: 0
       }
     },
-      label,
-      showBadge ? /*#__PURE__*/React.createElement('span', {
+      labelWithOptionalDot,
+      showBadge && !isDotBadge ? /*#__PURE__*/React.createElement('span', {
         style: {
           fontSize: 'var(--font-size-xs)',
           fontWeight: 800,

@@ -70,6 +70,22 @@ const lazyJsFiles = jsFiles.filter(isLazyChunk);
 const eagerJsFiles = jsFiles.filter(file => !isLazyChunk(file));
 const totalJsBytes = eagerJsFiles.reduce((sum, file) => sum + statSync(join(DIST_ASSETS_DIR, file)).size, 0);
 
+const emittedMapLibreWorkers = files.filter(file => /^maplibre-gl-worker-.*\.js$/.test(file));
+const mapLibreWorkerFallback = 'maplibre-gl-worker.mjs';
+if (emittedMapLibreWorkers.length !== 1) {
+  fail(`expected exactly one fingerprinted MapLibre worker, found ${emittedMapLibreWorkers.length}`);
+} else if (!files.includes(mapLibreWorkerFallback)) {
+  fail(`missing ${mapLibreWorkerFallback} fallback required by MapLibre's default worker URL`);
+} else {
+  const emittedSize = statSync(join(DIST_ASSETS_DIR, emittedMapLibreWorkers[0])).size;
+  const fallbackSize = statSync(join(DIST_ASSETS_DIR, mapLibreWorkerFallback)).size;
+  if (emittedSize !== fallbackSize) {
+    fail(`${mapLibreWorkerFallback} must match the fingerprinted MapLibre worker (${fallbackSize} !== ${emittedSize})`);
+  } else {
+    console.log(`[check-dist-budget] ${mapLibreWorkerFallback} fallback ${fallbackSize} bytes`);
+  }
+}
+
 for (const file of lazyJsFiles) {
   const size = statSync(join(DIST_ASSETS_DIR, file)).size;
   console.log(`[check-dist-budget] ${file} ${size} bytes (lazy/on-demand -- excluded from total js)`);

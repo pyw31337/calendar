@@ -92,12 +92,17 @@
         // /calendar/ URL: visiting ?id=cw offered "open 제이헤어" instead of installing 모아엘가.
         // Each calendar now lives under its own path, /calendar/app/<id>/ (a copy of this page
         // with <base href="../../">, written by copy-static-to-dist.mjs), and its manifest's scope
-        // is that path. A root visit is moved there in place -- a <base> keeps relative URLs on the
-        // root, then replaceState swaps the address; no reload. Only when the build shipped the
-        // app/ copies (the meta below), so vite dev and older deploys are left alone.
+        // is that path. Browser visits can be moved there in place. A pre-existing iOS home-screen
+        // web clip must stay at its original root URL though: changing it to a newer install path
+        // during launch can make an old standalone shell look offline before its page bootstraps.
+        // Only when the build shipped the app/ copies (the meta below), so vite dev and older
+        // deploys are left alone.
         var hasAppPaths = !!document.querySelector('meta[name="gather-app-paths"]');
+        var isStandaloneApp = !!((window.navigator && window.navigator.standalone === true)
+          || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
         if (hasAppPaths && id && manifestByCalendar[id] && !appMatch && window.top === window
-          && !/\/share\//.test(window.location.pathname) && !params.has('admin') && params.get('mode') !== 'admin') {
+          && !isStandaloneApp && !/\/share\//.test(window.location.pathname)
+          && !params.has('admin') && params.get('mode') !== 'admin') {
           var rootPath = window.location.pathname.replace(/[^/]*$/, '');
           try {
             if (!document.querySelector('base')) {

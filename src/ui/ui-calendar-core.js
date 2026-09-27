@@ -1791,26 +1791,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     })));
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("article", {
     id: `memo-${memo.id}`,
     "data-memo-id": memo.id,
     onClick: (e) => {
       const t = e.target;
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
       if (typeof onOpenEdit === 'function') onOpenEdit(memo);
-    },
-    role: "button",
-    tabIndex: 0,
-    onKeyDown: (e) => {
-      // 댓글 등 입력 중 Space/Enter는 카드 열기로 처리하지 않음
-      const t = e.target;
-      const tag = (t && t.tagName || '').toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
-      if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        if (typeof onOpenEdit === 'function') onOpenEdit(memo);
-      }
     },
     style: {
       backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : '#fff')),
@@ -1827,6 +1814,18 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     },
     className: "memo-card-hover v2-memo-card-contract"
   },
+    // The card also contains share, pin, link, image, and comment controls.  It therefore
+    // cannot itself be a role=button without nesting interactive elements.  Keep a dedicated
+    // keyboard entry point for the card editor while pointer users can still click card space.
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "aria-label": `${memo.title || '메모'} 열기`,
+      onClick: (e) => { e.stopPropagation(); if (typeof onOpenEdit === 'function') onOpenEdit(memo); },
+      style: {
+        position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px',
+        overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0
+      }
+    }, "메모 열기"),
     /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
        absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color
        as the pin's neutral ("off") state -- including its 0.2 opacity, which is what actually
@@ -1853,6 +1852,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onTogglePin();
       },
       title: effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : undefined,
+      "aria-label": effectivePinned ? (effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : "메모 고정 해제") : "메모 고정",
       style: {
         position: 'absolute', top: '10px', right: '10px',
         background: 'none', border: 'none', cursor: 'pointer',

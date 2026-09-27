@@ -62,7 +62,7 @@ function loadMapLibreLeaflet() {
       try {
         const workerUrlMod = await import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url');
         if (workerUrlMod?.default) mapLibreModule.setWorkerUrl(workerUrlMod.default);
-      } catch (_) { /* Vite can still resolve the worker via import.meta.url */ }
+      } catch (_) { /* The published default worker fallback is still available beside the map chunk. */ }
     }
     window.maplibregl = mapLibreModule;
     const maplibreGL = leafletBridge.maplibreGL || leafletBridge.default;

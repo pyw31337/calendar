@@ -58,4 +58,21 @@ if (fs.existsSync(distIndex)) {
   }
   console.log(`[copy-static-to-dist] app/<id>/ pages: ${ids.join(', ')}`);
 }
-console.log('[copy-static-to-dist] share/ synced to dist/');
+
+// MapLibre's ESM worker falls back to `new URL('./maplibre-gl-worker.mjs', import.meta.url)`.
+// Vite fingerprints the emitted worker chunk, while GitHub Pages has no rewrite from that stable
+// package filename to the fingerprinted asset. Publish a byte-identical fallback beside the
+// generated asset so MapLibre can always start a worker, including in Samsung Internet.
+const assetsDir = path.join(dist, 'assets');
+const emittedMapLibreWorkers = fs.existsSync(assetsDir)
+  ? fs.readdirSync(assetsDir).filter(name => /^maplibre-gl-worker-[A-Za-z0-9_-]+\.js$/.test(name))
+  : [];
+if (emittedMapLibreWorkers.length !== 1) {
+  throw new Error(`[copy-static-to-dist] expected one emitted MapLibre worker, found ${emittedMapLibreWorkers.length}`);
+}
+fs.copyFileSync(
+  path.join(assetsDir, emittedMapLibreWorkers[0]),
+  path.join(assetsDir, 'maplibre-gl-worker.mjs')
+);
+
+console.log('[copy-static-to-dist] static assets, app pages, and MapLibre worker fallback synced to dist/');
