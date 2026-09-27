@@ -1,0 +1,40 @@
+name: Daily Ops Report
+
+# Photo integrity audit + last 24h app errors, published to ONE issue labelled `ops-daily`
+# (scripts/ops-daily-report.mjs). The issue gets a comment -- and so a GitHub notification --
+# only when a count got worse than the previous day or a new error message appeared.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '50 1 * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ops-daily-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    env:
+      # Firestore REST reads sign in anonymously (scripts/lib/firestore-anon-auth.mjs), same as backup.
+      NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix functions ci
+      - name: Build and publish report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Read-only use: serverAuditLogs (client_error events) is not client-readable.
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: npm run ops:daily-report -- --publish
