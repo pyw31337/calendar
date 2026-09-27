@@ -300,6 +300,21 @@ test('V2 calendar home supports drag-to-move availability like v1\'s CalendarGri
   assert.match(shell, /handleBadgeTouchStart/, 'a touch long-press-then-drag equivalent must exist for mobile, where native HTML5 DnD never fires');
 });
 
+test('V2 calendar keeps its selected month in the shared URL-backed month state', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  const date = new Date(2026, 9, 1);
+  const url = buildAppViewUrl(location('?id=example&shell=v2'), 'calendar', date);
+  const params = new URL(url, 'https://example.test').searchParams;
+
+  assert.equal(params.get('year'), '2026');
+  assert.equal(params.get('month'), '10');
+  assert.match(shell, /activeCal, currentMonthDate, setCurrentMonthAndSync/);
+  assert.match(shell, /calendarContext\.setCurrentMonthAndSync\(nextDate\)/);
+  assert.match(appMain, /\{ activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters/);
+});
+
 
 test('V2 gallery/archive navigation writes one history entry (no records hub stop)', async () => {
   const { readFileSync } = await import('node:fs');

@@ -308,7 +308,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     // nullable so the 더보기 tab can toast "not loaded yet" -- but CalendarGrid has no such guard
     // and reads straight into `calendar.availabilities`, so passing it the nullable one crashes
     // (caught via Playwright: "Cannot read properties of null (reading 'availabilities')").
-    activeCal,
+    activeCal, currentMonthDate, setCurrentMonthAndSync,
     anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability,
     displayChatMessages, memos, customCultureItems,
     handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate,
@@ -329,6 +329,10 @@ export function buildRenewalCalendarContext(calendar, deps) {
   const { visibleConfirmedMeetings, hasVisiblePolls } = buildMainCalendarScreenState({ calendar: activeCal });
   return {
     calendar: activeCal,
+    // V2's calendar card is controlled by CalendarApp's URL-backed month state.
+    // It must not create an unrelated `new Date()` state on every page load.
+    currentMonthDate,
+    setCurrentMonthAndSync,
     displayChatMessages, memos, galleryPhotoIndex, setActiveLightbox,
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
@@ -697,7 +701,25 @@ function computeFestivalBars(days, anniversariesList) {
 
 function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const React = window.React;
-  const [monthDate, setMonthDate] = React.useState(() => new Date());
+  const normalizeMonthDate = value => {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+    return new Date(value.getFullYear(), value.getMonth(), 1);
+  };
+  // CalendarApp restores `year`/`month` from the URL before V2 mounts. Keep a
+  // local fallback only for isolated component use, then route every mutation
+  // back through the shared URL/state setter.
+  const [fallbackMonthDate, setFallbackMonthDate] = React.useState(() => new Date());
+  const sharedMonthDate = normalizeMonthDate(calendarContext?.currentMonthDate);
+  const monthDate = sharedMonthDate || fallbackMonthDate;
+  const setMonthDate = nextValue => {
+    const requested = typeof nextValue === 'function' ? nextValue(monthDate) : nextValue;
+    const nextDate = normalizeMonthDate(requested);
+    if (!nextDate) return;
+    setFallbackMonthDate(nextDate);
+    if (typeof calendarContext?.setCurrentMonthAndSync === 'function') {
+      calendarContext.setCurrentMonthAndSync(nextDate);
+    }
+  };
   const [monthPickerOpen, setMonthPickerOpen] = React.useState(false);
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
