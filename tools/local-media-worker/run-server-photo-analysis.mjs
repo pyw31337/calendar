@@ -10,6 +10,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { isRetryableAssetFailure } from './analysis-retry-policy.mjs';
 
 const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
 const VISION_SCRIPT = join(WORKER_DIR, 'MediaInsight.swift');
@@ -289,10 +290,17 @@ async function main() {
   const nextFailures = { ...previousFailures };
   for (const item of items.filter(item => item.status !== 'failed')) delete nextFailures[item.assetKey];
   for (const failure of failures) {
+    if (!isRetryableAssetFailure(failure.error)) {
+      // Keep the failed analysis row on the server for review, but do not pin the cursor on a
+      // deleted/missing asset. A fresh photo-index revision can still revisit it later.
+      delete nextFailures[failure.assetKey];
+      continue;
+    }
     const previous = Number(nextFailures[failure.assetKey]?.attempts || 0);
     nextFailures[failure.assetKey] = { attempts: previous + 1, error: failure.error, updatedAt: now };
   }
-  const retryableFailure = failures.some(failure => Number(nextFailures[failure.assetKey]?.attempts || 0) < MAX_CONSECUTIVE_ASSET_FAILURES);
+  const retryableFailure = failures.some(failure => isRetryableAssetFailure(failure.error)
+    && Number(nextFailures[failure.assetKey]?.attempts || 0) < MAX_CONSECUTIVE_ASSET_FAILURES);
   const result = await upload(args, token, runId, items, 'scheduled', {
     // Asset-level failures are recorded in the summary, but a successful heartbeat/upload still
     // means the worker itself is alive.  This prevents a single corrupt image from masking a

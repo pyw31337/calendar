@@ -2,6 +2,7 @@ const DEFAULT_BASE_URL = 'https://pyw31337.github.io/calendar/';
 const baseUrl = process.env.CALENDAR_LIVE_BASE_URL || DEFAULT_BASE_URL;
 const cacheBust = process.env.CALENDAR_LIVE_CACHE_BUST || Date.now().toString(36);
 const expectedBuildSha = String(process.env.EXPECTED_BUILD_SHA || '').trim();
+const REQUEST_TIMEOUT_MS = 6_000;
 
 const pages = [
   '?id=kkot',
@@ -56,8 +57,12 @@ function resolveAssetUrl(path, fallbackBase = baseUrl) {
   return new URL(normalized.startsWith('assets/') ? normalized : path, normalized.startsWith('assets/') ? baseUrl : fallbackBase).toString();
 }
 
+function fetchWithTimeout(url, options = {}) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+}
+
 async function checkUrl(url, validate) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     redirect: 'follow',
     headers: { 'Cache-Control': 'no-cache' }
   });
@@ -163,7 +168,7 @@ if (mode === 'vite') {
   let totalBytes = jsBody.length;
   for (const cu of chunkUrls.slice(0, 40)) {
     try {
-      const response = await fetch(cu, { redirect: 'follow' });
+      const response = await fetchWithTimeout(cu, { redirect: 'follow' });
       if (!response.ok) throw new Error(`${response.status} ${cu}`);
       const body = await response.text();
       if (body && body.length) {
@@ -203,7 +208,7 @@ if (mode === 'vite') {
   for (const [file, needle] of criticalChecks) {
     const fromIndex = assetPaths.find(p => p.includes(file));
     const finalUrl = withCacheBust(fromIndex || `assets/${file}`);
-    const body = await (await fetch(finalUrl, { redirect: 'follow' })).text();
+    const body = await (await fetchWithTimeout(finalUrl, { redirect: 'follow' })).text();
     if (!body.includes(needle)) throw new Error(`Marker "${needle}" missing in ${finalUrl}`);
     console.log(`[live-smoke] marker ok ${needle} @ ${fromIndex || file}`);
   }
@@ -219,7 +224,7 @@ const functionProbes = [
 ];
 for (const [name, okCodes, needle] of functionProbes) {
   const url = `${FUNCTIONS_BASE}/${name}`;
-  const response = await fetch(url, { redirect: 'follow' });
+  const response = await fetchWithTimeout(url, { redirect: 'follow' });
   const text = await response.text();
   if (response.status === 404) throw new Error(`Cloud Function missing (not deployed): ${name}`);
   if (!okCodes.includes(response.status)) {
@@ -228,7 +233,7 @@ for (const [name, okCodes, needle] of functionProbes) {
   if (needle && !text.includes(needle)) throw new Error(`Cloud Function ${name} body mismatch`);
   console.log(`[live-smoke] function ok ${name} ${response.status}`);
 }
-const photoIndexTrigger = await fetch(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' });
+const photoIndexTrigger = await fetchWithTimeout(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' });
 if (photoIndexTrigger.status === 404) {
   throw new Error('Cloud Function missing (not deployed): onMessagePhotoIndexWrite');
 }

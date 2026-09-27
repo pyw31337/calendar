@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { isAnalysisWindow, parseHolidayIcs } from '../tools/local-media-worker/run-scheduled-media-analysis.mjs';
+import { isRetryableAssetFailure } from '../tools/local-media-worker/analysis-retry-policy.mjs';
 import { fetchMediaAnalysisFeed } from '../src/core/media-analysis-feed.js';
 
 const require = createRequire(import.meta.url);
@@ -32,6 +33,14 @@ test('KST schedule grants nights, weekends and holiday daytime only', () => {
   assert.equal(isAnalysisWindow({ date: new Date('2026-09-29T01:00:00Z'), holidayKeys }).allowed, false); // 10:00 KST weekday
   assert.equal(isAnalysisWindow({ date: new Date('2026-09-29T13:00:00Z'), holidayKeys }).allowed, true); // 22:00 KST weekday
   assert.equal(isAnalysisWindow({ date: new Date('2026-09-27T01:00:00Z'), holidayKeys }).weekend, true);
+});
+
+test('missing photos are recorded but do not pin the local analysis cursor', () => {
+  assert.equal(isRetryableAssetFailure('Image download failed: 404'), false);
+  assert.equal(isRetryableAssetFailure('Missing Firebase Storage URL'), false);
+  assert.equal(isRetryableAssetFailure('Image download failed: 429'), true);
+  assert.equal(isRetryableAssetFailure('Image download failed: 503'), true);
+  assert.equal(isRetryableAssetFailure('Photo download timed out after 30s'), true);
 });
 
 test('live feed reads server-written analysis rows without exposing write credentials', async () => {
