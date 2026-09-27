@@ -1004,7 +1004,7 @@ assert(/function getMessageDirectMediaEntry\(msg\)[\s\S]{0,420}imageIndex: 0[\s\
 assert(/function getDirectMediaTagKey\(url\)/.test(script), 'direct URL image tags must use a stable URL hash key');
 assert(/getDirectMediaTagsForUrl\(sourceMessage,\s*meta\.directMediaUrl\)/.test(script), 'direct URL image tag saves must read the correct URL-scoped previous tag value');
 assert(/const nextDirectTags = previous && typeof previous === 'object' && !Array\.isArray\(previous\) \? \{ \.\.\.previous \} : \{\}/.test(script), 'direct URL image tag saves must persist a URL-keyed tag map');
-assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, 10\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the 10-tag persistence limit');
+assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, MAX_PHOTO_TAGS\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the persisted tag limit (MAX_PHOTO_TAGS, src/core/photo-limits.js)');
 assert(/directMediaTags/.test(firestoreRules), 'Firestore rules must allow direct URL image tag updates');
 assert(/affectedKeys\(\)\.hasOnly\(\[[^\]]*directMediaTags/.test(firestoreRules), 'message update rules must include directMediaTags in the allowed update mask');
 assert(/directMediaTags is map/.test(firestoreRules), 'Firestore rules must allow URL-keyed directMediaTags maps');

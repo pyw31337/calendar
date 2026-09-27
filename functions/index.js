@@ -227,7 +227,7 @@ function reconcileImageTagMapForIndex(message, tagMap = null) {
     const legacyTags = Array.isArray(message?.imageTags) ? message.imageTags : [];
     const hasLegacyTag = Object.prototype.hasOwnProperty.call(legacyTags, entry.index);
     if (!hasAssetTag && !hasLegacyTag) return;
-    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 100);
+    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 620); // src/core/photo-limits.js MAX_PHOTO_TAG_TEXT
   });
   return next;
 }

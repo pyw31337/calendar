@@ -7,6 +7,7 @@
 import { GATHER_APP_UTILS } from './app-utils.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { MAX_PHOTO_TAG_TEXT } from './photo-limits.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -2529,7 +2530,7 @@ function normalizeImageTagMap(value) {
     const cleanKey = String(key || '').trim();
     if (!/^asset:v1:[A-Za-z0-9-]+$/.test(cleanKey)) return;
     if (Object.keys(next).length >= 50) return;
-    next[cleanKey] = typeof rawValue === 'string' ? rawValue.slice(0, 100) : '';
+    next[cleanKey] = typeof rawValue === 'string' ? rawValue.slice(0, MAX_PHOTO_TAG_TEXT) : '';
   });
   return next;
 }
@@ -2589,7 +2590,7 @@ function reconcileMessageImageTagMap(message, tagMap = null) {
     if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey)) return;
     const state = getMessagePhotoTagState({ ...(message || {}), imageTagMap: existing }, entry, entry.imageIndex);
     if (!state.authoritative) return;
-    next[assetKey] = String(state.tags || '').slice(0, 100);
+    next[assetKey] = String(state.tags || '').slice(0, MAX_PHOTO_TAG_TEXT);
   });
   return next;
 }

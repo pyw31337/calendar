@@ -6,6 +6,7 @@ import {
 import { reverseGeocodeCoords } from './app-place-search.js';
 import { firebaseConfig, isStorageDisabled, ensureFirebaseStorageReady, checkFirebaseStorageHealth, writeCollectionDocumentWithFallback, fetchMessageRest } from './app-firebase-data.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
+import { MAX_UPLOAD_PHOTOS, MAX_PHOTOS_PER_MESSAGE } from './photo-limits.js';
 
 // Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
 // global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
@@ -727,7 +728,8 @@ function chunkResolvedImagesForMessages(resolvedImages) {
   let currentBytes = 0;
   for (const img of resolvedImages) {
     const imgBytes = (img.imageUrl?.length || 0) + (img.thumbUrl?.length || 0);
-    if (current.length > 0 && currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET) {
+    // Split on size (1MiB/doc) and on count: firestore.rules allow MAX_PHOTOS_PER_MESSAGE per message.
+    if (current.length > 0 && (currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET || current.length >= MAX_PHOTOS_PER_MESSAGE)) {
       chunks.push(current);
       current = [];
       currentBytes = 0;
@@ -791,15 +793,15 @@ async function appendChatImageFiles({
   const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
   if (imageFiles.length === 0) return { handled: false, succeeded: 0, failed: 0 };
 
-  const remainingSlots = 50 - currentCount;
+  const remainingSlots = MAX_UPLOAD_PHOTOS - currentCount;
   if (remainingSlots <= 0) {
-    if (showToast) showToast('사진 최대 50장', 'error');
+    if (showToast) showToast(`사진 최대 ${MAX_UPLOAD_PHOTOS}장`, 'error');
     return { handled: true, succeeded: 0, failed: 0 };
   }
 
   const filesToProcess = imageFiles.slice(0, remainingSlots);
   if (imageFiles.length > remainingSlots && showToast) {
-    showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+    showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_UPLOAD_PHOTOS}장)`, 'info');
   }
 
   setImageProcessing({ current: 0, total: filesToProcess.length });

@@ -332,6 +332,7 @@ import {
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue, shouldQueueCalendarWriteFailure, replayQueuedCalendarWrite } from './app-write-queue.js';
 import { useAppFeedbackState } from './app-feedback-state.js';
+import { MAX_UPLOAD_PHOTOS, MAX_PHOTO_TAGS, MAX_PHOTO_TAG_TOKEN, MAX_PHOTO_TAG_TEXT } from './photo-limits.js';
 // window.GATHER_APP_FIREBASE_DATA was never assigned anywhere in this codebase -- these two
 // vars were a permanently-null dead snapshot from module-eval time onward, which meant every
 // `if (!firebaseDb)` check below saw the SDK as "unavailable" forever and fell back to its
@@ -2924,8 +2925,8 @@ function CalendarApp() {
       showToast('업로드할 이미지가 없습니다.', 'error');
       return [];
     }
-    const limitedFiles = imageFiles.slice(0, 50);
-    if (imageFiles.length > limitedFiles.length) showToast('최대 50장까지 업로드됩니다.', 'info');
+    const limitedFiles = imageFiles.slice(0, MAX_UPLOAD_PHOTOS);
+    if (imageFiles.length > limitedFiles.length) showToast(`최대 ${MAX_UPLOAD_PHOTOS}장까지 업로드됩니다.`, 'info');
     setChatUploadProgress({ pct: 2, remainingSec: null, label: title, current: 0, total: limitedFiles.length });
     const { succeeded, failed } = await processImageFilesSequentially(limitedFiles, progress => {
       const total = Math.max(1, progress.total || limitedFiles.length);
@@ -3159,8 +3160,8 @@ function CalendarApp() {
     }
     const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
     const messageOperationId = `gather_photo_paste_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
-    const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+    const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), MAX_PHOTO_TAG_TOKEN)).filter(Boolean).slice(0, MAX_PHOTO_TAGS);
+    const cleanTags = sanitizeText(tagTokens.join(' '), MAX_PHOTO_TAG_TEXT);
     const messageData = {
       participantId: fallbackParticipantId,
       text: '',
@@ -3204,8 +3205,8 @@ function CalendarApp() {
     try {
       for (let i = 0; i < list.length; i++) {
         const cleanUrl = String(list[i].url).trim();
-        const tagTokens = String(list[i].tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
-        const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+        const tagTokens = String(list[i].tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), MAX_PHOTO_TAG_TOKEN)).filter(Boolean).slice(0, MAX_PHOTO_TAGS);
+        const cleanTags = sanitizeText(tagTokens.join(' '), MAX_PHOTO_TAG_TEXT);
         const messageOperationId = `gather_photos_paste_${activeCal.id}_${baseTs}_${i}_${Math.random().toString(36).slice(2, 8)}`;
         const messageData = {
           participantId: fallbackParticipantId,
@@ -3710,9 +3711,9 @@ function CalendarApp() {
       return false;
     }
     const parseTagTokens = text => Array.from(new Set(
-      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
-    )).slice(0, 10);
-    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), MAX_PHOTO_TAG_TOKEN)).filter(Boolean)
+    )).slice(0, MAX_PHOTO_TAGS);
+    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), MAX_PHOTO_TAG_TEXT);
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
     const saved = await commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
     if (!saved) return false;
@@ -3747,9 +3748,9 @@ function CalendarApp() {
       return false;
     }
     const parseTagTokens = text => Array.from(new Set(
-      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
-    )).slice(0, 10);
-    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), MAX_PHOTO_TAG_TOKEN)).filter(Boolean)
+    )).slice(0, MAX_PHOTO_TAGS);
+    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), MAX_PHOTO_TAG_TEXT);
     const nextPhotos = photos.map((p, i) => i === imageIndex ? { ...p, tags: cleanTags } : p);
     const annData = preserveAnniversaryCurationFields(ann, { ...ann, photos: nextPhotos, updatedAt: Date.now() });
     try {
