@@ -1670,6 +1670,60 @@ html:has(.renewal-shell.v2-design) textarea[data-field-lines="1"]:not(.admin-sco
   border-radius: 22px !important;
 }
 
+/* Every user-facing single-line control follows the same capsule geometry.  A number of
+   controls are rendered through the reusable bottom-sheet picker, so they are buttons with
+   .form-select rather than native <select>s; keep both implementations visually identical.
+   The settlement/date sheets are portaled next to the V2 root, hence the document-level
+   selector for overlays.  Multi-line textareas keep the rounded-card treatment above. */
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay
+) :is(
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input[type="password"],
+  input[type="date"],
+  input[type="time"],
+  input.form-input,
+  select.form-select,
+  button.form-select
+):not(.admin-scope *) {
+  border-radius: 999px !important;
+}
+
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay
+) textarea:not(.admin-scope *) {
+  border-radius: 14px !important;
+}
+
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay
+) textarea[data-field-lines="1"]:not(.admin-scope *) {
+  border-radius: 999px !important;
+}
+
+/* The settlement member area is a list container (a rounded box), but each member with no
+   memo is a one-line field.  Give those rows the same capsule ends as title, picker and bank
+   controls; a memo explicitly makes the row a multi-line card. */
+html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-row:not(.is-multiline) {
+  border-radius: 999px !important;
+}
+
+html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-row.is-multiline,
+html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
+  border-radius: 14px !important;
+}
+
 /* --------------------------------------------------------------------------
  * Side-nav collapse: lock Y. Width/opacity/padding-x may change; height,
  * margin-y, padding-y and flex gap must be identical so icons only travel

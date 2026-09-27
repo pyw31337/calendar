@@ -2643,9 +2643,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           )
         ),
         participantRows.length > 0 && React.createElement('div', {
+          className: 'settlement-participant-list',
           style: { display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
         }, participantRows.map(row => React.createElement('div', {
           key: row.id,
+          className: `settlement-participant-row${row.memo ? ' is-multiline' : ''}`,
           style: { display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '44px', padding: '7px 10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)' }
         },
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', minWidth: 0 } },
