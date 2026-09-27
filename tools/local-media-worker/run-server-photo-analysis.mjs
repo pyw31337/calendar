@@ -29,7 +29,7 @@ function kstDateStamp(date = new Date()) {
 }
 
 function parseArgs(argv) {
-  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, tokenService: DEFAULT_TOKEN_SERVICE, visionBinary: '', force: false };
+  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false };
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     if (key === '--calendar') args.calendar = argv[++index] || '';
@@ -39,6 +39,7 @@ function parseArgs(argv) {
     else if (key === '--endpoint') args.endpoint = argv[++index] || '';
     else if (key === '--max') args.max = Math.max(1, Math.min(100, Number(argv[++index]) || DEFAULT_MAX_PER_RUN));
     else if (key === '--token-service') args.tokenService = argv[++index] || DEFAULT_TOKEN_SERVICE;
+    else if (key === '--token-account') args.tokenAccount = argv[++index] || '';
     else if (key === '--vision-bin') args.visionBinary = argv[++index] || '';
     else if (key === '--force') args.force = true;
   }
@@ -148,8 +149,9 @@ function shell(command, args) {
   });
 }
 
-async function readWorkerToken(service) {
-  return (await shell('/usr/bin/security', ['find-generic-password', '-a', process.env.USER || '', '-s', service, '-w'])).trim();
+async function readWorkerToken(service, account) {
+  if (!account) throw new Error('Missing Keychain token account');
+  return (await shell('/usr/bin/security', ['find-generic-password', '-a', account, '-s', service, '-w'])).trim();
 }
 
 function nearestPlace(photo, places) {
@@ -240,7 +242,7 @@ async function main() {
   const outputPath = resolve(args.output);
   const state = await readJson(statePath, { schemaVersion: 1, calendars: {} });
   const current = state.calendars?.[args.calendar] || {};
-  const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService)]);
+  const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService, args.tokenAccount)]);
   const now = Date.now();
   const runId = `macos_${args.calendar}_${kstDateStamp(new Date(now))}`;
   // A completed revision can skip image downloads, but it must still heartbeat the server.  This

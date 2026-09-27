@@ -84,6 +84,7 @@ async function main() {
   for (const calendarId of config.calendarIds) {
     const reportFile = resolve(config.reportDirectory || join(appDir, 'media-analysis-reports'), `${calendarId}-latest.json`);
     const args = [SERVER_WORKER, '--calendar', calendarId, '--project', config.projectId || 'metro-live-2918e', '--state', resolve(config.statePath || join(appDir, 'server-photo-analysis-state.json')), '--output', reportFile, '--max', String(config.maxPerRun || 80), '--token-service', config.tokenService || 'Moyeora Media Analysis Worker'];
+    if (config.tokenAccount) args.push('--token-account', config.tokenAccount);
     if (config.endpoint) args.push('--endpoint', config.endpoint);
     if (config.visionBinary) args.push('--vision-bin', resolve(config.visionBinary));
     try {

@@ -46,6 +46,7 @@ CALENDAR_JSON="$(/usr/bin/env node -e 'const ids=process.argv[1].split(",").map(
     projectId,
     maxPerRun: 80,
     tokenService: "Moyeora Media Analysis Worker",
+    tokenAccount: process.env.USER || "moyeora",
     visionBinary: `${home}/Library/Application Support/Moyeora/bin/media-insight`,
     statePath: `${home}/Library/Application Support/Moyeora/server-photo-analysis-state.json`,
     reportDirectory: `${home}/Library/Application Support/Moyeora/media-analysis-reports`,
