@@ -2568,7 +2568,12 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
   try {
     const apiKey = String(process.env.RESEND_API_KEY || RESEND_API_KEY.value() || '').trim();
     const from = String(process.env.MEDIA_BRIEF_FROM || MEDIA_BRIEF_FROM.value() || '').trim();
-    if (!apiKey || !from) throw new Error('Email sender is not configured');
+    // Secret placeholders exist so a non-email deployment can still load this codebase.  Never
+    // issue an outbound request until both values are a real Resend credential and a verified
+    // RFC-style sender address.
+    if (!/^re_[A-Za-z0-9_-]{12,}$/.test(apiKey) || !/^.+<[^<>\s]+@[^<>\s]+>$/.test(from)) {
+      throw new Error('Email sender is not configured');
+    }
     const providerMessageId = await sendResendMail({
       apiKey,
       from,
