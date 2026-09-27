@@ -6,6 +6,7 @@ import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } f
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { fetchMediaAnalysisFeed, formatMediaAnalysisTime } from '../core/media-analysis-feed.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -524,7 +525,20 @@ export function ChatGalleryModal({
   const setGalleryTab = next => {
     setActiveTab(next);
     setSelectedBulkShareKeys(new Set());
-  }; // 'photos' | 'links' | 'files'
+  }; // 'photos' | 'links' | 'files' | 'analysis'
+  const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
+  const loadMediaAnalysis = React.useCallback((force = false) => {
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId) return Promise.resolve();
+    setMediaAnalysis(previous => ({ ...previous, loading: true, error: '' }));
+    return fetchMediaAnalysisFeed({ calendarId, projectId, force })
+      .then(items => setMediaAnalysis({ loading: false, error: '', items }))
+      .catch(error => setMediaAnalysis(previous => ({ ...previous, loading: false, error: String(error?.message || error) })));
+  }, [calendar?.id]);
+  React.useEffect(() => {
+    if (activeTab === 'analysis') void loadMediaAnalysis();
+  }, [activeTab, loadMediaAnalysis]);
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -2300,6 +2314,38 @@ export function ChatGalleryModal({
     )
   );
   const renderGalleryContent = () => {
+    if (activeTab === 'analysis') {
+      const chips = (values, color = 'var(--accent-primary)') => (Array.isArray(values) ? values : []).slice(0, 12).map(value => /*#__PURE__*/React.createElement('span', {
+        key: value,
+        style: { display: 'inline-flex', alignItems: 'center', minHeight: '24px', padding: '2px 9px', borderRadius: 'var(--radius-full)', background: 'var(--bg-secondary)', color, fontSize: 'var(--font-size-xs)', fontWeight: 800 }
+      }, `#${value}`));
+      return /*#__PURE__*/React.createElement('section', {
+        className: 'media-analysis-feed',
+        style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 0 20px' },
+        'aria-label': 'AI 사진 분석 추천'
+      },
+        /*#__PURE__*/React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' } },
+          /*#__PURE__*/React.createElement('p', { style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } }, '로컬 Mac 분석기가 올린 추천입니다. 기존 사진·태그는 자동으로 바뀌지 않습니다.'),
+          /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', onClick: () => void loadMediaAnalysis(true), disabled: mediaAnalysis.loading, style: { minHeight: '36px', whiteSpace: 'nowrap', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, mediaAnalysis.loading ? '불러오는 중' : '새로고침')
+        ),
+        mediaAnalysis.error && /*#__PURE__*/React.createElement('p', { role: 'alert', style: { margin: 0, color: 'var(--status-danger)', fontSize: 'var(--font-size-sm)' } }, mediaAnalysis.error),
+        !mediaAnalysis.loading && !mediaAnalysis.error && mediaAnalysis.items.length === 0 && /*#__PURE__*/React.createElement('p', { style: { margin: '28px 0', textAlign: 'center', color: 'var(--text-muted)' } }, '서버에 올라온 분석 추천이 없습니다.'),
+        mediaAnalysis.items.map(item => /*#__PURE__*/React.createElement('article', {
+          key: item.id,
+          style: { display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-card)' }
+        },
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+            /*#__PURE__*/React.createElement('span', null, item.assetKey ? '사진 분석' : '로컬 사진 분석'),
+            /*#__PURE__*/React.createElement('time', null, formatMediaAnalysisTime(item.lastReceivedAt || item.analyzedAt))
+          ),
+          chips(item.suggestedTags),
+          (item.people?.length || item.places?.length || item.meetings?.length) > 0 && /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+            chips(item.people, 'var(--status-danger)'), chips(item.places, 'var(--status-green)'), chips(item.meetings, 'var(--accent-primary)')
+          ),
+          item.ocrText?.length > 0 && /*#__PURE__*/React.createElement('p', { style: { margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } }, item.ocrText.join(' · '))
+        ))
+      );
+    }
     if (activeTab === 'photos' && usingPhotoIndex && indexedPhotoStatus !== 'ready') {
       const failed = indexedPhotoStatus === 'error';
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2665,7 +2711,8 @@ export function ChatGalleryModal({
         options: [
           { value: 'photos', label: '사진', badge: displayPhotoTabCount },
           { value: 'links', label: '링크', badge: filteredLinks.length },
-          { value: 'files', label: '파일', badge: filteredFiles.length }
+          { value: 'files', label: '파일', badge: filteredFiles.length },
+          { value: 'analysis', label: 'AI 분석', badge: mediaAnalysis.items.length || undefined }
         ]
       })
     );

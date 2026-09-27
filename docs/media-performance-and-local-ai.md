@@ -59,3 +59,64 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.moyeora.media
 Cloud Run/Ollama 같은 외부 또는 네트워크 모델은 한국어 설명 품질을 높일 수 있지만, 사진을
 외부로 보내는 비용·개인정보·실패 재처리 비용이 생긴다. 기본 경로는 M2의 Vision/Core ML이며,
 외부 모델은 사용자가 명시적으로 켠 경우에만 보조 제안으로 사용한다.
+
+## 상시 서버 동기화 분석 워커
+
+`setup-media-analysis-worker.sh`는 서버의 `photoIndex`에서 **변경된 사진만** 가져와 M2 Vision으로
+분석한다. 인물·장소·일정 후보, OCR, 장면, 얼굴 수, 기존 태그 문맥을 별도 `mediaAnalysis` 서버
+컬렉션에 올린다. 원본 사진은 다시 업로드하지 않으며, 기존 태그·사진·댓글을 자동 수정하지 않는다.
+라이브 앱은 같은 캘린더 링크 권한으로 이 추천 데이터를 읽어 어느 기기에서나 확인할 수 있다.
+
+- 평일: KST 18:00부터 다음 날 07:59까지 15분 간격으로 변경분을 처리한다.
+- 토·일 및 대한민국 공휴일: 하루 종일 같은 간격으로 처리한다.
+- 공휴일은 대한민국 공휴일 ICS를 일주일에 한 번만 갱신해 로컬 캐시에 저장한다. 갱신 실패 때도
+  마지막 정상 캐시를 사용한다.
+- 서버로 전송하는 것은 자산 키와 분석 결과 메타데이터뿐이다. 사진 바이트는 Storage에 이미 있는
+  원본을 그대로 참조한다.
+
+### 실제 설치
+
+```bash
+cd /Users/pyw31337/Developer/calendar
+MOYEORA_MEDIA_CALENDARS=cw,kkot,jhair \
+  tools/local-media-worker/setup-media-analysis-worker.sh
+firebase deploy --only functions:ingestMediaAnalysis,firestore:rules
+```
+
+설치기는 무작위 업로드 토큰을 macOS Keychain에만 저장하고, Cloud Secret Manager에는 그 검증값만
+연결한다. 토큰은 저장소·LaunchAgent·서버 분석 문서에 기록되지 않는다. `launchd`는 15분마다
+가볍게 시간대를 확인하며, 비작업 시간에는 즉시 종료한다. macOS가 잠들어 예약 시각을 지나면
+깨어난 뒤 실행되는 `launchd` 특성을 이용한다.
+
+분석 결과의 최신 로컬 상태는 다음 위치에 남는다. 이는 장애 진단용이며, 실제 확인 대상은 항상
+라이브 서버의 `mediaAnalysis` 데이터다.
+
+```text
+~/Library/Application Support/Moyeora/media-analysis-scheduler-latest.json
+~/Library/Application Support/Moyeora/media-analysis-reports/<calendar-id>-latest.json
+```
+
+### 평일 이메일 브리핑과 장애 안전장치
+
+평일 08:00(KST)에는 `pyw213@naver.com`으로 누적 분석 결과를 HTML 이메일로 보낸다. 메일에는
+캘린더별 추천·오류·인물/장소/일정 후보 수와 라이브 검토 링크만 포함하고, 사진 원본 URL·댓글·OCR
+원문은 포함하지 않는다. 발송 기록은 `operationsMediaBriefs`에 남아 이메일 보관함과 별도로 감사할 수
+있다.
+
+발송 서비스는 Resend를 사용한다. 한 번만 검증된 발신자와 API 키를 Secret Manager에 설정한다. 값은
+명령어 이력, 저장소, `launchd` 설정, 로컬 JSON에 남지 않는다.
+
+```bash
+cd /Users/pyw31337/Developer/calendar
+RESEND_API_KEY='re_…' \
+MEDIA_BRIEF_FROM='모아엘가 <brief@verified-domain.example>' \
+  tools/local-media-worker/configure-media-brief-email.sh
+```
+
+안전장치는 세 겹이다.
+
+1. `launchd`가 로컬 워커를 15분 간격으로 다시 실행하고, 변경이 없어도 서버에 생존 신호를 남긴다.
+2. 서버는 토큰·캘린더·실제 `photoIndex` 자산을 모두 검증하고, 분석 결과·실패·생존 신호를 원자적으로
+   기록한다. 배치가 끝나기 전에는 리비전을 완료로 표시하지 않아 80장 이후의 사진이 누락되지 않는다.
+3. 이메일은 08:00·08:15·08:30·08:45에 같은 멱등성 키로 재시도한다. 발송이 불확실하거나 실패하면
+   서버의 감사 문서에 남고, 다음 시도는 중복 없이 복구한다.

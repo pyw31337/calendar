@@ -256,6 +256,24 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Server-written local-AI recommendations. A shared calendar link may read its own
+      // recommendations in the live gallery, but only the secret-authenticated local worker
+      // reaches the Admin SDK ingestion endpoint to create or update them.
+      match /mediaAnalysis/{analysisId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
+      match /mediaAnalysisRuns/{runId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
+      match /mediaAnalysisWorkerState/{workerId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
       // Web Push subscriptions. Allows browsers to register their endpoints for offline/background
       // pushes -- write-only from the client (index.html never reads this collection, only
       // .set()/.delete()). Actually sending a push is done server-side via the Admin SDK in
