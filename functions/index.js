@@ -7,6 +7,7 @@ const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 const mediaCommands = require('./media-commands');
+const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
 
 admin.initializeApp();
 
@@ -163,13 +164,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     const imageIndex = Number.isInteger(photo?.index) ? photo.index : index;
     // Per-photo GPS written by the client after upload (src/core/photo-geo.js), keyed like
     // imageTagMap. Copied onto the index row so 보관함 > 장소 can file the photo by distance.
-    const geo = data.imageGeoMap && typeof data.imageGeoMap === 'object' ? data.imageGeoMap[assetKey] : null;
-    const geoLat = Number(geo && geo.lat);
-    const geoLng = Number(geo && geo.lng);
-    const hasGeo = Number.isFinite(geoLat) && Number.isFinite(geoLng) && Math.abs(geoLat) <= 90 && Math.abs(geoLng) <= 180
-      && !(geoLat === 0 && geoLng === 0);
+    const geo = readImageGeo(data, assetKey);
     entries.push({
-      ...(hasGeo ? { latitude: geoLat, longitude: geoLng } : {}),
+      ...(geo || {}),
       assetKey,
       full,
       thumb,
@@ -384,8 +381,10 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
     const existingComments = commentSnapshot?.exists && Array.isArray(commentSnapshot.data()?.comments)
       ? commentSnapshot.data().comments.length : 0;
     const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
+    const geo = pickPhotoIndexGeo(owners, existing);
     transaction.set(ref, {
       ...selected,
+      ...geo,
       assetKey,
       legacyKeys,
       owners,
