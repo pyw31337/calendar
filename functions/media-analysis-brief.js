@@ -2,6 +2,14 @@
 
 const ACTION_URL = 'https://pyw31337.github.io/calendar/?shell=v2&tab=gallery';
 
+// Keep provider credentials out of the browser and avoid treating deliberately empty Secret
+// Manager placeholders as a delivery failure. This lets the scheduled job leave a server-side
+// briefing audit trail until a verified sender is configured.
+function isEmailDeliveryConfigured({ apiKey, from } = {}) {
+  return /^re_[A-Za-z0-9_-]{12,}$/.test(String(apiKey || '').trim())
+    && /^.+<[^<>\s]+@[^<>\s]+>$/.test(String(from || '').trim());
+}
+
 function escapeHtml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -139,4 +147,4 @@ function buildBrief({ dateLabel, calendars = [] } = {}) {
   return { ...brief, subject: `모아엘가 AI 분석 브리핑 · ${brief.dateLabel}`, text: makeText(brief), html: renderHtml(brief) };
 }
 
-module.exports = { ACTION_URL, buildBrief };
+module.exports = { ACTION_URL, buildBrief, isEmailDeliveryConfigured };

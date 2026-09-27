@@ -9,7 +9,7 @@ const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract'
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
 const { MAX_BATCH_ITEMS, sanitizeAnalysisItem, summarize } = require('./media-analysis');
-const { buildBrief } = require('./media-analysis-brief');
+const { buildBrief, isEmailDeliveryConfigured } = require('./media-analysis-brief');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -2552,6 +2552,26 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
   if (existing.data()?.deliveryStatus === 'sent') return null;
   const calendars = await collectMediaBriefCalendars(db, dateKey, now);
   const brief = buildBrief({ dateLabel: formatBriefDate(new Date(now)), calendars });
+  const apiKey = String(process.env.RESEND_API_KEY || RESEND_API_KEY.value() || '').trim();
+  const from = String(process.env.MEDIA_BRIEF_FROM || MEDIA_BRIEF_FROM.value() || '').trim();
+  // Keep producing an auditable server report while an email sender is awaiting domain
+  // verification. The next scheduled slot automatically resumes delivery once secrets are
+  // configured; this path deliberately makes no outbound request and does not throw.
+  if (!isEmailDeliveryConfigured({ apiKey, from })) {
+    await reportRef.set({
+      kind: 'media-analysis-brief',
+      dateKey,
+      recipient: MEDIA_BRIEF_RECIPIENT,
+      deliveryStatus: 'not-configured',
+      emailConfigured: false,
+      lastCheckedAt: now,
+      generatedAt: now,
+      calendarCount: calendars.length,
+      summary: brief.total,
+      staleCount: brief.staleCount
+    }, { merge: true });
+    return null;
+  }
   const attempt = Math.max(0, Number(existing.data()?.attempts || 0)) + 1;
   await reportRef.set({
     kind: 'media-analysis-brief',
@@ -2559,6 +2579,7 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
     recipient: MEDIA_BRIEF_RECIPIENT,
     attempts: attempt,
     deliveryStatus: 'sending',
+    emailConfigured: true,
     lastAttemptAt: now,
     generatedAt: now,
     calendarCount: calendars.length,
@@ -2566,14 +2587,6 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
     staleCount: brief.staleCount
   }, { merge: true });
   try {
-    const apiKey = String(process.env.RESEND_API_KEY || RESEND_API_KEY.value() || '').trim();
-    const from = String(process.env.MEDIA_BRIEF_FROM || MEDIA_BRIEF_FROM.value() || '').trim();
-    // Secret placeholders exist so a non-email deployment can still load this codebase.  Never
-    // issue an outbound request until both values are a real Resend credential and a verified
-    // RFC-style sender address.
-    if (!/^re_[A-Za-z0-9_-]{12,}$/.test(apiKey) || !/^.+<[^<>\s]+@[^<>\s]+>$/.test(from)) {
-      throw new Error('Email sender is not configured');
-    }
     const providerMessageId = await sendResendMail({
       apiKey,
       from,

@@ -7,7 +7,7 @@ import { fetchMediaAnalysisFeed } from '../src/core/media-analysis-feed.js';
 
 const require = createRequire(import.meta.url);
 const { sanitizeAnalysisItem, stableAnalysisId, summarize } = require('../functions/media-analysis.js');
-const { buildBrief } = require('../functions/media-analysis-brief.js');
+const { buildBrief, isEmailDeliveryConfigured } = require('../functions/media-analysis-brief.js');
 
 test('server analysis accepts bounded recommendations but never takes a raw image URL', () => {
   const item = sanitizeAnalysisItem({
@@ -80,4 +80,9 @@ test('daily briefing produces a readable HTML digest and flags stale or failed w
   assert.match(brief.text, /오류 1건/);
   assert.equal(brief.staleCount, 1);
   assert.equal(brief.total.suggested, 9);
+});
+
+test('daily briefing remains in a safe server-only mode until a verified sender is configured', () => {
+  assert.equal(isEmailDeliveryConfigured({ apiKey: '__NOT_CONFIGURED__', from: '__NOT_CONFIGURED__' }), false);
+  assert.equal(isEmailDeliveryConfigured({ apiKey: 're_123456789012', from: '모아엘가 <brief@example.com>' }), true);
 });
