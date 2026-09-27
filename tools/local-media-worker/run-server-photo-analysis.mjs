@@ -15,6 +15,7 @@ const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
 const VISION_SCRIPT = join(WORKER_DIR, 'MediaInsight.swift');
 const DEFAULT_PROJECT_ID = 'metro-live-2918e';
 const DEFAULT_MAX_PER_RUN = 80;
+const DEFAULT_CONCURRENCY = 4;
 const MAX_DOWNLOAD_BYTES = 35 * 1024 * 1024;
 const DEFAULT_TOKEN_SERVICE = 'Moyeora Media Analysis Worker';
 const MAX_CONSECUTIVE_ASSET_FAILURES = 3;
@@ -29,7 +30,7 @@ function kstDateStamp(date = new Date()) {
 }
 
 function parseArgs(argv) {
-  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false };
+  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, concurrency: DEFAULT_CONCURRENCY, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false };
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     if (key === '--calendar') args.calendar = argv[++index] || '';
@@ -38,6 +39,7 @@ function parseArgs(argv) {
     else if (key === '--output') args.output = argv[++index] || '';
     else if (key === '--endpoint') args.endpoint = argv[++index] || '';
     else if (key === '--max') args.max = Math.max(1, Math.min(100, Number(argv[++index]) || DEFAULT_MAX_PER_RUN));
+    else if (key === '--concurrency') args.concurrency = Math.max(1, Math.min(4, Number(argv[++index]) || DEFAULT_CONCURRENCY));
     else if (key === '--token-service') args.tokenService = argv[++index] || DEFAULT_TOKEN_SERVICE;
     else if (key === '--token-account') args.tokenAccount = argv[++index] || '';
     else if (key === '--vision-bin') args.visionBinary = argv[++index] || '';
@@ -260,19 +262,26 @@ async function main() {
   const items = [];
   const failures = [];
   try {
-    for (const row of rows) {
-      const photo = { ...row.data, assetKey: String(row.data.assetKey || basename(row.name)) };
-      try {
-        const insight = await inspectPhoto(photo, tempRoot, args.visionBinary);
-        items.push({ sourceKey: photo.assetKey, assetKey: photo.assetKey, sourceUpdatedAt: Number(photo.updatedAt) || 0, analyzedAt: now, source: 'photo-index', insight, ...classify(photo, insight, calendar) });
-      } catch (error) {
-        const message = String(error?.message || error).slice(0, 240);
-        failures.push({ assetKey: photo.assetKey, error: message });
-        // Persist a bounded error against the immutable asset key.  It is safe to overwrite when
-        // a later retry succeeds, and makes an unanalysable file visible in the web briefing.
-        items.push({ sourceKey: photo.assetKey, assetKey: photo.assetKey, sourceUpdatedAt: Number(photo.updatedAt) || 0, analyzedAt: now, source: 'photo-index', status: 'failed', error: message });
+    let nextRow = 0;
+    const inspectNextRow = async () => {
+      while (nextRow < rows.length) {
+        const row = rows[nextRow++];
+        const photo = { ...row.data, assetKey: String(row.data.assetKey || basename(row.name)) };
+        try {
+          const insight = await inspectPhoto(photo, tempRoot, args.visionBinary);
+          items.push({ sourceKey: photo.assetKey, assetKey: photo.assetKey, sourceUpdatedAt: Number(photo.updatedAt) || 0, analyzedAt: now, source: 'photo-index', insight, ...classify(photo, insight, calendar) });
+        } catch (error) {
+          const message = String(error?.message || error).slice(0, 240);
+          failures.push({ assetKey: photo.assetKey, error: message });
+          // Persist a bounded error against the immutable asset key.  It is safe to overwrite when
+          // a later retry succeeds, and makes an unanalysable file visible in the web briefing.
+          items.push({ sourceKey: photo.assetKey, assetKey: photo.assetKey, sourceUpdatedAt: Number(photo.updatedAt) || 0, analyzedAt: now, source: 'photo-index', status: 'failed', error: message });
+        }
       }
-    }
+    };
+    // Core ML/Vision work is independent by asset. Four concurrent tasks fully use a desktop M2
+    // without turning an 80-photo backlog into unbounded CPU, RAM, or Firebase traffic.
+    await Promise.all(Array.from({ length: Math.min(args.concurrency, rows.length) }, inspectNextRow));
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
