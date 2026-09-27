@@ -644,12 +644,13 @@ function revokeCompressedObjectUrls(compressed) {
 // full-size blobs.
 const imagePreprocessCache = new Map();
 const IMAGE_PREPROCESS_CACHE_LIMIT = 80;
+export const MAX_IMAGE_UPLOADS_PER_ACTION = 200;
 // The page hydrates this index from already-saved message and memo records.  It is deliberately
 // calendar-scoped: the same stock photo may be useful in two different family calendars, while a
 // second copy in one calendar only creates another gallery asset with ambiguous tags/comments.
 const knownImageFingerprintsByCalendar = new Map();
 const KNOWN_IMAGE_FINGERPRINT_LIMIT = 6000;
-const fingerprintIndexHydrationByCalendar = new Map();
+const FINGERPRINT_QUERY_CHUNK_SIZE = 30;
 
 function normalizeImageFingerprint(value) {
   const fingerprint = String(value || '').trim();
@@ -681,41 +682,71 @@ function readFirestoreFingerprintValues(document) {
     : [];
 }
 
-// The normal chat and gallery windows are deliberately paginated, so they cannot be the sole
-// source of truth for duplicate detection.  Before a first upload in a calendar, retrieve only
-// the fingerprint field from every message/memo document.  This is a Firestore field mask (not
-// the actual image URL/base64 payload), is cached for the tab lifetime, and lets an old gallery
-// photo be recognised even if it is outside the current scroll window.
-async function hydrateKnownImageFingerprintsForCalendar(calendarId) {
+// The normal chat and gallery windows are deliberately paginated, so duplicate detection also
+// needs to see older media.  The previous approach listed *every* message and memo field on the
+// first upload in each browser tab.  Field masks reduce bytes, not Firestore document reads;
+// a long-running calendar therefore paid one read per historic record for every fresh client.
+//
+// Query only the submitted fingerprints instead.  `array-contains-any` supports 30 values, so
+// a 200-photo selection makes at most 14 small queries (two collections) and returns only
+// matched records.  This preserves exact historical duplicate protection without a full scan.
+async function lookupKnownImageFingerprintsForCalendar(calendarId, candidateValues) {
   const id = String(calendarId || '').trim();
-  if (!id || fingerprintIndexHydrationByCalendar.has(id)) {
-    return fingerprintIndexHydrationByCalendar.get(id) || Promise.resolve();
-  }
+  if (!id) return;
   const projectId = String(firebaseConfig?.projectId || '').trim();
-  if (!projectId || typeof fetch !== 'function') return Promise.resolve();
-  const work = (async () => {
-    const fetchCollection = async collection => {
-      let pageToken = '';
-      do {
-        const params = new URLSearchParams({ pageSize: '300' });
-        params.append('mask.fieldPaths', 'imageFingerprints');
-        if (pageToken) params.set('pageToken', pageToken);
-        const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(id)}/${collection}?${params.toString()}`;
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`fingerprint index ${collection} status ${response.status}`);
-        const payload = await response.json();
-        (payload.documents || []).forEach(document => rememberKnownImageFingerprints(id, readFirestoreFingerprintValues(document)));
-        pageToken = payload.nextPageToken || '';
-      } while (pageToken);
-    };
-    await Promise.all([fetchCollection('messages'), fetchCollection('memos')]);
-  })().catch(error => {
+  if (!projectId || typeof fetch !== 'function') return;
+  const known = getKnownImageFingerprintSet(id);
+  const candidates = Array.from(new Set(Array.from(candidateValues || [])
+    .map(normalizeImageFingerprint)
+    .filter(fingerprint => fingerprint && !known.has(fingerprint))));
+  if (candidates.length === 0) return;
+
+  const queryCollection = async (collection, fingerprints) => {
+    const parent = `projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(id)}`;
+    const response = await fetch(`https://firestore.googleapis.com/v1/${parent}:runQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: collection }],
+          select: { fields: [{ fieldPath: 'imageFingerprints' }] },
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'imageFingerprints' },
+              op: 'ARRAY_CONTAINS_ANY',
+              value: { arrayValue: { values: fingerprints.map(value => ({ stringValue: value })) } }
+            }
+          }
+        }
+      })
+    });
+    if (!response.ok) throw new Error(`fingerprint lookup ${collection} status ${response.status}`);
+    const rows = await response.json();
+    (Array.isArray(rows) ? rows : [rows])
+      .filter(row => row?.document)
+      .forEach(row => rememberKnownImageFingerprints(id, readFirestoreFingerprintValues(row.document)));
+  };
+
+  const chunks = [];
+  for (let offset = 0; offset < candidates.length; offset += FINGERPRINT_QUERY_CHUNK_SIZE) {
+    chunks.push(candidates.slice(offset, offset + FINGERPRINT_QUERY_CHUNK_SIZE));
+  }
+  const requests = [];
+  chunks.forEach(chunk => {
+    requests.push(queryCollection('messages', chunk), queryCollection('memos', chunk));
+  });
+  await Promise.all(requests).catch(error => {
     // Do not turn a read-only duplicate check into an upload blocker.  The selection-level hash
     // dedupe still runs and any loaded records remain in the local index.
-    console.warn('Image fingerprint index hydration skipped:', error);
+    console.warn('Image fingerprint lookup skipped:', error);
   });
-  fingerprintIndexHydrationByCalendar.set(id, work);
-  return work;
+}
+
+// Compatibility export for older integration code.  An empty candidate set is intentionally a
+// no-op: a blind collection hydration would recreate the read-amplification bug above.
+async function hydrateKnownImageFingerprintsForCalendar(calendarId) {
+  return lookupKnownImageFingerprintsForCalendar(calendarId, []);
 }
 
 function selectNonDuplicateCompressedImages(calendarId, compressedList) {
@@ -873,13 +904,20 @@ async function processImageFilesSequentially(files, onProgress) {
 
 // Chunk resolved images so a base64-fallback batch never exceeds Firestore's 1MiB/doc limit.
 const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 120000; // large images must use Storage URLs, not Firestore
+// Firestore rules cap each parallel media array at 50 slots. A user may select more photos in
+// one action, but they must be split into separate message documents before the write so an
+// otherwise valid Storage-url batch cannot be rejected just because its URLs are small.
+const CHAT_MESSAGE_MAX_IMAGE_SLOTS = 50;
 function chunkResolvedImagesForMessages(resolvedImages) {
   const chunks = [];
   let current = [];
   let currentBytes = 0;
   for (const img of resolvedImages) {
     const imgBytes = (img.imageUrl?.length || 0) + (img.thumbUrl?.length || 0);
-    if (current.length > 0 && currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET) {
+    if (current.length > 0 && (
+      current.length >= CHAT_MESSAGE_MAX_IMAGE_SLOTS
+      || currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET
+    )) {
       chunks.push(current);
       current = [];
       currentBytes = 0;
@@ -943,15 +981,15 @@ async function appendChatImageFiles({
   const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
   if (imageFiles.length === 0) return { handled: false, succeeded: 0, failed: 0 };
 
-  const remainingSlots = 50 - currentCount;
+  const remainingSlots = MAX_IMAGE_UPLOADS_PER_ACTION - currentCount;
   if (remainingSlots <= 0) {
-    if (showToast) showToast('사진 최대 50장', 'error');
+    if (showToast) showToast(`사진 최대 ${MAX_IMAGE_UPLOADS_PER_ACTION}장`, 'error');
     return { handled: true, succeeded: 0, failed: 0 };
   }
 
   const filesToProcess = imageFiles.slice(0, remainingSlots);
   if (imageFiles.length > remainingSlots && showToast) {
-    showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+    showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_IMAGE_UPLOADS_PER_ACTION}장)`, 'info');
   }
 
   setImageProcessing({ current: 0, total: filesToProcess.length });
@@ -1313,7 +1351,9 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
 async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
   await acquireMediaUploadWakeLock();
   try {
-  await hydrateKnownImageFingerprintsForCalendar(calendarId);
+  await lookupKnownImageFingerprintsForCalendar(calendarId, Array.from(compressedList || [])
+    .filter(item => !item?.isExisting)
+    .map(item => item?.fingerprint));
   const { accepted, duplicateIndexes } = selectNonDuplicateCompressedImages(calendarId, compressedList);
   const uploadIndexes = accepted.filter(({ item }) => !item.isExisting);
 
@@ -1535,7 +1575,7 @@ export {
   loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
   imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
-  buildImageFingerprint, rememberKnownImageFingerprints, hydrateKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
+  buildImageFingerprint, rememberKnownImageFingerprints, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
   acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
   uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles,

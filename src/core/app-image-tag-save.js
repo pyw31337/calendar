@@ -1,3 +1,6 @@
+export const MAX_MEDIA_TAGS = 20;
+export const MAX_MEDIA_TAG_TEXT_LENGTH = 640;
+
 // Per-photo tag persistence is deliberately kept out of CalendarApp.  The handler receives its
 // live UI/data dependencies so the app shell stays a composition layer rather than a second
 // source of photo identity logic.
@@ -48,8 +51,8 @@ export function createImageTagSaveHandler(context) {
     return Number.isFinite(number) ? Math.max(0, Math.round(number)) : null;
   };
   const tokenList = value => Array.from(new Set(String(value || '')
-    .split(/[,\s#]+/).map(token => sanitizeText(token.trim(), 30)).filter(Boolean))).slice(0, 10);
-  const cleanTagText = value => sanitizeText(tokenList(value).join(' '), 100);
+    .split(/[,\s#]+/).map(token => sanitizeText(token.trim(), 30)).filter(Boolean))).slice(0, MAX_MEDIA_TAGS);
+  const cleanTagText = value => sanitizeText(tokenList(value).join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
   const sourceMissing = () => {
     showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
     return false;

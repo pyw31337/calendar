@@ -174,7 +174,7 @@ async function tagAsset({ db, calendarDocId, asset, tags, now = Date.now() }) {
   const root = db.collection('calendars').doc(calendarDocId);
   const assetKey = getPhotoAssetKey(asset?.imageUrl || asset?.thumbUrl);
   if (!assetKey) return { ok: false, reason: 'invalid-asset' };
-  const value = String(tags || '').trim().slice(0, 160);
+  const value = String(tags || '').trim().slice(0, 640);
   const indexSnap = await root.collection('photoIndex').doc(assetKey).get();
   const owners = ownerDocIds(indexSnap.exists ? indexSnap.data() : null);
   (asset.messageId ? [asset.messageId] : []).forEach(id => owners.messages.add(id));

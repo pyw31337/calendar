@@ -2984,10 +2984,10 @@ export function EditMessageModal({
             showToast
           });
         } else {
-          const remainingSlots = 50 - images.length;
+          const remainingSlots = 200 - images.length;
           const filesToProcess = classified.images.slice(0, Math.max(0, remainingSlots));
           if (!filesToProcess.length) {
-            if (showToast) showToast('사진 최대 50장', 'error');
+            if (showToast) showToast('사진 최대 200장', 'error');
           } else {
             setImageProcessingEdit({ current: 0, total: filesToProcess.length });
             const { succeeded, failed } = await processImageFilesSequentially(

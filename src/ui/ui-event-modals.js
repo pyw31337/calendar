@@ -2208,6 +2208,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const cleanAccountDigits = (accountNumber || '').replace(/[^0-9]/g, '');
   const isAccountValid = cleanAccountDigits.length >= 8;
   const settlementSectionLabelStyle = { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' };
+  const participantColorByName = new Map(participantPickerOptions.map(option => [option.value, option.color || '#64748B']));
+  const payerBadgeForItem = item => {
+    const name = String(item?.payerId || item?.participantId || '').trim();
+    if (!name) return null;
+    return {
+      name,
+      // The last syllable gives a compact, familiar label for Korean full names
+      // (박영우 → 영, 송은혜 → 은) without consuming the settlement-row width.
+      initial: Array.from(name).slice(-1)[0] || name.slice(0, 1),
+      color: participantColorByName.get(name) || '#64748B'
+    };
+  };
 
   // Settlement-card preview -> image, rendered client-side onto an offscreen canvas (same
   // technique as the settlement-summary share image) so it can be saved as a plain jpg and
@@ -2281,7 +2293,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     };
 
     ctx.font = '500 14px sans-serif';
-    const participantColorByName = new Map(participantPickerOptions.map(option => [option.value, option.color || '#64748B']));
     const formatExpenseDateParts = (dateStr) => {
       const full = formatShortDateWithDay(dateStr);
       const match = String(full || '').match(/^(.*?)\s*(\([^)]*\))$/);
@@ -2297,6 +2308,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         parts,
         payer,
         payerColor,
+        payerBadge: payerBadgeForItem(item),
         labelLines: wrapText(item.label || '정산 항목', 420)
       };
     });
@@ -2466,7 +2478,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ctx.font = '500 14px sans-serif';
       ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
     } else {
-      imageItems.forEach(({ item, parts, payer, payerColor, labelLines }) => {
+      imageItems.forEach(({ item, parts, payerColor, payerBadge, labelLines }) => {
         hLine(PAD + 20, W - PAD - 20, listRowY - 22);
         let textX = PAD + 20;
         ctx.fillStyle = P.text;
@@ -2479,11 +2491,21 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           ctx.fillText(parts.day, textX, listRowY);
           textX += ctx.measureText(parts.day).width + 7;
         }
-        if (payer) {
-          ctx.fillStyle = payerColor;
-          ctx.font = '800 14px sans-serif';
-          const payerText = `${payer} /`;
-          ctx.fillText(payerText, textX, listRowY);
+        if (payerBadge) {
+          // Match the payment-request badge height with a personal-color round payer marker.
+          // It stays crisp in the 1280px export and replaces the ambiguous text separator.
+          const badgeSize = 18;
+          const badgeCenterX = textX + badgeSize / 2;
+          const badgeCenterY = listRowY - 6;
+          ctx.fillStyle = payerBadge.color;
+          ctx.beginPath();
+          ctx.arc(badgeCenterX, badgeCenterY, badgeSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = P.onRed;
+          ctx.font = '800 10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(payerBadge.initial, badgeCenterX, badgeCenterY + 3.5);
+          ctx.textAlign = 'left';
         }
         ctx.fillStyle = P.text;
         ctx.font = '500 14px sans-serif';
@@ -3022,10 +3044,21 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         React.createElement('div', { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, `정산목록 (${Object.keys(checkedItems).length}건)`),
         Object.values(checkedItems).length === 0
           ? React.createElement('div', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, '선택된 지출 항목이 없습니다.')
-          : Object.values(checkedItems).map((item, index) => React.createElement('div', { key: item.itemKey || index, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-md)' } },
-            React.createElement('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, `${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`),
-            React.createElement('strong', { style: { color: '#DC2626', whiteSpace: 'nowrap' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
-          ))
+          : Object.values(checkedItems).map((item, index) => {
+            const payerBadge = payerBadgeForItem(item);
+            return React.createElement('div', { key: item.itemKey || index, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-md)' } },
+              React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0, overflowWrap: 'anywhere' } },
+                React.createElement('span', null, formatShortDateWithDay(item.date)),
+                payerBadge && React.createElement('span', {
+                  title: `${payerBadge.name} 결제`,
+                  'aria-label': `${payerBadge.name} 결제`,
+                  style: { width: '18px', height: '18px', minWidth: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: payerBadge.color, color: '#FFFFFF', fontSize: '10px', fontWeight: 800, lineHeight: 1 }
+                }, payerBadge.initial),
+                React.createElement('span', null, item.label || '정산 항목')
+              ),
+              React.createElement('strong', { style: { color: '#DC2626', whiteSpace: 'nowrap' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
+            );
+          })
       ),
       React.createElement('button', {
         type: 'button',

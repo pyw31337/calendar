@@ -11,7 +11,7 @@
  */
 
 const HASHTAG_MAX_LEN = 24;
-const TAG_JOIN_MAX = 8;
+const TAG_JOIN_MAX = 20;
 
 const SAMSUNG_MODEL_MAP = Object.freeze([
   [/SM-F900/i, '갤럭시폴드'],

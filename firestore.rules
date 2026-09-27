@@ -97,6 +97,9 @@ service cloud.firestore {
           // thumbUrl (see handleSendChatMessage), never used for the base64-fallback path.
           && (!('imageUrls' in data) || (data.imageUrls is list && data.imageUrls.size() <= 50))
           && (!('thumbUrls' in data) || (data.thumbUrls is list && data.thumbUrls.size() <= 50))
+          // Content fingerprints are parallel to imageUrls. They are used only to prevent an
+          // already-uploaded original from being recorded a second time.
+          && (!('imageFingerprints' in data) || (data.imageFingerprints is list && data.imageFingerprints.size() <= 50))
           // imageShareUrls caches the /calendar/?image={id} share URL generated per image (see
           // handlePromoteInlineChatImage in index.html) so a second click on the same image's
           // URL button in the lightbox doesn't need to regenerate it.
@@ -113,7 +116,7 @@ service cloud.firestore {
           // URL in the chat text. New clients store it as a URL-hash keyed map so each direct
           // media item can have independent tags; legacy string values are still readable.
           && (!('directMediaTags' in data) || (
-            (data.directMediaTags is string && data.directMediaTags.size() <= 100)
+            (data.directMediaTags is string && data.directMediaTags.size() <= 640)
             || (data.directMediaTags is map && data.directMediaTags.size() <= 50)
           ));
       }
@@ -158,13 +161,14 @@ service cloud.firestore {
         return !('imageGeoMap' in data) || (data.imageGeoMap is map && data.imageGeoMap.size() <= 50);
       }
       function hasValidMessageMediaMetadataPatch() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'imageGeoMap'])
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'imageTagMap', 'imageFingerprints', 'directMediaTags', 'imageGeoMap'])
           && hasValidImageGeoMap(request.resource.data)
           && (!('imageShareUrls' in request.resource.data) || (request.resource.data.imageShareUrls is list && request.resource.data.imageShareUrls.size() <= 50))
           && (!('imageTags' in request.resource.data) || (request.resource.data.imageTags is list && request.resource.data.imageTags.size() <= 50))
+          && (!('imageFingerprints' in request.resource.data) || (request.resource.data.imageFingerprints is list && request.resource.data.imageFingerprints.size() <= 50))
           && (!('imageTagMap' in request.resource.data) || (request.resource.data.imageTagMap is map && request.resource.data.imageTagMap.size() <= 50))
           && (!('directMediaTags' in request.resource.data) || (
-            (request.resource.data.directMediaTags is string && request.resource.data.directMediaTags.size() <= 100)
+            (request.resource.data.directMediaTags is string && request.resource.data.directMediaTags.size() <= 640)
             || (request.resource.data.directMediaTags is map && request.resource.data.directMediaTags.size() <= 50)
           ));
       }
@@ -177,7 +181,7 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'imageTagMap', 'imageGeoMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
           && hasValidImageGeoMap(request.resource.data)
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
@@ -190,7 +194,7 @@ service cloud.firestore {
           && hasValidReplyTo(request.resource.data)
           && hasValidFileAttachments(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'imageTagMap', 'imageGeoMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
           && hasValidImageGeoMap(request.resource.data)
           && (
             hasValidMessageMediaMetadataPatch()

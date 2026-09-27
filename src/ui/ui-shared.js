@@ -1632,7 +1632,7 @@ export function MemoTagInputRow({
   tagInput = '',
   onTagInputChange,
   onAddTag,
-  maxTags = 10
+  maxTags = 20
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};

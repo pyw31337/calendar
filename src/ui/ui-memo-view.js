@@ -41,6 +41,8 @@ function withMemoFirestoreTimeout(promise, timeoutMs = 12000) {
 // or the user pages back to it. Fixing that would need a denormalized lastCommentAt field (a
 // firestore.rules change, deployed separately from the app) rather than a client-only change.
 const RECENT_MEMO_ACTIVITY_WINDOW_MS = 6 * 60 * 60 * 1000;
+const MAX_MEMO_IMAGE_ATTACHMENTS = 200;
+const MAX_MEMO_TAGS = 20;
 
 function getLatestMemoCommentTimestamp(memo) {
   const comments = memo?.comments || [];
@@ -468,14 +470,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const attachComposerFiles = async (files) => {
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - newImages.length;
+      const remainingSlots = MAX_MEMO_IMAGE_ATTACHMENTS - newImages.length;
       if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
+        if (showToast) showToast(`사진 최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장`, 'error');
         return;
       }
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
       if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+        showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장)`, 'info');
       }
 
       setImageProcessingNew({ current: 0, total: filesToProcess.length });
@@ -511,14 +513,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const attachEditFiles = async (files) => {
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - editImages.length;
+      const remainingSlots = MAX_MEMO_IMAGE_ATTACHMENTS - editImages.length;
       if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
+        if (showToast) showToast(`사진 최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장`, 'error');
         return;
       }
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
       if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+        showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장)`, 'info');
       }
 
       setImageProcessingEdit({ current: 0, total: filesToProcess.length });
@@ -577,7 +579,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         .map(tag => String(tag || '').trim())
         .filter(Boolean)
         .map(tag => tag.startsWith('#') ? tag : '#' + tag)
-        .slice(0, 10);
+        .slice(0, MAX_MEMO_TAGS);
       if (!title && !text && newImages.length === 0) {
         showToast('복제할 제목이나 내용이 없는 메모입니다.', 'error');
         return;
@@ -959,8 +961,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       showToast('이미 등록된 태그입니다.', 'error');
       return;
     }
-    if (newTags.length >= 10) {
-      showToast('태그는 최대 10개까지 등록 가능합니다.', 'error');
+    if (newTags.length >= MAX_MEMO_TAGS) {
+      showToast(`태그는 최대 ${MAX_MEMO_TAGS}개까지 등록 가능합니다.`, 'error');
       return;
     }
     setNewTags(prev => [...prev, cleanTag]);
@@ -981,8 +983,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       showToast('이미 등록된 태그입니다.', 'error');
       return;
     }
-    if (editTags.length >= 10) {
-      showToast('태그는 최대 10개까지 등록 가능합니다.', 'error');
+    if (editTags.length >= MAX_MEMO_TAGS) {
+      showToast(`태그는 최대 ${MAX_MEMO_TAGS}개까지 등록 가능합니다.`, 'error');
       return;
     }
     
@@ -1490,7 +1492,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 type: "text",
                 ref: newTagInputRef,
                 enterKeyHint: "enter",
-                placeholder: newTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${newTags.length}/10)`,
+                placeholder: newTags.length >= MAX_MEMO_TAGS ? `태그 최대 ${MAX_MEMO_TAGS}개 도달` : `태그 입력 (${newTags.length}/${MAX_MEMO_TAGS})`,
                 value: newTagInput,
                 onChange: e => setNewTagInput(e.target.value),
                 onKeyDown: e => {
@@ -1510,12 +1512,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: handleAddNewTag,
-                disabled: newTags.length >= 10,
+                disabled: newTags.length >= MAX_MEMO_TAGS,
                 style: {
                   flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
                   color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-                  opacity: newTags.length >= 10 ? 0.45 : 1
+                  opacity: newTags.length >= MAX_MEMO_TAGS ? 0.45 : 1
                 }
               }, "저장")
             ),
@@ -1913,7 +1915,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }),
           /*#__PURE__*/React.createElement("input", {
             type: "text",
-            placeholder: editTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${editTags.length}/10)`,
+            placeholder: editTags.length >= MAX_MEMO_TAGS ? `태그 최대 ${MAX_MEMO_TAGS}개 도달` : `태그 입력 (${editTags.length}/${MAX_MEMO_TAGS})`,
             value: editTagInput,
             onChange: e => setEditTagInput(e.target.value),
             onKeyDown: e => {
@@ -1933,12 +1935,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: handleAddEditTag,
-            disabled: editTags.length >= 10,
+            disabled: editTags.length >= MAX_MEMO_TAGS,
             style: {
               flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
               color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-              opacity: editTags.length >= 10 ? 0.45 : 1
+              opacity: editTags.length >= MAX_MEMO_TAGS ? 0.45 : 1
             }
           }, "저장")
         )),

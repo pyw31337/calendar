@@ -162,7 +162,11 @@ if (!localCacheLoader || !/return \[\];/.test(localCacheLoader[1])) {
 if (!localCacheSaver || !/Intentionally no-op/.test(localCacheSaver[1])) {
   fail('calendar local cache saver must remain a no-op.');
 }
-if (!/if \(isDocument\) \{[\s\S]{0,180}fetch\(req, \{ cache: 'no-store' \}\)/.test(serviceWorker)) {
+// Navigation handling delegates to fetchFreshDocument so legacy installed-app URLs can retry
+// through their scoped entry page. Verify both the dispatch and its cache-bypassing network
+// request rather than depending on the implementation being inlined in the fetch listener.
+if (!/if \(isDocument\) \{[\s\S]{0,180}event\.respondWith\(fetchFreshDocument\(req\)\)/.test(serviceWorker)
+  || !/async function fetchFreshDocument\(req\) \{[\s\S]{0,240}fetch\(req, \{ cache: 'no-store' \}\)/.test(serviceWorker)) {
   fail('service worker document navigations must bypass browser HTTP cache.');
 }
 const appUtils = readFileSync(join(ROOT, 'src/core/app-utils.js'), 'utf8');

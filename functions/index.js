@@ -227,7 +227,7 @@ function reconcileImageTagMapForIndex(message, tagMap = null) {
     const legacyTags = Array.isArray(message?.imageTags) ? message.imageTags : [];
     const hasLegacyTag = Object.prototype.hasOwnProperty.call(legacyTags, entry.index);
     if (!hasAssetTag && !hasLegacyTag) return;
-    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 100);
+    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 640);
   });
   return next;
 }
@@ -2078,7 +2078,7 @@ async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
   if (!match) return { ok: false, reason: 'unroutable' };
   const [, sourceType, sourceId, imageIndexStr] = match;
   const imageIndex = Number(imageIndexStr);
-  const cleanTags = String(tags || '').trim().slice(0, 160);
+  const cleanTags = String(tags || '').trim().slice(0, 640);
 
   if (sourceType === 'meeting') {
     const meetingRef = db.collection('calendars').doc(calendarDocId).collection('confirmedMeetings').doc(sourceId);

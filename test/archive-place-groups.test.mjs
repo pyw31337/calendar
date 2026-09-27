@@ -75,8 +75,8 @@ test('withPlaceTag prepends the place tag and never drops existing tags', async 
   assert.equal(placeTagToken(place), '예당호출렁다리');
   assert.deepEqual(withPlaceTag('#260920 서준', place), { status: 'add', tags: '예당호출렁다리 260920 서준' });
   assert.equal(withPlaceTag('예당호출렁다리야경 260920', place).status, 'already');
-  const ten = Array.from({ length: 10 }, (_, i) => `t${i}`).join(' ');
-  assert.deepEqual(withPlaceTag(ten, place), { status: 'full', tags: ten });
+  const twenty = Array.from({ length: 20 }, (_, i) => `t${i}`).join(' ');
+  assert.deepEqual(withPlaceTag(twenty, place), { status: 'full', tags: twenty });
   assert.equal(withPlaceTag('x', { name: '' }).status, 'invalid');
   assert.equal(placeTagToken({ name: '서울랜드', alias: '서랜' }), '서랜');
 });

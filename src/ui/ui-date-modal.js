@@ -963,11 +963,14 @@ export function DateModal({
     };
     refresh();
     // A browser without the Firestore SDK has no onSnapshot channel. Keep an open date modal
-    // fresh by rechecking only this date's tagged messages; this is bounded to the modal lifetime
-    // and stops immediately on close, so another device's completed upload appears without a
-    // manual refresh while normal SDK clients still get their push update instantly.
-    const refreshTimer = setInterval(refresh, 6000);
-    return () => { cancelled = true; clearInterval(refreshTimer); };
+    // fresh by rechecking only this date's tagged messages in that fallback case. This timer was
+    // accidentally started even for normal SDK clients, so every open sheet issued a server tag
+    // query every six seconds despite an active realtime channel.
+    const refreshTimer = __fb() ? null : setInterval(refresh, 6000);
+    return () => {
+      cancelled = true;
+      if (refreshTimer) clearInterval(refreshTimer);
+    };
   }, [dateStr, dateStrToHashtag, onFetchDateTaggedMessages]);
   React.useEffect(() => {
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';

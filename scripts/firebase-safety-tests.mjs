@@ -566,6 +566,12 @@ const imagePipelineSource = fs.readFileSync(new URL('../src/core/app-image-pipel
 assert(imagePipelineSource.includes('async function sniffImageFormat'), 'image attach must sniff real file bytes before trusting .png names');
 assert(imagePipelineSource.includes('withCorrectedImageFile'), 'image attach must rewrite mismatched MIME/extension from sniffed bytes');
 assert(imagePipelineSource.includes("sniffed?.kind === 'heic'"), 'HEIC bytes with a .png name must still take the HEIC convert path');
+assert(/ARRAY_CONTAINS_ANY/.test(imagePipelineSource) && /lookupKnownImageFingerprintsForCalendar/.test(imagePipelineSource), 'image duplicate detection must query submitted fingerprints instead of scanning every historic message');
+assert(!/mask\.fieldPaths'.*imageFingerprints/.test(imagePipelineSource), 'image duplicate detection must not reintroduce a full collection fingerprint scan');
+assert(/const refreshTimer = __fb\(\) \? null : setInterval\(refresh, 6000\)/.test(dateModalSource), 'date-tag scans must poll only when the Firestore realtime SDK is unavailable');
+const productionStressSource = fs.readFileSync(new URL('./firebase-live-stress-tests.mjs', import.meta.url), 'utf8');
+const productionCrudSource = fs.readFileSync(new URL('./firebase-full-crud-tests.mjs', import.meta.url), 'utf8');
+assert(/ALLOW_PRODUCTION_FIREBASE_WRITES/.test(productionStressSource) && /ALLOW_PRODUCTION_FIREBASE_WRITES/.test(productionCrudSource), 'billable production write tests must require an explicit opt-in');
 
 assert(photoIndexSource.includes("sourceEquals: 'anniversary'"), 'gallery photo count must subtract anniversary/content posters');
 assert(photoIndexSource.includes('filterGalleryPhotoIndexItems'), 'gallery photo index pages must drop anniversary/content posters');
@@ -1004,7 +1010,7 @@ assert(/function getMessageDirectMediaEntry\(msg\)[\s\S]{0,420}imageIndex: 0[\s\
 assert(/function getDirectMediaTagKey\(url\)/.test(script), 'direct URL image tags must use a stable URL hash key');
 assert(/getDirectMediaTagsForUrl\(sourceMessage,\s*meta\.directMediaUrl\)/.test(script), 'direct URL image tag saves must read the correct URL-scoped previous tag value');
 assert(/const nextDirectTags = previous && typeof previous === 'object' && !Array\.isArray\(previous\) \? \{ \.\.\.previous \} : \{\}/.test(script), 'direct URL image tag saves must persist a URL-keyed tag map');
-assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, 10\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the 10-tag persistence limit');
+assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, 20\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the 20-tag persistence limit');
 assert(/directMediaTags/.test(firestoreRules), 'Firestore rules must allow direct URL image tag updates');
 assert(/affectedKeys\(\)\.hasOnly\(\[[^\]]*directMediaTags/.test(firestoreRules), 'message update rules must include directMediaTags in the allowed update mask');
 assert(/directMediaTags is map/.test(firestoreRules), 'Firestore rules must allow URL-keyed directMediaTags maps');

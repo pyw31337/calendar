@@ -465,7 +465,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   // Keep the draft while navigating between photos. The lightbox intentionally reuses this
   // panel so a user can tap a photo once, then enter tags continuously with previous/next.
   if (tagTokens.length === 0 && !onSaveTags) return null;
-  const MAX_TAGS = 10;
+  const MAX_TAGS = 20;
   const handleSaveTags = async () => {
     if (isSavingTags) return;
     if (!onSaveTags) {
@@ -486,7 +486,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       // Check if any of the new tokens would actually be added
       const wouldAdd = newTokens.filter(t => !tagTokens.includes(t));
       if (tagTokens.length >= MAX_TAGS || (tagTokens.length + wouldAdd.length) > MAX_TAGS) {
-        if (typeof showToast === 'function') showToast('태그는 최대 10개 저장 가능', 'error');
+        if (typeof showToast === 'function') showToast(`태그는 최대 ${MAX_TAGS}개 저장 가능`, 'error');
         return;
       }
     }
@@ -590,8 +590,8 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     },
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "태그입력"),
       /*#__PURE__*/React.createElement("input", {
-        // Remount when token count changes so iOS Safari refreshes placeholder (n/10); it often
-        // keeps a stale "(0/10)" after chips catch up from async gallery tag resolution.
+        // Remount when token count changes so iOS Safari refreshes the placeholder count after
+        // chips catch up from async gallery tag resolution.
         key: `tag-input-${tagTokens.length}`,
         type: "text",
         className: "lightbox-tag-input",
@@ -613,7 +613,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         // 태그는 한 번에 짧게 입력하고 바로 저장하는 용도라 "완료"로 명시해 다음 필드로 넘어가지
         // 않게 한다.
         enterKeyHint: "enter",
-        placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
+        placeholder: tagTokens.length >= MAX_TAGS ? `태그 최대 ${MAX_TAGS}개 도달` : `태그 입력 (${tagTokens.length}/${MAX_TAGS})`,
         maxLength: 100,
         style: {
           flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
@@ -626,12 +626,12 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         onMouseDown: e => e.stopPropagation(),
         onTouchStart: e => e.stopPropagation(),
         onClick: e => { e.stopPropagation(); handleSaveTags(); },
-        disabled: isSavingTags || tagTokens.length >= 10,
+        disabled: isSavingTags || tagTokens.length >= MAX_TAGS,
         style: {
           flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
           color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-          opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
+          opacity: (isSavingTags || tagTokens.length >= MAX_TAGS) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
     )
@@ -1129,7 +1129,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
     String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
-  )).slice(0, 10).join(' ');
+  )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
         const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {

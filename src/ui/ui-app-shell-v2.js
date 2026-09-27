@@ -701,6 +701,23 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const [monthPickerOpen, setMonthPickerOpen] = React.useState(false);
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
+  const [pickerYear, setPickerYear] = React.useState(year);
+  const [pickerMonth, setPickerMonth] = React.useState(month);
+  const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+  // The initial V2 card temporarily replaced the app's shared year/month backdrop with a
+  // native <input type="month">. Apart from looking unlike the rest of V2, Safari presents
+  // that control as a tiny browser-owned popover (the UI in the report). Keep the selection
+  // state in React and render the same backdrop sheet used by the other calendar surfaces.
+  const openMonthPicker = () => {
+    setPickerYear(year);
+    setPickerMonth(month);
+    setMonthPickerOpen(true);
+  };
+  const applyMonthPicker = () => {
+    setMonthDate(new Date(pickerYear, pickerMonth, 1));
+    setMonthPickerOpen(false);
+  };
 
   // Drag-to-move a participant's availability badge onto a different date -- ported from
   // ui-calendar-core.js's CalendarGrid (HTML5 drag-and-drop for desktop, long-press-then-drag
@@ -927,8 +944,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     // Month nav
     React.createElement('div', { className: bentoClass('cal-month-nav-row'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
       React.createElement('button', {
-        onClick: () => setMonthPickerOpen(value => !value),
+        onClick: openMonthPicker,
         'aria-expanded': monthPickerOpen,
+        'aria-haspopup': 'dialog',
         className: bentoClass('ghost-btn cal-month-title'),
         style: { gap: '4px', fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)', padding: '2px 0' },
         type: 'button',
@@ -937,9 +955,6 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
         )
-      ),
-      monthPickerOpen && React.createElement('div', { className: 'bp-month-picker' },
-        React.createElement('input', { type: 'month', 'aria-label': '이동할 연월', value: `${year}-${String(month + 1).padStart(2, '0')}`, onChange: event => { const [y, m] = event.target.value.split('-').map(Number); if (y && m) { setMonthDate(new Date(y, m - 1, 1)); setMonthPickerOpen(false); } } })
       ),
       React.createElement('div', { className: bentoClass('cal-month-nav'), style: { display: 'flex', gap: '0px' } },
         React.createElement('button', {
@@ -1158,9 +1173,72 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     }, touchDragBadge.name), document.body)
     : null;
 
-  return touchDragIndicator
-    ? React.createElement(React.Fragment, null, cardTree, touchDragIndicator)
-    : cardTree;
+  const monthPickerSheet = monthPickerOpen
+    ? React.createElement('div', {
+      className: 'bottom-sheet-overlay bp-month-picker-overlay',
+      role: 'presentation',
+      onClick: () => setMonthPickerOpen(false),
+      style: { zIndex: 12000 },
+    }, React.createElement('section', {
+      className: 'bottom-sheet',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-label': '연월 선택',
+      onClick: event => event.stopPropagation(),
+    },
+      React.createElement('div', { className: 'bottom-sheet-header' },
+        React.createElement('h4', null, '연월 선택'),
+        React.createElement('button', {
+          type: 'button',
+          className: 'bp-month-picker-close',
+          'aria-label': '연월 선택 닫기',
+          onClick: () => setMonthPickerOpen(false),
+        }, '✕')
+      ),
+      React.createElement('div', { className: 'bottom-sheet-body' },
+        React.createElement('div', { className: 'bp-month-picker-field' },
+          React.createElement('span', { className: 'bp-month-picker-label' }, '년도'),
+          React.createElement('div', { className: 'bp-month-picker-year' },
+            React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-secondary',
+              'aria-label': '이전 연도',
+              onClick: () => setPickerYear(value => value - 1),
+            }, '‹'),
+            React.createElement('strong', null, `${pickerYear}년`),
+            React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-secondary',
+              'aria-label': '다음 연도',
+              onClick: () => setPickerYear(value => value + 1),
+            }, '›')
+          )
+        ),
+        React.createElement('div', { className: 'bp-month-picker-field' },
+          React.createElement('span', { className: 'bp-month-picker-label' }, '월'),
+          React.createElement('div', { className: 'bp-month-picker-months' },
+            monthNames.map((name, index) => React.createElement('button', {
+              key: name,
+              type: 'button',
+              className: index === pickerMonth ? 'is-selected' : undefined,
+              'aria-pressed': index === pickerMonth,
+              onClick: () => setPickerMonth(index),
+            }, name))
+          )
+        ),
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn btn-primary bp-month-picker-apply',
+          onClick: applyMonthPicker,
+        }, `${pickerYear}년 ${pickerMonth + 1}월로 이동`)
+      )
+    ))
+    : null;
+  const portaledMonthPickerSheet = monthPickerSheet && typeof document !== 'undefined' && window.ReactDOM?.createPortal
+    ? window.ReactDOM.createPortal(monthPickerSheet, document.body)
+    : monthPickerSheet;
+
+  return React.createElement(React.Fragment, null, cardTree, touchDragIndicator, portaledMonthPickerSheet);
 }
 
 
@@ -3490,6 +3568,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       BENTO_MAIN_ITEMS.map(item => {
         const active = isSideItemActive(item.id);
         const metaVal = item.id === 'chat' ? shortParticipantName(sideMeta[item.id]) : sideMeta[item.id];
+        // Gallery, places and memo are destinations, not compact status widgets.  Their
+        // trailing date/title/place labels made the navigation rail uneven and could collide
+        // with the menu title.  Keep only the intentional live status for chat and settlement.
+        const showMeta = item.id === 'chat' || item.id === 'settlement';
         return React.createElement('button', {
           key: item.id,
           type: 'button',
@@ -3499,7 +3581,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         },
           React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon, active })),
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label),
-          metaVal && (
+          showMeta && metaVal && (
             item.isPill
               ? React.createElement('span', {
                   className: bentoClass('side-nav-item-meta chat-dot'),

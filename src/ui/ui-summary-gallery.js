@@ -1902,7 +1902,7 @@ export function HistoryView({
     setPlaceSelectedKeys(new Set());
     setPlaceSelectMode(false);
     const parts = [`${counts.done}장을 #${placeTagToken(place)}(으)로 옮겼어요.`];
-    if (counts.full) parts.push(`${counts.full}장은 태그가 10개라 건너뛰었어요.`);
+    if (counts.full) parts.push(`${counts.full}장은 태그가 20개라 건너뛰었어요.`);
     if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
     showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
   };

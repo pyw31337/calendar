@@ -592,20 +592,23 @@ function sanitizeMessageForFirestore(messageData) {
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
   if (Array.isArray(out.imageUrls) || Array.isArray(out.thumbUrls)) {
     // These arrays describe one physical photo per slot. Remove a rejected base64 photo from
-    // every parallel array in the same pass; filtering only the URL array was what shifted a
-    // later person's tag onto an unrelated food photo.
+    // every parallel array in the same pass; filtering only one of URL, tag, or fingerprint
+    // arrays would shift a later photo's metadata onto an unrelated image.
     const urls = Array.isArray(out.imageUrls) ? out.imageUrls : [];
     const thumbs = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
     const tags = Array.isArray(out.imageTags) ? out.imageTags : null;
+    const fingerprints = Array.isArray(out.imageFingerprints) ? out.imageFingerprints : null;
     const nextUrls = [];
     const nextThumbs = [];
     const nextTags = tags ? [] : null;
+    const nextFingerprints = fingerprints ? [] : null;
     const slots = Math.max(urls.length, thumbs.length);
     for (let index = 0; index < slots; index += 1) {
       if (tooBig(urls[index]) || tooBig(thumbs[index])) continue;
       if (Array.isArray(out.imageUrls)) nextUrls.push(urls[index]);
       if (Array.isArray(out.thumbUrls)) nextThumbs.push(thumbs[index]);
       if (nextTags) nextTags.push(tags[index] || '');
+      if (nextFingerprints) nextFingerprints.push(fingerprints[index] || '');
     }
     if (Array.isArray(out.imageUrls)) {
       out.imageUrls = nextUrls;
@@ -616,6 +619,7 @@ function sanitizeMessageForFirestore(messageData) {
       if (!out.thumbUrls.some(Boolean)) delete out.thumbUrls;
     }
     if (nextTags) out.imageTags = nextTags;
+    if (nextFingerprints) out.imageFingerprints = nextFingerprints;
   }
   if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
     out.imageTagMap = reconcileMessageImageTagMap(out, normalizeImageTagMap(out.imageTagMap));
@@ -2589,7 +2593,7 @@ function reconcileMessageImageTagMap(message, tagMap = null) {
     if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey)) return;
     const state = getMessagePhotoTagState({ ...(message || {}), imageTagMap: existing }, entry, entry.imageIndex);
     if (!state.authoritative) return;
-    next[assetKey] = String(state.tags || '').slice(0, 100);
+    next[assetKey] = String(state.tags || '').slice(0, 640);
   });
   return next;
 }

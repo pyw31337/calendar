@@ -462,7 +462,7 @@ async function checkMemoTagInput(browser, baseUrl) {
     await page.getByText('새로운 메모를 남겨보세요...', { exact: true }).click();
 
     const participantButton = page.getByRole('button', { name: '작성자 선택' });
-    const tagInput = page.getByPlaceholder('태그 입력 (0/10)', { exact: true });
+    const tagInput = page.getByPlaceholder('태그 입력 (0/20)', { exact: true });
     await participantButton.waitFor({ state: 'visible', timeout: 5000 });
     await tagInput.waitFor({ state: 'visible', timeout: 5000 });
     await tagInput.fill('회귀검사');

@@ -165,7 +165,7 @@ export function placeTagToken(place) {
   return String(place?.alias || place?.name || '').replace(/[\s#,]+/g, '').slice(0, 30);
 }
 
-const MAX_PHOTO_TAGS = 10; // app-image-tag-save.js keeps the first 10 tokens
+const MAX_PHOTO_TAGS = 20; // app-image-tag-save.js keeps the first 20 tokens
 
 // Adds the place tag in front of a photo's tags. Never drops a tag the photo already has: a photo
 // that is already at the tag limit is reported as `full` instead of saved.

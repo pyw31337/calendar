@@ -2435,7 +2435,7 @@ function normalizeConfirmedMeetingPhoto(photo) {
   const assetKey = sanitizeText(photo.assetKey || '', 220);
   const source = sanitizeText(photo.source || '', 60);
   const uploadSource = sanitizeText(photo.uploadSource || '', 60);
-  const tags = sanitizeText(photo.tags || '', 500);
+  const tags = sanitizeText(photo.tags || '', 640);
   const sourceMessageId = sanitizeText(photo.sourceMessageId || '', 180);
   const sourceImageIndex = Number(photo.sourceImageIndex);
   const imageIndex = Number(photo.imageIndex);
