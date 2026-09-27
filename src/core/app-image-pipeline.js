@@ -185,6 +185,18 @@ function isHeicFile(file) {
   return name.endsWith('.heic') || name.endsWith('.heif');
 }
 
+// Google Photos and the iOS/macOS share sheet occasionally expose an otherwise normal JPEG
+// with an empty MIME type.  MIME alone therefore makes a multiple-selection look as though the
+// later photos disappeared before compression even started.  Keep the allowlist explicit (no
+// video/document catch-all), but let a recognised filename participate in the same pipeline.
+const IMAGE_UPLOAD_FILE_EXTENSION = /\.(?:avif|bmp|gif|heic|heif|jpe?g|png|webp)$/i;
+function isImageUploadFile(file) {
+  if (!file) return false;
+  return /^image\//i.test(String(file.type || ''))
+    || isHeicFile(file)
+    || IMAGE_UPLOAD_FILE_EXTENSION.test(String(file.name || ''));
+}
+
 // Wraps Image() decoding with a timeout so one stuck/malformed file can't hang a whole batch
 // indefinitely (the caller is otherwise waiting on onload/onerror, which some browsers never
 // fire for certain corrupt inputs).
@@ -532,20 +544,22 @@ async function extractPhotoMetadata(file) {
   if (!file) return null;
   const exifr = await loadExifr();
   if (typeof exifr?.parse !== 'function') return null;
-  // `latitude`/`longitude` are values exifr COMPUTES from the raw GPS tags -- they are not tags
-  // themselves, so picking only them made exifr skip the GPS block and never return a position
-  // (no photo ever got a location tag). Pick the raw GPS tags; exifr then adds latitude/longitude.
-  const exif = await exifr.parse(file, {
-    pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef']
-  });
-  if (!exif) return null;
+  // `exifr.gps()` is the library's dedicated, computed-coordinate reader.  A selective `parse`
+  // call only sees raw EXIF fields and can miss GPS blocks exported by Google Photos, so read the
+  // compact general metadata and the coordinate-only view independently.  Either result is useful
+  // on its own (for example, a privacy-stripped file can retain the capture date but no GPS).
+  const [exif, gps] = await Promise.all([
+    exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model'] }).catch(() => null),
+    typeof exifr.gps === 'function' ? exifr.gps(file).catch(() => null) : Promise.resolve(null)
+  ]);
+  if (!exif && !gps) return null;
   const result = {};
-  const date = exif.DateTimeOriginal || exif.CreateDate;
+  const date = exif?.DateTimeOriginal || exif?.CreateDate;
   if (date instanceof Date && !Number.isNaN(date.getTime())) result.capturedAt = date.toISOString();
-  const make = String(exif.Make || '').trim();
-  const model = String(exif.Model || '').trim();
+  const make = String(exif?.Make || '').trim();
+  const model = String(exif?.Model || '').trim();
   if (make || model) result.device = [make, model].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 100);
-  const lat = Number(exif.latitude), lon = Number(exif.longitude);
+  const lat = Number(gps?.latitude ?? exif?.latitude), lon = Number(gps?.longitude ?? exif?.longitude);
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     result.latitude = Number(lat.toFixed(6)); result.longitude = Number(lon.toFixed(6));
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
@@ -645,6 +659,22 @@ function revokeCompressedObjectUrls(compressed) {
 const imagePreprocessCache = new Map();
 const IMAGE_PREPROCESS_CACHE_LIMIT = 80;
 export const MAX_IMAGE_UPLOADS_PER_ACTION = 200;
+
+function getImageUploadCandidates(files) {
+  return Array.from(files || []).filter(isImageUploadFile);
+}
+
+// Keep the product limit at the selection boundary.  The subsequent 50-photo batching is only a
+// Firestore *record* constraint, never an upload/action limit.
+function limitImageUploadSelection(files, maxImages = MAX_IMAGE_UPLOADS_PER_ACTION) {
+  const candidates = getImageUploadCandidates(files);
+  const limit = Math.max(1, Number(maxImages) || MAX_IMAGE_UPLOADS_PER_ACTION);
+  return {
+    candidates,
+    selected: candidates.slice(0, limit),
+    omittedCount: Math.max(0, candidates.length - limit)
+  };
+}
 // The page hydrates this index from already-saved message and memo records.  It is deliberately
 // calendar-scoped: the same stock photo may be useful in two different family calendars, while a
 // second copy in one calendar only creates another gallery asset with ambiguous tags/comments.
@@ -827,7 +857,9 @@ async function processImageFilesSequentially(files, onProgress) {
   await acquireMediaUploadWakeLock();
   try {
   await checkFirebaseStorageHealth().catch(() => {});
-  const list = Array.from(files || []).sort((a, b) => String(a && a.name || '').localeCompare(String(b && b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const list = Array.from(files || [])
+    .map((file, sourceIndex) => ({ file, sourceIndex }))
+    .sort((a, b) => String(a.file && a.file.name || '').localeCompare(String(b.file && b.file.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
   const succeeded = new Array(list.length);
   const failed = [];
   const startedAt = Date.now();
@@ -856,7 +888,8 @@ async function processImageFilesSequentially(files, onProgress) {
     while (true) {
       const i = cursor++;
       if (i >= list.length) return;
-      const file = list[i];
+      const source = list[i];
+      const file = source.file;
       report(file && file.name);
       try {
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -868,9 +901,16 @@ async function processImageFilesSequentially(files, onProgress) {
           succeeded[i] = await compressImageToDataUrls(file);
           rememberPreprocessedImage(file, succeeded[i]);
         }
+        // `failed` retries and upload chunks must retain the original picker identity even though
+        // processing is name-sorted for a stable progress order.  Non-enumerable bookkeeping is
+        // deliberately excluded from Firestore/queue payloads.
+        Object.defineProperties(succeeded[i], {
+          sourceIndex: { value: source.sourceIndex, writable: true, configurable: true, enumerable: false },
+          sourceFile: { value: file, writable: true, configurable: true, enumerable: false }
+        });
         await new Promise(resolve => setTimeout(resolve, 0));
       } catch (err) {
-        failed.push({ fileName: file && file.name, error: err });
+        failed.push({ fileName: file && file.name, index: source.sourceIndex, file, error: err });
         succeeded[i] = null;
       }
       completed += 1;
@@ -892,7 +932,7 @@ async function processImageFilesSequentially(files, onProgress) {
       if (fingerprint) batchFingerprints.add(fingerprint);
       return true;
     }
-    duplicates.push({ fileName: list[index]?.name || '', fingerprint });
+    duplicates.push({ fileName: list[index]?.file?.name || '', fingerprint });
     revokeCompressedObjectUrls(item);
     return false;
   });
@@ -978,7 +1018,7 @@ async function appendChatImageFiles({
   setChatImages,
   showToast
 }) {
-  const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+  const imageFiles = getImageUploadCandidates(files);
   if (imageFiles.length === 0) return { handled: false, succeeded: 0, failed: 0 };
 
   const remainingSlots = MAX_IMAGE_UPLOADS_PER_ACTION - currentCount;
@@ -1366,7 +1406,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
       metadata: item.metadata || null,
       fingerprint: item.fingerprint || '',
       isExisting: true,
-      sourceIndex: index
+      sourceIndex: Number.isInteger(item.sourceIndex) ? item.sourceIndex : index
     }));
     Object.defineProperty(existingResults, 'failed', { value: [], enumerable: false, configurable: true });
     Object.defineProperty(existingResults, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
@@ -1415,18 +1455,24 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
       if (idx >= accepted.length) return;
       currentIndex = idx + 1;
       const { item: c, index: originalIndex } = accepted[idx];
+      const sourceIndex = Number.isInteger(c?.sourceIndex) ? c.sourceIndex : originalIndex;
       if (c.isExisting) {
         compressionDone++;
         reportCompressionProgress();
-        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail, metadata: c.metadata || null, fingerprint: c.fingerprint || '', isExisting: true, sourceIndex: originalIndex };
+        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail, metadata: c.metadata || null, fingerprint: c.fingerprint || '', isExisting: true, sourceIndex };
       } else {
         let result = null;
         try {
-          result = await resolveImageUrls(calendarId, c, originalIndex, onBytes, uploadFn, options);
-        } catch (error) { if (!options.continueOnError) throw error; failed.push({ index: originalIndex, error }); if (typeof options.onItemError === 'function') options.onItemError({ index: originalIndex, error, item: c }); }
+          result = await resolveImageUrls(calendarId, c, sourceIndex, onBytes, uploadFn, options);
+        } catch (error) {
+          if (!options.continueOnError) throw error;
+          const failure = { index: sourceIndex, file: c?.sourceFile || null, fileName: c?.sourceFile?.name || '', error };
+          failed.push(failure);
+          if (typeof options.onItemError === 'function') options.onItemError({ ...failure, item: c });
+        }
         compressionDone++;
         reportCompressionProgress();
-        results[idx] = result ? { ...result, sourceIndex: originalIndex } : null;
+        results[idx] = result ? { ...result, sourceIndex } : null;
       }
     }
   }
@@ -1572,7 +1618,7 @@ async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgre
 }
 
 export {
-  loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
+  loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, isImageUploadFile, getImageUploadCandidates, limitImageUploadSelection, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
   imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
   buildImageFingerprint, rememberKnownImageFingerprints, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,

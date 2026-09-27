@@ -32,7 +32,6 @@ import { fetchLinkPreview, useLinkPreview, shouldFetchLinkPreviewForChatUrl } fr
 import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from './app-chat-render.js';
 import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCategoryMarkerContent, buildPlaceMarkerHtml, panMapToFitMarkerPopup, centerMapOnMarkerAndPopup } from './app-place-map.js';
 import {
-  isHeicFile,
   buildMetadataTags,
   forgetPreprocessedImages,
   rememberKnownImageFingerprints,
@@ -41,7 +40,7 @@ import {
   uploadInlineChatImageToStorage, readClipboardImageFiles,
   migrateBase64ChatImagesForCalendar, backfillMeetingUploadSourcesForCalendar,
   resolveChatImageBatch, resolveMemoImageBatch, deleteAllChatImagesFromStorage,
-  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION
+  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION, limitImageUploadSelection
 } from './app-image-pipeline.js';
 import {
   computeKoreanHolidaysForYear,
@@ -2939,13 +2938,12 @@ function CalendarApp() {
   };
 
   const prepareGalleryImageUploads = async (files, title = '사진 업로드 준비 중...') => {
-    const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+    const { candidates: imageFiles, selected: limitedFiles, omittedCount } = limitImageUploadSelection(files);
     if (imageFiles.length === 0) {
       showToast('업로드할 이미지가 없습니다.', 'error');
       return [];
     }
-    const limitedFiles = imageFiles.slice(0, MAX_IMAGE_UPLOADS_PER_ACTION);
-    if (imageFiles.length > limitedFiles.length) showToast(`최대 ${MAX_IMAGE_UPLOADS_PER_ACTION}장까지 업로드됩니다.`, 'info');
+    if (omittedCount > 0) showToast(`이번에는 ${MAX_IMAGE_UPLOADS_PER_ACTION}장까지 업로드됩니다. ${omittedCount}장은 선택에서 제외되었습니다.`, 'info');
     setChatUploadProgress({ pct: 2, remainingSec: null, label: title, current: 0, total: limitedFiles.length });
     const { succeeded, failed } = await processImageFilesSequentially(limitedFiles, progress => {
       const total = Math.max(1, progress.total || limitedFiles.length);
@@ -3009,11 +3007,12 @@ function CalendarApp() {
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
         const messageOperationId = `gallery_${activeCal.id}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+        const savedCount = chunks.slice(0, i + 1).reduce((count, batch) => count + batch.length, 0);
         setChatUploadProgress({
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
           label: '갤러리 기록 저장 중...',
-          current: Math.min(resolvedImages.length, i + 1),
+          current: Math.min(resolvedImages.length, savedCount),
           total: resolvedImages.length
         });
         const messageData = {
@@ -4422,7 +4421,7 @@ function CalendarApp() {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
       }, { requireStorage: true, continueOnError: true });
       const failedCount = (resolvedImages.failed || []).length;
-      const failedFiles = (resolvedImages.failed || []).map(({ index }) => files?.[index]).filter(Boolean);
+      const failedFiles = (resolvedImages.failed || []).map(({ file, index }) => file || Array.from(files || [])[index]).filter(Boolean);
       const successfulImages = resolvedImages.filter(Boolean);
       if (successfulImages.length === 0) throw new Error('모든 일정 사진 업로드에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
       const chunks = chunkResolvedImagesForMessages(successfulImages);
@@ -4432,11 +4431,12 @@ function CalendarApp() {
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
         const messageOperationId = `meeting_${activeCal.id}_${dateStr}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+        const savedCount = chunks.slice(0, i + 1).reduce((count, batch) => count + batch.length, 0);
         setChatUploadProgress({
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
           label: '일정 사진 저장 중...',
-          current: Math.min(successfulImages.length, i + 1),
+          current: Math.min(successfulImages.length, savedCount),
           total: successfulImages.length
         });
         const messageData = {

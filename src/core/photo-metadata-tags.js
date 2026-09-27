@@ -61,8 +61,7 @@ const NOMINATIM_POI_KEYS = Object.freeze([
   'building', 'residential', 'apartments', 'house',
   'railway', 'station', 'subway', 'public_transport',
   'tourism', 'leisure', 'shop', 'office', 'historic',
-  'healthcare', 'hospital', 'clinic', 'place_of_worship',
-  'neighbourhood', 'quarter'
+  'healthcare', 'hospital', 'clinic', 'place_of_worship'
 ]);
 
 const GENERIC_POI_NAMES = new Set([
@@ -222,7 +221,7 @@ export function buildLocationHashtags(address = {}, displayName = '', extraName 
   const sido = normalizeKoreaSido(a.province || a.state || '');
   const sigungu = normalizeKoreaSigungu(a.city || a.county || a.municipality || '');
   const district = String(a.city_district || a.borough || a.district || '').trim();
-  const dong = String(a.suburb || a.quarter || a.neighbourhood || a.town || '').trim();
+  const dong = String(a.suburb || a.quarter || a.neighbourhood || a.town || a.village || '').trim();
 
   const poiCandidates = [];
   const topName = stripMarketingSuffix(extraName || displayName || a.name || '');
@@ -250,7 +249,15 @@ export function buildLocationHashtags(address = {}, displayName = '', extraName 
 
   if (uniquePoi[0]) addTag(tags, uniquePoi[0]);
 
-  if (isKorea && (sido || sigungu)) {
+  if (isKorea) {
+    // Keep Korean address units independently searchable.  The previous compact-only form
+    // (`#경기도파주시`) discarded 읍·면·동 and made a Google Photos image impossible to find by
+    // a natural tag such as `#문산읍`.  Retain the old combined region as a compatibility tag
+    // after the individual units, so existing saved searches continue to match as well.
+    [sido, sigungu, dong].forEach(unit => {
+      const clean = compactHashtagToken(unit);
+      if (clean && clean.length >= 2) addTag(tags, unit);
+    });
     const admin = compactHashtagToken(`${sido}${sigungu === sido ? '' : sigungu}`);
     if (admin && admin.length >= 3) addTag(tags, admin);
   } else if (!isKorea) {
@@ -258,14 +265,14 @@ export function buildLocationHashtags(address = {}, displayName = '', extraName 
     if (foreign) addTag(tags, foreign);
   }
 
-  if (tags.length < 2 && dong && !/동$|구$/.test(compactHashtagToken(uniquePoi[0] || ''))) {
+  if (!isKorea && tags.length < 2 && dong && !/동$|구$/.test(compactHashtagToken(uniquePoi[0] || ''))) {
     const dongTag = compactHashtagToken(dong);
     if (dongTag && dongTag.length >= 2) addTag(tags, dong);
   } else if (tags.length < 2 && district) {
     addTag(tags, district);
   }
 
-  return tags.slice(0, 3);
+  return tags.slice(0, 5);
 }
 
 function finalizeLocation(address, displayName, extraName) {
@@ -281,13 +288,14 @@ function finalizeLocation(address, displayName, extraName) {
     poi: stripMarketingSuffix(extraName || displayName || address.school || address.building || ''),
     station: stripMarketingSuffix(address.railway || address.station || address.subway || ''),
     sido: normalizeKoreaSido(address.province || address.state || ''),
-    sigungu: normalizeKoreaSigungu(address.city || address.county || address.municipality || '')
+    sigungu: normalizeKoreaSigungu(address.city || address.county || address.municipality || ''),
+    dong: String(address.suburb || address.quarter || address.neighbourhood || address.town || address.village || '').trim()
   };
 }
 
 export function parseNominatimLocation(payload) {
   if (!payload || typeof payload !== 'object') {
-    return { location: '', locationTags: [], poi: '', station: '', sido: '', sigungu: '' };
+    return { location: '', locationTags: [], poi: '', station: '', sido: '', sigungu: '', dong: '' };
   }
   const address = payload.address || {};
   const displayName = String(payload.name || payload.namedetails?.name || '').trim()
@@ -306,7 +314,7 @@ function parseKakaoAddressName(addressName) {
 
 export function parseKakaoAddress(doc) {
   if (!doc || typeof doc !== 'object') {
-    return { location: '', locationTags: [], poi: '', station: '', sido: '', sigungu: '' };
+    return { location: '', locationTags: [], poi: '', station: '', sido: '', sigungu: '', dong: '' };
   }
 
   if (doc.place_name) {
@@ -349,11 +357,13 @@ export function mergeLocationResults(primary = null, secondary = null) {
   const station = a.station || b.station || '';
   const sido = a.sido || b.sido || '';
   const sigungu = a.sigungu || b.sigungu || '';
-  if (poi || station || sido || sigungu) {
+  const dong = a.dong || b.dong || '';
+  if (poi || station || sido || sigungu || dong) {
     const address = {
       country: sido || sigungu ? '대한민국' : '',
       province: sido,
       city: sigungu,
+      suburb: dong,
       railway: station,
       building: poi
     };
@@ -365,11 +375,12 @@ export function mergeLocationResults(primary = null, secondary = null) {
   [...(a.locationTags || []), ...(b.locationTags || [])].forEach(tag => addTag(tags, tag));
   return {
     location: tags.map(tag => tag.replace(/^#/, '')).join(' ').slice(0, 80),
-    locationTags: tags.slice(0, 3),
+    locationTags: tags.slice(0, 5),
     poi,
     station,
     sido,
-    sigungu
+    sigungu,
+    dong
   };
 }
 
