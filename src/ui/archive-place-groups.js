@@ -158,3 +158,22 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
     unclassifiedCount: unclassified.reduce((sum, bucket) => sum + bucket.photos.length, 0)
   };
 }
+
+// 분류 필요 → 장소 일괄 지정: the tag a place is filed under (photoMatchesPlaceTag matches it
+// exactly), e.g. "예당호 출렁다리" → "예당호출렁다리". Uses the alias when the place has one.
+export function placeTagToken(place) {
+  return String(place?.alias || place?.name || '').replace(/[\s#,]+/g, '').slice(0, 30);
+}
+
+const MAX_PHOTO_TAGS = 10; // app-image-tag-save.js keeps the first 10 tokens
+
+// Adds the place tag in front of a photo's tags. Never drops a tag the photo already has: a photo
+// that is already at the tag limit is reported as `full` instead of saved.
+export function withPlaceTag(tagsText, place) {
+  const token = placeTagToken(place);
+  const tokens = Array.from(new Set(String(tagsText || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)));
+  if (!token) return { status: 'invalid', tags: tokens.join(' ') };
+  if (photoMatchesPlaceTag({ tags: tokens.join(' ') }, place)) return { status: 'already', tags: tokens.join(' ') };
+  if (tokens.length >= MAX_PHOTO_TAGS) return { status: 'full', tags: tokens.join(' ') };
+  return { status: 'add', tags: [token, ...tokens].join(' ') };
+}

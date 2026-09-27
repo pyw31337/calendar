@@ -68,3 +68,15 @@ test('GPS position files a photo under the nearest registered place, even withou
   assert.deepEqual(byId.g2, ['far'], 'no nearby place: falls back to the date rule');
   assert.equal(groups.find(g => g.place.id === 'g1').byGeo, 1);
 });
+
+test('withPlaceTag prepends the place tag and never drops existing tags', async () => {
+  const { withPlaceTag, placeTagToken } = await import('../src/ui/archive-place-groups.js');
+  const place = { name: '예당호 출렁다리', alias: '' };
+  assert.equal(placeTagToken(place), '예당호출렁다리');
+  assert.deepEqual(withPlaceTag('#260920 서준', place), { status: 'add', tags: '예당호출렁다리 260920 서준' });
+  assert.equal(withPlaceTag('예당호출렁다리야경 260920', place).status, 'already');
+  const ten = Array.from({ length: 10 }, (_, i) => `t${i}`).join(' ');
+  assert.deepEqual(withPlaceTag(ten, place), { status: 'full', tags: ten });
+  assert.equal(withPlaceTag('x', { name: '' }).status, 'invalid');
+  assert.equal(placeTagToken({ name: '서울랜드', alias: '서랜' }), '서랜');
+});

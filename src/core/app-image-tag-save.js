@@ -89,13 +89,15 @@ export function createImageTagSaveHandler(context) {
       if (meta.sourceMessageId && sourceIndex != null) {
         return handleSaveImageTags(meta.sourceMessageId, sourceIndex, tagsText, {
           source: 'chat', imageUrl: meta.imageUrl || meta.full || '', thumb: meta.thumb || meta.thumbUrl || '',
-          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || ''
+          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || '',
+          readFresh: meta.readFresh, silent: meta.silent
         });
       }
       if (messageId && requestedIndex != null && !meta.meetingDate) {
         return handleSaveImageTags(messageId, requestedIndex, tagsText, {
           source: 'chat', imageUrl: meta.imageUrl || meta.full || '', thumb: meta.thumb || meta.thumbUrl || '',
-          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || ''
+          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || '',
+          readFresh: meta.readFresh, silent: meta.silent
         });
       }
       return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
@@ -125,7 +127,7 @@ export function createImageTagSaveHandler(context) {
         patchGalleryArchiveMemo(memoId, { imageTags, imageTagMap: nextMap });
         patchIndex(memoId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || assetKey });
         await writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags);
-        showToast('태그 저장완료', 'success');
+        if (!meta?.silent) showToast('태그 저장완료', 'success');
         return true;
       } catch (err) {
         console.error('Memo image tag save failed:', err);
@@ -134,7 +136,10 @@ export function createImageTagSaveHandler(context) {
       }
     }
     if (!messageId || requestedIndex == null) return sourceMissing();
-    let message = (chatMessages || []).find(item => item.id === messageId);
+    // readFresh (보관함 > 장소 bulk assignment): several photos of one message are saved back to
+    // back, and the loaded chat window would still hold the message from before the previous save
+    // -- rebuilding imageTags from it would undo that save. Read the stored document instead.
+    let message = meta?.readFresh ? null : (chatMessages || []).find(item => item.id === messageId);
     if (!message) {
       try {
         if (firebaseDb) {
@@ -209,7 +214,7 @@ export function createImageTagSaveHandler(context) {
       catch (err) { console.warn('Image tag date link skipped:', err); showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000); }
     }
     patchIndex(messageId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || getPhotoAssetCommentKey(entry) }, direct);
-    showToast('태그 저장완료', 'success');
+    if (!meta?.silent) showToast('태그 저장완료', 'success');
     return true;
   };
 }

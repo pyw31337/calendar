@@ -9,9 +9,19 @@ import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
-import { buildPlacePhotoGroups, orderCoverPhotos } from './archive-place-groups.js';
+import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken } from './archive-place-groups.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
+// The per-photo fields the lightbox (and its tag save) needs, shared with 장소 일괄 지정.
+const toArchiveLightboxMeta = p => ({
+  timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
+  tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+  anniversaryId: p.anniversaryId,
+  meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
+  sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey,
+  legacyKeys: p.legacyKeys
+});
+const archivePhotoSelectKey = (photo, idx) => String(photo?.mediaKey || photo?.refKey || photo?.assetKey || `${photo?.messageId || ''}:${photo?.imageIndex ?? idx}`);
 
 function ArchivePhotoThumb({ photo }) {
   const React = window.React;
@@ -1836,21 +1846,95 @@ export function HistoryView({
     if (selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY && !selectedPlaceGroup) setSelectedPlaceKey(null);
     if (selectedPlaceKey === PLACE_UNCLASSIFIED_KEY && !placePhotoGroups.unclassifiedCount) setSelectedPlaceKey(null);
   }, [selectedPlaceKey, selectedPlaceGroup, placePhotoGroups.unclassifiedCount]);
+  // 분류 필요 → 장소 일괄 지정: select photos, then pick one of the day's candidate places; each
+  // selected photo gets "#장소이름" added through the regular per-photo tag save.
+  const [placeSelectMode, setPlaceSelectMode] = React.useState(false);
+  const [placeSelectedKeys, setPlaceSelectedKeys] = React.useState(() => new Set());
+  const [placeAssignProgress, setPlaceAssignProgress] = React.useState(null);
+  const saveImageTagsRef = React.useRef(onSaveImageTags);
+  saveImageTagsRef.current = onSaveImageTags;
+  React.useEffect(() => {
+    if (selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY) { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }
+  }, [selectedPlaceKey]);
+  const togglePlaceSelectedKey = key => setPlaceSelectedKeys(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const unclassifiedPhotoByKey = React.useMemo(() => {
+    const map = new Map();
+    placePhotoGroups.unclassified.forEach(bucket => bucket.photos.forEach((photo, idx) => map.set(archivePhotoSelectKey(photo, idx), photo)));
+    return map;
+  }, [placePhotoGroups.unclassified]);
+  const selectedCandidatePlaces = React.useMemo(() => {
+    const byId = new Map();
+    placePhotoGroups.unclassified.forEach(bucket => {
+      if (!bucket.photos.some((photo, idx) => placeSelectedKeys.has(archivePhotoSelectKey(photo, idx)))) return;
+      bucket.candidates.forEach(place => byId.set(place.id || place.name, place));
+    });
+    return Array.from(byId.values());
+  }, [placePhotoGroups.unclassified, placeSelectedKeys]);
+  const assignSelectedPhotosToPlace = async place => {
+    const photos = Array.from(placeSelectedKeys).map(key => unclassifiedPhotoByKey.get(key)).filter(Boolean);
+    if (!photos.length || typeof saveImageTagsRef.current !== 'function' || placeAssignProgress) return;
+    const counts = { done: 0, full: 0, failed: 0 };
+    // Let React re-render between saves so the next call uses a handler built from the state the
+    // previous save just patched (memo/meeting paths read local state; chat reads the stored doc).
+    const nextFrame = () => new Promise(resolve => setTimeout(resolve, 60));
+    for (let i = 0; i < photos.length; i += 1) {
+      setPlaceAssignProgress({ current: i + 1, total: photos.length, label: placeTagToken(place) });
+      const photo = photos[i];
+      const next = withPlaceTag(photo.tags, place);
+      if (next.status === 'already') { counts.done += 1; continue; }
+      if (next.status !== 'add') { counts.full += 1; continue; }
+      await nextFrame();
+      let ok = false;
+      try {
+        ok = await saveImageTagsRef.current(photo.messageId, photo.imageIndex, next.tags, {
+          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', readFresh: true, silent: true
+        });
+      } catch (err) {
+        console.warn('Place bulk tag save failed:', err);
+      }
+      if (ok) counts.done += 1; else counts.failed += 1;
+    }
+    setPlaceAssignProgress(null);
+    setPlaceSelectedKeys(new Set());
+    setPlaceSelectMode(false);
+    const parts = [`${counts.done}장을 #${placeTagToken(place)}(으)로 옮겼어요.`];
+    if (counts.full) parts.push(`${counts.full}장은 태그가 10개라 건너뛰었어요.`);
+    if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
+    showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
+  };
   // Same photo cell as the 인물 detail grid (comment badge + heartbeat), for the 장소 tab.
-  const renderArchivePhotoGrid = (photos, keyPrefix) => /*#__PURE__*/React.createElement("div", {
+  const renderArchivePhotoGrid = (photos, keyPrefix, selection = null) => /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
   }, photos.map((photo, idx) => {
     const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
     const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+    const selectKey = selection ? archivePhotoSelectKey(photo, idx) : '';
+    const isSelected = !!selection && selection.keys.has(selectKey);
     return /*#__PURE__*/React.createElement("button", {
       key: photo.mediaKey || photo.refKey || `${keyPrefix}_${idx}`,
       type: "button",
       className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
-      onClick: () => openHistoryLightbox(photos, idx),
-      style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
+      onClick: () => selection ? selection.onToggle(selectKey) : openHistoryLightbox(photos, idx),
+      "aria-pressed": selection ? isSelected : undefined,
+      style: {
+        position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s`,
+        outline: isSelected ? '3px solid var(--brand, #7C3AED)' : 'none', outlineOffset: '-3px'
+      }
     },
       /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
-      PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
+      PhotoCommentCountBadge && !selection && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
+      selection && /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true",
+        style: {
+          position: 'absolute', top: '6px', right: '6px', width: '22px', height: '22px', borderRadius: '50%', zIndex: 3,
+          border: '2px solid #fff', background: isSelected ? 'var(--brand, #7C3AED)' : 'rgba(15,23,42,0.35)',
+          color: 'var(--on-brand, #fff)', fontSize: '13px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }
+      }, isSelected ? '✓' : '')
     );
   }));
   // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
@@ -1862,14 +1946,7 @@ export function HistoryView({
   const openHistoryLightbox = (photos, index, memoryId = null) => {
     const urls = photos.map(p => p.full || p.thumb).filter(Boolean);
     if (urls.length === 0) return;
-    const meta = photos.map(p => ({
-      timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
-      tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
-      anniversaryId: p.anniversaryId,
-      meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
-      sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey,
-      legacyKeys: p.legacyKeys
-    }));
+    const meta = photos.map(toArchiveLightboxMeta);
     setHistoryLightbox({ urls, index, meta, memoryId });
   };
   // 추억 탭: 날짜(startDate/date)가 등록된 기념일이면 카테고리와 상관없이, 그 기간에 등록된
@@ -2772,17 +2849,78 @@ export function HistoryView({
       selectedPlaceGroup
         ? renderArchivePhotoGrid(selectedPlaceGroup.photos, 'place')
         : /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
-              "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 사진을 열고 #장소이름 태그를 달면 그 장소로 옮겨져요."),
-            placePhotoGroups.unclassified.map(bucket => /*#__PURE__*/React.createElement("div", {
-              key: bucket.date, style: { display: 'flex', flexDirection: 'column', gap: '6px' }
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px' } },
+              /*#__PURE__*/React.createElement("div", { style: { flex: 1, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+                placeSelectMode
+                  ? "옮길 사진을 고른 뒤 아래에서 장소를 누르세요. 그 장소 이름 태그가 붙어요."
+                  : "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. '여러 장 선택'으로 한 번에 장소를 지정하거나, 사진을 열고 #장소이름 태그를 달아 주세요."),
+              typeof onSaveImageTags === 'function' && /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "v2-archive-place-select-toggle",
+                disabled: !!placeAssignProgress,
+                onClick: () => { setPlaceSelectMode(mode => !mode); setPlaceSelectedKeys(new Set()); },
+                style: {
+                  flexShrink: 0, minHeight: '32px', padding: '0 12px', borderRadius: '999px', border: '1px solid var(--border-color)',
+                  background: placeSelectMode ? 'var(--brand, #7C3AED)' : 'var(--bg-secondary)', color: placeSelectMode ? 'var(--on-brand, #fff)' : 'var(--text-main)',
+                  fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer'
+                }
+              }, placeSelectMode ? '선택 취소' : '여러 장 선택')
+            ),
+            placePhotoGroups.unclassified.map(bucket => {
+              const bucketKeys = bucket.photos.map((photo, idx) => archivePhotoSelectKey(photo, idx));
+              const allSelected = bucketKeys.length > 0 && bucketKeys.every(key => placeSelectedKeys.has(key));
+              return /*#__PURE__*/React.createElement("div", {
+                key: bucket.date, style: { display: 'flex', flexDirection: 'column', gap: '6px' }
+              },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                  /*#__PURE__*/React.createElement("div", { style: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)' } },
+                    `${formatHistoryDate(bucket.date) || bucket.date} · ${bucket.photos.length}장`),
+                  placeSelectMode && /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => setPlaceSelectedKeys(prev => {
+                      const next = new Set(prev);
+                      bucketKeys.forEach(key => { if (allSelected) next.delete(key); else next.add(key); });
+                      return next;
+                    }),
+                    style: { border: 'none', background: 'transparent', color: 'var(--brand, #7C3AED)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', padding: '4px 0' }
+                  }, allSelected ? '이 날 선택 해제' : '이 날 전체 선택')
+                ),
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+                  `후보: ${bucket.candidates.map(place => `#${placeTagToken(place)}`).join(' ')}`),
+                renderArchivePhotoGrid(bucket.photos, `unclassified_${bucket.date}`,
+                  placeSelectMode ? { keys: placeSelectedKeys, onToggle: togglePlaceSelectedKey } : null)
+              );
+            }),
+            placeSelectMode && /*#__PURE__*/React.createElement("div", {
+              className: "v2-archive-place-assign-bar",
+              role: "region",
+              "aria-label": "선택한 사진 장소 지정",
+              style: {
+                position: 'sticky', bottom: 'calc(8px + env(safe-area-inset-bottom, 0px))', zIndex: 5,
+                display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', borderRadius: 'var(--radius-md, 14px)',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', boxShadow: '0 6px 20px rgba(0,0,0,0.18)'
+              }
             },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)' } },
-                `${formatHistoryDate(bucket.date) || bucket.date} · ${bucket.photos.length}장`),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-                `후보: ${bucket.candidates.map(place => `#${String(place.alias || place.name).replace(/\s+/g, '')}`).join(' ')}`),
-              renderArchivePhotoGrid(bucket.photos, `unclassified_${bucket.date}`)
-            ))
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: 'var(--text-main)' } },
+                placeAssignProgress
+                  ? `#${placeAssignProgress.label}(으)로 옮기는 중… ${placeAssignProgress.current}/${placeAssignProgress.total}`
+                  : placeSelectedKeys.size ? `${placeSelectedKeys.size}장 선택 · 어느 장소 사진인가요?` : '사진을 골라 주세요'),
+              !placeAssignProgress && placeSelectedKeys.size > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+                selectedCandidatePlaces.map(place => /*#__PURE__*/React.createElement("button", {
+                  key: place.id || place.name,
+                  type: "button",
+                  onClick: () => {
+                    const run = () => { void assignSelectedPhotosToPlace(place); };
+                    if (typeof onRequestConfirm === 'function') onRequestConfirm('장소 지정', `선택한 ${placeSelectedKeys.size}장에 #${placeTagToken(place)} 태그를 붙일까요?`, run);
+                    else run();
+                  },
+                  style: {
+                    minHeight: '32px', padding: '0 12px', borderRadius: '999px', border: 'none', cursor: 'pointer',
+                    background: 'var(--brand, #7C3AED)', color: 'var(--on-brand, #fff)', fontSize: 'var(--font-size-xs)', fontWeight: 800
+                  }
+                }, `#${placeTagToken(place)}`))
+              )
+            )
           )
     )),
 
