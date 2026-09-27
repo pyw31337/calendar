@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '44897540ad0164038a5fbf1130f35f6f2a771111';
+const BUILD_SHA = '7d10348c5a0718f9459748a5a50eaf4e27f6214d';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -77,7 +77,7 @@ self.addEventListener('fetch', event => {
     || req.url.endsWith('/index.html')
     || (accept.includes('text/html') && (req.url.endsWith('/calendar/') || req.url.endsWith('/calendar')));
   if (isDocument) {
-    event.respondWith(fetch(req, { cache: 'no-store' }).catch(() => Response.error()));
+    event.respondWith(fetchFreshDocument(req));
     return;
   }
 
@@ -148,6 +148,34 @@ self.addEventListener('fetch', event => {
     }
   })());
 });
+
+// A home-screen web clip can retain an app/<id>/ URL from an interrupted deploy or an older
+// manifest.  If that document path is temporarily unavailable, retry the canonical root page
+// for the same calendar instead of surfacing Safari's opaque "cannot connect" screen. The root
+// page has the same boot bundle and preserves the id query parameter, so this is a safe fallback
+// for the legacy installed apps while normal app-scoped paths keep their preferred response.
+async function fetchFreshDocument(req) {
+  try {
+    const response = await fetch(req, { cache: 'no-store' });
+    if (response && response.ok) return response;
+    throw new Error(`document status ${response?.status || 0}`);
+  } catch (_) {
+    try {
+      const url = new URL(req.url);
+      const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)\/?$/);
+      if (!appPath) return Response.error();
+      const fallback = new URL(`${appPath[1]}/`, url.origin);
+      fallback.search = url.search;
+      if (!fallback.searchParams.get('id') && !fallback.searchParams.get('cal')) {
+        fallback.searchParams.set('id', appPath[2]);
+      }
+      const response = await fetch(fallback.toString(), { cache: 'no-store' });
+      return response?.ok ? response : Response.error();
+    } catch (_) {
+      return Response.error();
+    }
+  }
+}
 
 function isCacheableStorageMedia(req, url) {
   // Range requests (video/audio seeking) stream partial content -- leave them to the network.
