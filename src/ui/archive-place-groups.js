@@ -63,9 +63,30 @@ function isScheduleUpload(photo) {
   return String(photo?.uploadSource || photo?.source || '').toLowerCase() === 'meeting';
 }
 
+function coverPhotoTimestamp(photo) {
+  const raw = photo?.timestamp ?? photo?.updatedAt ?? photo?.createdAt ?? 0;
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return numeric;
+  const parsed = Date.parse(String(raw || ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function coverPhotoIdentity(photo, index) {
+  return String(photo?.assetKey || photo?.mediaKey || photo?.refKey || photo?.full || photo?.thumb || photo?.id || index);
+}
+
 export function orderCoverPhotos(photos) {
   const list = Array.isArray(photos) ? photos : [];
-  return [...list.filter(isLikelyCameraPhoto), ...list.filter(photo => !isLikelyCameraPhoto(photo))];
+  // Covers must not depend on the arrival order of a REST page or a Cloud Function fan-out.
+  // A camera image remains preferred to a screenshot, then the newest timestamp and immutable
+  // asset key make every repeat visit select exactly the same cover until photos truly change.
+  return list.slice().sort((a, b) => {
+    const cameraDelta = Number(isLikelyCameraPhoto(b)) - Number(isLikelyCameraPhoto(a));
+    if (cameraDelta) return cameraDelta;
+    const timeDelta = coverPhotoTimestamp(b) - coverPhotoTimestamp(a);
+    if (timeDelta) return timeDelta;
+    return coverPhotoIdentity(a, 0).localeCompare(coverPhotoIdentity(b, 0));
+  });
 }
 
 function placeKey(place, index) {
@@ -150,6 +171,7 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
 
   const nonEmpty = groups
     .filter(group => group.photos.length)
+    .map(group => ({ ...group, photos: orderCoverPhotos(group.photos) }))
     .sort((a, b) => (b.lastDate.localeCompare(a.lastDate)) || (b.photos.length - a.photos.length));
   const unclassified = Array.from(unclassifiedByDate.values()).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   return {

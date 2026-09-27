@@ -248,6 +248,14 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A server-maintained revision for the canonical photo index. Clients may read this one
+      // small document to validate their local metadata cache, but can never forge freshness or
+      // invalidate another device's cache by writing it themselves.
+      match /photoIndexMeta/{metaId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
       // Web Push subscriptions. Allows browsers to register their endpoints for offline/background
       // pushes -- write-only from the client (index.html never reads this collection, only
       // .set()/.delete()). Actually sending a push is done server-side via the Admin SDK in

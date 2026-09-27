@@ -1,21 +1,32 @@
+import {
+  clearPhotoIndexPersistentEntries,
+  readPhotoIndexPersistentEntry,
+  writePhotoIndexPersistentEntry
+} from './photo-index-persistent-cache.js';
+
 const PAGE_SIZE = 100;
 const pageCache = new Map();
 const countCache = new Map();
 const countRequests = new Map();
 const REQUEST_TIMEOUT_MS = 8000;
 const CACHE_TTL_MS = 2 * 60 * 1000;
+const SUMMARY_CACHE_TTL_MS = 45 * 1000;
+const PHOTO_INDEX_CACHE_KIND_PAGE = 'page';
+const PHOTO_INDEX_CACHE_KIND_TOTAL = 'gallery-total';
+const summaryCache = new Map();
 
-function cacheId(calendarId, page) {
-  return `${calendarId}:${page}`;
+function cacheId(calendarId, page, revision = '') {
+  return `${calendarId}:${normalizeCacheRevision(revision) || 'live'}:${page}`;
 }
 
-async function fetchJsonWithRetry(url, init, attempts = 2) {
+async function fetchJsonWithRetry(url, init, attempts = 2, { allowNotFound = false } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS) : null;
     try {
       const response = await fetch(url, { ...init, ...(controller ? { signal: controller.signal } : {}) });
+      if (allowNotFound && response.status === 404) return null;
       if (!response.ok) throw new Error(`photo index request failed: ${response.status}`);
       return await response.json();
     } catch (error) {
@@ -26,6 +37,46 @@ async function fetchJsonWithRetry(url, init, attempts = 2) {
     }
   }
   throw lastError || new Error('photo index request failed');
+}
+
+function readFirestoreNumber(fields, fieldName) {
+  const value = fields?.[fieldName];
+  const number = value?.integerValue ?? value?.doubleValue;
+  return Number.isFinite(Number(number)) ? Number(number) : 0;
+}
+
+function photoIndexSummaryUrl(calendarId, projectId) {
+  return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/calendars/cal_${calendarId}/photoIndexMeta/summary`;
+}
+
+// A summary revision is written once for each source-document photo mutation by the Cloud
+// Function. It is deliberately a tiny point read: it lets a persisted page remain valid for
+// weeks without allowing an old gallery snapshot to masquerade as current collaborative data.
+export async function fetchPhotoIndexSummary({ calendarId, projectId, force = false } = {}) {
+  if (!calendarId || !projectId) return { version: '', updatedAt: 0, exists: false };
+  const key = `${projectId}:${calendarId}`;
+  const cached = summaryCache.get(key);
+  if (!force && cached && Date.now() - cached.savedAt < SUMMARY_CACHE_TTL_MS) return cached.value;
+  const document = await fetchJsonWithRetry(
+    photoIndexSummaryUrl(calendarId, projectId),
+    { method: 'GET', headers: { Accept: 'application/json' } },
+    2,
+    { allowNotFound: true }
+  );
+  const value = document
+    ? {
+        version: String(readFirestoreNumber(document.fields, 'revision') || ''),
+        updatedAt: readFirestoreNumber(document.fields, 'updatedAt'),
+        exists: true
+      }
+    : { version: '', updatedAt: 0, exists: false };
+  summaryCache.set(key, { savedAt: Date.now(), value });
+  return value;
+}
+
+function normalizeCacheRevision(value) {
+  const revision = String(value || '').trim();
+  return revision && revision !== '0' ? revision : '';
 }
 
 function isGalleryContentPosterRow(item) {
@@ -65,12 +116,27 @@ async function fetchPhotoIndexAggregationCount({ calendarId, projectId, sourceEq
   return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
-export async function fetchPhotoIndexCount({ calendarId, projectId }) {
-  const key = `${projectId}:${calendarId}`;
+export async function fetchPhotoIndexCount({ calendarId, projectId, cacheRevision = '' }) {
+  const revision = normalizeCacheRevision(cacheRevision);
+  const key = `${projectId}:${calendarId}:${revision || 'live'}`;
   const cached = countCache.get(key);
   if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.value;
   if (countRequests.has(key)) return countRequests.get(key);
   const request = (async () => {
+    // A server-issued revision proves that this cached aggregate matches the canonical index.
+    // Use it before hitting two aggregation endpoints (total and content-poster count) again.
+    if (revision) {
+      const persisted = await readPhotoIndexPersistentEntry({
+        calendarId,
+        revision,
+        kind: PHOTO_INDEX_CACHE_KIND_TOTAL
+      });
+      if (Number.isFinite(Number(persisted)) && Number(persisted) >= 0) {
+        const value = Number(persisted);
+        countCache.set(key, { savedAt: Date.now(), value });
+        return value;
+      }
+    }
     // Movie/sports content posters are indexed as source=anniversary; gallery 사진 must omit them.
     const [total, anniversaryTotal] = await Promise.all([
       fetchPhotoIndexAggregationCount({ calendarId, projectId }),
@@ -78,6 +144,12 @@ export async function fetchPhotoIndexCount({ calendarId, projectId }) {
     ]);
     const value = Math.max(0, total - anniversaryTotal);
     countCache.set(key, { savedAt: Date.now(), value });
+    if (revision) void writePhotoIndexPersistentEntry({
+      calendarId,
+      revision,
+      kind: PHOTO_INDEX_CACHE_KIND_TOTAL,
+      value
+    });
     return value;
   })();
   countRequests.set(key, request);
@@ -94,9 +166,10 @@ export async function fetchPhotoIndexCount({ calendarId, projectId }) {
 export async function verifyGalleryPhotoIndexTotals({
   calendarId,
   projectId,
-  expectedGalleryCount = null
+  expectedGalleryCount = null,
+  cacheRevision = ''
 } = {}) {
-  const indexedGalleryCount = await fetchPhotoIndexCount({ calendarId, projectId });
+  const indexedGalleryCount = await fetchPhotoIndexCount({ calendarId, projectId, cacheRevision });
   const expected = expectedGalleryCount == null ? null : Number(expectedGalleryCount);
   const hasExpected = Number.isFinite(expected);
   return {
@@ -179,36 +252,57 @@ async function runPhotoIndexQuery({ calendarId, projectId, structuredQuery }) {
 }
 
 // Store raw rows as consecutive PAGE_SIZE pages starting at firstPage, seeding each next cursor.
-function rememberPhotoIndexPages(calendarId, firstPage, rows, decodeDocument) {
+function rememberPhotoIndexPages(calendarId, firstPage, rows, decodeDocument, cacheRevision = '') {
+  const revision = normalizeCacheRevision(cacheRevision);
   const chunks = [];
   for (let index = 0; index < rows.length; index += PAGE_SIZE) chunks.push(rows.slice(index, index + PAGE_SIZE));
   if (!chunks.length) chunks.push([]);
   return chunks.map((pageRows, offset) => {
     const page = firstPage + offset;
     const items = filterGalleryPhotoIndexItems(pageRows.map(row => mapPhotoIndexRow(row, decodeDocument)));
-    pageCache.set(cacheId(calendarId, page), { savedAt: Date.now(), items });
+    pageCache.set(cacheId(calendarId, page, revision), { savedAt: Date.now(), items });
+    if (revision) void writePhotoIndexPersistentEntry({
+      calendarId,
+      revision,
+      kind: PHOTO_INDEX_CACHE_KIND_PAGE,
+      page,
+      value: items
+    });
     const next = pageRows.length === PAGE_SIZE ? cursorAfterRow(pageRows[pageRows.length - 1]) : null;
-    if (next) cursorCache.set(cacheId(calendarId, page + 1), next);
+    if (next) cursorCache.set(cacheId(calendarId, page + 1, revision), next);
     return items;
   });
 }
 
-export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, decodeDocument, force = false }) {
+export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, decodeDocument, force = false, cacheRevision = '' }) {
   const safePage = Math.max(1, Number(page) || 1);
-  const key = cacheId(calendarId, safePage);
+  const revision = normalizeCacheRevision(cacheRevision);
+  const key = cacheId(calendarId, safePage, revision);
   const cached = pageCache.get(key);
   if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
+  if (!force && revision) {
+    const persisted = await readPhotoIndexPersistentEntry({
+      calendarId,
+      revision,
+      kind: PHOTO_INDEX_CACHE_KIND_PAGE,
+      page: safePage
+    });
+    if (Array.isArray(persisted)) {
+      pageCache.set(key, { savedAt: Date.now(), items: persisted });
+      return persisted;
+    }
+  }
   const cursor = safePage > 1 ? cursorCache.get(key) || null : null;
   const rows = await runPhotoIndexQuery({
     calendarId,
     projectId,
     structuredQuery: buildPhotoIndexPageQuery({ cursor, offset: cursor ? 0 : (safePage - 1) * PAGE_SIZE })
   });
-  return rememberPhotoIndexPages(calendarId, safePage, rows, decodeDocument)[0];
+  return rememberPhotoIndexPages(calendarId, safePage, rows, decodeDocument, revision)[0];
 }
 
 // Every page of the calendar, walked with cursors in chunks of a few pages per request.
-export async function fetchAllPhotoIndexPages({ calendarId, projectId, pageCount, decodeDocument, pagesPerRequest = 3 }) {
+export async function fetchAllPhotoIndexPages({ calendarId, projectId, pageCount, decodeDocument, pagesPerRequest = 3, cacheRevision = '' }) {
   const all = [];
   let cursor = null;
   for (let page = 1; page <= pageCount; page += pagesPerRequest) {
@@ -218,7 +312,7 @@ export async function fetchAllPhotoIndexPages({ calendarId, projectId, pageCount
       projectId,
       structuredQuery: buildPhotoIndexPageQuery({ cursor, limit: count * PAGE_SIZE })
     });
-    all.push(...rememberPhotoIndexPages(calendarId, page, rows, decodeDocument));
+    all.push(...rememberPhotoIndexPages(calendarId, page, rows, decodeDocument, cacheRevision));
     if (rows.length < count * PAGE_SIZE) break;
     cursor = cursorAfterRow(rows[rows.length - 1]);
   }
@@ -226,8 +320,14 @@ export async function fetchAllPhotoIndexPages({ calendarId, projectId, pageCount
 }
 
 export function invalidatePhotoIndexCache(calendarId) {
+  if (!calendarId) return;
   for (const key of pageCache.keys()) if (key.startsWith(`${calendarId}:`)) pageCache.delete(key);
   for (const key of cursorCache.keys()) if (key.startsWith(`${calendarId}:`)) cursorCache.delete(key);
+  for (const key of countCache.keys()) if (key.includes(`:${calendarId}:`)) countCache.delete(key);
+  for (const key of summaryCache.keys()) if (key.endsWith(`:${calendarId}`)) summaryCache.delete(key);
+  // A verified local mutation may reach the index trigger slightly later. Do not reopen a
+  // stale persisted page during that window; the next server revision repopulates it safely.
+  void clearPhotoIndexPersistentEntries(calendarId);
 }
 
 // Client cannot write photoIndex (Firestore rules: write false). Tag saves land on messages/memos
@@ -407,9 +507,13 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     setState(previous => ({ ...previous, loading: true }));
     try {
       if (options.force) invalidatePhotoIndexCache(calendarId);
+      const summary = await fetchPhotoIndexSummary({ calendarId, projectId, force: Boolean(options.force) });
       const [items, total] = await Promise.all([
-        fetchPhotoIndexPage({ calendarId, projectId, page: requestedPage, decodeDocument, force: Boolean(options.force) }),
-        includeTotal ? fetchPhotoIndexCount({ calendarId, projectId }) : Promise.resolve(null)
+        fetchPhotoIndexPage({
+          calendarId, projectId, page: requestedPage, decodeDocument,
+          force: Boolean(options.force), cacheRevision: summary.version
+        }),
+        includeTotal ? fetchPhotoIndexCount({ calendarId, projectId, cacheRevision: summary.version }) : Promise.resolve(null)
       ]);
       setState(previous => {
         const merged = reconcilePhotoIndexTagItems(calendarId, previous.items, items);
@@ -437,7 +541,8 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     if (!calendarId) return false;
     setState(previous => ({ ...previous, loading: true }));
     try {
-      const total = await fetchPhotoIndexCount({ calendarId, projectId });
+      const summary = await fetchPhotoIndexSummary({ calendarId, projectId });
+      const total = await fetchPhotoIndexCount({ calendarId, projectId, cacheRevision: summary.version });
       if (total <= 0) {
         setState({ status: 'fallback', items: [], total: 0, page: 1, loading: false, complete: false });
         return false;
@@ -445,7 +550,9 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
       // Full hydration is reserved for an explicit search or month view. It is walked with cursors,
       // three pages per request, so the cost stays at one read per photo.
-      const pages = await fetchAllPhotoIndexPages({ calendarId, projectId, pageCount, decodeDocument });
+      const pages = await fetchAllPhotoIndexPages({
+        calendarId, projectId, pageCount, decodeDocument, cacheRevision: summary.version
+      });
       setState(previous => ({
         status: 'ready',
         items: reconcilePhotoIndexTagItems(

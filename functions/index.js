@@ -253,6 +253,20 @@ function selectPhotoIndexOwner(owners) {
     || Number(b.timestamp || 0) - Number(a.timestamp || 0))[0] || null;
 }
 
+// The client checks this tiny, server-only summary before accepting an IndexedDB photo-index
+// cache entry.  Increment once per changed source document (rather than once per photo row), so
+// a 200-photo upload produces four source-record bumps, not hundreds of contested writes.
+async function bumpPhotoIndexRevision(calendarDocId) {
+  if (!calendarDocId) return;
+  const summaryRef = admin.firestore()
+    .collection('calendars').doc(calendarDocId)
+    .collection('photoIndexMeta').doc('summary');
+  await summaryRef.set({
+    revision: admin.firestore.FieldValue.increment(1),
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const db = admin.firestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
@@ -319,6 +333,7 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       });
       await batch.commit();
     }
+    if (operations.length) await bumpPhotoIndexRevision(`cal_${calendarId}`);
   }
   const bySource = rows.reduce((acc, row) => {
     const key = String(row?.source || 'unknown');
@@ -356,6 +371,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
   // owners inside the canonical row prevents deleting one source from erasing the remaining
   // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
+  if (!touchedKeys.size) return false;
   await Promise.all(Array.from(touchedKeys).map(assetKey => db.runTransaction(async transaction => {
     const ref = indexRef.doc(assetKey);
     const snapshot = await transaction.get(ref);
@@ -396,6 +412,8 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       updatedAt: Date.now()
     });
   })));
+  await bumpPhotoIndexRevision(context.params.calendarDocId);
+  return true;
 }
 
 exports.onMessagePhotoIndexWrite = functions.firestore
