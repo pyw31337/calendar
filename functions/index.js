@@ -5,11 +5,12 @@ const admin = require('firebase-admin');
 const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
+const nodemailer = require('nodemailer');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
 const { MAX_BATCH_ITEMS, sanitizeAnalysisItem, summarize } = require('./media-analysis');
-const { buildBrief, isEmailDeliveryConfigured } = require('./media-analysis-brief');
+const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -18,7 +19,9 @@ const MEDIA_WORKER_TOKEN = defineSecret('MOYEORA_MEDIA_WORKER_TOKEN');
 // credential must never appear in the browser bundle, Git history, or a launchd plist.
 const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
 const MEDIA_BRIEF_FROM = defineSecret('MEDIA_BRIEF_FROM');
+const NAVER_SMTP_APP_PASSWORD = defineSecret('NAVER_SMTP_APP_PASSWORD');
 const MEDIA_BRIEF_RECIPIENT = 'pyw213@naver.com';
+const NAVER_SMTP_ACCOUNT = 'pyw213@naver.com';
 
 admin.initializeApp();
 
@@ -2502,7 +2505,7 @@ async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
       calendarDoc.ref.collection('mediaAnalysisWorkerState').doc('macos-vision-m2').get(),
       calendarDoc.ref.collection('mediaAnalysisRuns').doc(`macos_${calendarId}_${dateKey.replace(/-/g, '')}`).get()
     ]);
-    // A personal digest includes only calendars where the opted-in worker wrote a heartbeat or
+    // The service digest includes every calendar where the opted-in worker wrote a heartbeat or
     // run. Other shared/test calendars never leak into the recipient's morning email.
     if (!workerSnap.exists && !runSnap.exists) return null;
     const worker = workerSnap.data() || {};
@@ -2536,13 +2539,43 @@ async function sendResendMail({ apiKey, from, subject, html, text, idempotencyKe
   return String(payload.id);
 }
 
-// Four idempotent attempts during the weekday 08:00 hour. A response-loss after the provider
-// accepts a message cannot create duplicate email because every attempt uses the same
-// idempotency key, while Firestore records each state change for recovery.
+async function sendNaverSmtpMail({ account, appPassword, subject, html, text, dateKey }) {
+  const transport = nodemailer.createTransport({
+    host: 'smtp.naver.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user: account, pass: appPassword },
+    connectionTimeout: 20_000,
+    greetingTimeout: 20_000,
+    socketTimeout: 60_000,
+    tls: { minVersion: 'TLSv1.2' }
+  });
+  try {
+    const info = await transport.sendMail({
+      from: `모여라 캘린더 <${account}>`,
+      to: [MEDIA_BRIEF_RECIPIENT],
+      subject,
+      html,
+      text,
+      // SMTP has no provider-level idempotency API. A deterministic Message-ID allows mail
+      // clients and gateways to coalesce a retry caused by an interrupted response.
+      messageId: `<moyeora-media-brief-${String(dateKey).replace(/[^0-9]/g, '')}@moyeora-calendar.local>`,
+      headers: { 'X-Moyeora-Brief': String(dateKey) }
+    });
+    return String(info.messageId || info.response || 'smtp-accepted');
+  } finally {
+    transport.close();
+  }
+}
+
+// Four scheduled opportunities during the weekday 08:00 hour. Resend accepts the deterministic
+// idempotency key; SMTP receives a stable Message-ID, while Firestore records each state for
+// recovery and prevents all later scheduled slots after a confirmed send.
 exports.sendDailyMediaAnalysisBrief = functions.runWith({
   timeoutSeconds: 120,
   memory: '256MB',
-  secrets: [RESEND_API_KEY, MEDIA_BRIEF_FROM]
+  secrets: [RESEND_API_KEY, MEDIA_BRIEF_FROM, NAVER_SMTP_APP_PASSWORD]
 }).pubsub.schedule('0,15,30,45 8 * * 1-5').timeZone('Asia/Seoul').onRun(async () => {
   const now = Date.now();
   const dateKey = getKstDateKey(new Date(now));
@@ -2554,10 +2587,16 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
   const brief = buildBrief({ dateLabel: formatBriefDate(new Date(now)), calendars });
   const apiKey = String(process.env.RESEND_API_KEY || RESEND_API_KEY.value() || '').trim();
   const from = String(process.env.MEDIA_BRIEF_FROM || MEDIA_BRIEF_FROM.value() || '').trim();
-  // Keep producing an auditable server report while an email sender is awaiting domain
-  // verification. The next scheduled slot automatically resumes delivery once secrets are
-  // configured; this path deliberately makes no outbound request and does not throw.
-  if (!isEmailDeliveryConfigured({ apiKey, from })) {
+  const naverAppPassword = String(process.env.NAVER_SMTP_APP_PASSWORD || NAVER_SMTP_APP_PASSWORD.value() || '').trim();
+  const delivery = isEmailDeliveryConfigured({ apiKey, from })
+    ? { provider: 'resend' }
+    : isNaverSmtpConfigured({ account: NAVER_SMTP_ACCOUNT, appPassword: naverAppPassword })
+      ? { provider: 'naver-smtp' }
+      : null;
+  // Keep producing an auditable server report while an email sender is awaiting configuration.
+  // The next scheduled slot automatically resumes delivery once secrets are configured; this
+  // path deliberately makes no outbound request and does not throw.
+  if (!delivery) {
     await reportRef.set({
       kind: 'media-analysis-brief',
       dateKey,
@@ -2584,21 +2623,31 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
     generatedAt: now,
     calendarCount: calendars.length,
     summary: brief.total,
-    staleCount: brief.staleCount
+    staleCount: brief.staleCount,
+    provider: delivery.provider
   }, { merge: true });
   try {
-    const providerMessageId = await sendResendMail({
-      apiKey,
-      from,
-      subject: brief.subject,
-      html: brief.html,
-      text: brief.text,
-      idempotencyKey: `moyeora-media-brief-${dateKey}`
-    });
+    const providerMessageId = delivery.provider === 'resend'
+      ? await sendResendMail({
+        apiKey,
+        from,
+        subject: brief.subject,
+        html: brief.html,
+        text: brief.text,
+        idempotencyKey: `moyeora-media-brief-${dateKey}`
+      })
+      : await sendNaverSmtpMail({
+        account: NAVER_SMTP_ACCOUNT,
+        appPassword: naverAppPassword,
+        subject: brief.subject,
+        html: brief.html,
+        text: brief.text,
+        dateKey
+      });
     await reportRef.set({
       deliveryStatus: 'sent',
       sentAt: Date.now(),
-      provider: 'resend',
+      provider: delivery.provider,
       providerMessageId,
       lastError: admin.firestore.FieldValue.delete()
     }, { merge: true });

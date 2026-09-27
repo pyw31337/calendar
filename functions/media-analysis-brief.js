@@ -4,10 +4,18 @@ const ACTION_URL = 'https://pyw31337.github.io/calendar/?shell=v2&tab=gallery';
 
 // Keep provider credentials out of the browser and avoid treating deliberately empty Secret
 // Manager placeholders as a delivery failure. This lets the scheduled job leave a server-side
-// briefing audit trail until a verified sender is configured.
+// briefing audit trail until a sender is configured.
 function isEmailDeliveryConfigured({ apiKey, from } = {}) {
   return /^re_[A-Za-z0-9_-]{12,}$/.test(String(apiKey || '').trim())
     && /^.+<[^<>\s]+@[^<>\s]+>$/.test(String(from || '').trim());
+}
+
+// NAVER application passwords are exactly twelve upper-case alpha-numeric characters. Keep
+// this validation intentionally narrow so placeholders and regular account passwords can
+// never be used by the scheduled sender.
+function isNaverSmtpConfigured({ account, appPassword } = {}) {
+  return /^[^<>\s]+@naver\.com$/i.test(String(account || '').trim())
+    && /^[A-Z0-9]{12}$/.test(String(appPassword || '').trim());
 }
 
 function escapeHtml(value) {
@@ -29,7 +37,7 @@ function summaryValue(summary, key) {
 
 function makeText(brief) {
   const lines = [
-    `모아엘가 AI 분석 브리핑 · ${brief.dateLabel}`,
+    `모여라 캘린더 AI 분석 브리핑 · ${brief.dateLabel}`,
     `분석 추천 ${brief.total.suggested}건 · 오류 ${brief.total.failed}건 · 활성 캘린더 ${brief.calendars.length}개`,
     ''
   ];
@@ -144,7 +152,7 @@ function buildBrief({ dateLabel, calendars = [] } = {}) {
     total,
     staleCount: normalized.filter(calendar => calendar.stale).length
   };
-  return { ...brief, subject: `모아엘가 AI 분석 브리핑 · ${brief.dateLabel}`, text: makeText(brief), html: renderHtml(brief) };
+  return { ...brief, subject: `모여라 캘린더 AI 분석 브리핑 · ${brief.dateLabel}`, text: makeText(brief), html: renderHtml(brief) };
 }
 
-module.exports = { ACTION_URL, buildBrief, isEmailDeliveryConfigured };
+module.exports = { ACTION_URL, buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured };
