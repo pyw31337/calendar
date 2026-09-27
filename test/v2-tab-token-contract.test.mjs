@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-const root = new URL('..', import.meta.url).pathname;
-const shared = readFileSync(join(root, 'src/ui/ui-shared.js'), 'utf8');
-const gallery = readFileSync(join(root, 'src/ui/ui-summary-gallery.js'), 'utf8');
-const chrome = readFileSync(join(root, 'src/ui/v2/dest-chrome-late.css'), 'utf8');
+// Keep this static contract independent of browser globals; CI's design guard evaluates
+// test sources in a minimal Node context as well as the regular node:test runner.
+const shared = readFileSync('src/ui/ui-shared.js', 'utf8');
+const gallery = readFileSync('src/ui/ui-summary-gallery.js', 'utf8');
+const chrome = readFileSync('src/ui/v2/dest-chrome-late.css', 'utf8');
 
 test('V2 date-sheet tab labels and state dots use shared tokens', () => {
   assert.match(shared, /underline-tabs-label\$\{isDotBadge && showBadge \? ' has-status-dot' : ''\}/);
