@@ -1540,7 +1540,7 @@ function getNextConfirmedMeeting(calendar, now = new Date()) {
     if (!nearest || target < nearest.target) nearest = { ...meeting, date, target };
   });
   if (!nearest) return null;
-  const { target, ...meeting } = nearest;
+  const { target: _target, ...meeting } = nearest;
   return meeting;
 }
 

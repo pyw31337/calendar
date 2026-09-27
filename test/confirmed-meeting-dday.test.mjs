@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.window = globalThis.window || {};
-window.GATHER_APP_UTILS = {
-  ...(window.GATHER_APP_UTILS || {}),
+globalThis.window.GATHER_APP_UTILS = {
+  ...(globalThis.window.GATHER_APP_UTILS || {}),
   normalizeDateString(value) {
     const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
     return match ? match[0] : '';
