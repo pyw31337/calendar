@@ -936,6 +936,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .bp-comment-badge,
 .v2-design .bp-settlement-card-badge,
 .v2-design .bp-side-nav-cal-badge,
+.v2-design .bp-side-nav-calendar-dday-badge,
 .v2-design .underline-tabs [role="tab"] > span,
 .v2-design .section-count-badge,
 .v2-design .participant-badge,
@@ -960,6 +961,16 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   border-radius: 999px !important;
   vertical-align: middle;
   text-align: center;
+}
+
+/* Calendar's only live rail status: a nearest confirmed-meeting D-day. */
+.v2-design .bp-side-nav-calendar-dday-badge {
+  min-width: 34px;
+  margin-left: auto !important;
+  background: var(--brand) !important;
+  color: var(--on-brand) !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Name pills: same geometry, white type on participant color. */

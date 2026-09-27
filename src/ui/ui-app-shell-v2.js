@@ -43,7 +43,7 @@ import {
   formatDDayLabel, formatConfirmedMeetingLabel, unionActivityLogs,
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
-  getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
+  getTrulyConfirmedMeetings, getNextConfirmedMeeting, getActiveAvailabilities, getActiveParticipants,
   calculateSettlementBalance, formatBalanceBadge,
   getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
 } from '../core/app-domain-helpers.js';
@@ -2969,6 +2969,23 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // bypassed here.  It preserves the exact home memo selected during the tab
   // handoff, even before the outer app has a chance to rebuild its contexts.
   const [homeFocusedMemo, setHomeFocusedMemo] = React.useState(null);
+  // Keep the side-navigation D-day fresh for an installed app that stays open
+  // across midnight; otherwise it would only update after another interaction.
+  const [sideNavDayStamp, setSideNavDayStamp] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    let timer = null;
+    const scheduleNextDay = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timer = window.setTimeout(() => {
+        setSideNavDayStamp(Date.now());
+        scheduleNextDay();
+      }, Math.max(1000, nextMidnight.getTime() - now.getTime() + 100));
+    };
+    scheduleNextDay();
+    return () => { if (timer) window.clearTimeout(timer); };
+  }, []);
 
   // Status-bar tint follows theme + page (theme-color-sync.js).
   React.useEffect(() => syncThemeColor(activeTab === DEFAULT_TAB), [activeTab]);
@@ -3499,6 +3516,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const settlementBalanceBadge = calendar
     ? formatBalanceBadge(calculateSettlementBalance(calendar))
     : null;
+  const nextConfirmedMeeting = getNextConfirmedMeeting(calendar, new Date(sideNavDayStamp));
+  const calendarDdayBadge = nextConfirmedMeeting ? formatDDayLabel(nextConfirmedMeeting.date) : '';
   const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: settlementBalanceBadge?.text || '' };
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
@@ -3570,8 +3589,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         const metaVal = item.id === 'chat' ? shortParticipantName(sideMeta[item.id]) : sideMeta[item.id];
         // Gallery, places and memo are destinations, not compact status widgets.  Their
         // trailing date/title/place labels made the navigation rail uneven and could collide
-        // with the menu title.  Keep only the intentional live status for chat and settlement.
-        const showMeta = item.id === 'chat' || item.id === 'settlement';
+        // with the menu title. Keep only the intentional live status for chat, settlement,
+        // and the nearest future confirmed meeting on the calendar item.
+        const showMeta = item.id === 'calendar'
+          ? Boolean(calendarDdayBadge)
+          : item.id === 'chat' || item.id === 'settlement';
         return React.createElement('button', {
           key: item.id,
           type: 'button',
@@ -3581,8 +3603,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         },
           React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon, active })),
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label),
-          showMeta && metaVal && (
-            item.isPill
+          showMeta && (
+            item.id === 'calendar'
+              ? React.createElement('span', {
+                  className: bentoClass('side-nav-item-meta side-nav-calendar-dday-badge'),
+                  title: formatConfirmedMeetingLabel(nextConfirmedMeeting.date),
+                  'aria-label': `가장 가까운 모임확정 ${calendarDdayBadge}`,
+                }, calendarDdayBadge)
+              : metaVal && (item.isPill
               ? React.createElement('span', {
                   className: bentoClass('side-nav-item-meta chat-dot'),
                   style: {
@@ -3611,7 +3639,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
                   style: item.id === 'settlement'
                     ? { color: settlementBalanceBadge?.bgColor || '#EF4444', fontWeight: 700 }
                     : undefined,
-                }, metaVal)
+                }, metaVal))
           )
         );
       })

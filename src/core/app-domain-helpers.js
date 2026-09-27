@@ -1522,6 +1522,28 @@ function getTrulyConfirmedMeetings(calendar) {
   return getConfirmedMeetings(calendar).filter(m => m.confirmed !== false);
 }
 
+// The navigation rail needs one authoritative "next meeting" instead of deriving a
+// D-day from whichever embedded record happens to be listed first.  Calendar records
+// can contain historical confirmations and settlement-only (confirmed:false) rows, so
+// discard both before selecting the nearest date at or after the supplied local day.
+function getNextConfirmedMeeting(calendar, now = new Date()) {
+  const reference = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(reference.getTime())) return null;
+  const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  let nearest = null;
+  getTrulyConfirmedMeetings(calendar).forEach(meeting => {
+    const date = normalizeDateString(meeting?.date);
+    if (!date) return;
+    const [year, month, day] = date.split('-').map(Number);
+    const target = new Date(year, month - 1, day);
+    if (target < today || target.getFullYear() !== year || target.getMonth() !== month - 1 || target.getDate() !== day) return;
+    if (!nearest || target < nearest.target) nearest = { ...meeting, date, target };
+  });
+  if (!nearest) return null;
+  const { target, ...meeting } = nearest;
+  return meeting;
+}
+
 function isDateConfirmedMeeting(calendar, dateStr) {
   return getTrulyConfirmedMeetings(calendar).some(m => m.date === dateStr);
 }
@@ -3055,6 +3077,7 @@ export {
   getConfirmedMeetings,
   unionConfirmedMeetings,
   getTrulyConfirmedMeetings,
+  getNextConfirmedMeeting,
   isDateConfirmedMeeting,
   calculateSettlementBalance,
   formatBalanceBadge,
