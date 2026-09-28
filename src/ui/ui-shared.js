@@ -719,7 +719,7 @@ export function CommonPagination({
 
   const chevron = (direction, key) => React.createElement('svg', {
     key,
-    xmlns: 'http://www.w3.org/2000/svg', width: '16', height: '16', viewBox: '0 0 24 24',
+    xmlns: 'http://www.w3.org/2000/svg', width: isMobile ? '13' : '16', height: isMobile ? '13' : '16', viewBox: '0 0 24 24',
     fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
     style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
     className: 'icon icon-tabler icons-tabler-outline icon-tabler-chevron-down', 'aria-hidden': 'true'
@@ -732,7 +732,7 @@ export function CommonPagination({
     style: { display: 'inline-flex', alignItems: 'center' }
   },
     chevron(direction, `${direction}-a`),
-    React.createElement('span', { style: { display: 'inline-flex', marginLeft: '-10px' } },
+    React.createElement('span', { style: { display: 'inline-flex', marginLeft: isMobile ? '-9px' : '-10px' } },
       chevron(direction, `${direction}-b`)
     )
   );

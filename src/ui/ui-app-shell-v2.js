@@ -1449,12 +1449,22 @@ function HomeSummaryPager({ items, renderPage, label }) {
       className: swipe.contentClassName,
       style: swipe.contentStyle,
     }, renderPage(current, pageIndex)),
-    pages.length > 1 ? React.createElement('div', { className: 'home-summary-pager-nav', 'aria-label': `${label} 페이지` },
+    pages.length > 1 ? React.createElement('div', {
+      className: 'home-summary-pager-nav',
+      'aria-label': `${label} 페이지`,
+      onPointerDown: e => e.stopPropagation(),
+      onTouchStart: e => e.stopPropagation(),
+      onClick: e => e.stopPropagation(),
+    },
       React.createElement('button', {
         type: 'button',
         className: 'home-summary-pager-arrow is-previous',
-        onClick: () => swipe.changePage(-1),
-        disabled: pageIndex === 0 || swipe.isTransitioning,
+        onClick: e => {
+          e.preventDefault();
+          e.stopPropagation();
+          swipe.changePage(-1);
+        },
+        disabled: pageIndex <= 0,
         'aria-label': `${label} 이전`,
       }, '‹'),
       React.createElement('span', { className: 'home-summary-pager-dots', 'aria-hidden': 'true' }, pages.map((_, index) => React.createElement('i', {
@@ -1464,8 +1474,12 @@ function HomeSummaryPager({ items, renderPage, label }) {
       React.createElement('button', {
         type: 'button',
         className: 'home-summary-pager-arrow is-next',
-        onClick: () => swipe.changePage(1),
-        disabled: pageIndex === pages.length - 1 || swipe.isTransitioning,
+        onClick: e => {
+          e.preventDefault();
+          e.stopPropagation();
+          swipe.changePage(1);
+        },
+        disabled: pageIndex >= pages.length - 1,
         'aria-label': `${label} 다음`,
       }, '›')
     ) : null

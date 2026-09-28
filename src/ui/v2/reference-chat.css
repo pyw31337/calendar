@@ -79,7 +79,9 @@
     /* A chat memo share renders the live MemoCard rather than a URL card.  Keep
        the card compact enough for a speech row while preserving its native
        images, inline video player and comment controls. */
-    .v2-chat .chat-memo-share-card { width: min(100%, 420px); }
+    /* The message-row wrapper owns the 420px ceiling. Filling it here prevents a second,
+       smaller intrinsic width from leaving a blank strip at the right edge of a shared memo. */
+    .v2-chat .chat-memo-share-card { width: 100%; max-width: 420px; }
     .v2-chat .chat-memo-share-card .memo-card-hover { width: 100%; min-width: 0; }
     .v2-chat .chat-memo-share-card .v2-memo-card-contract {
       background: var(--bg-card) !important;

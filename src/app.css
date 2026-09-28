@@ -2880,21 +2880,21 @@ select.form-select {
     align-items: center;
     justify-content: center;
     flex-wrap: nowrap !important;
-    gap: 3px;
-    padding: 12px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+    gap: 2px;
+    padding: 10px 2px calc(8px + env(safe-area-inset-bottom, 0px));
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
   }
 
   .gallery-pagination-button {
-    min-width: 30px;
-    height: 34px;
-    min-height: 34px;
-    padding: 0 4px;
-    font-size: 13px;
+    min-width: 25px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 2px;
+    font-size: 12px;
     font-weight: 700;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius-sm, 5px);
     flex-shrink: 1;
     flex-grow: 0;
   }
@@ -2903,7 +2903,7 @@ select.form-select {
   .gallery-pagination.is-mobile .gallery-pagination-arrow,
   .gallery-pagination .gallery-pagination-arrow {
     display: inline-flex;
-    min-width: 30px;
+    min-width: 25px;
     padding: 0;
   }
 

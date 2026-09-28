@@ -138,6 +138,7 @@ export function useHomeSummarySwipe({ pageCount = 0, pageIndex = 0, onPageChange
     ? {
         onPointerDown: event => {
           if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+          if (event.target?.closest?.('.home-summary-pager-nav, button, a, input, textarea')) return;
           beginGesture({ clientX: event.clientX, clientY: event.clientY, currentTarget: event.currentTarget }, event.pointerId);
           try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch (_) {}
         },
@@ -150,6 +151,7 @@ export function useHomeSummarySwipe({ pageCount = 0, pageIndex = 0, onPageChange
       }
     : {
         onTouchStart: event => {
+          if (event.target?.closest?.('.home-summary-pager-nav, button, a, input, textarea')) return;
           const touch = event.touches?.[0];
           if (touch) beginGesture({ clientX: touch.clientX, clientY: touch.clientY, currentTarget: event.currentTarget }, touch.identifier);
         },

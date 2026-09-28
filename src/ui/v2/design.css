@@ -402,13 +402,17 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 18px;
+  min-height: 24px;
   margin-top: 8px;
+  position: relative;
+  z-index: 2;
 }
 .v2-design .home-summary-pager-arrow {
   display: inline-grid;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
   padding: 0;
   place-items: center;
   border: 0;
@@ -416,9 +420,12 @@
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
+  touch-action: manipulation;
+  position: relative;
+  z-index: 3;
 }
 .v2-design .home-summary-pager-arrow:disabled { opacity: .3; cursor: default; }
 .v2-design .home-summary-pager-arrow:not(:disabled):hover,

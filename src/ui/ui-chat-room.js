@@ -953,6 +953,30 @@ export function ChatRoomView({
   const handlePasteImagesChat = async (e) => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
     if (pastedFiles.length === 0) return;
+
+    // Safari (and some share-sheet/clipboard providers) expose a generated image together
+    // with the plain-text URL when a memo share is copied. Treat a standalone app memo link
+    // as one semantic attachment: keep the URL and intentionally discard that clipboard
+    // rendition. Without this guard, both the generated screenshot and the live MemoCard are
+    // uploaded and the chat ends up showing the same memo twice.
+    const clipboardText = e.clipboardData?.getData?.('text/plain') || '';
+    const pastedMemoShare = findMemoShareUrlInText(clipboardText, memoShareConfig());
+    if (pastedMemoShare?.isOnlyUrl) {
+      e.preventDefault();
+      e.stopPropagation();
+      const textarea = e.currentTarget;
+      const start = textarea?.selectionStart ?? chatInput.length;
+      const end = textarea?.selectionEnd ?? chatInput.length;
+      const nextText = `${chatInput.slice(0, start)}${pastedMemoShare.rawUrl}${chatInput.slice(end)}`;
+      setChatInput(nextText);
+      requestAnimationFrame(() => {
+        if (!textarea) return;
+        const caret = start + pastedMemoShare.rawUrl.length;
+        textarea.focus();
+        textarea.setSelectionRange(caret, caret);
+      });
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     try {
@@ -1143,10 +1167,13 @@ export function ChatRoomView({
     const msgImageCount = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls.length : (msg.imageUrl ? 1 : 0);
     const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
     // App-owned memo share URL becomes a live MemoCard.
-    // Standalone memo URL replaces bubble body; composite message (with text/images) appends MemoCard below.
+    // A standalone memo URL is a semantic attachment, even for older messages where a
+    // clipboard provider accidentally persisted a screenshot in imageUrls. Render precisely
+    // one live MemoCard in that case. A deliberate file attachment remains a composite message
+    // because files have content that cannot be represented by the memo card.
     const memoShare = findMemoShareUrlInText(msg.text || '', memoShareConfig());
     const isMemoShareMessage = !!memoShare;
-    const isMemoOnlyMessage = !!(memoShare && memoShare.isOnlyUrl && !msgHasImages && !msgHasFiles);
+    const isMemoOnlyMessage = !!(memoShare && memoShare.isOnlyUrl && !msgHasFiles);
     const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
     // Wide enough that the embed's own .chat-media-resizable wrapper (see DirectChatMediaText)
     // has real headroom to drag-resize into on desktop, instead of immediately overflowing
@@ -1300,7 +1327,16 @@ export function ChatRoomView({
       // shrink the bubble below its content's natural size (the classic flexbox overflow trap) --
       // without it, an oversized child (e.g. an embed sized by an imprecise vw estimate) can force
       // this box wider than message-row actually has room for.
-      style: { position: 'relative', maxWidth: bubbleWrapperMaxWidth, minWidth: 0, zIndex: 1, alignSelf: 'flex-end' }
+      style: {
+        position: 'relative',
+        // The shared card itself is 420px wide. Give its wrapper that same definite width so
+        // the sender row cannot retain the old 440px bubble allowance as a blank right gutter.
+        width: isMemoOnlyMessage ? 'min(100%, 420px)' : undefined,
+        maxWidth: bubbleWrapperMaxWidth,
+        minWidth: 0,
+        zIndex: 1,
+        alignSelf: 'flex-end'
+      }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -1360,7 +1396,13 @@ export function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: bubbleWrapperMaxWidth, minWidth: 0, zIndex: 1 }
+      style: {
+        position: 'relative',
+        width: isMemoOnlyMessage ? 'min(100%, 420px)' : undefined,
+        maxWidth: bubbleWrapperMaxWidth,
+        minWidth: 0,
+        zIndex: 1
+      }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
