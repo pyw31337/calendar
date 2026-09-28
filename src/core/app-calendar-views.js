@@ -52,7 +52,7 @@ export function renderCalendarViews({
   handleSendMemeImage, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles,
   handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto,
   handlePasteGatherPhotos, handleDeleteMessage, handleEditMessage, handlePromoteInlineChatImage,
-  handleSaveImageTags, guardLoadedCalendar, handleMoveAvailability, handleBulkRegisterAvailability,
+  handleSaveImageTags, handleBulkSaveImageTags, guardLoadedCalendar, handleMoveAvailability, handleBulkRegisterAvailability,
   handleFetchPhotoComments, handleDeletePhoto, handleReplacePhoto, handleSavePhotoComments,
   handleJumpToChatMessage, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
   handleJumpToMemo, handleJumpToMemoTag, handleJumpToGallery, handleJumpToPlace,
@@ -234,6 +234,7 @@ export function renderCalendarViews({
         },
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
+        onBulkSaveImageTags: handleBulkSaveImageTags,
         photoCommentCounts: photoCommentCounts,
         // Before the canonical index resolves, pass an explicit empty indexed set instead of
         // the partially hydrated chat/memo archive. Presenting that fallback as a final gallery
@@ -348,6 +349,7 @@ export function renderCalendarViews({
         showToast: showToast,
         onPromoteImageUrl: handlePromoteInlineChatImage,
         onSaveImageTags: handleSaveImageTags,
+        onBulkSaveImageTags: handleBulkSaveImageTags,
         onSearchTag: handleSearchTag,
         onDeletePhoto: handleDeletePhoto,
         onReplacePhoto: handleReplacePhoto,

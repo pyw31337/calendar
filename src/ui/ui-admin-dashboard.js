@@ -3235,7 +3235,7 @@ export function AdminDashboard({ initialCalendars }) {
           )
         ),
         /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 10px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } },
-          "선택된 캘린더의 photoIndex를 메시지·메모·확정모임 사진으로 재계산합니다. 컨텐츠/기념일 포스터는 갤러리 합계에서 제외됩니다. 배포 후 Cloud Function rebuildPhotoIndex가 필요합니다."
+          "선택된 캘린더의 photoIndex를 메시지·메모·확정모임 사진으로 재계산합니다. 컨텐츠/기념일 포스터는 갤러리 합계에서 제외됩니다. 이 작업은 목록·태그 참조를 복구하지만 이미 삭제된 Storage 원본·썸네일 파일 자체를 되살리지는 않습니다. 그런 사진은 원본 재업로드 또는 Storage 버전/백업 복구가 필요합니다."
         ),
         photoIndexReport && /*#__PURE__*/React.createElement("pre", {
           style: {

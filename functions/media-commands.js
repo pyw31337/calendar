@@ -14,6 +14,10 @@
 // emulator (functions/test/media-commands.emulator.test.js).
 
 const GC_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+// One mediaCommand transaction also reads every affected source document and the meeting album
+// collection. Keeping a conservative cap prevents a 200-photo UI selection from exceeding
+// Firestore's 500-document transaction limit; the browser chunks larger selections.
+const MAX_BULK_TAG_ITEMS = 80;
 const PLACEHOLDER_TEXTS = new Set(['', '갤러리 사진', '일정 사진', '사진']);
 
 // Must stay byte-identical to src/core/photo-asset.js and functions/index.js getPhotoAssetKey.
@@ -80,6 +84,31 @@ function ownerDocIds(indexData) {
     (match[1] === 'message' ? ids.messages : ids.memos).add(match[2]);
   });
   return ids;
+}
+
+function getDirectMediaTagKey(url) {
+  const source = String(normalizePhotoAssetUrl(url) || url || '');
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `u_${(hash >>> 0).toString(36)}`;
+}
+
+function sanitizeTagText(value) {
+  const seen = new Set();
+  return String(value || '').split(/[\s,#]+/)
+    .map(token => token.trim().replace(/^#+/, '').slice(0, 30))
+    .filter(token => token && !seen.has(token) && (seen.add(token) || true))
+    .slice(0, 20)
+    .join(' ')
+    .slice(0, 640);
+}
+
+function sourceOwnerParts(value) {
+  const match = String(value || '').match(/^(message|memo):(.+):\d+$/);
+  return match ? { collection: match[1] === 'message' ? 'messages' : 'memos', id: match[2] } : null;
 }
 
 // Remove every slot holding `asset` from a message/memo. Returns null when nothing matched.
@@ -221,6 +250,143 @@ async function tagAsset({ db, calendarDocId, asset, tags, now = Date.now() }) {
   });
 }
 
+// Applies final tag sets for many assets in one transaction. This deliberately receives the
+// *final* tags, rather than an "add/remove" instruction: the browser can show a precise undo by
+// sending the captured previous sets back, and the server remains the one authoritative writer
+// for source documents and their meeting-album projections.
+async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
+  const input = Array.isArray(items) ? items : [];
+  if (!input.length || input.length > MAX_BULK_TAG_ITEMS) {
+    return { ok: false, reason: 'invalid-items' };
+  }
+  const root = db.collection('calendars').doc(calendarDocId);
+  const entriesByKey = new Map();
+  input.forEach(item => {
+    const asset = item && typeof item === 'object' ? item : {};
+    const imageUrl = String(asset.imageUrl || asset.full || '').trim();
+    const thumbUrl = String(asset.thumbUrl || asset.thumb || imageUrl).trim();
+    const assetKey = getPhotoAssetKey(imageUrl || thumbUrl);
+    if (!assetKey || entriesByKey.has(assetKey)) return;
+    entriesByKey.set(assetKey, {
+      assetKey,
+      asset: {
+        imageUrl,
+        thumbUrl,
+        messageId: String(asset.messageId || asset.sourceMessageId || '').slice(0, 200),
+        memoId: String(asset.memoId || '').slice(0, 200),
+        directMediaUrl: String(asset.directMediaUrl || '').trim(),
+      },
+      tags: sanitizeTagText(asset.tags),
+      indexData: null,
+    });
+  });
+  const entries = Array.from(entriesByKey.values());
+  if (!entries.length) return { ok: false, reason: 'invalid-asset' };
+
+  // Fetching these before the transaction avoids re-reading the same photoIndex rows while the
+  // transaction is open. The source/album documents themselves are still transaction reads.
+  const indexSnaps = await Promise.all(entries.map(entry => root.collection('photoIndex').doc(entry.assetKey).get()));
+  const owners = { messages: new Set(), memos: new Set() };
+  const directByOwner = new Map();
+  indexSnaps.forEach((snapshot, index) => {
+    const entry = entries[index];
+    const data = snapshot.exists ? snapshot.data() || {} : {};
+    entry.indexData = data;
+    const listed = ownerDocIds(data);
+    listed.messages.forEach(id => owners.messages.add(id));
+    listed.memos.forEach(id => owners.memos.add(id));
+    if (entry.asset.messageId) owners.messages.add(entry.asset.messageId);
+    if (entry.asset.memoId) owners.memos.add(entry.asset.memoId);
+    // Direct-link tags must be routed by an existing canonical index owner. Unlike an uploaded
+    // image slot there is no array/file match to prove a caller-supplied message id owns an
+    // arbitrary external URL, so never use the request's messageId as a direct-media fallback.
+    const directUrl = String(data.directMediaUrl || '').trim();
+    const owner = sourceOwnerParts(data.sourceOwner);
+    if (!directUrl || !owner) return;
+    const key = `${owner.collection}:${owner.id}`;
+    const list = directByOwner.get(key) || [];
+    list.push({ directUrl, tags: entry.tags, assetKey: entry.assetKey });
+    directByOwner.set(key, list);
+  });
+
+  return db.runTransaction(async tx => {
+    const messageRefs = Array.from(owners.messages).map(id => root.collection('messages').doc(id));
+    const memoRefs = Array.from(owners.memos).map(id => root.collection('memos').doc(id));
+    const [messageSnaps, memoSnaps, meetingsSnap] = await Promise.all([
+      Promise.all(messageRefs.map(ref => tx.get(ref))),
+      Promise.all(memoRefs.map(ref => tx.get(ref))),
+      tx.get(root.collection('confirmedMeetings')),
+    ]);
+    const writes = [];
+    let sourceDocumentsTouched = 0;
+    let slotsTagged = 0;
+    let albumCopiesTagged = 0;
+    const writeSource = (snap, collection) => {
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      const slots = slotsOf(data);
+      const imageTags = Array.isArray(data.imageTags) ? data.imageTags.slice() : [];
+      while (imageTags.length < slots.length) imageTags.push('');
+      const imageTagMap = {
+        ...(data.imageTagMap && typeof data.imageTagMap === 'object' && !Array.isArray(data.imageTagMap)
+          ? data.imageTagMap : {})
+      };
+      let changed = false;
+      slots.forEach((slot, slotIndex) => {
+        const assetKey = getPhotoAssetKey(slot.imageUrl || slot.thumbUrl);
+        const entry = entriesByKey.get(assetKey);
+        if (!entry) return;
+        if (imageTags[slotIndex] !== entry.tags || imageTagMap[assetKey] !== entry.tags) {
+          imageTags[slotIndex] = entry.tags;
+          imageTagMap[assetKey] = entry.tags;
+          changed = true;
+          slotsTagged += 1;
+        }
+      });
+      const directEntries = directByOwner.get(`${collection}:${snap.id}`) || [];
+      let directMediaTags = data.directMediaTags && typeof data.directMediaTags === 'object' && !Array.isArray(data.directMediaTags)
+        ? { ...data.directMediaTags } : {};
+      directEntries.forEach(entry => {
+        const key = getDirectMediaTagKey(entry.directUrl);
+        if (directMediaTags[key] === entry.tags) return;
+        if (entry.tags) directMediaTags[key] = entry.tags;
+        else delete directMediaTags[key];
+        changed = true;
+        slotsTagged += 1;
+      });
+      if (!changed) return;
+      sourceDocumentsTouched += 1;
+      const patch = { imageTags, imageTagMap };
+      if (directEntries.length) patch.directMediaTags = directMediaTags;
+      writes.push(() => tx.update(snap.ref, patch));
+    };
+    messageSnaps.forEach(snap => writeSource(snap, 'messages'));
+    memoSnaps.forEach(snap => writeSource(snap, 'memos'));
+    meetingsSnap.docs.forEach(doc => {
+      const photos = Array.isArray(doc.data()?.photos) ? doc.data().photos : [];
+      let changed = false;
+      const next = photos.map(photo => {
+        const assetKey = getPhotoAssetKey(photo?.imageUrl || photo?.full || photo?.thumbUrl || photo?.thumb);
+        const entry = entriesByKey.get(assetKey);
+        if (!entry || String(photo?.tags || '') === entry.tags) return photo;
+        changed = true;
+        albumCopiesTagged += 1;
+        return { ...photo, tags: entry.tags };
+      });
+      if (changed) writes.push(() => tx.update(doc.ref, { photos: next, updatedAt: now }));
+    });
+    writes.forEach(write => write());
+    return {
+      ok: true,
+      itemCount: entries.length,
+      sourceDocumentsTouched,
+      slotsTagged,
+      albumCopiesTagged,
+      assetKeys: entries.map(entry => entry.assetKey),
+    };
+  });
+}
+
 // Delete queued Storage objects whose grace period elapsed and that no photoIndex row still
 // references (checked per calendar, by original or thumb path).
 async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
@@ -260,5 +426,7 @@ module.exports = {
   rewriteMeetingPhotos,
   deleteAsset,
   tagAsset,
+  bulkTagAssets,
+  MAX_BULK_TAG_ITEMS,
   sweepStorageGc,
 };

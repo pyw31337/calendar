@@ -1,3 +1,5 @@
+import { saveBulkPhotoTagsRemote } from './bulk-photo-tags.js';
+
 export const MAX_MEDIA_TAGS = 20;
 export const MAX_MEDIA_TAG_TEXT_LENGTH = 640;
 
@@ -219,5 +221,49 @@ export function createImageTagSaveHandler(context) {
     patchIndex(messageId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || getPhotoAssetCommentKey(entry) }, direct);
     if (!meta?.silent) showToast('태그 저장완료', 'success');
     return true;
+  };
+}
+
+// A gallery/archive selection can contain many photos from the same source message. Sending each
+// through handleSaveImageTags made every one perform its own source read, write, verification,
+// meeting-copy fan-out and index reload. The mediaCommand endpoint groups those writes in one
+// transaction per <=80-photo chunk. `changes` always contains final tags so callers can pass the
+// captured previous values back for a real undo without guessing an inverse operation.
+export function createBulkImageTagSaveHandler(context) {
+  const {
+    activeCalId,
+    projectId,
+    galleryPhotoIndex,
+    invalidatePhotoIndexCache,
+    rememberPhotoIndexTags,
+    schedulePhotoIndexTagReload,
+  } = context;
+  return async function saveBulkImageTags(changes) {
+    const list = Array.isArray(changes) ? changes.filter(change => change?.photo && change?.assetKey) : [];
+    if (!activeCalId || !projectId || !list.length) return { ok: false, changed: 0, reason: 'invalid' };
+    const result = await saveBulkPhotoTagsRemote({ calendarId: activeCalId, projectId, changes: list });
+    const tagByAsset = new Map(list.map(change => [String(change.assetKey), String(change.tags || '')]));
+    const probes = list.map(change => ({
+      assetKey: change.assetKey,
+      mediaKey: change.assetKey,
+      refKey: change.assetKey,
+      messageId: change.photo?.messageId || change.photo?.sourceMessageId || '',
+      imageIndex: Number.isFinite(Number(change.photo?.imageIndex)) ? Number(change.photo.imageIndex) : 0,
+      tags: change.tags,
+    }));
+    try {
+      invalidatePhotoIndexCache(activeCalId);
+      rememberPhotoIndexTags(activeCalId, probes);
+      galleryPhotoIndex?.patchItems?.(items => (items || []).map(photo => {
+        const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || '');
+        return tagByAsset.has(assetKey) ? { ...photo, tags: tagByAsset.get(assetKey) } : photo;
+      }));
+      // One delayed refresh is enough for the entire batch. The session sticky overlay above
+      // holds the verified values until Cloud Functions has rebuilt the photoIndex projection.
+      schedulePhotoIndexTagReload(galleryPhotoIndex, activeCalId, probes[0], { maxAttempts: 3 });
+    } catch (err) {
+      console.warn('Bulk gallery tag index sync skipped:', err);
+    }
+    return { ...result, changes: list };
   };
 }

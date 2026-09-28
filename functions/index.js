@@ -2361,16 +2361,27 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
 // P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
-const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset']);
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets']);
 exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
-  const { calendarId, op, asset, tags } = req.body || {};
+  const { calendarId, op, asset, tags, items } = req.body || {};
   if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !MEDIA_COMMAND_OPS.has(op)) { res.status(400).json({ ok: false, reason: 'invalid' }); return; }
+  const isHttpUrl = value => /^https?:\/\//i.test(String(value || ''));
+  const isStorageUrl = value => /^https:\/\/firebasestorage\.googleapis\.com\//i.test(String(value || ''));
+  if (op === 'bulkTagAssets') {
+    if (!Array.isArray(items) || !items.length || items.length > mediaCommands.MAX_BULK_TAG_ITEMS
+      || items.some(item => !isHttpUrl(item?.imageUrl || item?.full || item?.thumbUrl || item?.thumb))) {
+      res.status(400).json({ ok: false, reason: 'invalid-items' }); return;
+    }
+  }
   const imageUrl = String(asset?.imageUrl || '');
   const thumbUrl = String(asset?.thumbUrl || '');
-  if (![imageUrl, thumbUrl].some(value => /^https:\/\/firebasestorage\.googleapis\.com\//.test(value))) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  // Keep the established mutation surface for the original one-photo commands. Only the
+  // new batch command supports externally hosted direct-media URLs, and it still resolves the
+  // owner from its canonical photoIndex row before writing (media-commands.js).
+  if (op !== 'bulkTagAssets' && ![imageUrl, thumbUrl].some(isStorageUrl)) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
   if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
   const db = admin.firestore();
   const calendarDocId = `cal_${calendarId}`;
@@ -2384,7 +2395,20 @@ exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }
   try {
     const result = op === 'deleteAsset'
       ? await mediaCommands.deleteAsset({ db, calendarDocId, asset: cleanAsset })
-      : await mediaCommands.tagAsset({ db, calendarDocId, asset: cleanAsset, tags: String(tags || '') });
+      : (op === 'tagAsset'
+        ? await mediaCommands.tagAsset({ db, calendarDocId, asset: cleanAsset, tags: String(tags || '') })
+        : await mediaCommands.bulkTagAssets({
+          db,
+          calendarDocId,
+          items: items.map(item => ({
+            imageUrl: String(item?.imageUrl || item?.full || ''),
+            thumbUrl: String(item?.thumbUrl || item?.thumb || ''),
+            messageId: typeof item?.messageId === 'string' ? item.messageId.slice(0, 200) : '',
+            memoId: typeof item?.memoId === 'string' ? item.memoId.slice(0, 200) : '',
+            directMediaUrl: typeof item?.directMediaUrl === 'string' ? item.directMediaUrl.slice(0, 2048) : '',
+            tags: String(item?.tags || '').slice(0, 640),
+          }))
+        }));
     res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
     console.error(`mediaCommand ${op} failed:`, err);

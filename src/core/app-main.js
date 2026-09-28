@@ -19,7 +19,7 @@ import {
   getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
 } from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
-import { createImageTagSaveHandler, MAX_MEDIA_TAGS, MAX_MEDIA_TAG_TEXT_LENGTH } from './app-image-tag-save.js';
+import { createBulkImageTagSaveHandler, createImageTagSaveHandler, MAX_MEDIA_TAGS, MAX_MEDIA_TAG_TEXT_LENGTH } from './app-image-tag-save.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap, persistImageGeoMap } from './photo-geo.js';
@@ -3827,6 +3827,18 @@ function CalendarApp() {
       return commitConfirmedMeetings(meetings, null, [], 'write', 'success');
     }
   });
+  const handleBulkSaveImageTags = createBulkImageTagSaveHandler({
+    activeCalId,
+    projectId: firebaseConfig.projectId,
+    galleryPhotoIndex,
+    invalidatePhotoIndexCache,
+    rememberPhotoIndexTags,
+    schedulePhotoIndexTagReload,
+  });
+  // The V2 shell is constructed through a deliberately slim adapter object. Keep this handler
+  // available to that lazy UI boundary without making an already-large compatibility call site
+  // rebuild its whole argument list for every render.
+  window.__gatherBulkSaveImageTags = handleBulkSaveImageTags;
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
     if (rawId && !isAllowedCalendarId(rawId)) {
@@ -5837,7 +5849,7 @@ function CalendarApp() {
     handleSendChatMessage, handleSendMemeImage, handleUploadGalleryImages, handleAddGalleryLink,
     handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks,
     handlePasteGatherPhoto, handlePasteGatherPhotos, handleDeleteMessage, handleEditMessage,
-    handlePromoteInlineChatImage, handleSaveImageTags, guardLoadedCalendar, handleMoveAvailability,
+    handlePromoteInlineChatImage, handleSaveImageTags, handleBulkSaveImageTags, guardLoadedCalendar, handleMoveAvailability,
     handleBulkRegisterAvailability, handleFetchPhotoComments, handleDeletePhoto,
     handleReplacePhoto, handleSavePhotoComments, handleJumpToChatMessage,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleJumpToMemo,

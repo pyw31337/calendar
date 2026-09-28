@@ -2161,7 +2161,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isHistoryShareOpen, setIsHistoryShareOpen,
     handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag,
     anniversaries, historyMemosSnapshot,
-    handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag,
+    handlePromoteInlineChatImage, handleSaveImageTags, handleBulkSaveImageTags, handleSearchTag,
     handleReplacePhoto,
     handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
@@ -2177,6 +2177,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isMemoShareOpen, setIsMemoShareOpen,
     preloadedPhotoComments, preloadedPhotoCommentsReady,
   } = deps || {};
+  const bulkSaveImageTags = handleBulkSaveImageTags || window.__gatherBulkSaveImageTags || null;
   const requireLoadedCalendar = (message) => {
     if (activeCal) return true;
     if (typeof showToast === 'function') showToast(message, 'error');
@@ -2202,7 +2203,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onDeleteGalleryLinks: handleDeleteGalleryLinks,
       onRequestConfirm: showConfirmDialog,
       onPasteGatherPhoto: handlePasteGatherPhoto, onPasteGatherPhotos: handlePasteGatherPhotos,
-      setActiveLightbox, onDeletePhoto: handleDeletePhoto, onSaveImageTags: handleSaveImageTags, photoCommentCounts,
+      setActiveLightbox, onDeletePhoto: handleDeletePhoto, onSaveImageTags: handleSaveImageTags, onBulkSaveImageTags: bulkSaveImageTags, photoCommentCounts,
       indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
         ? galleryPhotoIndex.items
         : (galleryPhotoIndex && galleryPhotoIndex.status === 'fallback' ? null : []),
@@ -2236,7 +2237,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       syncStatus,
       onAddPersonTag: handleAddPersonTag, onRenamePersonTag: handleRenamePersonTag, onDeletePersonTag: handleDeletePersonTag,
       anniversaries, chatMessages: galleryChatMessages, memos: historyMemosSnapshot, setActiveLightbox,
-      showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags, onSearchTag: handleSearchTag,
+      showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags, onBulkSaveImageTags: bulkSaveImageTags, onSearchTag: handleSearchTag,
       onDeletePhoto: handleDeletePhoto, onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage, onJumpToMemo: handleJumpToMemo, onJumpToMeetingDate: handleJumpToMeetingDate,
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal, onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,

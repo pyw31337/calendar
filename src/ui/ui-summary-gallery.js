@@ -5,6 +5,7 @@
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
+import { buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
@@ -28,13 +29,14 @@ const toArchiveLightboxMeta = p => ({
 });
 const archivePhotoSelectKey = (photo, idx) => String(photo?.mediaKey || photo?.refKey || photo?.assetKey || `${photo?.messageId || ''}:${photo?.imageIndex ?? idx}`);
 
-function ArchivePhotoThumb({ photo }) {
+function ArchivePhotoThumb({ photo, onBroken }) {
   const React = window.React;
   return React.createElement(PhotoAssetThumb, {
     photo,
     alt: '',
     fill: true,
     draggable: false,
+    onBroken,
   });
 }
 
@@ -1259,7 +1261,7 @@ export function HistoryView({
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
   onAddPersonTag = null, onRenamePersonTag = null, onDeletePersonTag = null, showToast = null,
   anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null,
-  onPromoteImageUrl = null, onSaveImageTags = null, onSearchTag = null,
+  onPromoteImageUrl = null, onSaveImageTags = null, onBulkSaveImageTags = null, onSearchTag = null,
   onDeletePhoto = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
@@ -1319,6 +1321,28 @@ export function HistoryView({
       else if (mq.removeListener) mq.removeListener(handleChange);
     };
   }, []);
+  // MediaThumb reports a failure only after it has tried both the compressed thumbnail and the
+  // original. Keep that known-dead asset out of this mounted archive view instead of leaving a
+  // growing wall of broken-image icons. We do not persist this suppression: a re-upload or a
+  // recovered Storage object must appear normally on the next visit.
+  const brokenHistoryPhotoKeysRef = React.useRef(new Set());
+  const [brokenHistoryPhotoRevision, setBrokenHistoryPhotoRevision] = React.useState(0);
+  const historyPhotoBrokenKeys = (photo, info = {}) => [
+    photo?.assetKey, photo?.mediaKey, photo?.refKey,
+    photo?.full, photo?.thumb,
+    info?.src, info?.fallbackSrc, info?.currentSrc,
+  ].map(value => String(value || '').trim().split(/[?#]/)[0]).filter(Boolean);
+  const isKnownBrokenHistoryPhoto = photo => historyPhotoBrokenKeys(photo)
+    .some(key => brokenHistoryPhotoKeysRef.current.has(key));
+  const markBrokenHistoryPhoto = (photo, info = {}) => {
+    let changed = false;
+    historyPhotoBrokenKeys(photo, info).forEach(key => {
+      if (brokenHistoryPhotoKeysRef.current.has(key)) return;
+      brokenHistoryPhotoKeysRef.current.add(key);
+      changed = true;
+    });
+    if (changed) setBrokenHistoryPhotoRevision(value => value + 1);
+  };
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     return /*#__PURE__*/React.createElement('span', {
@@ -1723,8 +1747,9 @@ export function HistoryView({
       ? [...baseHistoryPhotoEntries, ...indexedMeetingPhotoEntries]
       : baseHistoryPhotoEntries;
     return dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey)
+      .filter(photo => !isKnownBrokenHistoryPhoto(photo))
       .sort((a, b) => (Number(b.timestamp || 0) - Number(a.timestamp || 0)));
-  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries]);
+  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   // 장소 탭: a place group's key, PLACE_UNCLASSIFIED_KEY for "분류 필요", or null (the place grid).
   const [selectedPlaceKey, setSelectedPlaceKey] = React.useState(null);
@@ -1897,6 +1922,8 @@ export function HistoryView({
   const [placeAssignProgress, setPlaceAssignProgress] = React.useState(null);
   const saveImageTagsRef = React.useRef(onSaveImageTags);
   saveImageTagsRef.current = onSaveImageTags;
+  const bulkSaveImageTagsRef = React.useRef(onBulkSaveImageTags);
+  bulkSaveImageTagsRef.current = onBulkSaveImageTags;
   React.useEffect(() => {
     if (selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY) { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }
   }, [selectedPlaceKey]);
@@ -1920,13 +1947,45 @@ export function HistoryView({
   }, [placePhotoGroups.unclassified, placeSelectedKeys]);
   const assignSelectedPhotosToPlace = async place => {
     const photos = Array.from(placeSelectedKeys).map(key => unclassifiedPhotoByKey.get(key)).filter(Boolean);
-    if (!photos.length || typeof saveImageTagsRef.current !== 'function' || placeAssignProgress) return;
+    if (!photos.length || (typeof saveImageTagsRef.current !== 'function' && typeof bulkSaveImageTagsRef.current !== 'function') || placeAssignProgress) return;
+    const placeTag = placeTagToken(place);
+    const bulkChanges = buildBulkPhotoTagChanges(photos, 'add', placeTag);
+    if (!bulkChanges.length) {
+      showToast('선택한 사진에는 이미 같은 장소 태그가 있습니다.', 'info');
+      return;
+    }
+    // The server path groups same-message edits and meeting-copy synchronization in one
+    // transaction. It avoids the old 60ms-per-photo loop (which still resulted in many network
+    // reads/writes) and records the previous tags for an immediate undo.
+    if (typeof bulkSaveImageTagsRef.current === 'function') {
+      setPlaceAssignProgress({ current: 0, total: bulkChanges.length, label: placeTag });
+      try {
+        const result = await bulkSaveImageTagsRef.current(bulkChanges);
+        if (!result?.ok) throw new Error('일괄 장소 태그 저장 실패');
+        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags }));
+        setPlaceSelectedKeys(new Set());
+        setPlaceSelectMode(false);
+        showToast(`${bulkChanges.length}장을 #${placeTag}(으)로 옮겼어요.`, 'success', 9000, () => {
+          const undo = bulkSaveImageTagsRef.current;
+          if (typeof undo !== 'function') return;
+          void undo(undoChanges)
+            .then(undoResult => showToast(undoResult?.ok ? '장소 분류를 되돌렸습니다.' : '장소 분류를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error'))
+            .catch(error => { console.error('Place bulk-tag undo failed:', error); showToast('장소 분류 되돌리기에 실패했습니다.', 'error'); });
+        }, null, '되돌리기');
+      } catch (err) {
+        console.error('Place bulk tag save failed:', err);
+        showToast(String(err?.message || '장소 태그 저장에 실패했습니다.'), 'error');
+      } finally {
+        setPlaceAssignProgress(null);
+      }
+      return;
+    }
     const counts = { done: 0, full: 0, failed: 0 };
     // Let React re-render between saves so the next call uses a handler built from the state the
     // previous save just patched (memo/meeting paths read local state; chat reads the stored doc).
     const nextFrame = () => new Promise(resolve => setTimeout(resolve, 60));
     for (let i = 0; i < photos.length; i += 1) {
-      setPlaceAssignProgress({ current: i + 1, total: photos.length, label: placeTagToken(place) });
+      setPlaceAssignProgress({ current: i + 1, total: photos.length, label: placeTag });
       const photo = photos[i];
       const next = withPlaceTag(photo.tags, place);
       if (next.status === 'already') { counts.done += 1; continue; }
@@ -1945,7 +2004,7 @@ export function HistoryView({
     setPlaceAssignProgress(null);
     setPlaceSelectedKeys(new Set());
     setPlaceSelectMode(false);
-    const parts = [`${counts.done}장을 #${placeTagToken(place)}(으)로 옮겼어요.`];
+    const parts = [`${counts.done}장을 #${placeTag}(으)로 옮겼어요.`];
     if (counts.full) parts.push(`${counts.full}장은 태그가 20개라 건너뛰었어요.`);
     if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
     showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
@@ -1970,7 +2029,7 @@ export function HistoryView({
         outline: isSelected ? '3px solid var(--brand, #7C3AED)' : 'none', outlineOffset: '-3px'
       }
     },
-      /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
+      /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo, onBroken: (_event, info) => markBrokenHistoryPhoto(photo, info) }),
       PhotoCommentCountBadge && !selection && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
       selection && /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true",

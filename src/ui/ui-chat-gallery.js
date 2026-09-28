@@ -5,6 +5,7 @@
 import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
+import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTime, recordMediaAnalysisFeedback } from '../core/media-analysis-feed.js';
 
@@ -448,6 +449,7 @@ export function ChatGalleryModal({
   onPasteGatherPhotos = null,
   syncStatus = null,
   onSaveImageTags = null,
+  onBulkSaveImageTags = null,
   onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -664,6 +666,9 @@ export function ChatGalleryModal({
   const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
   const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
+  const [isBulkTagPanelOpen, setIsBulkTagPanelOpen] = React.useState(false);
+  const [bulkTagDraft, setBulkTagDraft] = React.useState('');
+  const [isBulkTagSaving, setIsBulkTagSaving] = React.useState(false);
   const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
   const [bulkShareResultUrl, setBulkShareResultUrl] = React.useState('');
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
@@ -989,6 +994,65 @@ export function ChatGalleryModal({
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
   }), [filteredPhotos, brokenPhotoRevision]);
+  const selectedBulkPhotos = React.useMemo(() => {
+    if (activeTab !== 'photos' || selectedBulkShareKeys.size === 0) return [];
+    return visiblePhotos.filter(photo => selectedBulkShareKeys.has(getPhotoKey(photo)));
+  }, [activeTab, visiblePhotos, selectedBulkShareKeys]);
+  const selectedBulkTagTokens = React.useMemo(() => {
+    const counts = new Map();
+    selectedBulkPhotos.forEach(photo => normalizePhotoTagTokens(photo.tags).forEach(tag => {
+      counts.set(tag, (counts.get(tag) || 0) + 1);
+    }));
+    return Array.from(counts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .map(([tag, count]) => ({ tag, count }));
+  }, [selectedBulkPhotos]);
+  const applyBulkPhotoTags = async (operation, rawTags = bulkTagDraft) => {
+    const targetPhotos = selectedBulkPhotos;
+    const changes = buildBulkPhotoTagChanges(targetPhotos, operation, rawTags);
+    if (!targetPhotos.length) {
+      showToast?.('태그를 관리할 사진을 먼저 선택해 주세요.', 'error');
+      return;
+    }
+    if (!normalizePhotoTagTokens(rawTags).length) {
+      showToast?.('추가하거나 삭제할 태그를 입력해 주세요.', 'error');
+      return;
+    }
+    if (!changes.length) {
+      showToast?.(operation === 'remove' ? '선택한 사진에 해당 태그가 없습니다.' : '선택한 사진에는 이미 같은 태그가 있습니다.', 'info');
+      return;
+    }
+    const save = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof save !== 'function') {
+      showToast?.('일괄 태그 저장 기능을 준비하지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
+    setIsBulkTagSaving(true);
+    try {
+      const result = await save(changes);
+      if (!result?.ok) throw new Error('사진 태그 일괄 저장 실패');
+      const undoneChanges = changes.map(change => ({ ...change, tags: change.beforeTags }));
+      const label = operation === 'remove' ? '삭제' : '추가';
+      showToast?.(`사진 ${changes.length}장에 태그를 ${label}했습니다.`, 'success', 9000, () => {
+        const undoSave = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+        if (typeof undoSave !== 'function') return;
+        void undoSave(undoneChanges)
+          .then(undoResult => showToast?.(undoResult?.ok ? '태그 일괄 변경을 되돌렸습니다.' : '되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error'))
+          .catch(error => {
+            console.error('Bulk photo tag undo failed:', error);
+            showToast?.('태그 되돌리기에 실패했습니다.', 'error');
+          });
+      }, null, '되돌리기');
+      setBulkTagDraft('');
+      setIsBulkTagPanelOpen(false);
+      setSelectedBulkShareKeys(new Set());
+    } catch (error) {
+      console.error('Bulk photo tag save failed:', error);
+      showToast?.(String(error?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
+    } finally {
+      setIsBulkTagSaving(false);
+    }
+  };
   const [photoRenderLimit, setPhotoRenderLimit] = React.useState(24);
   const usingPhotoIndex = Array.isArray(indexedPhotos);
   const renderedPhotos = React.useMemo(
@@ -1331,6 +1395,8 @@ export function ChatGalleryModal({
   const handleToggleBulkShareMode = () => {
     setIsBulkShareMode(v => !v);
     setSelectedBulkShareKeys(new Set());
+    setIsBulkTagPanelOpen(false);
+    setBulkTagDraft('');
   };
   const handleClickBulkDelete = () => {
     const keys = Array.from(selectedBulkShareKeys);
@@ -1441,6 +1507,17 @@ export function ChatGalleryModal({
       );
     }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
+      activeTab === 'photos' && /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: () => setIsBulkTagPanelOpen(open => !open),
+        disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting || isBulkTagSaving,
+        title: "일괄 태그", "aria-label": "일괄 태그",
+        style: {
+          ...textBtn,
+          cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting || isBulkTagSaving) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting || isBulkTagSaving) ? 0.5 : 1
+        }
+      }, `태그${selectedBulkShareKeys.size ? ` (${selectedBulkShareKeys.size})` : ''}`),
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-danger",
         onClick: handleClickBulkDelete,
@@ -2361,15 +2438,58 @@ export function ChatGalleryModal({
       }
     }, tab.label))
   );
-  const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
+  const renderBulkTagPanel = () => (!isBulkShareMode || !isBulkTagPanelOpen || activeTab !== 'photos') ? null : /*#__PURE__*/React.createElement("section", {
+    className: "gallery-bulk-tag-panel",
+    "aria-label": "선택한 사진 태그 관리",
+    style: {
+      display: 'flex', flexDirection: 'column', gap: '8px', padding: isMobile ? '10px' : '12px',
+      border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)'
+    }
   },
-    (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
-    /*#__PURE__*/React.createElement("div", {
-      style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
-    },
-      renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("strong", { style: { color: 'var(--text-main)', fontSize: 'var(--font-size-sm)' } }, `선택한 사진 ${selectedBulkPhotos.length}장`),
+      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } }, '추가 또는 일괄 삭제')
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', alignItems: 'center', width: '100%' } },
+      /*#__PURE__*/React.createElement("input", {
+        type: "text", className: "form-input", value: bulkTagDraft,
+        onChange: event => setBulkTagDraft(event.target.value),
+        onKeyDown: event => { if (event.key === 'Enter') { event.preventDefault(); void applyBulkPhotoTags('add'); } },
+        placeholder: '태그 입력 (공백 또는 쉼표로 구분)', maxLength: 640,
+        style: { flex: 1, minWidth: 0, minHeight: '38px', borderRadius: 'var(--radius-full)' }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-dark", disabled: isBulkTagSaving,
+        onClick: () => { void applyBulkPhotoTags('add'); },
+        style: { minHeight: '38px', padding: '0 12px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', fontWeight: 800 }
+      }, isBulkTagSaving ? '저장 중' : '추가')
+    ),
+    selectedBulkTagTokens.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' } },
+      selectedBulkTagTokens.map(({ tag, count }) => /*#__PURE__*/React.createElement("button", {
+        key: tag, type: "button", title: `#${tag} 입력`, onClick: () => setBulkTagDraft(tag),
+        style: { minHeight: '26px', padding: '2px 9px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer' }
+      }, `#${tag}${count === selectedBulkPhotos.length ? '' : ` · ${count}`}`))
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-danger", disabled: isBulkTagSaving || !bulkTagDraft.trim(),
+        onClick: () => { void applyBulkPhotoTags('remove'); },
+        style: { minHeight: '34px', padding: '0 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
+      }, '입력한 태그 일괄 삭제')
     )
+  );
+  const renderPhotoListHeader = () => /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
+    },
+      (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
+      /*#__PURE__*/React.createElement("div", {
+        style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
+      },
+        renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
+      )
+    ),
+    renderBulkTagPanel()
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }

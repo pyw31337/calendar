@@ -183,6 +183,7 @@ export function createCalendarPhotoActions({
       || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))
     ));
     if (!targetPhoto) return false;
+    const targetDate = meeting.date || dateStr;
     const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
     if (!compressed.length) { setChatUploadProgress(null); return false; }
     try {
@@ -197,8 +198,14 @@ export function createCalendarPhotoActions({
         : m);
       const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '사진 교체완료');
       if (ok) {
-        deleteChatImageFromStorage(prevImageUrl);
-        deleteChatImageFromStorage(prevThumbUrl);
+        // A meeting-only photo can also be referenced by a chat, memo, or another meeting.
+        // Never delete its Storage objects optimistically: that was able to leave a live
+        // photoIndex row pointing at a 404 thumbnail. The shared guard reads both the local
+        // graph and the server index before removing an unreferenced asset.
+        await deleteAssetFilesIfUnreferenced(
+          { imageUrl: prevImageUrl, thumbUrl: prevThumbUrl },
+          { excludeMeetingDates: [targetDate] }
+        );
       }
       return ok ? resolved.imageUrl : false;
     } catch (err) {
@@ -662,10 +669,10 @@ export function createCalendarPhotoActions({
       thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
     }, memo.imageTagMap);
     const memoSnapshot = JSON.parse(JSON.stringify(memo));
-    const finalizeStorageDeletion = () => {
-      deleteChatImageFromStorage(removedUrl);
-      if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
-    };
+    const finalizeStorageDeletion = () => deleteAssetFilesIfUnreferenced(
+      { imageUrl: removedUrl, thumbUrl: removedThumb },
+      { excludeMemoId: memoId }
+    );
     try {
       const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
       const data = sanitizeMemoForFirestore({
@@ -751,8 +758,10 @@ export function createCalendarPhotoActions({
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 교체');
       if (!updated) throw new Error('Memo photo replace failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
-      deleteChatImageFromStorage(removedUrl);
-      if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
+      await deleteAssetFilesIfUnreferenced(
+        { imageUrl: removedUrl, thumbUrl: removedThumb },
+        { excludeMemoId: memoId }
+      );
       showToast('사진 교체완료', 'success');
       return resolved.imageUrl;
     } catch (err) {
