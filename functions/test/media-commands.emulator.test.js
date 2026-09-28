@@ -53,6 +53,7 @@ test('tagAsset writes the tag to the owning slot and every album copy in one tra
   assert.equal(result.ok, true);
   assert.equal(result.slotsTagged, 1);
   assert.equal(result.albumCopiesTagged, 2);
+  assert.equal(result.meetingReadScope, 'full-scan', 'legacy owner previews must retain the correctness-first fallback');
   const m1 = (await root.collection('messages').doc('m1').get()).data();
   assert.deepEqual(m1.imageTags, ['ta', '260919 서준 도은', 'tc']);
   assert.equal(m1.imageTagMap[getPhotoAssetKey(b.imageUrl)], '260919 서준 도은');
@@ -61,6 +62,34 @@ test('tagAsset writes the tag to the owning slot and every album copy in one tra
   assert.equal(d19.find(p => p.id === 'p1').tags, '260919 서준 도은');
   assert.equal(d19.find(p => p.id === 'p0').tags, 'ta');
   assert.equal(d20[0].tags, '260919 서준 도은');
+});
+
+test('tagAsset scopes complete owner projections to only the owning meetings', async () => {
+  await reset();
+  const { b } = await seed();
+  const indexRef = root.collection('photoIndex').doc(getPhotoAssetKey(b.imageUrl));
+  await indexRef.set({
+    owners: [
+      { sourceOwner: 'message:m1:1' },
+      { sourceOwner: 'meeting:2026-09-19:1' },
+      { sourceOwner: 'meeting:2026-09-20:0' },
+    ],
+    ownerCount: 3,
+    ownerListComplete: true,
+  }, { merge: true });
+  const unrelated = photo('unrelated');
+  await root.collection('confirmedMeetings').doc('unrelated').set({
+    date: '2026-09-21',
+    photos: [{ id: 'u', ...unrelated, tags: 'leave-me' }],
+  });
+
+  const result = await tagAsset({ db, calendarDocId: CAL, asset: b, tags: '완전한 소유 관계' });
+  assert.equal(result.ok, true);
+  assert.equal(result.meetingReadScope, 'owners');
+  assert.equal(result.meetingDocumentsRead, 2);
+  assert.equal(result.albumCopiesTagged, 2);
+  const untouched = (await root.collection('confirmedMeetings').doc('unrelated').get()).data().photos;
+  assert.equal(untouched[0].tags, 'leave-me');
 });
 
 test('bulkTagAssets updates multiple assets in one source and every meeting copy', async () => {

@@ -551,6 +551,9 @@ export function ChatGalleryModal({
     setSelectedBulkShareKeys(new Set());
   }; // 'photos' | 'links' | 'files' | 'analysis'
   const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
+  const [analysisPhotoCache, setAnalysisPhotoCache] = React.useState({});
+  const [isBatchApplying, setIsBatchApplying] = React.useState(false);
+  const [batchProgress, setBatchProgress] = React.useState({ current: 0, total: 0 });
   const [analysisAction, setAnalysisAction] = React.useState({ assetKey: '', mode: '', draft: '' });
   const [analysisSavingAssetKey, setAnalysisSavingAssetKey] = React.useState('');
   const loadMediaAnalysis = React.useCallback((force = false) => {
@@ -587,7 +590,7 @@ export function ChatGalleryModal({
     updateAnalysisReview(item.assetKey, review);
     return review;
   }, [calendar?.id, updateAnalysisReview]);
-  const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied') => {
+  const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied', { silent = false } = {}) => {
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!onSaveImageTags) throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
@@ -624,11 +627,39 @@ export function ChatGalleryModal({
       }
       await saveAnalysisReview(item, decision, finalTags, requestedTags);
       setAnalysisAction({ assetKey: '', mode: '', draft: '' });
-      showToast(changed ? 'AI 제안 태그를 적용했어요.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했어요.', 'success');
+      if (!silent) {
+        showToast(changed ? 'AI 제안 태그를 적용했어요.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했어요.', 'success');
+      }
     } finally {
       setAnalysisSavingAssetKey('');
     }
   }, [calendar?.id, onSaveImageTags, saveAnalysisReview, showToast]);
+  const handleBatchApplyAnalysis = React.useCallback(async () => {
+    const unreviewed = (mediaAnalysis.items || []).filter(item => !item.review && item.assetKey);
+    if (!unreviewed.length) {
+      showToast('처리할 미검토 항목이 없습니다.', 'info');
+      return;
+    }
+    setIsBatchApplying(true);
+    setBatchProgress({ current: 0, total: unreviewed.length });
+    let successCount = 0;
+    try {
+      for (let i = 0; i < unreviewed.length; i++) {
+        const item = unreviewed[i];
+        setBatchProgress({ current: i + 1, total: unreviewed.length });
+        try {
+          await applyAnalysisTags(item, getAnalysisSuggestedTags(item), 'applied', { silent: true });
+          successCount++;
+        } catch (e) {
+          console.warn('Batch apply failed for', item.assetKey, e);
+        }
+      }
+      showToast(`미검토 사진 ${successCount}장에 AI 추천 태그를 일괄 적용했습니다.`, 'success');
+    } finally {
+      setIsBatchApplying(false);
+      setBatchProgress({ current: 0, total: 0 });
+    }
+  }, [mediaAnalysis.items, applyAnalysisTags, showToast]);
   const rejectAnalysisTags = React.useCallback(async item => {
     if (!item?.assetKey) return;
     setAnalysisSavingAssetKey(item.assetKey);
@@ -951,6 +982,52 @@ export function ChatGalleryModal({
       })
     }));
   }, [chatMessages, memos, calendar, indexedPhotos]);
+
+  const photoByAssetKey = React.useMemo(() => {
+    const map = new Map();
+    (sharedPhotos || []).forEach(p => {
+      const k1 = p.assetKey;
+      const k2 = p.mediaKey;
+      const k3 = p.refKey;
+      if (k1) map.set(k1, p);
+      if (k2 && !map.has(k2)) map.set(k2, p);
+      if (k3 && !map.has(k3)) map.set(k3, p);
+    });
+    return map;
+  }, [sharedPhotos]);
+
+  React.useEffect(() => {
+    if (activeTab !== 'analysis' || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId) return;
+
+    const missingKeys = mediaAnalysis.items
+      .map(item => item.assetKey)
+      .filter(key => key && !photoByAssetKey.has(key) && !analysisPhotoCache[key]);
+
+    if (missingKeys.length === 0) return;
+
+    let canceled = false;
+    const fetchMissingPhotos = async () => {
+      const updates = {};
+      await Promise.all(
+        missingKeys.slice(0, 30).map(async key => {
+          try {
+            const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: key });
+            if (photo && (photo.thumb || photo.full || photo.imageUrl)) {
+              updates[key] = photo;
+            }
+          } catch (_) {}
+        })
+      );
+      if (!canceled && Object.keys(updates).length > 0) {
+        setAnalysisPhotoCache(previous => ({ ...previous, ...updates }));
+      }
+    };
+    void fetchMissingPhotos();
+    return () => { canceled = true; };
+  }, [activeTab, mediaAnalysis.items, photoByAssetKey, analysisPhotoCache, calendar?.id]);
 
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
@@ -2596,63 +2673,645 @@ export function ChatGalleryModal({
   );
   const renderGalleryContent = () => {
     if (activeTab === 'analysis') {
-      const chips = (values, color = 'var(--accent-primary)') => (Array.isArray(values) ? values : []).slice(0, 12).map(value => /*#__PURE__*/React.createElement('span', {
-        key: value,
-        style: { display: 'inline-flex', alignItems: 'center', minHeight: '24px', padding: '2px 9px', borderRadius: 'var(--radius-full)', background: 'var(--bg-secondary)', color, fontSize: 'var(--font-size-xs)', fontWeight: 800 }
-      }, `#${value}`));
+      const unreviewedCount = (mediaAnalysis.items || []).filter(item => !item.review).length;
+      const renderChips = (values, colorType = 'accent') => {
+        const bgMap = {
+          people: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+          places: 'color-mix(in srgb, var(--status-green, #10b981) 12%, transparent)',
+          meetings: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+          accent: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)'
+        };
+        const colorMap = {
+          people: 'var(--status-danger, #e11d48)',
+          places: 'var(--status-green, #10b981)',
+          meetings: 'var(--accent-primary)',
+          accent: 'var(--accent-primary)'
+        };
+        const borderMap = {
+          people: 'color-mix(in srgb, var(--status-danger, #e11d48) 22%, transparent)',
+          places: 'color-mix(in srgb, var(--status-green, #10b981) 22%, transparent)',
+          meetings: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)',
+          accent: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)'
+        };
+        return (Array.isArray(values) ? values : []).slice(0, 16).map(value => /*#__PURE__*/React.createElement('span', {
+          key: value,
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: '26px',
+            padding: '2px 10px',
+            borderRadius: 'var(--radius-full)',
+            background: bgMap[colorType] || bgMap.accent,
+            color: colorMap[colorType] || colorMap.accent,
+            border: `1px solid ${borderMap[colorType] || borderMap.accent}`,
+            fontSize: 'var(--font-size-xs, 12px)',
+            fontWeight: 800,
+            whiteSpace: 'nowrap'
+          }
+        }, `#${value}`));
+      };
+
       return /*#__PURE__*/React.createElement('section', {
         className: 'media-analysis-feed',
-        style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 0 20px' },
+        style: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '12px 0 24px' },
         'aria-label': 'AI 사진 분석 추천'
       },
-        /*#__PURE__*/React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' } },
-          /*#__PURE__*/React.createElement('p', { style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } }, '로컬 Mac 분석기가 올린 추천입니다. 기존 사진·태그는 자동으로 바뀌지 않습니다.'),
-          /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', onClick: () => void loadMediaAnalysis(true), disabled: mediaAnalysis.loading, style: { minHeight: '36px', whiteSpace: 'nowrap', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, mediaAnalysis.loading ? '불러오는 중' : '새로고침')
-        ),
-        mediaAnalysis.error && /*#__PURE__*/React.createElement('p', { role: 'alert', style: { margin: 0, color: 'var(--status-danger)', fontSize: 'var(--font-size-sm)' } }, mediaAnalysis.error),
-        !mediaAnalysis.loading && !mediaAnalysis.error && mediaAnalysis.items.length === 0 && /*#__PURE__*/React.createElement('p', { style: { margin: '28px 0', textAlign: 'center', color: 'var(--text-muted)' } }, '서버에 올라온 분석 추천이 없습니다.'),
-        mediaAnalysis.items.map(item => /*#__PURE__*/React.createElement('article', {
-          key: item.id,
-          style: { display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-card)' }
+        /* Top summary and batch action toolbar */
+        /*#__PURE__*/React.createElement('div', {
+          className: 'v2-analysis-header-toolbar',
+          style: {
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '14px 18px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--v2-card-border, var(--border-subtle))',
+            borderRadius: 'var(--radius-lg, 16px)',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
+          }
         },
-          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: '8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
-            /*#__PURE__*/React.createElement('span', null, item.assetKey ? '사진 분석' : '로컬 사진 분석'),
-            /*#__PURE__*/React.createElement('time', null, formatMediaAnalysisTime(item.lastReceivedAt || item.analyzedAt))
+          /* Left summary info */
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+            /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+              /*#__PURE__*/React.createElement('span', { style: { fontWeight: 900, color: 'var(--text-main)', fontSize: 'var(--font-size-md, 15px)' } }, 'AI 사진 분석 추천'),
+              /*#__PURE__*/React.createElement('span', {
+                style: {
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '2px 9px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--accent-tint, rgba(124, 47, 229, 0.1))',
+                  color: 'var(--accent-primary)',
+                  fontSize: 'var(--font-size-xs, 12px)',
+                  fontWeight: 800
+                }
+              }, `미처리 ${unreviewedCount}건 / 전체 ${mediaAnalysis.items.length}건`)
+            ),
+            /*#__PURE__*/React.createElement('p', {
+              style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', lineHeight: 1.4 }
+            }, '로컬 Mac 분석기가 인식한 태그 추천입니다. 적용 시 사진에 태그가 즉시 저장됩니다.')
           ),
-          chips(item.suggestedTags),
-          (item.people?.length || item.places?.length || item.meetings?.length) > 0 && /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
-            chips(item.people, 'var(--status-danger)'), chips(item.places, 'var(--status-green)'), chips(item.meetings, 'var(--accent-primary)')
+          /* Right action buttons */
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+            unreviewedCount > 0 && /*#__PURE__*/React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-action',
+              disabled: isBatchApplying || mediaAnalysis.loading,
+              onClick: handleBatchApplyAnalysis,
+              style: {
+                minHeight: '36px',
+                padding: '0 16px',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--accent-primary)',
+                color: 'var(--on-brand, #fff)',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: 'var(--font-size-sm, 13px)',
+                cursor: isBatchApplying ? 'wait' : 'pointer',
+                boxShadow: '0 2px 6px rgba(124, 47, 229, 0.25)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }
+            },
+              /* Sparkle icon */
+              /*#__PURE__*/React.createElement('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'currentColor' },
+                /*#__PURE__*/React.createElement('path', { d: 'm12 2 2.4 7.2L21.6 12l-7.2 2.8L12 22l-2.4-7.2L2.4 12l7.2-2.8L12 2z' })
+              ),
+              isBatchApplying
+                ? `적용 중 (${batchProgress.current}/${batchProgress.total})…`
+                : `미처리 전체 태그 적용 (${unreviewedCount})`
+            ),
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-action',
+              onClick: () => void loadMediaAnalysis(true),
+              disabled: mediaAnalysis.loading || isBatchApplying,
+              style: {
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-main)',
+                border: '1px solid var(--border-subtle)',
+                fontWeight: 700,
+                fontSize: 'var(--font-size-sm, 13px)',
+                cursor: mediaAnalysis.loading ? 'wait' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }
+            },
+              /* Refresh icon */
+              /*#__PURE__*/React.createElement('svg', {
+                width: '13',
+                height: '13',
+                viewBox: '0 0 24 24',
+                fill: 'none',
+                stroke: 'currentColor',
+                strokeWidth: '2.5',
+                strokeLinecap: 'round',
+                strokeLinejoin: 'round'
+              },
+                /*#__PURE__*/React.createElement('path', { d: 'M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2' })
+              ),
+              mediaAnalysis.loading ? '불러오는 중…' : '새로고침'
+            )
+          )
+        ),
+        mediaAnalysis.error && /*#__PURE__*/React.createElement('p', {
+          role: 'alert',
+          style: { margin: 0, padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'color-mix(in srgb, var(--status-danger) 10%, var(--bg-card))', color: 'var(--status-danger)', fontSize: 'var(--font-size-sm)' }
+        }, mediaAnalysis.error),
+        !mediaAnalysis.loading && !mediaAnalysis.error && mediaAnalysis.items.length === 0 && /*#__PURE__*/React.createElement('div', {
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '48px 16px',
+            textAlign: 'center',
+            color: 'var(--text-muted)'
+          }
+        },
+          /* Check circle icon */
+          /*#__PURE__*/React.createElement('svg', { width: '36', height: '36', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8' },
+            /*#__PURE__*/React.createElement('path', { d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' }),
+            /*#__PURE__*/React.createElement('polyline', { points: '22 4 12 14.01 9 11.01' })
           ),
-          item.ocrText?.length > 0 && /*#__PURE__*/React.createElement('p', { style: { margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } }, item.ocrText.join(' · ')),
-          item.review
-            ? /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 800 } },
-                /*#__PURE__*/React.createElement('span', { style: { display: 'inline-flex', minHeight: '24px', alignItems: 'center', padding: '2px 9px', borderRadius: 'var(--radius-full)', background: item.review.decision === 'rejected' ? 'var(--bg-secondary)' : 'var(--status-success-bg, #DCFCE7)', color: item.review.decision === 'rejected' ? 'var(--text-muted)' : 'var(--status-success, #15803D)' } },
-                  item.review.decision === 'rejected' ? '제외함' : item.review.decision === 'edited' ? '수정 적용함' : '적용함'),
-                item.review.finalTags?.length > 0 && /*#__PURE__*/React.createElement('span', null, item.review.finalTags.map(tag => `#${tag}`).join(' '))
-              )
-            : /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '2px' } },
-                analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit' && /*#__PURE__*/React.createElement('input', {
-                  type: 'text',
-                  value: analysisAction.draft,
-                  onChange: event => setAnalysisAction(previous => ({ ...previous, draft: event.target.value })),
-                  placeholder: '적용할 태그를 공백 또는 쉼표로 구분',
-                  maxLength: 640,
-                  style: { width: '100%', boxSizing: 'border-box', minHeight: '38px', padding: '0 12px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-main)' }
-                }),
-                /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
-                  analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit'
-                    ? /*#__PURE__*/React.createElement(React.Fragment, null,
-                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-dark', disabled: analysisSavingAssetKey === item.assetKey, onClick: () => { void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error')); }, style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, analysisSavingAssetKey === item.assetKey ? '저장 중' : '수정 적용'),
-                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', disabled: analysisSavingAssetKey === item.assetKey, onClick: () => setAnalysisAction({ assetKey: '', mode: '', draft: '' }), style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, '취소')
-                      )
-                    : /*#__PURE__*/React.createElement(React.Fragment, null,
-                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-dark', disabled: analysisSavingAssetKey === item.assetKey || !onSaveImageTags, onClick: () => { void applyAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error')); }, style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, analysisSavingAssetKey === item.assetKey ? '적용 중' : '태그 적용'),
-                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', disabled: analysisSavingAssetKey === item.assetKey || !onSaveImageTags, onClick: () => setAnalysisAction({ assetKey: item.assetKey, mode: 'edit', draft: getAnalysisSuggestedTags(item).join(' ') }), style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, '수정'),
-                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', disabled: analysisSavingAssetKey === item.assetKey, onClick: () => { void rejectAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error')); }, style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, analysisSavingAssetKey === item.assetKey ? '저장 중' : '제외')
-                      )
+          /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 14px)', fontWeight: 700 } }, '새로운 AI 분석 추천이 없습니다.'),
+          /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)' } }, '로컬 Mac 분석기가 사진을 감지하면 여기에 추천 태그가 표시됩니다.')
+        ),
+        mediaAnalysis.items.map(item => {
+          const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+          const thumbUrl = photo?.thumb || photo?.full || photo?.imageUrl || '';
+          const fullUrl = photo?.full || photo?.imageUrl || photo?.thumb || '';
+          const isSaving = analysisSavingAssetKey === item.assetKey;
+          const isEditing = analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit';
+          const suggestedTags = getAnalysisSuggestedTags(item);
+
+          return /*#__PURE__*/React.createElement('article', {
+            key: item.id,
+            className: 'v2-analysis-card',
+            style: {
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'flex-start',
+              gap: isMobile ? '12px' : '16px',
+              padding: '16px',
+              border: '1px solid var(--v2-card-border, var(--border-subtle))',
+              borderRadius: 'var(--radius-lg, 16px)',
+              background: 'var(--bg-card)',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              position: 'relative'
+            }
+          },
+            /* Left: Photo Thumbnail */
+            /*#__PURE__*/React.createElement('div', {
+              className: 'v2-analysis-thumb-wrap',
+              style: {
+                position: 'relative',
+                width: isMobile ? '100%' : '110px',
+                height: isMobile ? '190px' : '110px',
+                minWidth: isMobile ? 'auto' : '110px',
+                borderRadius: 'var(--radius-md, 12px)',
+                overflow: 'hidden',
+                flexShrink: 0,
+                background: 'var(--bg-secondary)',
+                cursor: fullUrl ? 'pointer' : 'default',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              },
+              title: fullUrl ? '클릭하여 사진 원본 보기' : '사진을 불러오는 중',
+              onClick: () => {
+                if (!fullUrl) return;
+                if (typeof setActiveLightbox === 'function') {
+                  setActiveLightbox({
+                    urls: [fullUrl],
+                    index: 0,
+                    meta: [{
+                      ...(photo || {}),
+                      full: fullUrl,
+                      thumb: thumbUrl,
+                      assetKey: item.assetKey,
+                      mediaKey: item.assetKey,
+                      tags: photo?.tags || suggestedTags.join(' ')
+                    }]
+                  });
+                }
+              }
+            },
+              thumbUrl
+                ? /*#__PURE__*/React.createElement('img', {
+                    src: thumbUrl,
+                    alt: '분석 대상 사진',
+                    loading: 'lazy',
+                    decoding: 'async',
+                    referrerPolicy: 'no-referrer',
+                    style: {
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }
+                  })
+                : /*#__PURE__*/React.createElement('div', {
+                    style: {
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      color: 'var(--text-muted)'
+                    }
+                  },
+                    /* Photo icon */
+                    /*#__PURE__*/React.createElement('svg', {
+                      width: '24',
+                      height: '24',
+                      viewBox: '0 0 24 24',
+                      fill: 'none',
+                      stroke: 'currentColor',
+                      strokeWidth: '1.8'
+                    },
+                      /*#__PURE__*/React.createElement('rect', { x: '3', y: '3', width: '18', height: '18', rx: '3' }),
+                      /*#__PURE__*/React.createElement('circle', { cx: '8.5', cy: '8.5', r: '1.5' }),
+                      /*#__PURE__*/React.createElement('path', { d: 'm21 15-5-5L5 21' })
+                    ),
+                    /*#__PURE__*/React.createElement('span', { style: { fontSize: '11px', fontWeight: 600 } }, '사진 로딩 중')
+                  ),
+              fullUrl && /*#__PURE__*/React.createElement('div', {
+                style: {
+                  position: 'absolute',
+                  right: '6px',
+                  bottom: '6px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  pointerEvents: 'none'
+                }
+              },
+                /* Magnifier icon */
+                /*#__PURE__*/React.createElement('svg', {
+                  width: '13',
+                  height: '13',
+                  viewBox: '0 0 24 24',
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  strokeWidth: '2.5',
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round'
+                },
+                  /*#__PURE__*/React.createElement('circle', { cx: '11', cy: '11', r: '8' }),
+                  /*#__PURE__*/React.createElement('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' })
                 )
               )
-        ))
+            ),
+            /* Right: Content details and actions */
+            /*#__PURE__*/React.createElement('div', {
+              className: 'v2-analysis-content',
+              style: {
+                flex: '1 1 auto',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                width: '100%'
+              }
+            },
+              /* Card header: Badge + existing tags + time */
+              /*#__PURE__*/React.createElement('div', {
+                style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+              },
+                /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+                  /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'var(--accent-tint, rgba(124, 47, 229, 0.08))',
+                      color: 'var(--accent-primary)',
+                      fontSize: 'var(--font-size-xs, 12px)',
+                      fontWeight: 800
+                    }
+                  },
+                    /* Sparkle icon */
+                    /*#__PURE__*/React.createElement('svg', { width: '12', height: '12', viewBox: '0 0 24 24', fill: 'currentColor' },
+                      /*#__PURE__*/React.createElement('path', { d: 'm12 2 2.4 7.2L21.6 12l-7.2 2.8L12 22l-2.4-7.2L2.4 12l7.2-2.8L12 2z' })
+                    ),
+                    item.assetKey ? '사진 분석' : '로컬 사진 분석'
+                  ),
+                  photo?.tags && /*#__PURE__*/React.createElement('span', {
+                    style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' },
+                    title: `기존 등록 태그: ${photo.tags}`
+                  }, `기존: ${photo.tags.slice(0, 32)}${photo.tags.length > 32 ? '…' : ''}`)
+                ),
+                /*#__PURE__*/React.createElement('time', {
+                  style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', whiteSpace: 'nowrap' }
+                }, formatMediaAnalysisTime(item.lastReceivedAt || item.analyzedAt))
+              ),
+              /* Tags chips */
+              /*#__PURE__*/React.createElement('div', {
+                style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }
+              },
+                renderChips(item.suggestedTags, 'accent'),
+                renderChips(item.people, 'people'),
+                renderChips(item.places, 'places'),
+                renderChips(item.meetings, 'meetings'),
+                suggestedTags.length === 0 && /*#__PURE__*/React.createElement('span', {
+                  style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)' }
+                }, '추천 태그 없음')
+              ),
+              /* OCR Text */
+              item.ocrText?.length > 0 && /*#__PURE__*/React.createElement('div', {
+                style: {
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                  fontSize: 'var(--font-size-xs, 12px)',
+                  lineHeight: 1.45,
+                  wordBreak: 'break-all'
+                }
+              },
+                /*#__PURE__*/React.createElement('span', { style: { fontWeight: 700, color: 'var(--text-muted)', marginRight: '6px' } }, '텍스트 인식:'),
+                item.ocrText.join(' · ')
+              ),
+              /* Action row or Review state */
+              item.review
+                ? /*#__PURE__*/React.createElement('div', {
+                    style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '4px' }
+                  },
+                    /*#__PURE__*/React.createElement('span', {
+                      style: {
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        minHeight: '26px',
+                        padding: '2px 10px',
+                        borderRadius: 'var(--radius-full)',
+                        background: item.review.decision === 'rejected'
+                          ? 'var(--bg-secondary)'
+                          : 'var(--status-success-bg, #DCFCE7)',
+                        color: item.review.decision === 'rejected'
+                          ? 'var(--text-muted)'
+                          : 'var(--status-success, #15803D)',
+                        fontSize: 'var(--font-size-xs, 12px)',
+                        fontWeight: 800
+                      }
+                    },
+                      item.review.decision === 'rejected'
+                        ? '✕ 제외됨'
+                        : (item.review.decision === 'edited' ? '✓ 수정 적용됨' : '✓ 태그 적용 완료')
+                    ),
+                    item.review.finalTags?.length > 0 && /*#__PURE__*/React.createElement('div', {
+                      style: { display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }
+                    },
+                      item.review.finalTags.map(tag => /*#__PURE__*/React.createElement('span', {
+                        key: tag,
+                        style: {
+                          fontSize: 'var(--font-size-xs, 12px)',
+                          fontWeight: 700,
+                          color: 'var(--text-secondary)',
+                          background: 'var(--bg-secondary)',
+                          padding: '1px 7px',
+                          borderRadius: 'var(--radius-full)'
+                        }
+                      }, `#${tag}`))
+                    ),
+                    /* Re-edit option */
+                    /*#__PURE__*/React.createElement('button', {
+                      type: 'button',
+                      onClick: () => setAnalysisAction({
+                        assetKey: item.assetKey,
+                        mode: 'edit',
+                        draft: (item.review.finalTags?.length ? item.review.finalTags : suggestedTags).join(' ')
+                      }),
+                      style: {
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: 'var(--font-size-xs, 12px)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        padding: '2px 6px'
+                      }
+                    }, '다시 수정')
+                  )
+                : /*#__PURE__*/React.createElement('div', {
+                    style: { display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '2px' }
+                  },
+                    isEditing
+                      ? /*#__PURE__*/React.createElement('div', {
+                          style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+                        },
+                          /*#__PURE__*/React.createElement('input', {
+                            type: 'text',
+                            value: analysisAction.draft,
+                            onChange: event => setAnalysisAction(previous => ({ ...previous, draft: event.target.value })),
+                            placeholder: '적용할 태그를 공백 또는 쉼표로 구분',
+                            maxLength: 640,
+                            autoFocus: true,
+                            style: {
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              minHeight: '40px',
+                              padding: '0 14px',
+                              borderRadius: 'var(--radius-md, 8px)',
+                              border: '1.5px solid var(--accent-primary)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-main)',
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              outline: 'none'
+                            },
+                            onKeyDown: e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error'));
+                              } else if (e.key === 'Escape') {
+                                setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+                              }
+                            }
+                          }),
+                          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+                            /*#__PURE__*/React.createElement('button', {
+                              type: 'button',
+                              className: 'btn btn-action',
+                              disabled: isSaving,
+                              onClick: () => {
+                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error'));
+                              },
+                              style: {
+                                minHeight: '34px',
+                                padding: '0 14px',
+                                borderRadius: 'var(--radius-full)',
+                                background: 'var(--accent-primary)',
+                                color: 'var(--on-brand, #fff)',
+                                border: 'none',
+                                fontWeight: 800,
+                                fontSize: 'var(--font-size-xs, 12px)',
+                                cursor: 'pointer'
+                              }
+                            }, isSaving ? '저장 중…' : '수정 적용'),
+                            /*#__PURE__*/React.createElement('button', {
+                              type: 'button',
+                              className: 'btn btn-action',
+                              disabled: isSaving,
+                              onClick: () => setAnalysisAction({ assetKey: '', mode: '', draft: '' }),
+                              style: {
+                                minHeight: '34px',
+                                padding: '0 12px',
+                                borderRadius: 'var(--radius-full)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-muted)',
+                                border: '1px solid var(--border-subtle)',
+                                fontWeight: 700,
+                                fontSize: 'var(--font-size-xs, 12px)',
+                                cursor: 'pointer'
+                              }
+                            }, '취소')
+                          )
+                        )
+                      : /*#__PURE__*/React.createElement('div', {
+                          style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }
+                        },
+                          /* Primary: 태그 적용 */
+                          /*#__PURE__*/React.createElement('button', {
+                            type: 'button',
+                            className: 'btn btn-action',
+                            disabled: isSaving || !onSaveImageTags,
+                            onClick: () => {
+                              void applyAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error'));
+                            },
+                            style: {
+                              minHeight: '36px',
+                              padding: '0 16px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--accent-primary)',
+                              color: 'var(--on-brand, #fff)',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              cursor: isSaving ? 'wait' : 'pointer',
+                              boxShadow: '0 2px 6px rgba(124, 47, 229, 0.25)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }
+                          },
+                            /* Check icon */
+                            /*#__PURE__*/React.createElement('svg', {
+                              width: '14',
+                              height: '14',
+                              viewBox: '0 0 24 24',
+                              fill: 'none',
+                              stroke: 'currentColor',
+                              strokeWidth: '2.5',
+                              strokeLinecap: 'round',
+                              strokeLinejoin: 'round'
+                            },
+                              /*#__PURE__*/React.createElement('polyline', { points: '20 6 9 17 4 12' })
+                            ),
+                            isSaving ? '적용 중…' : '태그 적용'
+                          ),
+                          /* Secondary: 수정 */
+                          /*#__PURE__*/React.createElement('button', {
+                            type: 'button',
+                            className: 'btn btn-action',
+                            disabled: isSaving || !onSaveImageTags,
+                            onClick: () => setAnalysisAction({
+                              assetKey: item.assetKey,
+                              mode: 'edit',
+                              draft: suggestedTags.join(' ')
+                            }),
+                            style: {
+                              minHeight: '36px',
+                              padding: '0 14px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-main)',
+                              border: '1px solid var(--border-subtle)',
+                              fontWeight: 700,
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }
+                          },
+                            /* Edit icon */
+                            /*#__PURE__*/React.createElement('svg', {
+                              width: '13',
+                              height: '13',
+                              viewBox: '0 0 24 24',
+                              fill: 'none',
+                              stroke: 'currentColor',
+                              strokeWidth: '2.2',
+                              strokeLinecap: 'round',
+                              strokeLinejoin: 'round'
+                            },
+                              /*#__PURE__*/React.createElement('path', { d: 'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z' })
+                            ),
+                            '수정'
+                          ),
+                          /* Tertiary: 제외 */
+                          /*#__PURE__*/React.createElement('button', {
+                            type: 'button',
+                            className: 'btn btn-action',
+                            disabled: isSaving,
+                            onClick: () => {
+                              void rejectAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error'));
+                            },
+                            style: {
+                              minHeight: '36px',
+                              padding: '0 14px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-muted)',
+                              border: '1px solid var(--border-subtle)',
+                              fontWeight: 700,
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              cursor: isSaving ? 'wait' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }
+                          },
+                            /* X icon */
+                            /*#__PURE__*/React.createElement('svg', {
+                              width: '13',
+                              height: '13',
+                              viewBox: '0 0 24 24',
+                              fill: 'none',
+                              stroke: 'currentColor',
+                              strokeWidth: '2.2',
+                              strokeLinecap: 'round',
+                              strokeLinejoin: 'round'
+                            },
+                              /*#__PURE__*/React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
+                              /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
+                            ),
+                            isSaving ? '저장 중…' : '제외'
+                          )
+                        )
+                  )
+            )
+          );
+        })
       );
     }
     if (activeTab === 'photos' && usingPhotoIndex && indexedPhotoStatus !== 'ready') {

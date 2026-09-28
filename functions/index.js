@@ -328,9 +328,12 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const ownersByAsset = new Map();
   const addOwners = (sourceType, snapshot, idField = null) => snapshot.docs.forEach(doc => {
     getPhotoIndexEntries(sourceType, idField ? String(doc.data()?.[idField] || doc.id) : doc.id, doc.data() || {}).forEach(entry => {
-      const owners = ownersByAsset.get(entry.assetKey) || [];
-      if (!owners.some(owner => owner.sourceOwner === entry.sourceOwner)) owners.push(entry);
-      ownersByAsset.set(entry.assetKey, owners.slice(0, 12));
+    const owners = ownersByAsset.get(entry.assetKey) || [];
+    if (!owners.some(owner => owner.sourceOwner === entry.sourceOwner)) owners.push(entry);
+    // Keep the complete set while rebuilding. The persisted row keeps a bounded owner preview,
+    // but its completeness marker lets mutation commands avoid reading unrelated meetings.
+    // Older rows without this marker deliberately retain the safe full-scan behaviour.
+    ownersByAsset.set(entry.assetKey, owners);
     });
   });
   addOwners('message', byName.messages);
@@ -341,21 +344,28 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const rows = [];
   let dataUrlBytes = 0;
   let dataUrlRows = 0;
-  ownersByAsset.forEach((owners, assetKey) => {
-    const selected = selectPhotoIndexOwner(owners);
+  ownersByAsset.forEach((allOwners, assetKey) => {
+    const owners = allOwners.slice().sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b)
+      || Number(b.timestamp || 0) - Number(a.timestamp || 0));
+    const ownerCount = owners.length;
+    const ownerListComplete = ownerCount <= 12;
+    const persistedOwners = owners.slice(0, 12);
+    const selected = selectPhotoIndexOwner(persistedOwners);
     if (!selected) return;
-    const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
+    const legacyKeys = Array.from(new Set(persistedOwners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
     const commentCount = Math.max(0, ...[assetKey, ...legacyKeys].map(key => Number(commentCounts.get(key) || 0)));
     if (String(selected.full || '').startsWith('data:') || String(selected.thumb || '').startsWith('data:')) {
       dataUrlRows += 1;
       dataUrlBytes += String(selected.full || '').length + String(selected.thumb || '').length;
     }
-    const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
+    const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
     rows.push({
       ...selected,
       assetKey,
       legacyKeys,
-      owners,
+      owners: persistedOwners,
+      ownerCount,
+      ownerListComplete,
       commentCount,
       tags: tagState.tags,
       tagCacheVersion: 2,
@@ -429,29 +439,37 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       ? await transaction.get(db.collection('calendars').doc(context.params.calendarDocId).collection('photoComments').doc(assetKey))
       : null;
     let owners = Array.isArray(existing.owners) ? existing.owners.filter(owner => owner && typeof owner === 'object') : [];
+    // A missing marker means this is a pre-completeness row. Never guess that its bounded owner
+    // preview is exhaustive: media mutations retain their correctness-first full meeting scan
+    // until the nightly/admin rebuild stamps a complete projection.
+    const ownerListWasComplete = !snapshot.exists || existing.ownerListComplete === true;
     if (!owners.length && existing.sourceOwner && existing.full) owners = [{ ...existing }];
     owners = owners.filter(owner => !String(owner.sourceOwner || '').startsWith(ownerRoot));
     if (replacement) owners.push(replacement);
     owners = owners
       .filter((owner, index, list) => list.findIndex(candidate => candidate.sourceOwner === owner.sourceOwner) === index)
-      .sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0))
-      .slice(0, 12);
+      .sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0));
     if (!owners.length) {
       transaction.delete(ref);
       return;
     }
-    const selected = owners[0];
-    const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
+    const ownerCount = ownerListWasComplete ? owners.length : Math.max(Number(existing.ownerCount) || 0, owners.length);
+    const ownerListComplete = ownerListWasComplete && ownerCount <= 12;
+    const persistedOwners = owners.slice(0, 12);
+    const selected = persistedOwners[0];
+    const legacyKeys = Array.from(new Set(persistedOwners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
     const existingComments = commentSnapshot?.exists && Array.isArray(commentSnapshot.data()?.comments)
       ? commentSnapshot.data().comments.length : 0;
-    const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
-    const geo = pickPhotoIndexGeo(owners, existing);
+    const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
+    const geo = pickPhotoIndexGeo(persistedOwners, existing);
     transaction.set(ref, {
       ...selected,
       ...geo,
       assetKey,
       legacyKeys,
-      owners,
+      owners: persistedOwners,
+      ownerCount,
+      ownerListComplete,
       commentCount: Math.max(0, Number(existing.commentCount || 0), existingComments),
       tags: tagState.tags,
       tagCacheVersion: 2,

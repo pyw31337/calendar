@@ -86,6 +86,38 @@ function ownerDocIds(indexData) {
   return ids;
 }
 
+// `owners` is intentionally a bounded preview in photoIndex.  A row explicitly marked as
+// complete can safely scope meeting mutations to the listed documents; unmarked legacy rows
+// retain the full scan so an older, truncated projection can never leave an album copy stale.
+function meetingOwnerScope(indexData) {
+  const owners = Array.isArray(indexData?.owners) ? indexData.owners : [];
+  const ids = new Set();
+  owners.forEach(owner => {
+    const match = String(owner?.sourceOwner || '').match(/^meeting:(.+):\d+$/);
+    if (match?.[1]) ids.add(match[1]);
+  });
+  return { ids, complete: indexData?.ownerListComplete === true };
+}
+
+function mergeMeetingOwnerScopes(scopes) {
+  const ids = new Set();
+  let complete = true;
+  (Array.isArray(scopes) ? scopes : []).forEach(scope => {
+    if (!scope?.complete) complete = false;
+    (scope?.ids || []).forEach(id => ids.add(id));
+  });
+  return { ids, complete };
+}
+
+function meetingSnapshots(read) {
+  return Array.isArray(read) ? read : (read?.docs || []);
+}
+
+function readMeetingDocuments(transaction, root, scope) {
+  if (!scope?.complete) return transaction.get(root.collection('confirmedMeetings'));
+  return Promise.all(Array.from(scope.ids).map(id => transaction.get(root.collection('confirmedMeetings').doc(id))));
+}
+
 function getDirectMediaTagKey(url) {
   const source = String(normalizePhotoAssetUrl(url) || url || '');
   let hash = 2166136261;
@@ -158,17 +190,19 @@ async function deleteAsset({ db, calendarDocId, asset, now = Date.now() }) {
   if (!assetKey) return { ok: false, reason: 'invalid-asset' };
   const indexSnap = await root.collection('photoIndex').doc(assetKey).get();
   const owners = ownerDocIds(indexSnap.exists ? indexSnap.data() : null);
+  const meetingScope = meetingOwnerScope(indexSnap.exists ? indexSnap.data() : null);
   (asset.messageId ? [asset.messageId] : []).forEach(id => owners.messages.add(id));
   (asset.memoId ? [asset.memoId] : []).forEach(id => owners.memos.add(id));
 
   return db.runTransaction(async tx => {
     const messageRefs = Array.from(owners.messages).map(id => root.collection('messages').doc(id));
     const memoRefs = Array.from(owners.memos).map(id => root.collection('memos').doc(id));
-    const [messageSnaps, memoSnaps, meetingsSnap] = await Promise.all([
+    const [messageSnaps, memoSnaps, meetingRead] = await Promise.all([
       Promise.all(messageRefs.map(ref => tx.get(ref))),
       Promise.all(memoRefs.map(ref => tx.get(ref))),
-      tx.get(root.collection('confirmedMeetings')),
+      readMeetingDocuments(tx, root, meetingScope),
     ]);
+    const meetingDocs = meetingSnapshots(meetingRead).filter(snapshot => snapshot?.exists);
     const editedMessages = new Map();
     const writes = [];
     let slotsRemoved = 0;
@@ -181,7 +215,7 @@ async function deleteAsset({ db, calendarDocId, asset, now = Date.now() }) {
       writes.push(() => (result.deleteDoc ? tx.delete(snap.ref) : tx.update(snap.ref, result.patch)));
     });
     let albumCopiesRemoved = 0;
-    meetingsSnap.docs.forEach(doc => {
+    meetingDocs.forEach(doc => {
       const before = Array.isArray(doc.data()?.photos) ? doc.data().photos : [];
       const { photos, changed } = rewriteMeetingPhotos(before, asset, editedMessages);
       if (!changed) return;
@@ -195,7 +229,16 @@ async function deleteAsset({ db, calendarDocId, asset, now = Date.now() }) {
       }));
     });
     writes.forEach(write => write());
-    return { ok: true, assetKey, slotsRemoved, albumCopiesRemoved, messagesTouched: editedMessages.size, queuedStoragePaths: paths };
+    return {
+      ok: true,
+      assetKey,
+      slotsRemoved,
+      albumCopiesRemoved,
+      messagesTouched: editedMessages.size,
+      queuedStoragePaths: paths,
+      meetingReadScope: meetingScope.complete ? 'owners' : 'full-scan',
+      meetingDocumentsRead: meetingDocs.length,
+    };
   });
 }
 
@@ -206,6 +249,7 @@ async function tagAsset({ db, calendarDocId, asset, tags, now = Date.now() }) {
   const value = String(tags || '').trim().slice(0, 640);
   const indexSnap = await root.collection('photoIndex').doc(assetKey).get();
   const owners = ownerDocIds(indexSnap.exists ? indexSnap.data() : null);
+  const meetingScope = meetingOwnerScope(indexSnap.exists ? indexSnap.data() : null);
   (asset.messageId ? [asset.messageId] : []).forEach(id => owners.messages.add(id));
   (asset.memoId ? [asset.memoId] : []).forEach(id => owners.memos.add(id));
   return db.runTransaction(async tx => {
@@ -213,7 +257,11 @@ async function tagAsset({ db, calendarDocId, asset, tags, now = Date.now() }) {
       ...Array.from(owners.messages).map(id => root.collection('messages').doc(id)),
       ...Array.from(owners.memos).map(id => root.collection('memos').doc(id)),
     ];
-    const [snaps, meetingsSnap] = await Promise.all([Promise.all(refs.map(ref => tx.get(ref))), tx.get(root.collection('confirmedMeetings'))]);
+    const [snaps, meetingRead] = await Promise.all([
+      Promise.all(refs.map(ref => tx.get(ref))),
+      readMeetingDocuments(tx, root, meetingScope),
+    ]);
+    const meetingDocs = meetingSnapshots(meetingRead).filter(snapshot => snapshot?.exists);
     const writes = [];
     let slotsTagged = 0;
     snaps.forEach(snap => {
@@ -234,7 +282,7 @@ async function tagAsset({ db, calendarDocId, asset, tags, now = Date.now() }) {
       if (hit) writes.push(() => tx.update(snap.ref, { imageTags, imageTagMap }));
     });
     let albumCopiesTagged = 0;
-    meetingsSnap.docs.forEach(doc => {
+    meetingDocs.forEach(doc => {
       const photos = Array.isArray(doc.data()?.photos) ? doc.data().photos : [];
       let changed = false;
       const next = photos.map(photo => {
@@ -246,7 +294,14 @@ async function tagAsset({ db, calendarDocId, asset, tags, now = Date.now() }) {
       if (changed) writes.push(() => tx.update(doc.ref, { photos: next, updatedAt: now }));
     });
     writes.forEach(write => write());
-    return { ok: true, assetKey, slotsTagged, albumCopiesTagged };
+    return {
+      ok: true,
+      assetKey,
+      slotsTagged,
+      albumCopiesTagged,
+      meetingReadScope: meetingScope.complete ? 'owners' : 'full-scan',
+      meetingDocumentsRead: meetingDocs.length,
+    };
   });
 }
 
@@ -288,10 +343,12 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
   const indexSnaps = await Promise.all(entries.map(entry => root.collection('photoIndex').doc(entry.assetKey).get()));
   const owners = { messages: new Set(), memos: new Set() };
   const directByOwner = new Map();
+  const meetingScopes = [];
   indexSnaps.forEach((snapshot, index) => {
     const entry = entries[index];
     const data = snapshot.exists ? snapshot.data() || {} : {};
     entry.indexData = data;
+    meetingScopes.push(meetingOwnerScope(data));
     const listed = ownerDocIds(data);
     listed.messages.forEach(id => owners.messages.add(id));
     listed.memos.forEach(id => owners.memos.add(id));
@@ -308,15 +365,17 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
     list.push({ directUrl, tags: entry.tags, assetKey: entry.assetKey });
     directByOwner.set(key, list);
   });
+  const meetingScope = mergeMeetingOwnerScopes(meetingScopes);
 
   return db.runTransaction(async tx => {
     const messageRefs = Array.from(owners.messages).map(id => root.collection('messages').doc(id));
     const memoRefs = Array.from(owners.memos).map(id => root.collection('memos').doc(id));
-    const [messageSnaps, memoSnaps, meetingsSnap] = await Promise.all([
+    const [messageSnaps, memoSnaps, meetingRead] = await Promise.all([
       Promise.all(messageRefs.map(ref => tx.get(ref))),
       Promise.all(memoRefs.map(ref => tx.get(ref))),
-      tx.get(root.collection('confirmedMeetings')),
+      readMeetingDocuments(tx, root, meetingScope),
     ]);
+    const meetingDocs = meetingSnapshots(meetingRead).filter(snapshot => snapshot?.exists);
     const writes = [];
     let sourceDocumentsTouched = 0;
     let slotsTagged = 0;
@@ -362,7 +421,7 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
     };
     messageSnaps.forEach(snap => writeSource(snap, 'messages'));
     memoSnaps.forEach(snap => writeSource(snap, 'memos'));
-    meetingsSnap.docs.forEach(doc => {
+    meetingDocs.forEach(doc => {
       const photos = Array.isArray(doc.data()?.photos) ? doc.data().photos : [];
       let changed = false;
       const next = photos.map(photo => {
@@ -383,6 +442,8 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
       slotsTagged,
       albumCopiesTagged,
       assetKeys: entries.map(entry => entry.assetKey),
+      meetingReadScope: meetingScope.complete ? 'owners' : 'full-scan',
+      meetingDocumentsRead: meetingDocs.length,
     };
   });
 }
@@ -422,6 +483,9 @@ module.exports = {
   normalizePhotoAssetUrl,
   getPhotoAssetKey,
   storagePathFromUrl,
+  ownerDocIds,
+  meetingOwnerScope,
+  mergeMeetingOwnerScopes,
   removeAssetSlots,
   rewriteMeetingPhotos,
   deleteAsset,
