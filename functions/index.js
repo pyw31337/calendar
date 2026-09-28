@@ -609,19 +609,31 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   }
   const payload = JSON.stringify(payloadObj);
   const promises = [];
-  let skipped = 0;
+  const result = {
+    total: subSnap.size,
+    sent: 0,
+    skippedSender: 0,
+    skippedChannel: 0,
+    skippedInvalid: 0,
+    failed: 0
+  };
   subSnap.forEach(doc => {
     const data = doc.data() || {};
     if (skipParticipantId && data.participantId === skipParticipantId) {
-      skipped += 1;
+      result.skippedSender += 1;
       return;
     }
     // Channel filter: legacy docs without channels → chat only
     const ch = data.channels;
     if (ch && typeof ch === 'object') {
-      if (ch[channel] === false) { skipped += 1; return; }
+      if (ch[channel] === false) { result.skippedChannel += 1; return; }
     } else if (channel !== 'chat') {
-      skipped += 1;
+      result.skippedChannel += 1;
+      return;
+    }
+    if (!data.endpoint || !data.keys?.auth || !data.keys?.p256dh) {
+      result.skippedInvalid += 1;
+      console.warn('Push subscription missing endpoint or keys', doc.id, channel);
       return;
     }
     const pushSubscription = {
@@ -632,6 +644,7 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
     const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
       .then(() => {
         console.log('Push ok', doc.id, channel);
+        result.sent += 1;
         return doc.ref.set({
           lastPushAt: sentAt,
           lastPushStatus: 'sent',
@@ -641,6 +654,7 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
       })
       .catch(err => {
         console.error('Push fail', doc.id, err && err.statusCode);
+        result.failed += 1;
         const status = err && err.statusCode ? `http-${err.statusCode}` : 'send-failed';
         const record = doc.ref.set({
           lastPushAt: sentAt,
@@ -656,7 +670,8 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
     promises.push(p);
   });
   await Promise.all(promises);
-  return { sent: promises.length, skipped };
+  console.log('Push broadcast result', JSON.stringify({ calendarDocId, channel, ...result }));
+  return result;
 }
 
 
@@ -693,12 +708,18 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     const senderName = sender.name;
     
     const bodyText = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : '새 메시지가 도착했습니다'));
-    await broadcastCalendarPush(calendarDocId, {
+    const delivery = await broadcastCalendarPush(calendarDocId, {
       title: `${calendarTitle} · ${senderName}`,
       body: bodyText,
       url: `./?id=${calendarDocId.replace('cal_', '')}&view=chat`,
       tag: `chat-${calendarDocId}`
     }, { skipParticipantId: senderId, channel: 'chat' });
+    console.log('Chat push dispatch', JSON.stringify({
+      calendarDocId,
+      messageId: context.params.messageId,
+      senderId,
+      ...delivery
+    }));
   });
 
 // Mirrors the client's getAnniversariesForDate matching logic (index.html) so a lunar birthday

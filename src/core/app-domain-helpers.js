@@ -7,6 +7,7 @@
 import { GATHER_APP_UTILS } from './app-utils.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { normalizePushChannelPreferences } from './push-channel-preferences.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -1185,10 +1186,11 @@ async function _subscribeUserToPushInternal(calendarId, activeParticipantId, opt
       const participantId = activeParticipantId;
       const subId = getSubscriptionHashId(subscription.endpoint);
       const nowTs = Date.now();
-      let channelPrefs = { chat: true, memo: true, poll: true, schedule: true };
+      let channelPrefs = null;
       try {
-        if (typeof getNotifyChannels === 'function') channelPrefs = getNotifyChannels() || channelPrefs;
+        if (typeof getNotifyChannels === 'function') channelPrefs = getNotifyChannels();
       } catch (_) {}
+      const channels = normalizePushChannelPreferences(channelPrefs, options.channelOverrides);
       const deviceId = typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : ('dev_' + String(nowTs));
       const deviceLabel = typeof getDeviceLabel === 'function' ? getDeviceLabel() : '이 기기';
       const saved = await writeSharedCollection('push_subscriptions', calendarId, subId, {
@@ -1204,12 +1206,7 @@ async function _subscribeUserToPushInternal(calendarId, activeParticipantId, opt
         lastSeenAt: nowTs,
         deviceId: String(deviceId).slice(0, 80),
         deviceLabel: String(deviceLabel).slice(0, 120),
-        channels: {
-          chat: channelPrefs.chat !== false,
-          memo: channelPrefs.memo !== false,
-          poll: channelPrefs.poll !== false,
-          schedule: channelPrefs.schedule !== false
-        }
+        channels
       }, 'set', '기기 구독 등록', { merge: true });
       if (!saved?.success) throw new Error('Push subscription save failed');
       try {
@@ -1229,7 +1226,7 @@ async function _subscribeUserToPushInternal(calendarId, activeParticipantId, opt
   }
 }
 
-async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
+async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId, options = {}) {
   if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return { ok: false, reason: 'permission-not-granted' };
@@ -1248,11 +1245,11 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
     const registration = await navigator.serviceWorker.ready;
     const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
     if (!subscription) {
-      return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: false });
+      return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: false });
     }
-    const result = await subscribeUserToPush(calendarId, activeParticipantId, {});
+    const result = await subscribeUserToPush(calendarId, activeParticipantId, options);
     if (result.ok) return result;
-    return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: true });
+    return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: true });
   } catch (err) {
     return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
   }
@@ -1263,7 +1260,7 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
 // Cloud Functions read the copy stored on this browser's push subscription document.
 // Without this explicit update, turning a channel off/on had no effect until a full
 // re-subscription happened (and turning it off never re-subscribed at all).
-async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
+async function syncPushSubscriptionChannels(calendarId, activeParticipantId, options = {}) {
   if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return { ok: false, reason: 'permission-not-granted' };
@@ -1275,7 +1272,7 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
     const registration = await navigator.serviceWorker.ready;
     const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
     if (!subscription || !window.__gatherFirebaseDb) return { ok: false, reason: 'no-browser-subscription' };
-    const channelPrefs = typeof getNotifyChannels === 'function' ? getNotifyChannels() : {};
+    const channelPrefs = typeof getNotifyChannels === 'function' ? getNotifyChannels() : null;
     const nowTs = Date.now();
     const subId = getSubscriptionHashId(subscription.endpoint);
     // Prefer update (field-only) so we never replace endpoint/keys even if a writer forgets merge.
@@ -1284,12 +1281,7 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
       participantId: activeParticipantId,
       updatedAt: nowTs,
       lastSeenAt: nowTs,
-      channels: {
-        chat: channelPrefs.chat !== false,
-        memo: channelPrefs.memo !== false,
-        poll: channelPrefs.poll !== false,
-        schedule: channelPrefs.schedule !== false
-      }
+      channels: normalizePushChannelPreferences(channelPrefs, options.channelOverrides)
     };
     let saved = await writeSharedCollection('push_subscriptions', calendarId, subId, channelPatch, 'update', '알림 채널 설정 동기화');
     if (!saved?.success) {
@@ -1340,7 +1332,7 @@ async function syncPushSubscriptionParticipant(calendarId, activeParticipantId) 
   }
 }
 
-async function subscribeUserToPushWithPermission(calendarId, activeParticipantId) {
+async function subscribeUserToPushWithPermission(calendarId, activeParticipantId, options = {}) {
   if (!isNotificationSupported()) {
     return { ok: false, reason: 'permission-not-granted' };
   }
@@ -1353,7 +1345,7 @@ async function subscribeUserToPushWithPermission(calendarId, activeParticipantId
       return { ok: false, reason: 'permission-not-granted', permission };
     }
   }
-  return subscribeUserToPush(calendarId, activeParticipantId);
+  return subscribeUserToPush(calendarId, activeParticipantId, options);
 }
 
 async function unsubscribeUserFromPush(calendarId) {
