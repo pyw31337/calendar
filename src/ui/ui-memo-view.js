@@ -1322,6 +1322,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             },
               /* Title input - Styled precisely as user requested */
               /*#__PURE__*/React.createElement("input", {
+                className: "memo-edit-title-input field-edge-bottom",
                 type: "text",
                 ref: newTitleInputRef,
                 placeholder: "제목",
@@ -1330,15 +1331,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 style: {
                   padding: '8px 8px',
                   background: 'transparent',
-                  borderWidth: 'medium',
-                  borderStyle: 'none',
-                  borderColor: 'currentcolor',
-                  borderImage: 'none',
+                  border: 'none',
+                  borderRadius: 0,
                   outline: 'none',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
                   color: 'var(--text-main)',
                   width: '100%',
+                  minHeight: '44px',
                   borderBottom: '1px solid var(--border-subtle)',
                   boxSizing: 'border-box'
                 }
@@ -1730,6 +1730,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         },
           /* Title input - Styled precisely as user requested */
           /*#__PURE__*/React.createElement("input", {
+            className: "memo-edit-title-input field-edge-bottom",
             type: "text",
             placeholder: "제목",
             value: editTitle,
@@ -1737,15 +1738,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             style: {
               padding: '8px 8px',
               background: 'transparent',
-              borderWidth: 'medium',
-              borderStyle: 'none',
-              borderColor: 'currentcolor',
-              borderImage: 'none',
+              border: 'none',
+              borderRadius: 0,
               outline: 'none',
               fontSize: '0.95rem',
               fontWeight: 'bold',
               color: 'var(--text-main)',
               width: '100%',
+              minHeight: '44px',
               borderBottom: '1px solid var(--border-subtle)',
               boxSizing: 'border-box'
             }

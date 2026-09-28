@@ -232,7 +232,11 @@ function ChatMemoShareCard({ share, calendar, onEditMemo, memoOverride = null, o
     }, '삭제된 메모입니다.');
   }
   return /*#__PURE__*/React.createElement('div', {
-    className: 'chat-memo-share-card v2-memo-card-wrap', 'data-stop-card-open': 'true',
+    // Do not mark this wrapper as data-stop-card-open. MemoCard checks that marker on every
+    // ancestor before opening its editor, which made the card itself inert in chat. We still
+    // stop propagation after MemoCard has received the click so the surrounding message bubble
+    // cannot turn a memo edit into a chat-row action.
+    className: 'chat-memo-share-card v2-memo-card-wrap',
     onClick: event => event.stopPropagation()
   }, /*#__PURE__*/React.createElement(MemoCard, {
     memo,
@@ -241,7 +245,9 @@ function ChatMemoShareCard({ share, calendar, onEditMemo, memoOverride = null, o
     onOpenEdit: openSourceMemo,
     onTogglePin: () => updateMemo({ isPinned: !memo.isPinned }),
     onShare: copyShareUrl,
-    onSelectTag: openSourceMemo,
+    // Tags are metadata controls, not the open affordance. The card surface itself opens the
+    // editor just like it does on the regular memo page.
+    onSelectTag: () => {},
     onCommentsChange: comments => updateMemo({ comments }),
     onRequestConfirm,
     showToast,
@@ -402,7 +408,8 @@ export function ChatRoomView({
   const [composerHeight, setComposerHeight] = React.useState(0);
   // Keep the desktop composer at the original compact height on every open. Height is
   // intentionally session-local; a previous oversized drag must not become the new default.
-  const [composerInputHeight, setComposerInputHeight] = React.useState(44);
+  const COMPOSER_MIN_INPUT_HEIGHT = 44;
+  const [composerInputHeight, setComposerInputHeight] = React.useState(COMPOSER_MIN_INPUT_HEIGHT);
   const MAX_COMPOSER_INPUT_HEIGHT = 360;
   const composerResizeRef = React.useRef(null);
   const memeTagDragRef = React.useRef(null);
@@ -843,14 +850,16 @@ export function ChatRoomView({
   }, [chatReplyTarget, chatInput, chatImages, isInputFocused, viewportBottom]);
 
   const beginComposerResize = (event) => {
+    if (event.isPrimary === false) return;
     event.preventDefault();
+    event.stopPropagation();
     composerResizeRef.current = { startY: event.clientY, startHeight: composerInputHeight };
     if (event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
   };
   const moveComposerResize = (event) => {
     const drag = composerResizeRef.current;
     if (!drag) return;
-    const next = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, drag.startHeight + drag.startY - event.clientY));
+    const next = Math.max(COMPOSER_MIN_INPUT_HEIGHT, Math.min(MAX_COMPOSER_INPUT_HEIGHT, drag.startHeight + drag.startY - event.clientY));
     setComposerInputHeight(next);
   };
   const endComposerResize = () => { composerResizeRef.current = null; };
@@ -1858,11 +1867,12 @@ export function ChatRoomView({
     }
   },
     /* Inner card wrapper (same border/radius as CommentsSection input card) */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-md)',
+      /*#__PURE__*/React.createElement("div", {
+        className: `chat-composer-input-surface${composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT ? ' is-multiline' : ''}`,
+        style: {
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT ? 'var(--field-radius-multiline)' : 'var(--field-radius-single-line)',
         padding: '10px 12px 12px',
         display: 'flex',
         flexDirection: 'column',
@@ -1877,7 +1887,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement(PanelResizeHandle, {
         label: "대화 입력창 높이 조절",
         value: composerInputHeight,
-        min: 44,
+        min: COMPOSER_MIN_INPUT_HEIGHT,
         max: MAX_COMPOSER_INPUT_HEIGHT,
         onPointerDown: beginComposerResize,
         onPointerMove: moveComposerResize,
@@ -1886,7 +1896,7 @@ export function ChatRoomView({
         onKeyDown: event => {
           if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
           event.preventDefault();
-          setComposerInputHeight(height => Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, height + (event.key === 'ArrowUp' ? 12 : -12))));
+          setComposerInputHeight(height => Math.max(COMPOSER_MIN_INPUT_HEIGHT, Math.min(MAX_COMPOSER_INPUT_HEIGHT, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
       }),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -1991,6 +2001,7 @@ export function ChatRoomView({
       ),
       /* Textarea at top */
       /*#__PURE__*/React.createElement("textarea", {
+        className: "chat-composer-textarea",
         ref: chatTextareaRef,
         "aria-label": "메시지 입력",
         placeholder: "메시지를 입력하세요...",
@@ -2026,11 +2037,11 @@ export function ChatRoomView({
           announceTyping(e.target.value);
           const grown = autoGrowTextarea(e.target, MAX_COMPOSER_INPUT_HEIGHT);
           if (grown && typeof grown.contentHeight === 'number') {
-            const nextHeight = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, grown.contentHeight + 4));
+            const nextHeight = Math.max(COMPOSER_MIN_INPUT_HEIGHT, Math.min(MAX_COMPOSER_INPUT_HEIGHT, grown.contentHeight + 4));
             setComposerInputHeight(height => (nextHeight > height ? nextHeight : height));
           } else {
             requestAnimationFrame(() => {
-              const nextHeight = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, e.target.scrollHeight + 4));
+              const nextHeight = Math.max(COMPOSER_MIN_INPUT_HEIGHT, Math.min(MAX_COMPOSER_INPUT_HEIGHT, e.target.scrollHeight + 4));
               setComposerInputHeight(height => Math.max(height, nextHeight));
             });
           }
@@ -2046,7 +2057,7 @@ export function ChatRoomView({
         style: {
           width: '100%',
           height: `${composerInputHeight}px`,
-          minHeight: '44px',
+          minHeight: 'var(--field-single-line-height)',
           maxHeight: `${MAX_COMPOSER_INPUT_HEIGHT}px`,
           resize: 'none',
           border: 'none',
@@ -2436,10 +2447,18 @@ export function ChatRoomView({
             ...previous,
             [memoId]: { ...(previous[memoId] || chatMemoEditingTarget.memo), ...patch }
           }));
+          if (chatMemoEditingTarget?.share?.memoId === memoId) {
+            cacheSharedMemo(memoShareCacheKey(chatMemoEditingTarget.share), {
+              ...(chatMemoOverrides[memoId] || chatMemoEditingTarget.memo), ...patch, id: memoId
+            });
+          }
         },
         onUpsertMemo: memo => {
           if (!memo?.id) return;
           setChatMemoOverrides(previous => ({ ...previous, [memo.id]: memo }));
+          if (chatMemoEditingTarget?.share?.memoId === memo.id) {
+            cacheSharedMemo(memoShareCacheKey(chatMemoEditingTarget.share), memo);
+          }
           setChatMemoEditingTarget(previous => previous?.memo?.id === memo.id ? { ...previous, memo } : previous);
         },
         onDeleteMemo: memoId => {

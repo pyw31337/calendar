@@ -1370,10 +1370,20 @@ button, input, textarea, select {
    horizontal drag to the calendar. The moving child, rather than the clipping surface, is
    animated so range-event bars and day cells always enter as one coherent month. */
 :root {
+  --field-radius-single-line: var(--radius-full, 999px);
+  --field-radius-multiline: var(--radius-md, 14px);
+  --field-radius-edge: 0px;
+  --field-single-line-height: 44px;
   --calendar-month-swipe-exit-duration: 150ms;
   --calendar-month-swipe-enter-duration: 210ms;
   --calendar-month-swipe-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
   --calendar-month-swipe-exit-distance: 18%;
+}
+.field-edge-bottom,
+.field-edge-top,
+.field-edge-left,
+.field-edge-right {
+  border-radius: var(--field-radius-edge);
 }
 .calendar-month-swipe-surface {
   position: relative;

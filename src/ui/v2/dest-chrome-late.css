@@ -1697,9 +1697,9 @@ html:has(.renewal-shell.v2-design) .bp-month-picker-apply {
    src/core/field-shape.js (placeholder or text line count) and --field-min-h so a wrapped
    placeholder is never clipped. */
 html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
-  height: 44px !important;
-  min-height: 44px !important;
-  border-radius: 999px !important;
+  height: var(--field-single-line-height) !important;
+  min-height: var(--field-single-line-height) !important;
+  border-radius: var(--field-radius-single-line) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   padding: 0 16px !important;
   box-sizing: border-box !important;
@@ -1708,19 +1708,19 @@ html:has(.renewal-shell.v2-design) .modal-overlay textarea.form-input {
   height: auto !important;
   min-height: max(44px, var(--field-min-h, 44px)) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  border-radius: 14px !important;
+  border-radius: var(--field-radius-multiline) !important;
   padding: 11px 16px !important;
   line-height: 20px !important;
   box-sizing: border-box !important;
 }
 html:has(.renewal-shell.v2-design) input:is([type="text"], [type="search"], [type="email"], [type="tel"], [type="url"], [type="number"], [type="password"], :not([type])):not(.admin-scope *):not(.lightbox-tag-input) {
-  border-radius: 999px !important;
+  border-radius: var(--field-radius-single-line) !important;
 }
 html:has(.renewal-shell.v2-design) textarea:not(.admin-scope *) {
-  border-radius: 14px !important;
+  border-radius: var(--field-radius-multiline) !important;
 }
 html:has(.renewal-shell.v2-design) textarea[data-field-lines="1"]:not(.admin-scope *) {
-  border-radius: 22px !important;
+  border-radius: var(--field-radius-single-line) !important;
 }
 
 /* Every user-facing single-line control follows the same capsule geometry.  A number of
@@ -1746,7 +1746,7 @@ html:has(.renewal-shell.v2-design) :is(
   select.form-select,
   button.form-select
 ):not(.admin-scope *) {
-  border-radius: 999px !important;
+  border-radius: var(--field-radius-single-line) !important;
 }
 
 html:has(.renewal-shell.v2-design) :is(
@@ -1754,7 +1754,7 @@ html:has(.renewal-shell.v2-design) :is(
   .modal-overlay,
   .bottom-sheet-overlay
 ) textarea:not(.admin-scope *) {
-  border-radius: 14px !important;
+  border-radius: var(--field-radius-multiline) !important;
 }
 
 html:has(.renewal-shell.v2-design) :is(
@@ -1762,19 +1762,38 @@ html:has(.renewal-shell.v2-design) :is(
   .modal-overlay,
   .bottom-sheet-overlay
 ) textarea[data-field-lines="1"]:not(.admin-scope *) {
-  border-radius: 999px !important;
+  border-radius: var(--field-radius-single-line) !important;
+}
+
+/* The global single-line rule is deliberately strong because dialog controls
+ * are often portaled. An edge-only field is the explicit exception: rounding
+ * would curve the end of its single border, so keep that line perfectly
+ * straight. */
+html:has(.renewal-shell.v2-design) .field-edge-bottom,
+html:has(.renewal-shell.v2-design) .field-edge-top,
+html:has(.renewal-shell.v2-design) .field-edge-left,
+html:has(.renewal-shell.v2-design) .field-edge-right {
+  border-radius: var(--field-radius-edge) !important;
+}
+
+html:has(.renewal-shell.v2-design) .chat-composer-input-surface {
+  border-radius: var(--field-radius-single-line);
+  transition: border-radius var(--motion-fast, 140ms) ease;
+}
+html:has(.renewal-shell.v2-design) .chat-composer-input-surface.is-multiline {
+  border-radius: var(--field-radius-multiline);
 }
 
 /* The settlement member area is a list container (a rounded box), but each member with no
    memo is a one-line field.  Give those rows the same capsule ends as title, picker and bank
    controls; a memo explicitly makes the row a multi-line card. */
 html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-row:not(.is-multiline) {
-  border-radius: 999px !important;
+  border-radius: var(--field-radius-single-line) !important;
 }
 
 html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-row.is-multiline,
 html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
-  border-radius: 14px !important;
+  border-radius: var(--field-radius-multiline) !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -2895,6 +2914,34 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     gap: var(--v2-side-item-gap) !important;
     margin-top: auto !important;
     padding: 8px 8px 16px !important;
+  }
+}
+
+/* PWA sheets are bottom aligned, but their tallest state must still leave a
+ * real top clearance for the iPhone status indicator. `100dvh` alone is not
+ * reliable in standalone Safari (WebKit can report the extended paint area),
+ * so the overlay owns the safe top gap and every sheet is capped against that
+ * same usable viewport. This keeps the drag handle and close button reachable
+ * without adding a second bottom inset to its footer. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    --v2-sheet-top-gap: 12px;
+    height: var(--app-vv-height, 100dvh) !important;
+    min-height: var(--app-vv-height, 100dvh) !important;
+    max-height: var(--app-vv-height, 100dvh) !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--v2-sheet-top-gap)) !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    max-height: min(
+      var(--gather-vv-modal-max, 860px),
+      calc(var(--app-vv-height, 100dvh) - env(safe-area-inset-top, 0px) - var(--v2-sheet-top-gap) - env(safe-area-inset-bottom, 0px))
+    ) !important;
   }
 }
 

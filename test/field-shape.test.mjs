@@ -20,8 +20,8 @@ test('V2 applies capsule geometry to picker controls and one-line settlement mem
     readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/ui-event-modals.js', import.meta.url), 'utf8')
   ]);
-  assert.match(css, /button\.form-select[\s\S]{0,320}border-radius:\s*999px !important/, 'bottom-sheet picker trigger is a capsule');
-  assert.match(css, /\.settlement-participant-row:not\(\.is-multiline\)[\s\S]{0,120}border-radius:\s*999px !important/, 'single-line settlement member is a capsule');
-  assert.match(css, /\.settlement-participant-row\.is-multiline[\s\S]{0,220}border-radius:\s*14px !important/, 'memo-bearing member remains a rounded box');
+  assert.match(css, /button\.form-select[\s\S]{0,320}border-radius:\s*var\(--field-radius-single-line\) !important/, 'bottom-sheet picker trigger is a capsule');
+  assert.match(css, /\.settlement-participant-row:not\(\.is-multiline\)[\s\S]{0,120}border-radius:\s*var\(--field-radius-single-line\) !important/, 'single-line settlement member is a capsule');
+  assert.match(css, /\.settlement-participant-row\.is-multiline[\s\S]{0,220}border-radius:\s*var\(--field-radius-multiline\) !important/, 'memo-bearing member remains a rounded box');
   assert.match(modal, /className: `settlement-participant-row\$\{row\.memo \? ' is-multiline' : ''\}`/, 'member row exposes its actual line count to the style system');
 });

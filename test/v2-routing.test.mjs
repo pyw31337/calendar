@@ -154,7 +154,7 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /--v2-fs-title:\s*1\.2rem/);
 
   assert.match(shell, /resolveHomeGalleryStripState/);
-  assert.match(shell, /limit:\s*9/);
+  assert.match(shell, /limit:\s*18/);
   assert.match(shell, /navigateV2Destination/);
   assert.match(shell, /gallery-thumb/);
   assert.match(shell, /dday-participant-memos/);

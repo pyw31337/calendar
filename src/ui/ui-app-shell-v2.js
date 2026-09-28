@@ -52,6 +52,7 @@ import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
+import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
@@ -1415,6 +1416,62 @@ function HomeSummarySection({ title, kind, children, onMore, delay }) {
     ), children);
 }
 
+/**
+ * Home cards intentionally page their already-loaded data instead of starting another Firestore
+ * read. The gesture is shared by every support section; controls remain available to keyboard
+ * and mouse users and the moving page is clipped to its card while it transitions.
+ */
+function HomeSummaryPager({ items, renderPage, label }) {
+  const React = window.React;
+  const pages = Array.isArray(items) ? items.filter(Boolean) : [];
+  const [pageIndex, setPageIndex] = React.useState(0);
+  React.useEffect(() => {
+    setPageIndex(previous => Math.min(Math.max(0, pages.length - 1), previous));
+  }, [pages.length]);
+  const swipe = useHomeSummarySwipe({
+    pageCount: pages.length,
+    pageIndex,
+    onPageChange: setPageIndex,
+  });
+  if (!pages.length) return null;
+  const current = pages[Math.min(pageIndex, pages.length - 1)];
+  return React.createElement('div', {
+    className: 'home-summary-pager',
+    'aria-label': `${label} ${pageIndex + 1} / ${pages.length}`,
+    ...swipe.surfaceProps,
+    onClickCapture: event => {
+      if (!swipe.justSwipedRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  },
+    React.createElement('div', {
+      className: swipe.contentClassName,
+      style: swipe.contentStyle,
+    }, renderPage(current, pageIndex)),
+    pages.length > 1 ? React.createElement('div', { className: 'home-summary-pager-nav', 'aria-label': `${label} 페이지` },
+      React.createElement('button', {
+        type: 'button',
+        className: 'home-summary-pager-arrow is-previous',
+        onClick: () => swipe.changePage(-1),
+        disabled: pageIndex === 0 || swipe.isTransitioning,
+        'aria-label': `${label} 이전`,
+      }, '‹'),
+      React.createElement('span', { className: 'home-summary-pager-dots', 'aria-hidden': 'true' }, pages.map((_, index) => React.createElement('i', {
+        key: index,
+        className: index === pageIndex ? 'is-active' : '',
+      }))),
+      React.createElement('button', {
+        type: 'button',
+        className: 'home-summary-pager-arrow is-next',
+        onClick: () => swipe.changePage(1),
+        disabled: pageIndex === pages.length - 1 || swipe.isTransitioning,
+        'aria-label': `${label} 다음`,
+      }, '›')
+    ) : null
+  );
+}
+
 const PLACE_CATEGORY_FALLBACK = { restaurant: '식당', food: '식당', cafe: '카페', play: '놀이', lodging: '숙박', shopping: '쇼핑', other: '기타' };
 
 function homePlaceCategory(place, calendar) {
@@ -1535,19 +1592,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     };
     const recentFirst = (a, b) => memoUpdatedAt(b) - memoUpdatedAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
     const pinned = rows.filter(memo => memo.isPinned).sort(recentFirst);
-    const selected = pinned.slice(0, 2);
-    if (selected.length >= 2) return selected;
+    const selected = pinned.slice(0, 4);
+    if (selected.length >= 4) return selected;
 
     const remaining = rows.filter(memo => !selected.includes(memo));
     const commented = remaining
       .filter(memo => latestCommentAt(memo) > 0)
       .sort((a, b) => latestCommentAt(b) - latestCommentAt(a) || recentFirst(a, b));
-    selected.push(...commented.slice(0, 2 - selected.length));
+    selected.push(...commented.slice(0, 4 - selected.length));
 
     // Preserve a recent-memo fallback when there are fewer commented memos than slots.
-    if (selected.length < 2) {
+    if (selected.length < 4) {
       const fallback = latestRows(remaining.filter(memo => !selected.includes(memo)));
-      selected.push(...fallback.slice(0, 2 - selected.length));
+      selected.push(...fallback.slice(0, 4 - selected.length));
     }
     return selected;
   }, [memoItems]);
@@ -1586,7 +1643,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       items: photoItems,
       status: photoIndexStatus,
       loading: photoIndexLoading,
-      limit: 9,
+      limit: 18,
       isBroken: isBrokenThumb,
     }),
     [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
@@ -1594,7 +1651,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const photos = homeGalleryStrip.photos;
   const placeItems = calendarContext?.places;
   const places = React.useMemo(
-    () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 2) : []),
+    () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 4) : []),
     [placeItems]
   );
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
@@ -1613,7 +1670,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
     ),
     React.createElement(HomeSummarySection, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
-      messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
+      messages.length ? React.createElement(HomeSummaryPager, {
+        items: messages,
+        label: '최근 채팅',
+        renderPage: (m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
         const goChat = event => {
           // Link cards, file cards, players and images inside the bubble keep their own tap.
@@ -1627,7 +1687,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const sharedBody = typeof renderBody === 'function'
           ? renderBody(m, calendarContext?.setActiveLightbox, { maxWidth: '200px', maxHeight: '160px', isMiniChat: true }, '', null, null, true)
           : null;
-        return React.createElement('div', {
+        return React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, React.createElement('div', {
           role: 'button',
           tabIndex: 0,
           className: 'v2-home-chat-row',
@@ -1677,11 +1737,15 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           React.createElement('div', { className: 'v2-home-chat-meta' },
             React.createElement('span', { className: 'v2-home-chat-time' }, formatTime(m.timestamp ?? m.createdAt))
           )
-        );
-      })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
+        ));
+      }
+      }) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
     ),
     React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
-      memos.length ? React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-home-memo-module` }, memos.map((memo, i) => {
+      memos.length ? React.createElement(HomeSummaryPager, {
+        items: memos,
+        label: '최근 메모',
+        renderPage: (memo, i) => {
         const MemoCard = window.GATHER_UI_COMPONENTS?.MemoCard;
         const openMemo = () => {
           // The app's jump helper carries the memo id through to MemoView and applies the
@@ -1692,7 +1756,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const color = displayColor(memo);
         // Same module, same frame and same classes as the memo page (screens.js MemoScreen), so
         // images, link/video previews, files, tags and the comment fold all render identically.
-        return React.createElement(ChatBubbleFrame, {
+        return React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-home-memo-module` }, React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
           name: null,
           color,
@@ -1716,8 +1780,9 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             setActiveLightbox: calendarContext?.setActiveLightbox,
             effectivePinned: !!memo.isPinned,
           })
-          : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모'));
-      })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
+          : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모')));
+      }
+      }) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
     sharingMemo && MemoShareModal && ReactDOM?.createPortal
       ? ReactDOM.createPortal(React.createElement(MemoShareModal, {
@@ -1740,14 +1805,18 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           'aria-hidden': 'true',
         })))
         : photos.length
-          ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => {
+          ? React.createElement(HomeSummaryPager, {
+            items: Array.from({ length: Math.ceil(photos.length / 9) }, (_, page) => photos.slice(page * 9, page * 9 + 9)),
+            label: '최근 사진',
+            renderPage: (pagePhotos, pageIndex) => React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, pagePhotos.map((photo, i) => {
+            const photoIndex = pageIndex * 9 + i;
             return React.createElement('button', {
               type: 'button',
               className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
-              key: photo.assetKey || photo.id || photo.mediaKey || i,
+              key: photo.assetKey || photo.id || photo.mediaKey || photoIndex,
               onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
-              style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
-              'aria-label': `사진 ${i + 1} 크게 보기`
+              style: photo.commentCount > 0 ? galleryCommentMotion(photo, photoIndex) : undefined,
+              'aria-label': `사진 ${photoIndex + 1} 크게 보기`
             },
               React.createElement(PhotoAssetThumb, {
                 photo,
@@ -1762,15 +1831,20 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
             );
           }))
+          })
           : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),
     React.createElement(HomeSummarySection, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
-      places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement(HomePlaceCard, {
-        key: place.id || i,
-        place,
-        calendar: calendarContext?.calendar,
-        onOpen: () => onChangeView?.('places'),
-      }))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
+      places.length ? React.createElement(HomeSummaryPager, {
+        items: places,
+        label: '최근 장소',
+        renderPage: (place, i) => React.createElement('div', { className: bentoClass('renewal-home-place-list') }, React.createElement(HomePlaceCard, {
+          key: place.id || i,
+          place,
+          calendar: calendarContext?.calendar,
+          onOpen: () => onChangeView?.('places'),
+        }))
+      }) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
     )
   );
 }

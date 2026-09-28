@@ -100,6 +100,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
   const dragModeRef = React.useRef(null); // 'se' | 'move' | 'resize-y'
   const startPosRef = React.useRef({ x: 0, y: 0 });
   const startDimRef = React.useRef({ w: 0, h: 0, left: 0, top: 0 });
+  const activePointerCleanupRef = React.useRef(null);
 
   const isPcSheet = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches;
 
@@ -143,6 +144,12 @@ export function ResizableModalContainer({ className, style, children, ...props }
     el.style.setProperty('max-height', 'none', 'important');
   };
 
+  const getVisibleHeight = () => {
+    const vv = window.visualViewport;
+    return vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
+  };
+  const getResizeMaxHeight = () => Math.max(220, Math.floor(getVisibleHeight() - 16));
+
   const handleMouseDown = e => {
     if (e.button !== 0) return; // Only left-click
     isDraggingRef.current = true;
@@ -172,7 +179,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       return;
     }
     if (dragModeRef.current === 'resize-y') {
-      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      const nextH = Math.max(220, Math.min(getResizeMaxHeight(), startDimRef.current.h - deltaY));
       applyHeightStyle(nextH);
       return;
     }
@@ -192,7 +199,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       return;
     }
     if (dragModeRef.current === 'resize-y') {
-      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      const nextH = Math.max(220, Math.min(getResizeMaxHeight(), startDimRef.current.h - deltaY));
       applyHeightStyle(nextH);
       return;
     }
@@ -278,6 +285,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
     document.addEventListener('mouseup', handleMouseUp);
   };
   const onHandleTouchStart = e => {
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     const t = e.touches && e.touches[0];
     if (!t) return;
@@ -285,25 +293,64 @@ export function ResizableModalContainer({ className, style, children, ...props }
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
   };
+  const onHandlePointerDown = e => {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.cancelable) e.preventDefault();
+    e.stopPropagation();
+    startHandleDrag(e.clientX, e.clientY);
+    const handle = e.currentTarget;
+    const pointerId = e.pointerId;
+    activePointerCleanupRef.current?.();
+    try { handle.setPointerCapture?.(pointerId); } catch (_) {}
+    const onPointerMove = event => {
+      if (!event.isPrimary || event.pointerId !== pointerId) return;
+      if (event.cancelable) event.preventDefault();
+      handleMouseMove(event);
+    };
+    const onPointerEnd = event => {
+      if (!event.isPrimary || event.pointerId !== pointerId) return;
+      cleanupPointer();
+      handleMouseUp();
+    };
+    const cleanupPointer = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerEnd);
+      document.removeEventListener('pointercancel', onPointerEnd);
+      try { handle.releasePointerCapture?.(pointerId); } catch (_) {}
+      if (activePointerCleanupRef.current === cleanupPointer) activePointerCleanupRef.current = null;
+    };
+    activePointerCleanupRef.current = cleanupPointer;
+    document.addEventListener('pointermove', onPointerMove, { passive: false });
+    document.addEventListener('pointerup', onPointerEnd);
+    document.addEventListener('pointercancel', onPointerEnd);
+  };
 
   React.useEffect(() => {
     const root = containerRef.current;
     if (!root) return undefined;
     const handles = root.querySelectorAll('.bp-sheet-handle, .v2-modal-drag-handle');
+    const supportsPointerEvents = typeof window.PointerEvent === 'function';
     handles.forEach(handle => {
-      handle.addEventListener('mousedown', onHandleMouseDown);
-      handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+      if (supportsPointerEvents) handle.addEventListener('pointerdown', onHandlePointerDown, { passive: false });
+      else {
+        handle.addEventListener('mousedown', onHandleMouseDown);
+        handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+      }
     });
     return () => {
       handles.forEach(handle => {
-        handle.removeEventListener('mousedown', onHandleMouseDown);
-        handle.removeEventListener('touchstart', onHandleTouchStart);
+        if (supportsPointerEvents) handle.removeEventListener('pointerdown', onHandlePointerDown);
+        else {
+          handle.removeEventListener('mousedown', onHandleMouseDown);
+          handle.removeEventListener('touchstart', onHandleTouchStart);
+        }
       });
     };
   }, []);
 
   React.useEffect(() => {
     return () => {
+      activePointerCleanupRef.current?.();
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleTouchMove);
@@ -318,14 +365,15 @@ export function ResizableModalContainer({ className, style, children, ...props }
     const apply = () => {
       const vv = window.visualViewport;
       const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
+      const vvTop = vv && typeof vv.offsetTop === 'number' ? Math.max(0, vv.offsetTop) : 0;
       const isAdminSettings = containerRef.current && containerRef.current.classList.contains('admin-settings-modal');
       const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
       const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
       const maxPx = Math.max(180, Math.floor(isAdminSettings
-        ? Math.max(180, vvH - 8)
+        ? Math.max(180, vvH - vvTop - 8)
         : isMemoEdit
-          ? Math.min(780, vvH - reserved)
-        : Math.min(860, vvH - reserved)));
+          ? Math.min(780, vvH - vvTop - reserved)
+        : Math.min(860, vvH - vvTop - reserved)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
       if (containerRef.current) {
         containerRef.current.style.maxHeight = `${maxPx}px`;
@@ -354,9 +402,10 @@ export function ResizableModalContainer({ className, style, children, ...props }
     ...(dimensions ? { width: `${dimensions.width}px`, height: `${dimensions.height}px`, maxWidth: 'none', maxHeight: 'none' } : {})
   };
 
-  const hasOwnHandle = React.Children.toArray(children).some(child =>
-    child && child.props && typeof child.props.className === 'string' && child.props.className.includes('bp-sheet-handle')
-  );
+  const hasOwnHandle = React.Children.toArray(children).some(child => {
+    const className = child?.props?.className;
+    return typeof className === 'string' && (className.includes('bp-sheet-handle') || className.includes('v2-modal-drag-handle'));
+  });
 
   return /*#__PURE__*/React.createElement("div", {
     ref: containerRef,
