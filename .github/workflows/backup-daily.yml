@@ -11,10 +11,6 @@ permissions:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    env:
-      # P2-B prep: Firestore REST calls sign in anonymously (scripts/lib/firestore-anon-auth.mjs)
-      # so this job keeps working once the rules require request.auth.
-      NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -27,6 +23,9 @@ jobs:
         run: npm ci
       - name: Export production calendar backup
         run: npm run ops:export -- --dir ops-backups
+        # The auth bootstrap is in the checkout, so it must be step-scoped rather than job-scoped.
+        env:
+          NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:

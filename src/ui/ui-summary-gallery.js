@@ -2,7 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, getPaginationWindow, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
@@ -16,8 +16,35 @@ const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 // Archive routes can contain thousands of photos. Keeping the gallery interactive matters more
 // than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
 // first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
-const ARCHIVE_GRID_INITIAL_COUNT = 80;
-const ARCHIVE_GRID_PAGE_COUNT = 80;
+const PAGE_RENDER_SIZE = 100;
+const PAGE_WINDOW_SIZE = 7;
+const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
+
+// Gallery's existing number-window calculation is the single pagination rule. Archive and
+// content intentionally use the same 100-item bounded rendering instead of scroll-driven DOM
+// growth, which is what previously made data-heavy tabs freeze the browser.
+function ExistingPageNavigation({ currentPage, pageCount, onChange, label = '목록' }) {
+  const React = window.React;
+  if (pageCount <= 1) return null;
+  const pages = getPaginationWindow(currentPage, pageCount, PAGE_WINDOW_SIZE);
+  const go = page => {
+    const target = Math.min(pageCount, Math.max(1, Number(page) || 1));
+    if (target !== currentPage) onChange(target);
+  };
+  const buttonStyle = active => ({
+    minWidth: '36px', minHeight: '36px', padding: '0 8px', borderRadius: 'var(--radius-full)',
+    border: '1px solid var(--border-subtle)', background: active ? 'var(--cta-fill)' : 'var(--bg-card)',
+    color: active ? 'var(--on-cta)' : 'var(--text-main)', fontWeight: 800, cursor: 'pointer'
+  });
+  return React.createElement('nav', {
+    className: 'gallery-pagination', 'aria-label': `${label} 페이지`,
+    style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', flexWrap: 'wrap', gridColumn: '1 / -1', padding: '16px 0 4px' }
+  },
+    React.createElement('button', { type: 'button', 'aria-label': '이전 페이지', disabled: currentPage <= 1, onClick: () => go(currentPage - 1), style: { ...buttonStyle(false), opacity: currentPage <= 1 ? 0.42 : 1 } }, '‹'),
+    pages.map(page => React.createElement('button', { key: page, type: 'button', 'aria-current': page === currentPage ? 'page' : undefined, onClick: () => go(page), style: buttonStyle(page === currentPage) }, page)),
+    React.createElement('button', { type: 'button', 'aria-label': '다음 페이지', disabled: currentPage >= pageCount, onClick: () => go(currentPage + 1), style: { ...buttonStyle(false), opacity: currentPage >= pageCount ? 0.42 : 1 } }, '›')
+  );
+}
 // The per-photo fields the lightbox (and its tag save) needs, shared with 장소 일괄 지정.
 const toArchiveLightboxMeta = p => ({
   timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
@@ -43,22 +70,20 @@ function ArchivePhotoThumb({ photo, onBroken }) {
 function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
   const React = window.React;
   const list = Array.isArray(photos) ? photos : [];
-  const [visibleCount, setVisibleCount] = React.useState(() => Math.min(list.length, ARCHIVE_GRID_INITIAL_COUNT));
+  const [currentPage, setCurrentPage] = React.useState(1);
   React.useEffect(() => {
-    setVisibleCount(Math.min(list.length, ARCHIVE_GRID_INITIAL_COUNT));
+    setCurrentPage(1);
   }, [listKey, list.length]);
-  const visible = list.slice(0, visibleCount);
+  const page = paginateGalleryItems(list, currentPage, ARCHIVE_GRID_INITIAL_COUNT);
+  const visible = page.items;
   return React.createElement(React.Fragment, null,
     React.createElement('div', {
       className: 'archive-photo-grid',
       style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-    }, visible.map((photo, index) => renderPhoto(photo, index))),
-    visibleCount < list.length && React.createElement('button', {
-      type: 'button',
-      className: 'btn btn-action btn-action-outline',
-      onClick: () => setVisibleCount(count => Math.min(list.length, count + ARCHIVE_GRID_PAGE_COUNT)),
-      style: { alignSelf: 'center', minHeight: '40px', margin: '12px auto 4px', padding: '0 16px', borderRadius: 'var(--radius-full)', fontWeight: 800 }
-    }, `사진 더 보기 (${visibleCount}/${list.length})`)
+    }, visible.map((photo, index) => renderPhoto(photo, (page.currentPage - 1) * ARCHIVE_GRID_INITIAL_COUNT + index))),
+    React.createElement(ExistingPageNavigation, {
+      currentPage: page.currentPage, pageCount: page.pageCount, onChange: setCurrentPage, label: '보관함 사진'
+    })
   );
 }
 
@@ -1637,11 +1662,37 @@ export function HistoryView({
       })
     }));
   }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, indexedPhotoComplete]);
-  React.useEffect(() => {
-    if (!indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function') void onIndexedPhotoLoadAll();
-  }, [indexedPhotoComplete, onIndexedPhotoLoadAll]);
+  // Do not turn opening 보관함 into a full-index network request. Large archives can opt into
+  // the complete historical scan through the visible control below.
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
   // chat window is incomplete. Memories need the same for anniversary date ranges.
+  const [isLoadingEntireArchive, setIsLoadingEntireArchive] = React.useState(false);
+  const loadEntireArchive = React.useCallback(async () => {
+    if (indexedPhotoComplete || typeof onIndexedPhotoLoadAll !== 'function' || isLoadingEntireArchive) return;
+    setIsLoadingEntireArchive(true);
+    try {
+      await onIndexedPhotoLoadAll();
+    } finally {
+      setIsLoadingEntireArchive(false);
+    }
+  }, [indexedPhotoComplete, onIndexedPhotoLoadAll, isLoadingEntireArchive]);
+  const incompleteArchiveNotice = !indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function'
+    ? /*#__PURE__*/React.createElement('div', {
+      role: 'status',
+      style: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+        padding: '9px 10px', marginBottom: '8px', border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', color: 'var(--text-muted)',
+        fontSize: 'var(--font-size-xs)'
+      }
+    },
+      /*#__PURE__*/React.createElement('span', null, '최근 사진만 먼저 표시합니다. 전체 과거 사진 분석은 필요할 때 실행하세요.'),
+      /*#__PURE__*/React.createElement('button', {
+        type: 'button', onClick: () => { void loadEntireArchive(); }, disabled: isLoadingEntireArchive,
+        className: 'btn btn-action btn-action-outline',
+        style: { flexShrink: 0, minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
+      }, isLoadingEntireArchive ? '분석 중…' : '전체 분석')
+    ) : null;
   const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
   // People badges and Memories groups share historyPhotoEntries. Only hydrating the meeting
   // photo index on the Memories tab made People counts jump after the first Memories visit.
@@ -2550,6 +2601,7 @@ export function HistoryView({
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
+      incompleteArchiveNotice,
       /*#__PURE__*/React.createElement("div", {
         style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px', ...(v2Embed ? { padding: '4px 0 2px' } : {}) }
       },
@@ -2699,6 +2751,7 @@ export function HistoryView({
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
+      incompleteArchiveNotice,
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
       // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
@@ -2862,6 +2915,7 @@ export function HistoryView({
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-places-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
+      incompleteArchiveNotice,
       /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
         "장소 탭에 등록한 장소별로 사진을 모아요. 사진 위치가 장소 근처이거나 #장소이름 태그가 있으면 그 장소로, 그날 방문한 장소가 한 곳뿐이면 그 장소로 분류돼요."
       ),
@@ -5076,20 +5130,17 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // switching tabs unmounts this component and this state naturally resets with it.
   const [categoryFilter, setCategoryFilter] = React.useState('');
 
-  // 문화공연 스냅샷은 1500개 안팎, 스포츠도 700개 안팎이라 필터 없이 전부 DOM에 한꺼번에
-  // 그려버리면(포스터 이미지 <img>는 loading:'lazy'라 네트워크는 지연되지만, 카드 자체의 DOM
-  // 노드 생성/레이아웃은 즉시 전부 일어남) 저사양 모바일에서 탭 진입 시 버벅임이 생긴다.
-  // 한 번에 60개만 그리고 "더 보기"로 늘려가는 방식으로 초기 렌더 부담을 줄인다.
-  const CULTURE_RENDER_PAGE_SIZE = 60;
-  const [renderLimit, setRenderLimit] = React.useState(CULTURE_RENDER_PAGE_SIZE);
+  // 문화공연 스냅샷은 수천 건까지 자랄 수 있다. 무한 스크롤/더 보기는 누적 DOM과 이미지
+  // 관찰자를 계속 키우므로, Gallery와 같은 100건 번호 페이지로 한 화면의 작업량을 고정한다.
+  const [contentPage, setContentPage] = React.useState(1);
   // One shuffle seed per tab mount: 문화행사's crawled list is shown in a fresh random order each
   // visit (so thousands of shows all get exposure, not the same first 60), but stays put while
   // the user scrolls, loads more, or toggles a checkbox.
   const shuffleSeedRef = React.useRef(Math.floor(Math.random() * 0x7fffffff));
-  // 필터가 바뀌면(지역/카테고리) 보여줄 항목 자체가 달라지므로 페이지 크기를 처음부터 다시 센다.
+  // 필터가 바뀌면(지역/카테고리) 첫 페이지부터 보여 준다.
   React.useEffect(() => {
-    setRenderLimit(CULTURE_RENDER_PAGE_SIZE);
-  }, [categoryFilter, regionSelections, dataUrl]);
+    setContentPage(1);
+  }, [categoryFilter, regionSelections, dataUrl, searchQuery]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -5425,22 +5476,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       || (mergedItems || []).find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
       || null)
     : null;
+  const pagedItems = paginateGalleryItems(filteredItems, contentPage, PAGE_RENDER_SIZE);
   const visibleItems = (() => {
-    const sliced = filteredItems.slice(0, renderLimit);
+    const sliced = pagedItems.items;
     if (!focusedItem) return sliced;
     return [focusedItem, ...sliced.filter(i => i.id !== focusedItem.id)];
   })();
-  const hasMoreToRender = filteredItems.length > visibleItems.length;
-  // 스크롤이 하단 근처(300px 이내)에 닿으면 "더 보기"를 누른 것과 동일하게 다음 60개를 이어
-  // 붙인다. 이 그리드는 HistoryView가 헤더 접힘 효과에 쓰는 자기 onScroll도 받고 있어서, 그걸
-  // 대체하지 않고 함께 호출한다.
+  // HistoryView's header-hide scroll behavior remains, but scrolling never fetches/renders a
+  // new page. A deliberate page click is the only way to change the 100-card window.
   const handleGridScroll = e => {
     if (typeof onScroll === 'function') onScroll(e);
-    if (!hasMoreToRender) return;
-    const el = e.target;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
-      setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE);
-    }
   };
 
   // 상세보기 설명(selected.description)은 외부 지역축제/문화행사 피드의 원본 텍스트를 그대로
@@ -5657,15 +5702,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           )
         );
       }),
-      hasMoreToRender && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE),
-        style: {
-          gridColumn: '1 / -1', padding: '12px', borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-main)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer'
-        }
-      }, `더 보기 (${visibleItems.length}/${filteredItems.length})`)
+      /*#__PURE__*/React.createElement(ExistingPageNavigation, {
+        currentPage: pagedItems.currentPage,
+        pageCount: pagedItems.pageCount,
+        onChange: setContentPage,
+        label: '콘텐츠'
+      })
     ),
     selected && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {

@@ -11,6 +11,7 @@ const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
 const { MAX_BATCH_ITEMS, MAX_TAGS, sanitizeAnalysisItem, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
+const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -196,6 +197,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       source,
       messageId,
       imageIndex,
+      // A date remains the legacy document key, but the graph carries a stable meetingId so
+      // photos/expenses/memos can keep their relationship when the scheduled date is edited.
+      meetingId: String(context.meetingId || data.meetingId || photo?.meetingId || ''),
       meetingDate: String(context.meetingDate || photo?.meetingDate || ''),
       photoId: String(photo?.id || photo?.photoId || ''),
       sourceMessageId: String(photo?.sourceMessageId || ''),
@@ -218,7 +222,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     getMessageImageEntriesForIndex(data).forEach((photo, index) => push(photo, index));
     getDirectImageEntriesForIndex(data).forEach((photo, index) => push(photo, index, { directMediaUrl: photo.directMediaUrl }));
   } else if (sourceType === 'meeting') {
-    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index, { meetingDate: data.date || sourceId, text: `${data.date || sourceId} 일정 사진` }));
+    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index, {
+      meetingId: data.meetingId || '', meetingDate: data.date || sourceId, text: `${data.date || sourceId} 일정 사진`
+    }));
   } else if (sourceType === 'anniversary') {
     // Content posters (movie/sports anniversaries) stay on the calendar/컨텐츠 surfaces.
     // Keep returning [] so sync/rebuild strip any legacy anniversary-owned photoIndex rows.
@@ -279,6 +285,34 @@ async function bumpPhotoIndexRevision(calendarDocId) {
     revision: admin.firestore.FieldValue.increment(1),
     updatedAt: Date.now()
   }, { merge: true });
+}
+
+// The migration runs in dual-write mode: the legacy document remains compatible with every
+// installed client, while future writes continuously refresh the normalized Asset/edge graph.
+// It is a projection today; its immutable asset key and owner edge are what let us later switch
+// reads without another positional-tag migration.
+async function syncAssetGraphProjection(calendarDocId, assetKeys) {
+  const keys = Array.from(new Set(Array.from(assetKeys || []).filter(Boolean))).slice(0, 80);
+  if (!calendarDocId || !keys.length) return;
+  const db = admin.firestore();
+  const root = db.collection('calendars').doc(calendarDocId);
+  const rows = await db.getAll(...keys.map(key => root.collection('photoIndex').doc(key)));
+  const calendarId = calendarDocId.startsWith('cal_') ? calendarDocId.slice(4) : calendarDocId;
+  const writes = [];
+  rows.forEach(snapshot => {
+    if (!snapshot.exists) return;
+    const row = { assetKey: snapshot.id, ...(snapshot.data() || {}) };
+    const asset = assetProjection(row, { calendarId });
+    writes.push({ ref: root.collection('assets').doc(asset.assetId), data: { ...asset, updatedAt: Date.now() } });
+    assetEdges(row).slice(0, 12).forEach(edge => {
+      writes.push({ ref: root.collection('assetEdges').doc(edge.id), data: edge });
+    });
+  });
+  for (let offset = 0; offset < writes.length; offset += 350) {
+    const batch = db.batch();
+    writes.slice(offset, offset + 350).forEach(write => batch.set(write.ref, write.data, { merge: true }));
+    await batch.commit();
+  }
 }
 
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
@@ -427,6 +461,9 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
     });
   })));
   await bumpPhotoIndexRevision(context.params.calendarDocId);
+  // Never wait for client reads to regenerate this graph; the canonical source trigger owns
+  // the dual-write so tag/photo edits stay tied to the same immutable asset key.
+  await syncAssetGraphProjection(context.params.calendarDocId, touchedKeys);
   return true;
 }
 
@@ -441,6 +478,17 @@ exports.onMemoPhotoIndexWrite = functions.firestore
 exports.onMeetingPhotoIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
+
+// Existing meeting document ids are dates for backwards compatibility. Give each record a
+// stable opaque identity once, without rewriting the date or any legacy field. The guard avoids
+// a trigger loop and makes the migration safe to run alongside old installed clients.
+exports.ensureMeetingIdentity = functions.firestore
+  .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
+  .onWrite(async change => {
+    if (!change.after.exists || String(change.after.data()?.meetingId || '')) return null;
+    await change.after.ref.set({ meetingId: `meeting:${crypto.randomUUID()}`, meetingIdentityVersion: 1 }, { merge: true });
+    return null;
+  });
 
 exports.onAnniversaryPhotoIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/anniversaries/{anniversaryId}')
@@ -2839,6 +2887,162 @@ exports.rebuildPhotoIndex = functions.runWith({ timeoutSeconds: 300, memory: '1G
     res.status(200).json({ ok: true, ...report });
   } catch (error) {
     console.error('rebuildPhotoIndex failed:', error);
+    res.status(500).json({ ok: false, message: String(error?.message || error) });
+  }
+});
+
+// Non-destructive integrity and graph migration. This is intentionally separate from
+// rebuildPhotoIndex: rebuilding a projection must never be interpreted as permission to remove
+// a Storage object or legacy comment.  Every detected issue is written to an admin review queue
+// together with a compact source snapshot, so a bad automatic decision can be reversed.
+async function checkCanonicalAssetStorage(bucket, row) {
+  const paths = [mediaGraphStoragePath(row?.full), mediaGraphStoragePath(row?.thumb)].filter(Boolean);
+  if (!paths.length) return false;
+  try {
+    const exists = await Promise.all(paths.map(async path => {
+      try { return Boolean((await bucket.file(path).exists())[0]); } catch (_) { return true; }
+    }));
+    return !exists.some(Boolean);
+  } catch (_) {
+    // A failed metadata request is not proof of data loss.
+    return false;
+  }
+}
+
+function sourceAssetIds(data = {}) {
+  const entries = getMessageImageEntriesForIndex(data);
+  return Array.from(new Set(entries.map(entry => getPhotoAssetKey(entry.imageUrl || entry.thumbUrl)).filter(Boolean)));
+}
+
+async function prepareMediaIntegrityReview({ calendarId, apply = false, materializeGraph = false, migrateLegacyComments = false } = {}) {
+  const db = admin.firestore();
+  const root = db.collection('calendars').doc(`cal_${calendarId}`);
+  const names = ['photoIndex', 'messages', 'memos', 'confirmedMeetings', 'photoComments'];
+  const snapshots = await Promise.all(names.map(name => root.collection(name).get()));
+  const byName = Object.fromEntries(names.map((name, index) => [name, snapshots[index]]));
+  const rows = byName.photoIndex.docs.map(doc => ({ id: doc.id, assetKey: doc.id, ...(doc.data() || {}) }));
+  const missingAssetKeys = new Set();
+  // Metadata checks are deliberately bounded. No image bytes are downloaded, and a transient
+  // Storage failure is treated as unknown/alive rather than as a missing photo.
+  const bucket = admin.storage().bucket();
+  const queue = rows.slice();
+  await Promise.all(Array.from({ length: 12 }, async () => {
+    while (queue.length) {
+      const row = queue.pop();
+      if (row && await checkCanonicalAssetStorage(bucket, row)) missingAssetKeys.add(row.assetKey);
+    }
+  }));
+  const report = buildIntegrityReview({
+    calendarId,
+    indexRows: rows,
+    messages: byName.messages.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    memos: byName.memos.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    meetings: byName.confirmedMeetings.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    comments: byName.photoComments.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    missingAssetKeys
+  });
+  const counts = report.findings.reduce((acc, item) => {
+    acc[item.kind] = (acc[item.kind] || 0) + 1;
+    return acc;
+  }, {});
+  const summary = {
+    calendarId, generatedAt: report.generatedAt, mode: apply ? 'applied' : 'dry-run',
+    sourceDocuments: Object.fromEntries(names.map(name => [name, byName[name].size])),
+    counts, findings: report.findings.length, assets: report.assets.length, edges: report.edges.length,
+    missingAssets: missingAssetKeys.size,
+    migratableComments: report.findings.filter(item => item.kind === 'legacy_comment_migratable').length,
+    unresolvedComments: report.findings.filter(item => item.kind === 'legacy_comment_unresolved').length
+  };
+  if (!apply) return summary;
+
+  const runId = `integrity_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+  const now = Date.now();
+  const writes = [];
+  writes.push({ ref: root.collection('integrityRuns').doc(runId), data: {
+    ...summary, runId, status: 'review_required', createdAt: now,
+    safeguards: ['no_auto_delete', 'source_snapshot_backup', 'restore_reupload_hide_only']
+  } });
+  report.findings.forEach(item => {
+    const review = { ...item, calendarId, runId, createdAt: now, updatedAt: now };
+    writes.push({ ref: root.collection('integrityReview').doc(item.id), data: review });
+    // Snapshot documents are intentionally append-only per run. The queue itself can be updated
+    // by later audits, while this copy remains a recovery reference.
+    writes.push({ ref: root.collection('integrityRuns').doc(runId).collection('backup').doc(item.id), data: {
+      kind: item.kind, assetKey: item.assetKey || '', sourceSnapshot: item.snapshot || {}, backedUpAt: now
+    } });
+  });
+  if (materializeGraph) {
+    report.assets.forEach(asset => writes.push({ ref: root.collection('assets').doc(asset.assetId), data: { ...asset, materializedAt: now } }));
+    report.edges.forEach(edge => writes.push({ ref: root.collection('assetEdges').doc(edge.id), data: { ...edge, materializedAt: now } }));
+    byName.messages.docs.forEach(doc => writes.push({ ref: doc.ref, data: { assetIds: sourceAssetIds(doc.data() || {}), assetGraphVersion: 1 } }));
+    byName.memos.docs.forEach(doc => writes.push({ ref: doc.ref, data: { assetIds: sourceAssetIds(doc.data() || {}), assetGraphVersion: 1 } }));
+    byName.confirmedMeetings.docs.forEach(doc => {
+      const data = doc.data() || {};
+      const albumAssetIds = (Array.isArray(data.photos) ? data.photos : [])
+        .map(photo => getPhotoAssetKey(photo?.imageUrl || photo?.full || photo?.url || photo?.thumbUrl || photo?.thumb || '')).filter(Boolean);
+      writes.push({ ref: doc.ref, data: {
+        meetingId: String(data.meetingId || `meeting:${crypto.randomUUID()}`),
+        albumAssetIds: Array.from(new Set(albumAssetIds)), assetGraphVersion: 1
+      } });
+    });
+  }
+  // Firestore batch limit is 500. Keep a margin for future schema fields.
+  for (let offset = 0; offset < writes.length; offset += 350) {
+    const batch = db.batch();
+    writes.slice(offset, offset + 350).forEach(write => batch.set(write.ref, write.data, { merge: true }));
+    await batch.commit();
+  }
+  let migratedComments = 0;
+  if (migrateLegacyComments) {
+    const migrations = report.findings.filter(item => item.kind === 'legacy_comment_migratable' && item.assetKey);
+    for (const item of migrations) {
+      const legacyKey = String(item.snapshot?.legacyKey || '');
+      const legacyRef = root.collection('photoComments').doc(legacyKey);
+      const targetRef = root.collection('photoComments').doc(item.assetKey);
+      await db.runTransaction(async tx => {
+        const [legacy, target] = await Promise.all([tx.get(legacyRef), tx.get(targetRef)]);
+        if (!legacy.exists) return;
+        const legacyComments = Array.isArray(legacy.data()?.comments) ? legacy.data().comments : [];
+        const targetComments = Array.isArray(target.data()?.comments) ? target.data().comments : [];
+        const unique = new Map();
+        [...targetComments, ...legacyComments].forEach(comment => {
+          const id = String(comment?.id || `${comment?.timestamp || 0}:${comment?.text || ''}`);
+          if (!unique.has(id)) unique.set(id, comment);
+        });
+        const comments = Array.from(unique.values()).sort((a, b) => Number(a?.timestamp || 0) - Number(b?.timestamp || 0)).slice(0, 200);
+        tx.set(targetRef, { comments, migratedFrom: admin.firestore.FieldValue.arrayUnion(legacyKey), updatedAt: now }, { merge: true });
+        // Preserve the old thread for undo/audit; it is only marked as copied, never deleted.
+        tx.set(legacyRef, { migration: { status: 'copied', assetKey: item.assetKey, runId, copiedAt: now } }, { merge: true });
+      });
+      migratedComments += 1;
+    }
+  }
+  return { ...summary, runId, migratedComments, graphMaterialized: Boolean(materializeGraph) };
+}
+
+// Administrator entry point: dry-run is the default. `apply` only creates review records and
+// optional dual-write graph records; it does not delete legacy documents or Storage objects.
+exports.prepareMediaIntegrityReview = functions.runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const { password, calendarId, apply, materializeGraph, migrateLegacyComments } = req.body || {};
+  if (typeof password !== 'string' || !password.trim() || !CALENDAR_ID_RE.test(String(calendarId || ''))) {
+    res.status(400).json({ ok: false, message: 'Invalid request' }); return;
+  }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false, message: 'Too many requests' }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' }); return; }
+  try {
+    const report = await prepareMediaIntegrityReview({
+      calendarId: String(calendarId), apply: apply === true,
+      materializeGraph: materializeGraph === true, migrateLegacyComments: migrateLegacyComments === true
+    });
+    res.status(200).json({ ok: true, ...report });
+  } catch (error) {
+    console.error('prepareMediaIntegrityReview failed:', error);
     res.status(500).json({ ok: false, message: String(error?.message || error) });
   }
 });

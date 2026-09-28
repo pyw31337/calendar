@@ -872,6 +872,20 @@ async function rebuildPhotoIndexRemote(password, calendarId, options = {}) {
   return result || { ok: false };
 }
 
+// Integrity queue and graph materialization are deliberately opt-in after a dry-run. The
+// server creates snapshots and review records only; no legacy source nor Storage object is
+// deleted by this command.
+async function prepareMediaIntegrityReviewRemote(password, calendarId, options = {}) {
+  const result = await callAdminFunction('prepareMediaIntegrityReview', {
+    password,
+    calendarId,
+    apply: options.apply === true,
+    materializeGraph: options.materializeGraph === true,
+    migrateLegacyComments: options.migrateLegacyComments === true
+  }, 540000);
+  return result || { ok: false };
+}
+
 // 밈 키보드 이미지 풀 메타데이터(해시태그 등)는 어드민 비밀번호로 게이트된 이 두 함수로만
 // 쓸 수 있다 -- 실제 이미지 바이트 업로드는 uploadMemePoolAssets(meme-pool.js)가 Storage에
 // 직접 올리고, 그 다운로드 URL을 여기로 등록만 한다.
@@ -3028,6 +3042,7 @@ export {
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,
   rebuildPhotoIndexRemote,
+  prepareMediaIntegrityReviewRemote,
   listPushSubscriptionHealthRemote,
   queueServerAuditEvent,
   getClientAuditContext,

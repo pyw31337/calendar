@@ -4,6 +4,7 @@
 
 import { enqueueWriteOperation } from '../core/app-write-queue.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -58,42 +59,11 @@ function getMemoRecentActivityDismissalStorageKey(calendarId) {
   return `gather_memo_recent_activity_dismissed_${calendarId || 'default'}`;
 }
 
-function parseMemoShareUrl(value) {
-  const text = String(value || '').trim();
-  if (!text) return null;
-  let url;
-  try {
-    url = new URL(text);
-  } catch (_) {
-    return null;
-  }
-
-  // Only accept this app's public share route. This prevents arbitrary URLs
-  // pasted into a memo from becoming a cross-origin data fetch primitive.
-  const allowedHosts = new Set([
-    window.location.host,
-    'pyw31337.github.io'
-  ].filter(Boolean));
-  if (!allowedHosts.has(url.host)) return null;
-
-  const parts = url.pathname.split('/').filter(Boolean);
-  const shareIndex = parts.indexOf('share');
-  if (shareIndex < 0 || parts[shareIndex + 2] !== 'memo' || !parts[shareIndex + 3]) return null;
-  const calendarId = decodeURIComponent(parts[shareIndex + 1] || '');
-  const memoId = decodeURIComponent(parts[shareIndex + 3] || '');
-  const publicCalendarIds = GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS || [];
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId) || !/^[A-Za-z0-9_-]{1,128}$/.test(memoId)) return null;
-  if (publicCalendarIds.length > 0 && !publicCalendarIds.includes(calendarId)) return null;
-  return { calendarId, memoId, url: url.toString() };
-}
-
 function getMemoShareUrlFromText(value) {
-  const text = String(value || '').trim();
-  const match = text.match(/https?:\/\/[^\s]+/i);
-  if (!match) return null;
-  const candidate = match[0].replace(/[),.;!?]+$/, '');
-  const parsed = parseMemoShareUrl(candidate);
-  return parsed && text === candidate ? parsed : null;
+  const found = findMemoShareUrlInText(value, {
+    publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS || []
+  });
+  return found?.isOnlyUrl ? found : null;
 }
 
 async function fetchMemoForClone(share) {
@@ -243,7 +213,7 @@ function enqueueMemoMediaSave(...args) {
   const f = __gatherUiDeps().enqueueMemoMediaSave || GATHER_APP_UTILS.enqueueMemoMediaSave;
   return typeof f === 'function' ? f(...args) : enqueueWriteOperation(...args);
 }
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2, onRegisterMenuActions = null }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2, onRegisterMenuActions = null, editorOnly = false, initialEditingMemo = null, onEditorClosed = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -419,6 +389,41 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isComposerPartOpen, setIsComposerPartOpen] = React.useState(false);
   const [editParticipantId, setEditParticipantId] = React.useState('');
   const [isEditPartOpen, setIsEditPartOpen] = React.useState(false);
+  // The chat and date-detail surfaces reuse this proven editor instead of maintaining a
+  // second, incomplete edit form. `editorOnly` renders just the portalled editor/share UI,
+  // preserving the caller's current page behind it.
+  const openMemoEditor = React.useCallback((memo) => {
+    if (!memo) return;
+    setEditingMemo(memo);
+    setEditTitle(memo.title || '');
+    setEditText(memo.text || '');
+    setEditColor(memo.color || 'var(--bg-card)');
+    setEditIsPinned(!!memo.isPinned);
+    const rawTags = Array.isArray(memo.tags) ? memo.tags : (memo.tags ? [memo.tags] : []);
+    setEditTags(rawTags.map(tag => String(tag || '').startsWith('#') ? String(tag).slice(1).trim() : String(tag || '').trim()).filter(Boolean));
+    setEditTagInput('');
+    setEditImages((Array.isArray(memo.imageUrls) ? memo.imageUrls : []).map((url, idx) => ({
+      original: url,
+      thumbnail: memo.thumbUrls?.[idx] || url,
+      fingerprint: memo.imageFingerprints?.[idx] || '',
+      isExisting: true
+    })));
+    setEditParticipantId(memo.participantId || '');
+  }, []);
+  const closeMemoEditor = React.useCallback(() => {
+    setEditingMemo(null);
+    if (editorOnly && typeof onEditorClosed === 'function') onEditorClosed();
+  }, [editorOnly, onEditorClosed]);
+  React.useEffect(() => {
+    if (!editorOnly) return;
+    if (!initialEditingMemo?.id) {
+      if (editingMemo) setEditingMemo(null);
+      return;
+    }
+    const incomingStamp = Number(initialEditingMemo.updatedAt || initialEditingMemo.createdAt || 0);
+    const activeStamp = Number(editingMemo?.updatedAt || editingMemo?.createdAt || 0);
+    if (editingMemo?.id !== initialEditingMemo.id || incomingStamp !== activeStamp) openMemoEditor(initialEditingMemo);
+  }, [editorOnly, initialEditingMemo, editingMemo, openMemoEditor]);
   const memoEditorDirtySnapshot = () => JSON.stringify([
     editTitle,
     editText,
@@ -433,7 +438,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   // current memo id as a baseline reset key to keep dirty tracking scoped to the memo being
   // edited rather than the page's surrounding composer/search state.
   const memoEditorDirtyGuard = useModalDirtyGuard(
-    () => setEditingMemo(null),
+    closeMemoEditor,
     onRequestConfirm,
     undefined,
     !!editingMemo,
@@ -707,7 +712,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         });
         if (queued) {
           showToast('오프라인입니다. 연결되면 메모 수정을 자동 저장합니다.', 'info', 5000);
-          setEditingMemo(null);
+          closeMemoEditor();
           return;
         }
       }
@@ -775,7 +780,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       }
 
       showToast('메모가 수정되었습니다.', 'success');
-      setEditingMemo(null);
+      closeMemoEditor();
     } catch (err) {
       console.error('Failed to update memo:', err);
       if (typeof onUpsertMemo === 'function') onUpsertMemo(editingMemo);
@@ -829,7 +834,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               };
               await pushSingleCloudCalendar(nextCal, restoreStamp, 4, null, 'settings', [restoreActivityLog]);
             }
-            setEditingMemo(null);
+            closeMemoEditor();
             showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (err) {
             console.error('Failed to restore deleted memo:', err);
@@ -837,7 +842,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             showToast('메모 복원 실패', 'error', 4000);
           }
         });
-        setEditingMemo(null);
+        closeMemoEditor();
       } catch (err) {
         console.error('Failed to delete memo:', err);
         if (typeof onUpsertMemo === 'function') onUpsertMemo(memoSnapshot);
@@ -850,30 +855,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     }
   };
 
-  const handleOpenEdit = (memo) => {
-    setEditingMemo(memo);
-    setEditTitle(memo.title || '');
-    setEditText(memo.text || '');
-    setEditColor(memo.color || 'var(--bg-card)');
-    setEditIsPinned(!!memo.isPinned);
-    
-    // Parse tag tokens (strip '#' prefix for local state management)
-    const rawTags = memo.tags || [];
-    const cleanTags = rawTags.map(t => t.startsWith('#') ? t.slice(1).trim() : t).filter(Boolean);
-    setEditTags(cleanTags);
-    setEditTagInput('');
-
-    // Reconstruct list of images for editing (same { original, thumbnail, isExisting }
-    // shape chat's edit flow uses, so resolveMemoImageBatch passes these through untouched)
-    const currentImgs = (memo.imageUrls || []).map((url, idx) => ({
-      original: url,
-      thumbnail: memo.thumbUrls?.[idx] || url,
-      fingerprint: memo.imageFingerprints?.[idx] || '',
-      isExisting: true
-    }));
-    setEditImages(currentImgs);
-    setEditParticipantId(memo.participantId || '');
-  };
+  const handleOpenEdit = openMemoEditor;
 
   // A memo counts as auto-pinned by recent activity only when it isn't ALSO manually pinned
   // (manual pin already puts it in 고정됨, so 최근 활동 would be a redundant, confusing second

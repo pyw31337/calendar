@@ -4,6 +4,7 @@
 
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
 import { useChatTypingPresence } from '../core/chat-typing-presence.js';
+import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 import { PanelResizeHandle } from './ui-widgets.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
@@ -96,6 +97,154 @@ function isEmojiOnlyChatText(...args) {
 function getDirectChatMediaInfo(...args) {
   const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
   return typeof f === 'function' ? f(...args) : undefined;
+}
+
+function memoShareConfig() {
+  return { publicCalendarIds: window.GATHER_APP_CONFIG?.PUBLIC_CALENDAR_IDS || [] };
+}
+
+const MEMO_SHARE_CACHE_LIMIT = 120;
+const memoShareCache = new Map();
+const memoShareInflight = new Map();
+
+function memoShareCacheKey(share) {
+  return `${share?.calendarId || ''}:${share?.memoId || ''}`;
+}
+
+function cacheSharedMemo(key, memo) {
+  memoShareCache.set(key, memo);
+  if (memoShareCache.size > MEMO_SHARE_CACHE_LIMIT) {
+    const oldestKey = memoShareCache.keys().next().value;
+    if (oldestKey) memoShareCache.delete(oldestKey);
+  }
+}
+
+async function fetchSharedMemo(share) {
+  if (!share) return null;
+  const db = __fb();
+  if (db) {
+    const snapshot = await db.collection('calendars').doc(`cal_${share.calendarId}`).collection('memos').doc(share.memoId).get();
+    return snapshot?.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+  }
+  const projectId = window.GATHER_FIREBASE_DEPS?.projectId || '';
+  const decode = window.GATHER_FIREBASE_DEPS?.firestoreDocumentToJs;
+  if (!projectId || typeof decode !== 'function') return null;
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(share.calendarId)}/memos/${encodeURIComponent(share.memoId)}`,
+    { cache: 'no-store' }
+  );
+  if (!response.ok) return null;
+  return { id: share.memoId, ...decode(await response.json()) };
+}
+
+function readSharedMemo(share) {
+  const key = memoShareCacheKey(share);
+  if (!key) return Promise.resolve(null);
+  if (memoShareCache.has(key)) return Promise.resolve(memoShareCache.get(key));
+  if (memoShareInflight.has(key)) return memoShareInflight.get(key);
+  const request = fetchSharedMemo(share).then(memo => {
+    if (memo) cacheSharedMemo(key, memo);
+    return memo;
+  }).finally(() => memoShareInflight.delete(key));
+  memoShareInflight.set(key, request);
+  return request;
+}
+
+/**
+ * A pasted internal memo link is deliberately rendered through the actual
+ * MemoCard, rather than a second "chat preview" lookalike. This keeps image,
+ * video, tag and comment behaviour identical to the memo page while the link
+ * itself remains the fallback if the source is unavailable or unreadable.
+ */
+function ChatMemoShareCard({ share, calendar, onEditMemo, memoOverride = null, onMemoChange, setActiveLightbox, showToast, onRequestConfirm }) {
+  const React = window.React;
+  const MemoCard = window.GATHER_UI_COMPONENTS?.MemoCard || window.GATHER_UI_DEPS?.MemoCard;
+  const [state, setState] = React.useState({ status: 'loading', memo: null });
+
+  React.useEffect(() => {
+    let disposed = false;
+    setState({ status: 'loading', memo: null });
+    readSharedMemo(share).then(memo => {
+      if (!disposed) setState(memo ? { status: 'ready', memo } : { status: 'missing', memo: null });
+    }).catch(() => {
+      if (!disposed) setState({ status: 'missing', memo: null });
+    });
+    return () => { disposed = true; };
+  }, [share?.calendarId, share?.memoId]);
+
+  const openSourceMemo = () => {
+    if (share.calendarId === calendar?.id && state.memo && typeof onEditMemo === 'function') {
+      onEditMemo(memoOverride || state.memo, share);
+      return;
+    }
+    // A foreign-calendar item must keep its source context; the share route
+    // is the only route that can resolve its source participant permissions.
+    window.location.assign(share.url);
+  };
+  const copyShareUrl = async () => {
+    try {
+      await navigator.clipboard?.writeText(share.url);
+      showToast?.('메모 공유 링크를 복사했습니다.', 'success');
+    } catch (_) {
+      showToast?.('메모 공유 링크를 복사하지 못했습니다.', 'error');
+    }
+  };
+  const updateMemo = async patch => {
+    const memo = state.memo;
+    const db = __fb();
+    if (!memo || !db) return false;
+    try {
+      const updatedAt = Date.now();
+      await db.collection('calendars').doc(`cal_${share.calendarId}`).collection('memos').doc(share.memoId).update({ ...patch, updatedAt });
+      const nextMemo = { ...memo, ...patch, updatedAt };
+      cacheSharedMemo(memoShareCacheKey(share), nextMemo);
+      onMemoChange?.(nextMemo);
+      setState(previous => {
+        if (!previous.memo) return previous;
+        return { ...previous, memo: { ...previous.memo, ...patch, updatedAt } };
+      });
+      return true;
+    } catch (_) {
+      showToast?.('공유 메모를 저장하지 못했습니다. 권한과 연결 상태를 확인해 주세요.', 'error');
+      return false;
+    }
+  };
+
+  if (state.status === 'loading') {
+    return /*#__PURE__*/React.createElement('div', {
+      className: 'chat-memo-share-loading', role: 'status', 'aria-label': '공유 메모 불러오는 중'
+    }, '공유 메모를 불러오는 중…');
+  }
+  if (state.status !== 'ready' || !state.memo || typeof MemoCard !== 'function') {
+    return /*#__PURE__*/React.createElement('a', {
+      className: 'chat-memo-share-fallback', href: share.url,
+      onClick: event => { event.preventDefault(); openSourceMemo(); }
+    }, '공유 메모 열기');
+  }
+
+  const memo = memoOverride || state.memo;
+  if (memo?._deleted) {
+    return /*#__PURE__*/React.createElement('div', {
+      className: 'chat-memo-share-loading', role: 'status'
+    }, '삭제된 메모입니다.');
+  }
+  return /*#__PURE__*/React.createElement('div', {
+    className: 'chat-memo-share-card', 'data-stop-card-open': 'true',
+    onClick: event => event.stopPropagation()
+  }, /*#__PURE__*/React.createElement(MemoCard, {
+    memo,
+    calendar,
+    variant: 'v2-page',
+    onOpenEdit: openSourceMemo,
+    onTogglePin: () => updateMemo({ isPinned: !memo.isPinned }),
+    onShare: copyShareUrl,
+    onSelectTag: openSourceMemo,
+    onCommentsChange: comments => updateMemo({ comments }),
+    onRequestConfirm,
+    showToast,
+    setActiveLightbox,
+    effectivePinned: !!memo.isPinned,
+  }));
 }
 export function ChatRoomView({
   calendar,
@@ -207,6 +356,7 @@ export function ChatRoomView({
   const MegaphoneIcon = __comp.MegaphoneIcon || __deps.MegaphoneIcon;
   const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
+  const MemoView = __comp.MemoView || __deps.MemoView;
       const ChatSideMenu = __comp.ChatSideMenu || __deps.ChatSideMenu;
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
@@ -278,6 +428,8 @@ export function ChatRoomView({
   const [noticeInput, setNoticeInput] = React.useState('');
   const [isChatSideMenuOpen, setIsChatSideMenuOpen] = React.useState(false);
   const [isChatGalleryOpen, setIsChatGalleryOpen] = React.useState(false);
+  const [chatMemoEditingTarget, setChatMemoEditingTarget] = React.useState(null);
+  const [chatMemoOverrides, setChatMemoOverrides] = React.useState({});
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
@@ -832,13 +984,14 @@ export function ChatRoomView({
   // composer resizes, header show/hide and popups no longer rebuild every bubble. Row buttons
   // call through this ref so memoized rows always reach the latest handlers.
   const chatRowCallbacksRef = React.useRef(null);
-  chatRowCallbacksRef.current = { handleStartReply, onEditMessage, setActiveLightbox, onActivateVideo, openDocumentLightbox, onJumpToChatMessage };
+  chatRowCallbacksRef.current = { handleStartReply, onEditMessage, setActiveLightbox, onActivateVideo, openDocumentLightbox, onJumpToChatMessage, onJumpToMemo };
   const chatRowCallbacks = React.useMemo(() => ({
     startReply: (...args) => chatRowCallbacksRef.current.handleStartReply(...args),
     editMessage: (msg) => { const f = chatRowCallbacksRef.current.onEditMessage; if (typeof f === 'function') f(msg); },
     setActiveLightbox: (...args) => { const f = chatRowCallbacksRef.current.setActiveLightbox; return typeof f === 'function' ? f(...args) : undefined; },
     onActivateVideo: (...args) => { const f = chatRowCallbacksRef.current.onActivateVideo; return typeof f === 'function' ? f(...args) : undefined; },
     openDocumentLightbox: (...args) => { const f = chatRowCallbacksRef.current.openDocumentLightbox; return typeof f === 'function' ? f(...args) : undefined; },
+    jumpToMemo: (...args) => { const f = chatRowCallbacksRef.current.onJumpToMemo; return typeof f === 'function' ? f(...args) : undefined; },
   }), []);
   const renderReplyQuoteCard = (replyTo) => {
     if (!replyTo) return null;
@@ -960,11 +1113,18 @@ export function ChatRoomView({
     const msgFileCount = msgHasFiles ? msg.fileAttachments.length : 0;
     const msgImageCount = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls.length : (msg.imageUrl ? 1 : 0);
     const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
+    // Only a message consisting of an app-owned memo share URL becomes a live
+    // MemoCard. A sentence that merely includes such a URL keeps its normal
+    // chat rendering, so no surrounding text is lost.
+    const memoShare = !msgHasImages && !msgHasFiles ? findMemoShareUrlInText(msg.text || '', memoShareConfig()) : null;
+    const isMemoShareMessage = !!memoShare?.isOnlyUrl;
     const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
     // Wide enough that the embed's own .chat-media-resizable wrapper (see DirectChatMediaText)
     // has real headroom to drag-resize into on desktop, instead of immediately overflowing
     // this bubble's box the moment the user grows it past the old 820px ceiling.
-    const chatBubbleMaxWidth = isEmbedMessage ? 'calc(100% - 60px)' : '65%';
+    const chatBubbleMaxWidth = isMemoShareMessage
+      ? 'min(100%, 440px)'
+      : (isEmbedMessage ? 'calc(100% - 60px)' : '65%');
     const multiImageBubbleMaxWidth = msgImageCount >= 2
       ? `min(65%, calc(${msgImageCount >= 12 ? 6 : msgImageCount >= 5 ? 5 : msgImageCount === 2 ? 2 : 3} * 76px + (${msgImageCount >= 12 ? 6 : msgImageCount >= 5 ? 5 : msgImageCount === 2 ? 2 : 3} - 1) * 4px + 24px))`
       : chatBubbleMaxWidth;
@@ -972,7 +1132,7 @@ export function ChatRoomView({
     const chatMediaStyle = isEmbedMessage
       ? { maxWidth: '760px', embedMaxWidth: '760px', portraitEmbedMaxWidth: '360px', maxHeight: '72vh', marginBottom: msg.text ? '10px' : '0' }
       : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
-    const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages && !msgHasFiles;
+    const isEmojiOnlyMessage = !isMemoShareMessage && isEmojiOnlyChatText(msg.text) && !msgHasImages && !msgHasFiles;
     const rowId = msg.id || `msg-${idx}`;
     const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
     // Focused either by in-chat text search (isSearchMatch + arrow-key navigation) or by an
@@ -983,6 +1143,18 @@ export function ChatRoomView({
     // V2 follows the reference chat: the sender's own bubble is right-aligned without a
     // duplicate name badge. Incoming bubbles keep their participant badge.
     const showOwnNamePill = false;
+    const messageBody = isMemoShareMessage
+      ? /*#__PURE__*/React.createElement(ChatMemoShareCard, {
+        share: memoShare,
+        calendar,
+        onEditMemo: (memo, share) => setChatMemoEditingTarget({ memo, share }),
+        memoOverride: chatMemoOverrides[memoShare.memoId] || null,
+        onMemoChange: memo => setChatMemoOverrides(previous => ({ ...previous, [memo.id]: memo })),
+        setActiveLightbox: chatRowCallbacks.setActiveLightbox,
+        showToast,
+        onRequestConfirm,
+      })
+      : renderChatMessageBody(msg, chatRowCallbacks.setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, chatRowCallbacks.onActivateVideo, false, chatRowCallbacks.openDocumentLightbox);
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}${showOwnNamePill ? ' msg-row-own-with-pill' : ''}`,
@@ -1097,25 +1269,26 @@ export function ChatRoomView({
       style: {
         position: 'relative',
         zIndex: 1,
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-md)',
-        padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
+        backgroundColor: isMemoShareMessage ? 'transparent' : 'var(--bg-card)',
+        border: isMemoShareMessage ? 'none' : '1px solid var(--border-subtle)',
+        borderRadius: isMemoShareMessage ? 0 : 'var(--radius-md)',
+        padding: isMemoShareMessage ? 0 : (isEmojiOnlyMessage ? '12px 16px' : '8px 12px'),
         fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
         lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
         color: 'var(--text-main)',
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+        boxShadow: isMemoShareMessage ? 'none' : '0 2px 6px rgba(0,0,0,0.06)',
         // Hard guarantee that text/media content never visually escapes the bubble's rounded
         // border, regardless of any upstream sizing imprecision (e.g. an embed's vw-estimated
         // width overshooting on a narrow viewport) -- overflow:hidden is spec-basic and behaves
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
-        overflow: 'hidden'
+        overflow: isMemoShareMessage ? 'visible' : 'hidden'
       }
-    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, chatRowCallbacks.setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, chatRowCallbacks.onActivateVideo, false, chatRowCallbacks.openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), messageBody), /*#__PURE__*/React.createElement("div", {
       style: {
+        display: isMemoShareMessage ? 'none' : undefined,
         position: 'absolute',
         right: '-7px',
         top: '10px',
@@ -1132,6 +1305,7 @@ export function ChatRoomView({
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: {
+        display: isMemoShareMessage ? 'none' : undefined,
         position: 'absolute',
         right: '-5px',
         top: '11px',
@@ -1155,25 +1329,26 @@ export function ChatRoomView({
       style: {
         position: 'relative',
         zIndex: 1,
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-md)',
-        padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
+        backgroundColor: isMemoShareMessage ? 'transparent' : 'var(--bg-card)',
+        border: isMemoShareMessage ? 'none' : '1px solid var(--border-subtle)',
+        borderRadius: isMemoShareMessage ? 0 : 'var(--radius-md)',
+        padding: isMemoShareMessage ? 0 : (isEmojiOnlyMessage ? '12px 16px' : '8px 12px'),
         fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
         lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
         color: 'var(--text-main)',
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+        boxShadow: isMemoShareMessage ? 'none' : '0 2px 6px rgba(0,0,0,0.06)',
         // Hard guarantee that text/media content never visually escapes the bubble's rounded
         // border, regardless of any upstream sizing imprecision (e.g. an embed's vw-estimated
         // width overshooting on a narrow viewport) -- overflow:hidden is spec-basic and behaves
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
-        overflow: 'hidden'
+        overflow: isMemoShareMessage ? 'visible' : 'hidden'
       }
-    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, chatRowCallbacks.setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, chatRowCallbacks.onActivateVideo, false, chatRowCallbacks.openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), messageBody), /*#__PURE__*/React.createElement("div", {
       style: {
+        display: isMemoShareMessage ? 'none' : undefined,
         position: 'absolute',
         left: '-7px',
         top: '10px',
@@ -1190,6 +1365,7 @@ export function ChatRoomView({
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: {
+        display: isMemoShareMessage ? 'none' : undefined,
         position: 'absolute',
         left: '-5px',
         top: '11px',
@@ -1251,7 +1427,7 @@ export function ChatRoomView({
   });
   return renderedMessages;
   // participantsMap is rebuilt from calendar.participants every render; key on the source.
-  }, [visibleChatMessages, calendar && calendar.participants, chatParticipantId, priorReadTimestamp, revealedMsgId, searchQuery, focusedMsgId, externalFocusMessageId, stickyVideoKey, chatRowCallbacks]);
+  }, [visibleChatMessages, calendar, chatParticipantId, priorReadTimestamp, revealedMsgId, searchQuery, focusedMsgId, externalFocusMessageId, stickyVideoKey, chatRowCallbacks, showToast, onRequestConfirm]);
   const __chatLegacyTree = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
     style: {
@@ -2210,8 +2386,46 @@ export function ChatRoomView({
     )
   }));
 
+  // Keep a memo share inside the conversation. The existing full editor is rendered in
+  // editor-only mode, so closing it returns precisely to this scroll position instead of
+  // changing the page or constructing a reduced chat-specific editor.
+  const chatMemoEditorHost = chatMemoEditingTarget && typeof MemoView === 'function'
+    ? /*#__PURE__*/React.createElement(MemoView, {
+        key: `${chatMemoEditingTarget.memo?.id || ''}:${chatMemoEditingTarget.memo?.updatedAt || ''}`,
+        calendar,
+        memos: [chatMemoEditingTarget.memo],
+        chatMessages: [],
+        hasMoreMemos: false,
+        totalMemoCount: 1,
+        onBack: () => {},
+        showToast,
+        onRequestConfirm,
+        setActiveLightbox,
+        onUpdateMemo: (memoId, patch) => {
+          setChatMemoOverrides(previous => ({
+            ...previous,
+            [memoId]: { ...(previous[memoId] || chatMemoEditingTarget.memo), ...patch }
+          }));
+        },
+        onUpsertMemo: memo => {
+          if (!memo?.id) return;
+          setChatMemoOverrides(previous => ({ ...previous, [memo.id]: memo }));
+          setChatMemoEditingTarget(previous => previous?.memo?.id === memo.id ? { ...previous, memo } : previous);
+        },
+        onDeleteMemo: memoId => {
+          setChatMemoOverrides(previous => ({
+            ...previous,
+            [memoId]: { ...(previous[memoId] || chatMemoEditingTarget.memo), id: memoId, _deleted: true }
+          }));
+        },
+        editorOnly: true,
+        initialEditingMemo: chatMemoEditingTarget.memo,
+        onEditorClosed: () => setChatMemoEditingTarget(null),
+        renderV2: () => null,
+      })
+    : null;
   if (typeof renderV2 === 'function') {
-    return renderV2({
+    return /*#__PURE__*/React.createElement(React.Fragment, null, renderV2({
       legacyView: __chatLegacyTree,
       calendar,
       onBack,
@@ -2228,9 +2442,9 @@ export function ChatRoomView({
       isSearchOpen,
       viewportBottom,
       slots: {},
-    });
+    }), chatMemoEditorHost);
   }
-  return __chatLegacyTree;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, __chatLegacyTree, chatMemoEditorHost);
 }
 
   if (typeof window !== 'undefined') {

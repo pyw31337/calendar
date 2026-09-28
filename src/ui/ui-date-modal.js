@@ -294,6 +294,7 @@ export function DateModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const MemoCard = __comp.MemoCard || __deps.MemoCard;
+  const MemoView = __comp.MemoView || __deps.MemoView;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
@@ -379,6 +380,8 @@ export function DateModal({
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [editingDateMemo, setEditingDateMemo] = React.useState(null);
+  const [dateMemoOverrides, setDateMemoOverrides] = React.useState({});
   React.useEffect(() => {
     const nextTab = searchFocus?.tab || initialTab;
     if (nextTab) setActiveTab(nextTab);
@@ -1291,15 +1294,19 @@ export function DateModal({
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
     const byId = new Map();
     [...(Array.isArray(memos) ? memos : []), ...(Array.isArray(fetchedTaggedMemos) ? fetchedTaggedMemos : [])]
-      .forEach(memo => { if (memo?.id) byId.set(String(memo.id), memo); });
+      .forEach(memo => {
+        if (!memo?.id) return;
+        const overridden = dateMemoOverrides[String(memo.id)];
+        byId.set(String(memo.id), overridden ? { ...memo, ...overridden } : memo);
+      });
     return Array.from(byId.values()).filter(memo => {
-      if (!memo || isTombstone(memo)) return false;
+      if (!memo || memo._deleted || isTombstone(memo)) return false;
       const raw = [memo.tags, memo.text, memo.title, memo.note, memo.memo, memo.description, memo.content, memo.body]
         .flatMap(value => Array.isArray(value) ? value : [value]).filter(Boolean).join(' ');
       const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(raw) : [];
       return (targetTag && raw.includes(targetTag)) || parsedDates.includes(dateStr);
     }).sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
-  }, [memos, fetchedTaggedMemos, dateStr, dateStrToHashtag]);
+  }, [memos, fetchedTaggedMemos, dateStr, dateStrToHashtag, dateMemoOverrides]);
   const handleBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
     markBrokenMeetingPhoto(photo, brokenInfo);
   };
@@ -3332,7 +3339,13 @@ export function DateModal({
         memo,
         calendar,
         variant: "date-modal",
-        onOpenEdit: typeof onOpenEditMemo === 'function' ? () => onOpenEditMemo(memo) : undefined,
+        // Keep the date sheet open and launch the same complete MemoView editor over it.
+        // The legacy callback remains a fallback only while the lazily registered editor is
+        // unavailable during an initial chunk load.
+        onOpenEdit: () => {
+          if (typeof MemoView === 'function') setEditingDateMemo(memo);
+          else if (typeof onOpenEditMemo === 'function') onOpenEditMemo(memo);
+        },
         onTogglePin: typeof onToggleMemoPin === 'function' ? () => onToggleMemoPin(memo) : () => {},
         onShare: typeof onShareMemo === 'function' ? () => onShareMemo(memo) : () => {},
         onSelectTag: typeof onSelectMemoTag === 'function' ? onSelectMemoTag : () => {},
@@ -3605,7 +3618,44 @@ export function DateModal({
     )
   )) : null;
 
-  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal);
+  // Reuse the full memo editor (media, video/link preview, tags, comments, share and delete)
+  // rather than sending the user away from this date detail sheet or offering a partial form.
+  const dateMemoEditorHost = editingDateMemo && typeof MemoView === 'function'
+    ? /*#__PURE__*/React.createElement(MemoView, {
+        key: `${editingDateMemo.id || ''}:${editingDateMemo.updatedAt || ''}`,
+        calendar,
+        memos: [editingDateMemo],
+        chatMessages: [],
+        hasMoreMemos: false,
+        totalMemoCount: 1,
+        onBack: () => {},
+        showToast,
+        onRequestConfirm,
+        setActiveLightbox,
+        onUpdateMemo: (memoId, patch) => {
+          setDateMemoOverrides(previous => ({
+            ...previous,
+            [memoId]: { ...(previous[memoId] || editingDateMemo), ...patch }
+          }));
+        },
+        onUpsertMemo: memo => {
+          if (!memo?.id) return;
+          setDateMemoOverrides(previous => ({ ...previous, [memo.id]: memo }));
+          setEditingDateMemo(previous => previous?.id === memo.id ? memo : previous);
+        },
+        onDeleteMemo: memoId => {
+          setDateMemoOverrides(previous => ({
+            ...previous,
+            [memoId]: { ...(previous[memoId] || editingDateMemo), id: memoId, _deleted: true }
+          }));
+        },
+        editorOnly: true,
+        initialEditingMemo: editingDateMemo,
+        onEditorClosed: () => setEditingDateMemo(null),
+        renderV2: () => null,
+      })
+    : null;
+  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal, dateMemoEditorHost);
   const portalRoot = (typeof document !== 'undefined' && isBentoSheet)
     ? (document.querySelector('.renewal-shell.v2-design') || document.body)
     : (typeof document !== 'undefined' ? document.body : null);

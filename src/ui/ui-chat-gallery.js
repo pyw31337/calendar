@@ -666,6 +666,10 @@ export function ChatGalleryModal({
   const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
   const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
+  // 마지막 기준점을 키로 보관하면 OS 파일 관리자처럼 Shift+클릭으로 현재 목록의
+  // 연속 구간을 고를 수 있다. URL/배열 인덱스 대신 immutable asset key를 사용하므로
+  // 중복 정리나 정렬 변경 뒤에도 다른 사진을 선택하지 않는다.
+  const bulkSelectionAnchorKeyRef = React.useRef('');
   const [isBulkTagPanelOpen, setIsBulkTagPanelOpen] = React.useState(false);
   const [bulkTagDraft, setBulkTagDraft] = React.useState('');
   const [isBulkTagSaving, setIsBulkTagSaving] = React.useState(false);
@@ -1385,16 +1389,30 @@ export function ChatGalleryModal({
       setIsSavingGatherPhotosPaste(false);
     }
   };
-  const toggleBulkShareSelected = key => {
+  const toggleBulkShareSelected = (key, options = {}) => {
+    const orderedKeys = Array.isArray(options.orderedKeys) ? options.orderedKeys.filter(Boolean) : [];
     setSelectedBulkShareKeys(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      const anchorKey = bulkSelectionAnchorKeyRef.current;
+      const canSelectRange = Boolean(options.shiftKey && anchorKey && orderedKeys.length);
+      const start = canSelectRange ? orderedKeys.indexOf(anchorKey) : -1;
+      const end = canSelectRange ? orderedKeys.indexOf(key) : -1;
+      if (start >= 0 && end >= 0) {
+        const [from, to] = start <= end ? [start, end] : [end, start];
+        orderedKeys.slice(from, to + 1).forEach(itemKey => next.add(itemKey));
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      bulkSelectionAnchorKeyRef.current = key;
       return next;
     });
   };
   const handleToggleBulkShareMode = () => {
     setIsBulkShareMode(v => !v);
     setSelectedBulkShareKeys(new Set());
+    bulkSelectionAnchorKeyRef.current = '';
     setIsBulkTagPanelOpen(false);
     setBulkTagDraft('');
   };
@@ -2099,7 +2117,9 @@ export function ChatGalleryModal({
       loading: "lazy",
       decoding: "async",
       referrerPolicy: 'no-referrer',
-      onClick: () => isBulkShareMode ? toggleBulkShareSelected(photoKey) : (setActiveLightbox && setActiveLightbox({
+      onClick: event => isBulkShareMode ? toggleBulkShareSelected(photoKey, {
+        shiftKey: Boolean(event?.shiftKey), orderedKeys: (items || []).map(getPhotoKey)
+      }) : (setActiveLightbox && setActiveLightbox({
         urls: (lightboxItems || []).map(p => p.full),
         index: lightboxIndex >= 0 ? lightboxIndex : idx,
         meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey }))
@@ -2224,45 +2244,12 @@ export function ChatGalleryModal({
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
   );
-  // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
-  // its own IntersectionObserver to auto-fire onClick once the user scrolls near it, instead of
-  // requiring an explicit tap. A sentinel div sits 300px above the visible button so the next
-  // page starts loading just before the user actually reaches the bottom.
-  //
-  // Auto-fire is gated by an "armed" flag, not just by `disabled` -- a page that happens to add
-  // no net-new content (a stretch of text-only chat history with no photos, or a page shorter
-  // than the 300px lookahead) leaves the sentinel sitting in the trigger zone with nothing having
-  // moved, so gating on `disabled` alone would re-fire the instant it clears and hammer Firestore
-  // in a tight loop for as long as that page keeps coming back empty.
-  // Re-arm only when the sentinel leaves the viewport (intersecting → not intersecting). Arming
-  // on every scroll (including bottom rubber-band) would loop-fire while the sentinel stays
-  // intersecting. Manual tap on the button still calls onClick directly.
+  // Older chat-derived links/files may not have an indexed page yet. Keep their explicit
+  // continuation action, but never fetch another batch merely because a user reached the
+  // bottom: automatic loading made long history pages expand unpredictably and could issue
+  // repeated reads while the viewport stayed at the sentinel.
   const GalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => {
-    const sentinelRef = React.useRef(null);
-    const armedRef = React.useRef(true);
-    const wasIntersectingRef = React.useRef(false);
-    React.useEffect(() => {
-      const node = sentinelRef.current;
-      if (!node || disabled || typeof IntersectionObserver !== 'function') return undefined;
-      const root = gridHostRef.current || null;
-      const observer = new IntersectionObserver(entries => {
-        const isIntersecting = entries.some(entry => entry.isIntersecting);
-        if (wasIntersectingRef.current && !isIntersecting) {
-          armedRef.current = true;
-        }
-        wasIntersectingRef.current = isIntersecting;
-        if (!armedRef.current) return;
-        if (isIntersecting) {
-          armedRef.current = false;
-          onClick();
-        }
-      }, { root, rootMargin: '300px 0px' });
-      observer.observe(node);
-      return () => observer.disconnect();
-    }, [disabled, onClick]);
-    return /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", { ref: sentinelRef, "aria-hidden": "true" }),
-      /*#__PURE__*/React.createElement("button", {
+    return /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onClick,
         disabled: !!disabled,
@@ -2279,8 +2266,7 @@ export function ChatGalleryModal({
           cursor: disabled ? 'wait' : 'pointer',
           textAlign: 'center'
         }
-      }, disabled ? loadingLabel : label)
-    );
+      }, disabled ? loadingLabel : label);
   };
   const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
   // Mobile pagination has no arrows -- a horizontal drag pans the centered page window so more
@@ -2489,7 +2475,12 @@ export function ChatGalleryModal({
         renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
       )
     ),
-    renderBulkTagPanel()
+    renderBulkTagPanel(),
+    !isBulkShareMode && /*#__PURE__*/React.createElement('button', {
+      type: 'button', onClick: () => setGalleryTab('analysis'),
+      className: 'btn btn-action btn-action-outline',
+      style: { alignSelf: 'flex-start', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
+    }, '✨ AI 추천·검토')
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }

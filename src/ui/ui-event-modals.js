@@ -3,13 +3,15 @@
  */
 
 import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
-import { preserveAnniversaryCurationFields } from '../core/gallery-data.js';
+import { preserveAnniversaryCurationFields, getPaginationWindow, paginateGalleryItems } from '../core/gallery-data.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
+const SETTLEMENT_PAGE_SIZE = 100;
+const SETTLEMENT_PAGE_WINDOW_SIZE = 7;
 const BULK_WEEK_OPTIONS = Object.freeze([
   Object.freeze({ value: 1, label: '첫째주' }),
   Object.freeze({ value: 2, label: '둘째주' }),
@@ -3199,6 +3201,30 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions]);
   const [collapsedDailyRows, setCollapsedDailyRows] = React.useState({});
+  const [ledgerPage, setLedgerPage] = React.useState(1);
+  const [dailyPage, setDailyPage] = React.useState(1);
+  const [settlementCardPage, setSettlementCardPage] = React.useState(1);
+  React.useEffect(() => {
+    if (isSettlementListOpen) setSettlementCardPage(1);
+  }, [isSettlementListOpen]);
+  const renderSettlementPagination = ({ page, pageCount, onChange, label }) => {
+    if (pageCount <= 1) return null;
+    const pages = getPaginationWindow(page, pageCount, SETTLEMENT_PAGE_WINDOW_SIZE);
+    const go = next => onChange(Math.min(pageCount, Math.max(1, Number(next) || 1)));
+    const style = active => ({
+      minWidth: '36px', minHeight: '36px', padding: '0 8px', borderRadius: 'var(--radius-full)',
+      border: '1px solid var(--border-subtle)', background: active ? 'var(--cta-fill)' : 'var(--bg-card)',
+      color: active ? 'var(--on-cta)' : 'var(--text-main)', fontWeight: 800, cursor: 'pointer'
+    });
+    return React.createElement('nav', {
+      className: 'gallery-pagination', 'aria-label': `${label} 페이지`,
+      style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', flexWrap: 'wrap', padding: '12px 0 2px' }
+    },
+      React.createElement('button', { type: 'button', disabled: page <= 1, onClick: () => go(page - 1), 'aria-label': '이전 페이지', style: { ...style(false), opacity: page <= 1 ? 0.42 : 1 } }, '‹'),
+      pages.map(item => React.createElement('button', { key: item, type: 'button', onClick: () => go(item), 'aria-current': item === page ? 'page' : undefined, style: style(item === page) }, item)),
+      React.createElement('button', { type: 'button', disabled: page >= pageCount, onClick: () => go(page + 1), 'aria-label': '다음 페이지', style: { ...style(false), opacity: page >= pageCount ? 0.42 : 1 } }, '›')
+    );
+  };
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
   // Income entries have no meaningful expense category of their own (their categoryId is
@@ -3384,7 +3410,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     .map(filterSettlementRow)
     .filter(row => row.items.length > 0);
 
+  // Changing the tab/month/search produces a different source list; always start that list at
+  // page one instead of leaving a sparse result on a now-invalid old page.
+  React.useEffect(() => {
+    setLedgerPage(1);
+    setDailyPage(1);
+  }, [activeTab, year, month, settlementSearchQuery]);
+
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
+  const pagedAllTimeItems = paginateGalleryItems(allTimeItems, ledgerPage, SETTLEMENT_PAGE_SIZE);
+  const pagedRows = paginateGalleryItems(rows, dailyPage, SETTLEMENT_PAGE_SIZE);
+  const pagedSettlementCards = paginateGalleryItems(sortedSettlementCards, settlementCardPage, SETTLEMENT_PAGE_SIZE);
+  const pagedVisibleSettlementCards = paginateGalleryItems(visibleSettlementCards, settlementCardPage, SETTLEMENT_PAGE_SIZE);
   const incomeItems = allItems.filter(item => item.isIncome);
   const expenseItems = allItems.filter(item => !item.isIncome);
   const fundExpenseItems = expenseItems.filter(item => !item.isSelfPay);
@@ -3525,7 +3562,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     className: "registered-at-text"
   }, "어드민에서 설정한 누적 잔액")), /*#__PURE__*/React.createElement("strong", {
     style: { color: 'var(--status-green)', whiteSpace: 'nowrap' }
-  }, "+", baseBudget.toLocaleString(), "원")), allTimeItems.map(item => renderItemRow(item, true))));
+  }, "+", baseBudget.toLocaleString(), "원")), pagedAllTimeItems.items.map(item => renderItemRow(item, true)), renderSettlementPagination({
+    page: pagedAllTimeItems.currentPage,
+    pageCount: pagedAllTimeItems.pageCount,
+    onChange: setLedgerPage,
+    label: '누적 정산 목록'
+  })));
 
   const monthEmptyContent = /*#__PURE__*/React.createElement("div", {
     style: { padding: '40px 12px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' }
@@ -3533,7 +3575,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const dailyContent = rows.length === 0 ? monthEmptyContent : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-  }, rows.map(row => {
+  }, pagedRows.items.map(row => {
     const isCollapsed = !!collapsedDailyRows[row.meeting.date];
     return /*#__PURE__*/React.createElement("section", {
       key: row.meeting.date,
@@ -3564,6 +3606,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     }))), !isCollapsed && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '8px' }
     }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))));
+  }), renderSettlementPagination({
+    page: pagedRows.currentPage,
+    pageCount: pagedRows.pageCount,
+    onChange: setDailyPage,
+    label: '월별 정산 목록'
   }));
 
   const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
@@ -3656,7 +3703,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
        to show. */
     (() => {
       const activeParticipants = settlementParticipants;
-      const displayCards = visibleSettlementCards;
+      const displayCards = pagedVisibleSettlementCards.items;
       if (displayCards.length === 0) return null;
 
       return React.createElement("div", {
@@ -3869,6 +3916,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         })
       );
     })(),
+    renderSettlementPagination({
+      page: pagedVisibleSettlementCards.currentPage,
+      pageCount: pagedVisibleSettlementCards.pageCount,
+      onChange: setSettlementCardPage,
+      label: '진행 중 정산 카드'
+    }),
 
     /* Metric Grid (총수입 / 총지출 / 현재잔액) */
     /*#__PURE__*/React.createElement("div", {
@@ -4203,7 +4256,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         ? React.createElement("div", {
             style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
           }, "정산 목록이 없습니다.")
-        : sortedSettlementCards.map(card => {
+        : pagedSettlementCards.items.map(card => {
         const isClosed = card?.status === 'closed';
         const cardTime = getSettlementCardTime(card);
         const participantNames = Array.isArray(card?.participantRows) && card.participantRows.length > 0
@@ -4265,6 +4318,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             React.createElement("span", null, cardTime ? new Date(cardTime).toLocaleDateString('ko-KR') : '날짜 없음')
           )
         );
+      }),
+      renderSettlementPagination({
+        page: pagedSettlementCards.currentPage,
+        pageCount: pagedSettlementCards.pageCount,
+        onChange: setSettlementCardPage,
+        label: '정산 카드 목록'
       })
     )
   ))),

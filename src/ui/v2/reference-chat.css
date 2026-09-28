@@ -75,4 +75,17 @@
       .v2-chat .bp-composer { max-width: 820px; }
       .v2-chat .bp-header { border-radius: 0; }
     }
+
+    /* A chat memo share renders the live MemoCard rather than a URL card.  Keep
+       the card compact enough for a speech row while preserving its native
+       images, inline video player and comment controls. */
+    .v2-chat .chat-memo-share-card { width: min(100%, 420px); }
+    .v2-chat .chat-memo-share-card .memo-card-hover { width: 100%; min-width: 0; }
+    .v2-chat .chat-memo-share-loading,
+    .v2-chat .chat-memo-share-fallback {
+      display: flex; align-items: center; min-height: 44px; padding: 10px 12px;
+      color: var(--brand); font-size: var(--v2-fs-sm, .82rem); font-weight: 700;
+      text-decoration: none;
+    }
+    .v2-chat .chat-memo-share-loading { color: var(--text-light); }
   

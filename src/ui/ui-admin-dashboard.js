@@ -217,6 +217,10 @@ function rebuildPhotoIndexRemote(...args) {
   const f = __gatherUiDeps().rebuildPhotoIndexRemote || GATHER_APP_UTILS.rebuildPhotoIndexRemote;
   return typeof f === 'function' ? f(...args) : Promise.reject(new Error('rebuildPhotoIndexRemote unavailable'));
 }
+function prepareMediaIntegrityReviewRemote(...args) {
+  const f = __gatherUiDeps().prepareMediaIntegrityReviewRemote || GATHER_APP_UTILS.prepareMediaIntegrityReviewRemote;
+  return typeof f === 'function' ? f(...args) : Promise.reject(new Error('prepareMediaIntegrityReviewRemote unavailable'));
+}
 function listPushSubscriptionHealthRemote(...args) {
   const f = __gatherUiDeps().listPushSubscriptionHealthRemote || GATHER_APP_UTILS.listPushSubscriptionHealthRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve(null);
@@ -406,6 +410,8 @@ export function AdminDashboard({ initialCalendars }) {
   const [auditLoading, setAuditLoading] = React.useState(false);
   const [photoIndexBusy, setPhotoIndexBusy] = React.useState(false);
   const [photoIndexReport, setPhotoIndexReport] = React.useState(null);
+  const [integrityBusy, setIntegrityBusy] = React.useState(false);
+  const [integrityReport, setIntegrityReport] = React.useState(null);
 
   // 서버 감사 로그는 더 이상 독립된 탭이 아니라 복구 탭의 로그 상세 팝업에 통합되어 보여진다
   // (openRecoveryLogDetail 참고) -- 예전 '로그' 탭은 로딩이 느리고 채팅/복구 탭과 중복되는
@@ -776,6 +782,36 @@ export function AdminDashboard({ initialCalendars }) {
           showAdminToast('photoIndex 재구축 실패: ' + (err.message || '오류'), 'error');
         } finally {
           setPhotoIndexBusy(false);
+        }
+      }
+    );
+  };
+  const handlePrepareMediaIntegrity = (apply) => {
+    const session = getAdminSession();
+    if (!session?.password || !selectedCalId) {
+      showAdminToast('관리자 세션 또는 선택된 캘린더가 없습니다.', 'error');
+      return;
+    }
+    requestConfirm(
+      apply ? '무결성 큐 생성 및 그래프 이관' : '사진 무결성 점검',
+      apply
+        ? '원본 메시지·사진 파일을 삭제하지 않습니다. 무결성 검토 큐와 항목별 백업을 만들고, assets/assetEdges 이중 기록 및 확인 가능한 레거시 댓글 복사만 진행할까요?'
+        : 'Storage 메타데이터와 사진·태그·댓글 참조를 읽기 전용으로 대조할까요?',
+      async () => {
+        setIntegrityBusy(true);
+        try {
+          const report = await prepareMediaIntegrityReviewRemote(session.password, selectedCalId, {
+            apply: !!apply, materializeGraph: !!apply, migrateLegacyComments: !!apply
+          });
+          setIntegrityReport(report);
+          showAdminToast(apply
+            ? `무결성 큐 생성 완료 — 검토 ${report?.findings || 0}건, 댓글 이관 ${report?.migratedComments || 0}건`
+            : `무결성 점검 완료 — 검토 필요 ${report?.findings || 0}건`, 'success');
+        } catch (err) {
+          console.warn('media integrity review failed:', err);
+          showAdminToast('무결성 점검 실패: ' + (err.message || '오류'), 'error');
+        } finally {
+          setIntegrityBusy(false);
         }
       }
     );
@@ -3244,6 +3280,28 @@ export function AdminDashboard({ initialCalendars }) {
             fontSize: '11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
           }
         }, JSON.stringify(photoIndexReport, null, 2))
+      ),
+
+      /*#__PURE__*/React.createElement("section", { style: styles.card },
+        /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
+          /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "사진 무결성 검토 큐 · 자산 그래프"),
+          /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions" },
+            /*#__PURE__*/React.createElement("button", {
+              className: "btn btn-secondary", disabled: integrityBusy || !selectedCalId,
+              onClick: () => handlePrepareMediaIntegrity(false)
+            }, integrityBusy ? "점검 중…" : "점검(dry-run)"),
+            /*#__PURE__*/React.createElement("button", {
+              className: "btn btn-primary", disabled: integrityBusy || !selectedCalId,
+              onClick: () => handlePrepareMediaIntegrity(true)
+            }, integrityBusy ? "처리 중…" : "검토 큐 생성·이관")
+          )
+        ),
+        /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 10px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } },
+          "깨진 Storage 참조, stale owner, 태그 차이, 레거시 댓글을 원본 스냅샷과 함께 검토 큐에 기록합니다. 적용은 삭제가 아니라 assets/assetEdges 이중 기록과 확인 가능한 댓글 복사만 수행합니다. 원본이 사라진 사진은 복원·재업로드·숨김으로만 처리합니다."
+        ),
+        integrityReport && /*#__PURE__*/React.createElement("pre", {
+          style: { margin: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
+        }, JSON.stringify(integrityReport, null, 2))
       ),
 
       /* Original Backup card tools */
