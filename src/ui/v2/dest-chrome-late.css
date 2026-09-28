@@ -2274,8 +2274,13 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
 html:has(.renewal-shell.v2-design) .search-result-focus,
 html:has(.renewal-shell.v2-design) .chat-search-focused-bubble,
 html:has(.renewal-shell.v2-design) .place-card-row.is-focused,
-html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused > .v2-bubble-surface,
-html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused > .v2-memo-card-contract {
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-memo-card-contract,
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-contract,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract {
   border: 2px solid var(--v2-accent, #7C2FE5) !important;
   background: rgba(124, 47, 229, 0.14) !important;
   box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.18) !important;

@@ -514,14 +514,15 @@ export function MemoScreen(p) {
   // into view instead of it sitting open by default on every page load.
   const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
   const toggleSearch = () => setIsSearchOpen(v => !v);
-  // `memoFocus` is written by the V2 home card before its local tab handoff.
-  // It keeps the destination deterministic even if an outer legacy context
-  // rerender arrives between the click and MemoView mounting.
+  // `memoFocus` or `memo` is written by deep links, share URLs, or V2 home card
+  // before local tab handoff.
   const focusIdFromLocation = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('memoFocus') || ''
+    ? new URLSearchParams(window.location.search).get('memoFocus')
+      || new URLSearchParams(window.location.search).get('memo')
+      || ''
     : '';
   const focusedMemoId = p.focusedMemo?.id || focusIdFromLocation;
-  // A home-card click should land the reader on the matching card, not merely
+  // A home-card click or deep link should land the reader on the matching card, not merely
   // switch tabs.  The target can be an older shared memo outside the current
   // page window, so add it once when necessary before scrolling to it.
   const visibleMemos = window.React.useMemo(() => {
@@ -531,13 +532,32 @@ export function MemoScreen(p) {
   }, [p.memos, p.focusedMemo]);
   window.React.useEffect(() => {
     if (!focusedMemoId || typeof document === 'undefined') return undefined;
-    const frame = window.requestAnimationFrame(() => {
-      const target = [...document.querySelectorAll('[data-v2-memo-id]')]
-        .find(element => element.getAttribute('data-v2-memo-id') === String(focusedMemoId));
-      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [focusedMemoId]);
+    const focusTarget = () => {
+      const target = [...document.querySelectorAll('[data-v2-memo-id], [data-memo-id]')]
+        .find(element => element.getAttribute('data-v2-memo-id') === String(focusedMemoId) || element.getAttribute('data-memo-id') === String(focusedMemoId) || element.id === 'memo-' + String(focusedMemoId));
+      if (target) {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        target.classList.remove('chat-search-focused-bubble');
+        const inner = target.querySelector('.v2-bubble-surface, .v2-memo-card-contract');
+        if (inner) inner.classList.remove('chat-search-focused-bubble');
+        void target.offsetWidth;
+        target.classList.add('chat-search-focused-bubble');
+        if (inner) inner.classList.add('chat-search-focused-bubble');
+        setTimeout(() => {
+          target.classList.remove('chat-search-focused-bubble');
+          if (inner) inner.classList.remove('chat-search-focused-bubble');
+        }, 2200);
+        return true;
+      }
+      return false;
+    };
+    if (focusTarget()) return undefined;
+    const timer = setInterval(() => {
+      if (focusTarget()) clearInterval(timer);
+    }, 100);
+    const timeout = setTimeout(() => clearInterval(timer), 3500);
+    return () => { clearInterval(timer); clearTimeout(timeout); };
+  }, [focusedMemoId, visibleMemos]);
   // Dedicated-cards mode still receives the real MemoView's full legacy tree via p.legacyView
   // (only used for slot extraction here, never rendered directly) -- pull the "새로운 메모를
   // 남겨보세요..." composer card out of it the same way the legacyView+slots.body branch below
@@ -681,7 +701,7 @@ export function MemoScreen(p) {
                 name: null,
                 color: author.color,
                 meta,
-                className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused' : ''}`,
+                className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused chat-search-focused-bubble' : ''}`,
                 'data-v2-memo-id': memo.id,
                 surfaceClassName: 'v2-memo-bubble-surface',
                 surfaceProps: {

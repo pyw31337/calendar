@@ -3158,9 +3158,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const shakeElement = (el) => {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.remove('chat-search-focused-bubble');
+    const innerBubble = el.querySelector('.v2-bubble-surface, .v2-memo-card-contract') || el;
+    innerBubble.classList.remove('chat-search-focused-bubble');
     void el.offsetWidth;
     el.classList.add('chat-search-focused-bubble');
-    setTimeout(() => el.classList.remove('chat-search-focused-bubble'), 2200);
+    if (innerBubble !== el) innerBubble.classList.add('chat-search-focused-bubble');
+    setTimeout(() => {
+      el.classList.remove('chat-search-focused-bubble');
+      if (innerBubble !== el) innerBubble.classList.remove('chat-search-focused-bubble');
+    }, 2200);
   };
   // Polls until `find()` returns an element (the destination tab mounts lazily), then shakes it.
   const focusWhenMounted = (find, { timeoutMs = 3000 } = {}) => new Promise(resolve => {
@@ -3248,10 +3254,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         // Not in the loaded page: the legacy helper fetches it by id into sharedMemo, which the
         // memo page shows (MemoScreen adds a focused memo outside the current page to the list).
         recordsContext?.memoProps?.onOpenMemo?.(id);
+        const url = new URL(window.location.href);
+        url.searchParams.set('memoFocus', id);
+        window.history.replaceState(window.history.state, '', url);
         setActiveTab('memo');
       }
-      focusWhenMounted(() => [...document.querySelectorAll('[data-v2-memo-id]')]
-        .find(el => el.getAttribute('data-v2-memo-id') === String(id)), { timeoutMs: 5000 });
+      focusWhenMounted(() => [...document.querySelectorAll('[data-v2-memo-id], [data-memo-id]')]
+        .find(el => el.getAttribute('data-v2-memo-id') === String(id) || el.getAttribute('data-memo-id') === String(id) || el.id === 'memo-' + String(id)), { timeoutMs: 5000 });
     });
   };
   const jumpToGalleryFromLightbox = (messageId, imageIndex, imageUrl) => {

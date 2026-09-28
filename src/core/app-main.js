@@ -998,13 +998,22 @@ function CalendarApp() {
     const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
     if (!el) return false;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const targetBubble = el.querySelector('.chat-search-focused-bubble')
+      || el.querySelector('[key="bubble-wrapper"] > div')
+      || el.querySelector('.message-bubble')
+      || el;
+    targetBubble.classList.remove('chat-search-focused-bubble');
+    void targetBubble.offsetWidth;
+    targetBubble.classList.add('chat-search-focused-bubble');
+    setTimeout(() => targetBubble.classList.remove('chat-search-focused-bubble'), 2200);
+
     if (externalFocusTimeoutRef.current) clearTimeout(externalFocusTimeoutRef.current);
     // Clear first so re-targeting the same message a second time still re-triggers the shake
     // animation (ChatRoomView keys the focused bubble off this value flipping to a new state).
     setExternalFocusMsgId(null);
     requestAnimationFrame(() => {
       setExternalFocusMsgId(messageId);
-      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 1700);
+      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 2200);
     });
     return true;
   };

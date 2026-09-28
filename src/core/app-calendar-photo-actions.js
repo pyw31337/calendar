@@ -855,10 +855,14 @@ export function createCalendarPhotoActions({
     if (!el) return false;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.remove('chat-search-focused-bubble');
+    const innerBubble = el.querySelector('.v2-bubble-surface, .v2-memo-card-contract') || el;
+    innerBubble.classList.remove('chat-search-focused-bubble');
     void el.offsetWidth;
     el.classList.add('chat-search-focused-bubble');
+    if (innerBubble !== el) innerBubble.classList.add('chat-search-focused-bubble');
     setTimeout(() => {
       el.classList.remove('chat-search-focused-bubble');
+      if (innerBubble !== el) innerBubble.classList.remove('chat-search-focused-bubble');
     }, 2200);
     return true;
   };
@@ -1048,7 +1052,7 @@ export function createCalendarPhotoActions({
     }
     changeView('memo');
     setTimeout(() => {
-      const el = document.querySelector(`[data-memo-id="${memoId}"], #memo-${memoId}`);
+      const el = document.querySelector(`[data-v2-memo-id="${memoId}"], [data-memo-id="${memoId}"], #memo-${memoId}`);
       if (el) focusElementWithShake(el);
     }, 350);
   };
