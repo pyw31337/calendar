@@ -80,7 +80,8 @@ test('bulkTagAssets updates multiple assets in one source and every meeting copy
   assert.equal(result.itemCount, 3);
   assert.equal(result.sourceDocumentsTouched, 1);
   assert.equal(result.slotsTagged, 3);
-  assert.equal(result.albumCopiesTagged, 3);
+  // a, b, c are in 9/19 and b is also referenced by the 9/20 meeting copy.
+  assert.equal(result.albumCopiesTagged, 4);
   const m1 = (await root.collection('messages').doc('m1').get()).data();
   assert.deepEqual(m1.imageTags, ['260919 서준', '260919 도은', '파주 하니랜드']);
   assert.equal(m1.imageTagMap[getPhotoAssetKey(a.imageUrl)], '260919 서준');
