@@ -30,7 +30,12 @@ assert(/CHAT_OLDER_PAGE_SIZE:\s*20/.test(config), 'older chat reads must retain 
 // effect that could fire unconditionally, so this still guards against unbounded egress.
 assert(/isGlobalSearchOpen[\s\S]{0,40}activeView !== 'history'[\s\S]{0,40}activeView !== 'gallery'/.test(galleryArchive), 'full archives must only hydrate for explicit search, history, or gallery views');
 assert(!/visiblePhotos \|\| \[\]\)\.length >= 60[\s\S]{0,100}onLoadOlderChat/.test(gallery), 'gallery must not auto-chain older history reads');
-assert(/const PAGE_SIZE = 100/.test(photoIndex) && /indexedPhotoTotal[^\n]*\/ 100/.test(gallery), 'gallery must cap each rendered photo page at 100 items');
+assert(
+  /const PAGE_SIZE = 100/.test(photoIndex)
+    && /const GALLERY_PAGE_SIZE = 100/.test(gallery)
+    && /indexedPhotoTotal[^\n]*\/ GALLERY_PAGE_SIZE/.test(gallery),
+  'gallery must cap each rendered photo page at 100 items'
+);
 assert(!/<script[^>]+firebase-storage-compat/.test(index), 'Storage SDK must stay off the initial document path');
 
 console.log('[egress-safety] passed: bounded reads, paged gallery rendering, lazy Storage, and thumbnail-first summaries are intact');

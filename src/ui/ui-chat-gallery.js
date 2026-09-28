@@ -2,7 +2,7 @@
  * Chat / gallery modal (P4-13)
  */
 
-import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
@@ -12,6 +12,7 @@ import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTim
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const AI_REVIEW_MAX_TAGS = 20;
+const GALLERY_PAGE_SIZE = 100;
 function normalizeAnalysisTagList(values) {
   const input = Array.isArray(values) ? values : String(values || '').split(/[\s,#]+/);
   return Array.from(new Set(input
@@ -540,8 +541,11 @@ export function ChatGalleryModal({
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
   const [activeTab, setActiveTab] = React.useState('photos');
+  const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
+  const [galleryListPage, setGalleryListPage] = React.useState(1);
   const setGalleryTab = next => {
     setActiveTab(next);
+    setGalleryListPage(1);
     setSelectedBulkShareKeys(new Set());
   }; // 'photos' | 'links' | 'files' | 'analysis'
   const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
@@ -1057,32 +1061,19 @@ export function ChatGalleryModal({
       setIsBulkTagSaving(false);
     }
   };
-  const [photoRenderLimit, setPhotoRenderLimit] = React.useState(24);
+  const pagedFallbackPhotos = React.useMemo(
+    () => paginateGalleryItems(visiblePhotos, galleryListPage, GALLERY_PAGE_SIZE),
+    [visiblePhotos, galleryListPage]
+  );
   const usingPhotoIndex = Array.isArray(indexedPhotos);
   const renderedPhotos = React.useMemo(
-    () => asPage && !usingPhotoIndex ? visiblePhotos.slice(0, photoRenderLimit) : visiblePhotos,
-    [asPage, visiblePhotos, photoRenderLimit, usingPhotoIndex]
+    () => asPage && !usingPhotoIndex ? pagedFallbackPhotos.items : visiblePhotos,
+    [asPage, visiblePhotos, pagedFallbackPhotos.items, usingPhotoIndex]
   );
-  const hasLocallyHiddenPhotos = !usingPhotoIndex && renderedPhotos.length < visiblePhotos.length;
   const loadMorePhotos = () => {
-    if (hasLocallyHiddenPhotos) {
-      setPhotoRenderLimit(limit => limit + 20);
-      return;
-    }
     if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
   };
-  const handleGalleryContentScroll = e => {
-    handleGalleryScroll(e);
-    if (!asPage || activeTab !== 'photos' || galleryViewMode !== 'all' || !hasLocallyHiddenPhotos) return;
-    const el = e?.currentTarget;
-    if (!el) return;
-    // Keep the initial DOM light, then progressively reveal the complete already-hydrated
-    // gallery before the user reaches the bottom. The button remains as an accessibility and
-    // slow-device fallback, but ordinary scrolling no longer requires repeated manual taps.
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 900) {
-      setPhotoRenderLimit(limit => Math.min(visiblePhotos.length, limit + 40));
-    }
-  };
+  const handleGalleryContentScroll = handleGalleryScroll;
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
     markBrokenPhoto(photo, brokenInfo);
@@ -1103,13 +1094,15 @@ export function ChatGalleryModal({
 
   const displayPhotoTabCount = usingPhotoIndex && Number.isFinite(Number(indexedPhotoTotal))
     ? Number(indexedPhotoTotal) : visiblePhotos.length;
-  const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
   const [isGalleryPickerOpen, setIsGalleryPickerOpen] = React.useState(false);
   const [pickerGalleryYear, setPickerGalleryYear] = React.useState(() => new Date().getFullYear());
   const [pickerGalleryMonth, setPickerGalleryMonth] = React.useState(() => new Date().getMonth());
   const galleryMonthKey = `${galleryMonthDate.getFullYear()}-${String(galleryMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  React.useEffect(() => {
+    setGalleryListPage(1);
+  }, [searchQuery, galleryViewMode, galleryMonthKey]);
   const requiresCompletePhotoIndex = usingPhotoIndex
     && activeTab === 'photos'
     && (Boolean(searchQuery.trim()) || galleryViewMode === 'date');
@@ -1148,16 +1141,23 @@ export function ChatGalleryModal({
     list.sort((a, b) => Number(b?.timestamp || 0) - Number(a?.timestamp || 0));
     return list;
   };
+  const dateModeSourceItems = React.useMemo(() => {
+    const sourceItems = activeTab === 'links' ? filteredLinks : (activeTab === 'files' ? filteredFiles : visiblePhotos);
+    return (sourceItems || []).filter(item => {
+      const key = getGalleryItemDateKey(item) || '__unknown__';
+      return key === '__unknown__' || key.startsWith(galleryMonthKey);
+    });
+  }, [activeTab, filteredLinks, filteredFiles, visiblePhotos, galleryMonthKey]);
+  const pagedDateModeItems = React.useMemo(
+    () => paginateGalleryItems(dateModeSourceItems, galleryListPage, GALLERY_PAGE_SIZE),
+    [dateModeSourceItems, galleryListPage]
+  );
   const groupedGallerySections = React.useMemo(() => {
     if (galleryViewMode !== 'date') return [];
-    // Date mode must group the full filtered list (visiblePhotos), not the flat-mode
-    // render slice (renderedPhotos). Slicing left hasLocallyHiddenPhotos true for other
-    // months and made auto load-more keep firing without growing the current month UI.
-    const sourceItems = activeTab === 'links' ? filteredLinks : (activeTab === 'files' ? filteredFiles : visiblePhotos);
+    const sourceItems = pagedDateModeItems.items;
     const groups = new Map();
     (sourceItems || []).forEach((item, idx) => {
       const key = getGalleryItemDateKey(item) || '__unknown__';
-      if (key !== '__unknown__' && !key.startsWith(galleryMonthKey)) return;
       const next = groups.get(key) || [];
       next.push({ item, idx });
       groups.set(key, next);
@@ -1176,16 +1176,13 @@ export function ChatGalleryModal({
           .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
           .map(entry => entry.item)
       }));
-  }, [galleryViewMode, activeTab, filteredLinks, filteredFiles, visiblePhotos, galleryMonthKey]);
+  }, [galleryViewMode, pagedDateModeItems.items]);
 
   // Per-month photo count for the active galleryMonthKey (already-loaded visiblePhotos only).
   const monthVisiblePhotoCount = React.useMemo(() => {
     if (galleryViewMode !== 'date' || activeTab !== 'photos') return 0;
-    return (visiblePhotos || []).reduce((count, item) => {
-      const key = getGalleryItemDateKey(item) || '';
-      return key.startsWith(galleryMonthKey) ? count + 1 : count;
-    }, 0);
-  }, [galleryViewMode, activeTab, visiblePhotos, galleryMonthKey]);
+    return dateModeSourceItems.length;
+  }, [galleryViewMode, activeTab, dateModeSourceItems]);
 
   // When an older-chat load finishes without adding any photos for the current month,
   // mark that month exhausted so date-mode auto load-more stops bouncing at the bottom.
@@ -2278,17 +2275,25 @@ export function ChatGalleryModal({
     setPaginationDragPage(null);
     paginationDragRef.current = null;
     paginationSuppressClickRef.current = false;
-  }, [indexedPhotoPage, indexedPhotoTotal]);
-  const renderGalleryPagination = () => {
-    if (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function') return null;
-    const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
+  }, [indexedPhotoPage, indexedPhotoTotal, galleryListPage]);
+  // One existing gallery paginator serves server-indexed photos and every local 100-row view.
+  // Keeping the same control prevents an unbounded date/list DOM from returning through a
+  // separate “load on scroll” implementation.
+  const renderGalleryPagination = (options = null) => {
+    const isIndexedPage = !options;
+    if (isIndexedPage && (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function')) return null;
+    const currentPage = Number(options?.currentPage || indexedPhotoPage || 1);
+    const pageCount = Math.max(1, Number(options?.pageCount || Math.ceil(Number(indexedPhotoTotal || 0) / GALLERY_PAGE_SIZE)) || 1);
+    const onPageChange = options?.onChange || onIndexedPhotoPageChange;
+    const pageLoading = options?.loading ?? indexedPhotoLoading;
     if (pageCount <= 1) return null;
     const windowSize = isMobile ? 5 : 10;
-    const focusPage = paginationDragPage != null ? paginationDragPage : indexedPhotoPage;
+    const focusPage = paginationDragPage != null ? paginationDragPage : currentPage;
     const pages = getPaginationWindow(focusPage, pageCount, windowSize);
     const go = page => {
-      if (indexedPhotoLoading || page < 1 || page > pageCount || page === indexedPhotoPage) return;
-      void onIndexedPhotoPageChange(page);
+      if (pageLoading || page < 1 || page > pageCount || page === currentPage || typeof onPageChange !== 'function') return;
+      if (isIndexedPage) void onPageChange(page);
+      else onPageChange(page);
       if (gridHostRef.current) gridHostRef.current.scrollTop = 0;
     };
     // Same chevron used by the month-nav / BackArrowIcon (down path, rotated). Double-stack for
@@ -2313,22 +2318,22 @@ export function ChatGalleryModal({
     );
     const arrow = (label, page, disabled, glyph) => /*#__PURE__*/React.createElement("button", {
       key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
-      "aria-label": label, disabled: disabled || indexedPhotoLoading, onClick: () => go(page)
+      "aria-label": label, disabled: disabled || pageLoading, onClick: () => go(page)
     }, glyph);
     const endMobileDrag = () => {
       const drag = paginationDragRef.current;
       paginationDragRef.current = null;
       if (!drag) return;
-      const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || indexedPhotoPage));
+      const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || currentPage));
       setPaginationDragPage(null);
       if (!drag.moved) return;
       // Prevent the synthesized click on the button under the finger from also selecting a page.
       paginationSuppressClickRef.current = true;
-      if (target !== indexedPhotoPage) go(target);
+      if (target !== currentPage) go(target);
     };
     const mobileDragProps = isMobile ? {
       onPointerDown: event => {
-        if (indexedPhotoLoading || event.button != null && event.button !== 0) return;
+        if (pageLoading || event.button != null && event.button !== 0) return;
         paginationDragRef.current = {
           pointerId: event.pointerId,
           startX: event.clientX,
@@ -2356,15 +2361,15 @@ export function ChatGalleryModal({
     } : {};
     return /*#__PURE__*/React.createElement("nav", {
       className: `gallery-pagination${isMobile ? ' is-mobile is-swipeable' : ''}`,
-      "aria-label": "갤러리 페이지",
+      "aria-label": options?.label || "갤러리 페이지",
       ...mobileDragProps
     },
-      !isMobile && arrow('첫 페이지', 1, indexedPhotoPage <= 1, doubleChevron('left')),
-      !isMobile && arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, chevron('left')),
+      !isMobile && arrow('첫 페이지', 1, currentPage <= 1, doubleChevron('left')),
+      !isMobile && arrow('이전 페이지', currentPage - 1, currentPage <= 1, chevron('left')),
       pages.map(page => /*#__PURE__*/React.createElement("button", {
-        key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}${page === focusPage && page !== indexedPhotoPage ? ' is-focus' : ''}`,
-        "aria-current": page === indexedPhotoPage ? 'page' : undefined,
-        disabled: indexedPhotoLoading,
+        key: page, type: "button", className: `gallery-pagination-button${page === currentPage ? ' is-active' : ''}${page === focusPage && page !== currentPage ? ' is-focus' : ''}`,
+        "aria-current": page === currentPage ? 'page' : undefined,
+        disabled: pageLoading,
         onClick: event => {
           if (paginationSuppressClickRef.current) {
             paginationSuppressClickRef.current = false;
@@ -2375,8 +2380,8 @@ export function ChatGalleryModal({
           go(page);
         }
       }, String(page))),
-      !isMobile && arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, chevron('right')),
-      !isMobile && arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, doubleChevron('right'))
+      !isMobile && arrow('다음 페이지', currentPage + 1, currentPage >= pageCount, chevron('right')),
+      !isMobile && arrow('마지막 페이지', pageCount, currentPage >= pageCount, doubleChevron('right'))
     );
   };
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
@@ -2599,9 +2604,9 @@ export function ChatGalleryModal({
       const isLinkMode = activeTab === 'links';
       const isFileMode = activeTab === 'files';
       const monthExhausted = activeTab === 'photos' && exhaustedGalleryMonthKey === galleryMonthKey;
-      // Date mode: do not gate on hasLocallyHiddenPhotos (flat slice). Photos already group from
-      // visiblePhotos; only older-chat pagination (plus loading) matters. Hide when this month
-      // was exhausted by a load that added zero month photos.
+      // Date mode has its own explicit 100-row page. Older chat history is only requested from
+      // the visible continuation button, and is hidden when this month was exhausted by a load
+      // that added zero month photos.
       const showLoadMore = isLinkMode
         ? (hasMoreOlderChat || hasMoreMemos)
         : (isFileMode ? hasMoreOlderChat : ((hasMoreOlderChat || loadingOlderChat) && !monthExhausted));
@@ -2673,16 +2678,29 @@ export function ChatGalleryModal({
             }, isLinkMode ? renderGalleryLinkList(section.items) : (isFileMode ? renderGalleryFileList(section.items) : renderGalleryPhotoGrid(section.items, section.items)))
           );
         }),
+        renderGalleryPagination({
+          currentPage: pagedDateModeItems.currentPage,
+          pageCount: pagedDateModeItems.pageCount,
+          onChange: setGalleryListPage,
+          label: '일자별 갤러리 페이지'
+        }),
         loadMoreNode
       );
     }
     if (activeTab === 'files') {
       const sortedFiles = sortGalleryFlatItems(filteredFiles);
+      const pagedFiles = paginateGalleryItems(sortedFiles, galleryListPage, GALLERY_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderFileListHeader(),
         sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : renderGalleryFileList(sortedFiles),
+        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : renderGalleryFileList(pagedFiles.items),
+        renderGalleryPagination({
+          currentPage: pagedFiles.currentPage,
+          pageCount: pagedFiles.pageCount,
+          onChange: setGalleryListPage,
+          label: '파일 갤러리 페이지'
+        }),
         (hasMoreOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
           label: `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)`,
           loadingLabel: '이전 파일을 불러오는 중…',
@@ -2695,11 +2713,18 @@ export function ChatGalleryModal({
     }
     if (activeTab === 'links') {
       const sortedLinks = sortGalleryFlatItems(filteredLinks);
+      const pagedLinks = paginateGalleryItems(sortedLinks, galleryListPage, GALLERY_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderLinkListHeader(),
         sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(sortedLinks),
+        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(pagedLinks.items),
+        renderGalleryPagination({
+          currentPage: pagedLinks.currentPage,
+          pageCount: pagedLinks.pageCount,
+          onChange: setGalleryListPage,
+          label: '링크 갤러리 페이지'
+        }),
         (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
           label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
           loadingLabel: '이전 링크를 불러오는 중…',
@@ -2722,11 +2747,18 @@ export function ChatGalleryModal({
         ? "검색 결과가 없습니다."
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedVisiblePhotos),
-      usingPhotoIndex && !(searchQuery || '').trim() && renderGalleryPagination(),
-      (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-        label: hasLocallyHiddenPhotos ? `사진 더 보기 (${visiblePhotos.length}장 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
+      usingPhotoIndex && !(searchQuery || '').trim()
+        ? renderGalleryPagination()
+        : renderGalleryPagination({
+          currentPage: pagedFallbackPhotos.currentPage,
+          pageCount: pagedFallbackPhotos.pageCount,
+          onChange: setGalleryListPage,
+          label: '사진 갤러리 페이지'
+        }),
+      (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
+        label: `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
         loadingLabel: '이전 사진을 불러오는 중…',
-        disabled: !!loadingOlderChat && !hasLocallyHiddenPhotos,
+        disabled: !!loadingOlderChat,
         onClick: loadMorePhotos
       })
     );
