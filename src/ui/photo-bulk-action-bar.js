@@ -12,7 +12,7 @@
  */
 
 import { ClipboardPasteIcon, TrashIcon } from './ui-icons.js';
-import { normalizePhotoTagTokens, buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
+import { normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
 
 let tagClipboardBuffer = [];
 

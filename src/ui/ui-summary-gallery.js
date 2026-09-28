@@ -11,7 +11,7 @@ import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken } from './archive-place-groups.js';
-import { PhotoBulkActionBar, setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
+import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
