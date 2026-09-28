@@ -1365,6 +1365,68 @@ button, input, textarea, select {
   max-width: 100%;
 }
 
+/* Calendar month paging: the same pointer gesture is shared by the legacy and V2 grids.
+   `pan-y` deliberately leaves vertical document scrolling to the browser while giving a
+   horizontal drag to the calendar. The moving child, rather than the clipping surface, is
+   animated so range-event bars and day cells always enter as one coherent month. */
+:root {
+  --calendar-month-swipe-exit-duration: 150ms;
+  --calendar-month-swipe-enter-duration: 210ms;
+  --calendar-month-swipe-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --calendar-month-swipe-exit-distance: 18%;
+}
+.calendar-month-swipe-surface {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+}
+.calendar-month-swipe-content {
+  min-width: 0;
+  will-change: transform, opacity;
+}
+.calendar-month-swipe-content.is-dragging {
+  transition: none;
+}
+.calendar-month-swipe-content.is-exiting {
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform var(--calendar-month-swipe-exit-duration) var(--calendar-month-swipe-ease),
+    opacity var(--calendar-month-swipe-exit-duration) ease;
+}
+.calendar-month-swipe-content.is-exiting.is-next {
+  transform: translate3d(calc(var(--calendar-month-swipe-exit-distance) * -1), 0, 0);
+}
+.calendar-month-swipe-content.is-exiting.is-previous {
+  transform: translate3d(var(--calendar-month-swipe-exit-distance), 0, 0);
+}
+.calendar-month-swipe-content.is-entering.is-next {
+  animation: calendar-month-swipe-enter-next var(--calendar-month-swipe-enter-duration) var(--calendar-month-swipe-ease) both;
+}
+.calendar-month-swipe-content.is-entering.is-previous {
+  animation: calendar-month-swipe-enter-previous var(--calendar-month-swipe-enter-duration) var(--calendar-month-swipe-ease) both;
+}
+@keyframes calendar-month-swipe-enter-next {
+  from { transform: translate3d(var(--calendar-month-swipe-exit-distance), 0, 0); opacity: 0; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@keyframes calendar-month-swipe-enter-previous {
+  from { transform: translate3d(calc(var(--calendar-month-swipe-exit-distance) * -1), 0, 0); opacity: 0; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .calendar-month-swipe-content.is-exiting,
+  .calendar-month-swipe-content.is-entering.is-next,
+  .calendar-month-swipe-content.is-entering.is-previous {
+    animation: none;
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
 .app-container {
   max-width: 1100px;
   margin: 0 auto;

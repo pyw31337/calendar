@@ -1,6 +1,7 @@
 import { shortParticipantName } from './v2/view-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
@@ -469,6 +470,14 @@ export function CalendarGrid({
     endTouchDrag(null);
   };
 
+  const calendarSwipe = useCalendarMonthSwipe({
+    onMonthDelta: delta => {
+      if (delta > 0) onNextMonth?.();
+      else onPrevMonth?.();
+    },
+    isInteractionLocked: () => isTouchDragging || Boolean(touchDragRef.current?.dragging)
+  });
+
   // Sync picker values when month navigates externally
   React.useEffect(() => {
     setPickerYear(year);
@@ -713,7 +722,7 @@ export function CalendarGrid({
     title: "\uC774\uC804\uB2EC",
     "aria-label": "\uC774\uC804\uB2EC",
     style: { padding: '8px' },
-    onClick: onPrevMonth
+    onClick: () => calendarSwipe.navigateByMonth(-1)
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "20",
@@ -745,7 +754,7 @@ export function CalendarGrid({
     title: "\uB2E4\uC74C\uB2EC",
     "aria-label": "\uB2E4\uC74C\uB2EC",
     style: { padding: '8px' },
-    onClick: onNextMonth
+    onClick: () => calendarSwipe.navigateByMonth(1)
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "20",
@@ -824,6 +833,13 @@ export function CalendarGrid({
     ));
     return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
   })(), /*#__PURE__*/React.createElement("div", {
+    className: "calendar-month-swipe-surface",
+    "aria-label": "캘린더 월 이동: 좌우로 쓸어 이전 또는 다음 달 보기",
+    ...calendarSwipe.surfaceProps
+  }, /*#__PURE__*/React.createElement("div", {
+    className: calendarSwipe.contentClassName,
+    style: calendarSwipe.contentStyle
+  }, /*#__PURE__*/React.createElement("div", {
     className: "weekday-grid"
   }, /*#__PURE__*/React.createElement("div", {
     className: "weekday-label sun"
@@ -897,7 +913,9 @@ export function CalendarGrid({
         ...(isTouchDropTarget ? { outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' } : {}),
         "--cell-index": idx
       },
-      onClick: () => onSelectDate(dateStr),
+      onClick: () => {
+        if (!calendarSwipe.justSwipedRef.current) onSelectDate(dateStr);
+      },
       onDragOver: event => {
         event.preventDefault();
       },
@@ -1195,7 +1213,7 @@ export function CalendarGrid({
         }
       }))
     ];
-  })]));
+  })]))));
 
   // Floating badge that follows the finger while a touch drag is active (see
   // handleBadgeTouchStart above) -- portaled straight to <body> so it renders above everything

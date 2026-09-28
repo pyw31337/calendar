@@ -51,6 +51,7 @@ import {
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
@@ -859,6 +860,14 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     endTouchDrag(null);
   };
 
+  // Month navigation is independent from the long-press availability drag. A normal horizontal
+  // sweep on the calendar advances the month, while an active long-press keeps owning the gesture
+  // so moving a participant dot can never accidentally change the displayed month.
+  const calendarSwipe = useCalendarMonthSwipe({
+    onMonthDelta: delta => setMonthDate(date => new Date(date.getFullYear(), date.getMonth() + delta, 1)),
+    isInteractionLocked: () => isTouchDragging || Boolean(touchDragRef.current?.dragging)
+  });
+
   const calendar = calendarContext?.calendar || {};
   // Use the same normalized active participant list for both calendar dots and
   // the legend.  The raw calendar array can contain archived/stale color
@@ -987,7 +996,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           className: bentoClass('ghost-btn cal-nav-btn'),
           'aria-label': '이전달',
           type: 'button',
-          onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
+          onClick: () => calendarSwipe.navigateByMonth(-1),
         },
           React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { transform: 'rotate(90deg)' } },
             React.createElement('path', { d: 'M6 9l6 6l6 -6' })
@@ -1003,7 +1012,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           className: bentoClass('ghost-btn cal-nav-btn'),
           'aria-label': '다음달',
           type: 'button',
-          onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
+          onClick: () => calendarSwipe.navigateByMonth(1),
         },
           React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { transform: 'rotate(-90deg)' } },
             React.createElement('path', { d: 'M6 9l6 6l6 -6' })
@@ -1012,6 +1021,16 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       )
     ),
 
+    // Weekdays and month grid share one swipe surface. The inner content follows a finger while
+    // dragging, then exits/enters as a whole so the weekday labels never visually lag the dates.
+    React.createElement('div', {
+      className: 'calendar-month-swipe-surface',
+      'aria-label': '캘린더 월 이동: 좌우로 쓸어 이전 또는 다음 달 보기',
+      ...calendarSwipe.surfaceProps
+    }, React.createElement('div', {
+      className: calendarSwipe.contentClassName,
+      style: calendarSwipe.contentStyle
+    },
     // Weekdays
     React.createElement('div', { className: bentoClass('cal-weekdays'), style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '2px' } },
       React.createElement('div', { className: bentoClass('weekday-label'), style: { color: '#EF4444' } }, '일'),
@@ -1102,7 +1121,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             ...(rowDepth > 0 ? { '--ann-lanes': rowDepth } : {}),
             ...(isTouchDropTarget ? { outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' } : {}),
           },
-          onClick: () => { if (!justTouchDraggedRef.current) onSelectDate?.(dateStr); },
+          onClick: () => { if (!justTouchDraggedRef.current && !calendarSwipe.justSwipedRef.current) onSelectDate?.(dateStr); },
           onDragOver: event => { event.preventDefault(); },
           onDrop: event => {
             event.preventDefault();
@@ -1187,7 +1206,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         React.createElement('span', { className: bentoClass('dot'), style: { background: p.color || '#A78BFA' } }),
         p.name
       ))
-    )
+    )))
   );
 
   // Floating badge that follows the finger while a touch drag is active -- portaled to <body>
