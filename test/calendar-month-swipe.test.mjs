@@ -21,3 +21,27 @@ test('calendar month swipe threshold stays reachable on phones and bounded on wi
   assert.equal(getCalendarSwipeThreshold(393), 63);
   assert.ok(getCalendarSwipeThreshold(2400) < 100);
 });
+
+test('calendar month swipe preserves clicks on date cells and defers pointer capture to drag', async () => {
+  const fs = await import('node:fs/promises');
+  const swipeSource = await fs.readFile(new URL('../src/ui/calendar-month-swipe.js', import.meta.url), 'utf8');
+
+  // Verify onPointerDown does NOT call setPointerCapture
+  const onPointerDownMatch = swipeSource.match(/onPointerDown:\s*event\s*=>\s*\{([^}]+)\}/);
+  assert.ok(onPointerDownMatch, 'onPointerDown must exist');
+  assert.ok(
+    !onPointerDownMatch[1].includes('setPointerCapture'),
+    'onPointerDown must NOT call setPointerCapture, so date cell clicks are not swallowed'
+  );
+
+  // Verify pointer capture is only acquired in moveGesture after horizontal drag is confirmed
+  assert.ok(
+    swipeSource.includes('gesture.currentTarget?.setPointerCapture?.(pointerId)'),
+    'pointer capture must be deferred until horizontal dragging begins'
+  );
+  assert.ok(
+    swipeSource.includes('gesture.currentTarget?.releasePointerCapture'),
+    'pointer capture must be released on gesture end or cancel'
+  );
+});
+

@@ -90,6 +90,10 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
   };
 
   const cancelGesture = () => {
+    const gesture = gestureRef.current;
+    if (gesture?.pointerId != null && gesture?.currentTarget) {
+      try { gesture.currentTarget.releasePointerCapture?.(gesture.pointerId); } catch (_) {}
+    }
     gestureRef.current = null;
     setDragOffset(0);
     setIsDragging(false);
@@ -101,6 +105,7 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
       pointerId,
       startX: point.clientX,
       startY: point.clientY,
+      currentTarget: point.currentTarget,
       width: point.currentTarget?.getBoundingClientRect?.().width || point.currentTarget?.clientWidth || 0,
       axis: ''
     };
@@ -123,6 +128,7 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
         return;
       }
       setIsDragging(true);
+      try { gesture.currentTarget?.setPointerCapture?.(pointerId); } catch (_) {}
     }
     if (gesture.axis !== 'horizontal') return;
     const maxDrag = Math.max(CALENDAR_SWIPE_MIN_PX, gesture.width * CALENDAR_SWIPE_DRAG_RATIO);
@@ -132,6 +138,7 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
   const endGesture = (point, pointerId) => {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== pointerId) return;
+    try { gesture.currentTarget?.releasePointerCapture?.(pointerId); } catch (_) {}
     const deltaX = point ? point.clientX - gesture.startX : 0;
     const deltaY = point ? point.clientY - gesture.startY : 0;
     const direction = gesture.axis === 'horizontal'
@@ -150,13 +157,9 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
         onPointerDown: event => {
           if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
           beginGesture({ clientX: event.clientX, clientY: event.clientY, currentTarget: event.currentTarget }, event.pointerId);
-          try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch (_) {}
         },
         onPointerMove: event => moveGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
-        onPointerUp: event => {
-          endGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId);
-          try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch (_) {}
-        },
+        onPointerUp: event => endGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
         onPointerCancel: cancelGesture
       }
     : {
