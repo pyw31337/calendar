@@ -362,3 +362,27 @@ html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="di
     padding-bottom: calc(80px + var(--v2-pane-bottom)) !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+ * iOS focused-control contract
+ * --------------------------------------------------------------------------
+ * Safari zooms a text control whose computed font size is below 16px.  The V2
+ * chat composer intentionally uses compact desktop typography, but keeping
+ * that value on an iPhone made a tap zoom the whole standalone window and
+ * invalidated the fixed-pane geometry.  Use one mobile control token across
+ * every editable text control instead of special-casing the chat textarea.
+ * Buttons (including the author picker) do not trigger Safari's input zoom.
+ */
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design {
+    --v2-mobile-control-font-size: 1rem;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design textarea,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design select {
+    font-size: var(--v2-mobile-control-font-size) !important;
+  }
+}

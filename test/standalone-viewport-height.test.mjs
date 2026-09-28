@@ -9,7 +9,7 @@ import vm from 'node:vm';
 // bottom of every page (menu FAB, chat composer) under the navigation bar.
 const source = fs.readFileSync('src/ui/v2/visual-viewport-sync.js', 'utf8');
 
-function runShell({ userAgent, innerHeight, screenHeight, width, navStandalone = false }) {
+function runShell({ userAgent, innerHeight, screenHeight, width, innerWidth = width, navStandalone = false, visualViewport = {} }) {
   const props = new Map();
   const attrs = new Set();
   const root = {
@@ -20,11 +20,11 @@ function runShell({ userAgent, innerHeight, screenHeight, width, navStandalone =
   };
   const document = { documentElement: root, body: { querySelectorAll: () => [] }, querySelectorAll: () => [] };
   const window = {
-    innerHeight, innerWidth: width,
+    innerHeight, innerWidth,
     screen: { width, height: screenHeight },
     navigator: { userAgent, standalone: navStandalone, maxTouchPoints: 5 },
     matchMedia: q => ({ matches: /display-mode:\s*standalone/.test(q) || (/orientation: landscape/.test(q) && false) }),
-    visualViewport: { height: innerHeight, offsetTop: 0, offsetLeft: 0, addEventListener() {} },
+    visualViewport: { height: innerHeight, offsetTop: 0, offsetLeft: 0, scale: 1, addEventListener() {}, ...visualViewport },
     addEventListener() {}
   };
   const context = { window, document, MutationObserver: class { observe() {} }, requestAnimationFrame: fn => fn(), cancelAnimationFrame() {} };
@@ -40,6 +40,25 @@ test('Android home-screen app keeps the reported window height', () => {
 test('iOS home-screen app still extends over the status-bar shortfall', () => {
   const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
   assert.equal(runShell({ userAgent: ua, innerHeight: 793, screenHeight: 852, width: 393, navStandalone: true }), '852px');
+});
+
+test('compact iOS standalone keeps its full height while a focused control has changed the viewport width', () => {
+  const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';
+  assert.equal(runShell({
+    userAgent: ua,
+    innerHeight: 793,
+    screenHeight: 852,
+    width: 393,
+    innerWidth: 327,
+    navStandalone: true,
+    visualViewport: { height: 660, scale: 1.2 },
+  }), '852px');
+});
+
+test('iOS input controls use a 16px-equivalent mobile token so Safari does not auto-zoom', () => {
+  const css = fs.readFileSync('src/ui/v2/viewport-shell.css', 'utf8');
+  assert.match(css, /--v2-mobile-control-font-size:\s*1rem/);
+  assert.match(css, /textarea,\s*html:has\(\.renewal-shell\.v2-design\) \.renewal-shell\.v2-design select[\s\S]*font-size:\s*var\(--v2-mobile-control-font-size\)\s*!important/);
 });
 
 test('the menu FAB clears the measured bottom-toolbar gap', () => {

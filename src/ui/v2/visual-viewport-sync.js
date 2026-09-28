@@ -12,8 +12,12 @@
   // edge, yet WebKit reports innerHeight / visualViewport.height one status bar short. Sizing the
   // shell to that number left an empty band at the bottom of every page. In standalone there is
   // no browser chrome, so the screen height for the current orientation is the real app height.
-  // Only trusted when the window spans the full screen width and the shortfall is a status bar
-  // (<= 100px) -- an iPad split-view window is narrower/shorter and keeps its reported size.
+  // The correction is deliberately limited to the normal iPhone status-bar-sized
+  // shortfall.  A focused sub-16px field can make iOS temporarily zoom the visual
+  // viewport, which changes `innerWidth`; do not let that transient width change
+  // turn the correction off and strand the composer/drawer below the screen.
+  // iPad split-view remains protected by retaining the full-width check on wide
+  // screens, where a large non-fullscreen window is a legitimate layout.
   // iOS WebKit only. Android home-screen apps (Chrome/Samsung Internet/Whale WebAPKs) report
   // innerHeight correctly, and their screen.height also counts the status and navigation bars
   // (~50-100px), so applying this there made the shell taller than the window and pushed the
@@ -28,20 +32,37 @@
       return false;
     }
   })();
+  const isIPhoneOrIPod = (() => {
+    try {
+      return /iP(hone|od)/.test(String(window.navigator?.userAgent || ''));
+    } catch (_) {
+      return false;
+    }
+  })();
+  const MAX_STANDALONE_SHORTFALL_PX = 140;
+  const COMPACT_IOS_SCREEN_WIDTH_PX = 600;
+
   const standaloneScreenHeight = (layoutH) => {
     if (!isIOSWebKit) return 0;
     try {
       const standalone = window.navigator.standalone === true
-        || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        || (window.matchMedia && (
+          window.matchMedia('(display-mode: standalone)').matches
+          || window.matchMedia('(display-mode: fullscreen)').matches
+        ));
       if (!standalone || !window.screen) return 0;
       const landscape = window.matchMedia && window.matchMedia('(orientation: landscape)').matches;
       const sw = Number(window.screen.width) || 0;
       const sh = Number(window.screen.height) || 0;
       const screenW = landscape ? Math.max(sw, sh) : Math.min(sw, sh);
       const screenH = landscape ? Math.min(sw, sh) : Math.max(sw, sh);
-      if (!screenH || Math.abs((window.innerWidth || 0) - screenW) > 2) return 0;
+      const hasFullWidth = Math.abs((window.innerWidth || 0) - screenW) <= 2;
+      // On compact iPhones, the page may already be temporarily zoomed by a
+      // focused control when this runs.  That only changes the reported width,
+      // not the fact that a standalone app owns the physical screen.
+      if (!screenH || (!isIPhoneOrIPod && screenW > COMPACT_IOS_SCREEN_WIDTH_PX && !hasFullWidth)) return 0;
       const shortfall = screenH - layoutH;
-      return shortfall > 0 && shortfall <= 100 ? Math.round(screenH) : 0;
+      return shortfall > 0 && shortfall <= MAX_STANDALONE_SHORTFALL_PX ? Math.round(screenH) : 0;
     } catch (_) {
       return 0;
     }
@@ -56,7 +77,10 @@
     // A real keyboard is tall. Smaller offsetTop/height drift (scrollbar, address
     // bar, our own fixed shell moving) must not be written back onto the shell:
     // that feedback makes the chat header and composer jump in and out.
-    const keyboard = layoutH - vvH - rawTop > 120;
+    // Do not mistake Safari's automatic input zoom for the keyboard.  A real
+    // keyboard keeps visualViewport.scale at 1; an auto/manual zoom does not.
+    const viewportScale = Number(vv?.scale || 1);
+    const keyboard = viewportScale <= 1.01 && layoutH - vvH - rawTop > 120;
     const height = keyboard ? vvH : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH));
     const offsetTop = keyboard ? rawTop : 0;
     // How far the real screen extends past what WebKit reports (iOS standalone only, see
