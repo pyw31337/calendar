@@ -51,16 +51,27 @@
  * navigation.  Make the destination unambiguous without inventing a second
  * memo detail component. */
 .v2-design .v2-memo .chat-search-focused-bubble,
-.v2-design .v2-memo .chat-search-focused-bubble .v2-bubble-surface,
-.v2-design .v2-memo .chat-search-focused-bubble .v2-memo-card-contract,
-.v2-design .v2-memo .v2-memo-card-is-focused .v2-bubble-surface,
-.v2-design .v2-memo .v2-memo-card-is-focused .v2-memo-card-contract,
-.v2-design .v2-home-memo-module .v2-memo-card-is-focused .v2-bubble-surface,
-.v2-design .v2-home-memo-module .v2-memo-card-is-focused .v2-memo-card-contract {
-  border: 2px solid rgba(124, 47, 229, 0.72) !important;
-  background: rgba(124, 47, 229, 0.075) !important;
-  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.12), var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
+.v2-design .v2-memo .v2-memo-card-is-focused,
+.v2-design .v2-home-memo-module .v2-memo-card-is-focused {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
   scroll-margin: 24px;
+}
+.v2-design .v2-memo .chat-search-focused-bubble > .v2-bubble-surface,
+.v2-design .v2-memo .v2-memo-card-is-focused > .v2-bubble-surface,
+.v2-design .v2-home-memo-module .v2-memo-card-is-focused > .v2-bubble-surface {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.v2-design .v2-memo .chat-search-focused-bubble .v2-memo-card-contract,
+.v2-design .v2-memo .v2-memo-card-is-focused .v2-memo-card-contract,
+.v2-design .v2-home-memo-module .v2-memo-card-is-focused .v2-memo-card-contract {
+  border: 1px solid var(--brand, #7C3AED) !important;
+  background: var(--brand-soft, #F3EEFF) !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
 }
 
 /* MemoScreen's scroll body already owns the common 40px/20px content gutter.

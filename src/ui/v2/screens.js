@@ -537,16 +537,9 @@ export function MemoScreen(p) {
         .find(element => element.getAttribute('data-v2-memo-id') === String(focusedMemoId) || element.getAttribute('data-memo-id') === String(focusedMemoId) || element.id === 'memo-' + String(focusedMemoId));
       if (target) {
         target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        target.classList.remove('chat-search-focused-bubble');
-        const inner = target.querySelector('.v2-bubble-surface, .v2-memo-card-contract');
-        if (inner) inner.classList.remove('chat-search-focused-bubble');
-        void target.offsetWidth;
-        target.classList.add('chat-search-focused-bubble');
-        if (inner) inner.classList.add('chat-search-focused-bubble');
-        setTimeout(() => {
-          target.classList.remove('chat-search-focused-bubble');
-          if (inner) inner.classList.remove('chat-search-focused-bubble');
-        }, 2200);
+        target.classList.add('v2-memo-card-is-focused');
+        const inner = target.querySelector('.v2-memo-card-contract');
+        if (inner) inner.classList.add('v2-memo-card-is-focused');
         return true;
       }
       return false;
@@ -701,7 +694,7 @@ export function MemoScreen(p) {
                 name: null,
                 color: author.color,
                 meta,
-                className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused chat-search-focused-bubble' : ''}`,
+                className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused' : ''}`,
                 'data-v2-memo-id': memo.id,
                 surfaceClassName: 'v2-memo-bubble-surface',
                 surfaceProps: {

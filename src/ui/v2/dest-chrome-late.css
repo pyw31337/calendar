@@ -2272,18 +2272,40 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
  * Search-result focus: the item the user just picked from 통합검색.
  * -------------------------------------------------------------------------- */
 html:has(.renewal-shell.v2-design) .search-result-focus,
-html:has(.renewal-shell.v2-design) .chat-search-focused-bubble,
-html:has(.renewal-shell.v2-design) .place-card-row.is-focused,
-html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-bubble-surface,
-html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-memo-card-contract,
-html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-bubble-surface,
-html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-contract,
-html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble,
-html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-bubble-surface,
-html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract {
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble:not([data-v2-memo-id]):not(.v2-memo-card-wrap),
+html:has(.renewal-shell.v2-design) .place-card-row.is-focused {
   border: 2px solid var(--v2-accent, #7C2FE5) !important;
   background: rgba(124, 47, 229, 0.14) !important;
   box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.18) !important;
+}
+
+/* Memo focus: no outer rectangle border, no multi-layer borders, clean 1px solid border on the card itself */
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.v2-memo-card-is-focused,
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.chat-search-focused-bubble,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.v2-memo-card-is-focused > .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.chat-search-focused-bubble > .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused > .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble > .v2-bubble-surface {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-memo-card-contract,
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-contract,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused .v2-memo-card-contract,
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract {
+  border: 1px solid var(--brand, #7C3AED) !important;
+  background: var(--brand-soft, #F3EEFF) !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
 }
 
 /* --------------------------------------------------------------------------

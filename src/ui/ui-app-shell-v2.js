@@ -139,7 +139,10 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   else url.searchParams.set('sub', subTabId);
   // A home-card focus is meaningful only on the memo destination.  Do not let
   // it follow the user into unrelated screens or a later fresh memo visit.
-  if (tabId !== 'memo') url.searchParams.delete('memoFocus');
+  if (tabId !== 'memo') {
+    url.searchParams.delete('memoFocus');
+    url.searchParams.delete('memo');
+  }
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
   window.history[method](window.history.state, '', url);
