@@ -1,0 +1,1 @@
+var e=Object.freeze({chat:!0,memo:!0,poll:!0,schedule:!0});function o(o,t){const c={...e,...o&&"object"==typeof o?o:{},...t&&"object"==typeof t?t:{}};return{chat:!1!==c.chat,memo:!1!==c.memo,poll:!1!==c.poll,schedule:!1!==c.schedule}}export{o as t};
