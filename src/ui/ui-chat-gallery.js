@@ -2718,12 +2718,7 @@ export function ChatGalleryModal({
         renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
       )
     ),
-    renderBulkTagPanel(),
-    !isBulkShareMode && /*#__PURE__*/React.createElement('button', {
-      type: 'button', onClick: () => setGalleryTab('analysis'),
-      className: 'btn btn-action btn-action-outline',
-      style: { alignSelf: 'flex-start', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
-    }, '✨ AI 추천·검토')
+    renderBulkTagPanel()
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
