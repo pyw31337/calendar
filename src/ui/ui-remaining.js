@@ -1,3 +1,5 @@
+import { parseMemoShareUrl, findMemoShareUrlInText } from '../core/memo-share-link.js';
+
 /**
  * Direct media, deadline picker, places section, image URL (P4-21)
  */
@@ -85,6 +87,7 @@ function getChatLinkPreviewHost(url) {
 
 function shouldRenderChatLinkPreview(url) {
   if (!url) return false;
+  if (parseMemoShareUrl(url)) return false;
   const mediaInfo = getDirectChatMediaInfo(url);
   if (mediaInfo) return false;
   const host = getChatLinkPreviewHost(url);
@@ -303,6 +306,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       } else {
         displayText = removeFirstUrl(displayText);
       }
+    }
+    const memoShareInText = findMemoShareUrlInText(displayText);
+    if (memoShareInText && memoShareInText.rawUrl) {
+      displayText = displayText.split(memoShareInText.rawUrl).join('');
     }
     displayText = displayText.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
     const textNode = displayText ? parseTextWithLinks(displayText, searchQuery) : null;

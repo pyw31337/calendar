@@ -78,5 +78,5 @@ export function findMemoShareUrlInText(value, options = {}) {
   const share = parseMemoShareUrl(candidate, options);
   if (!share) return null;
   const remainingText = `${text.slice(0, match.index)}${text.slice((match.index || 0) + match[0].length)}`.trim();
-  return { ...share, isOnlyUrl: remainingText.length === 0 };
+  return { ...share, isOnlyUrl: remainingText.length === 0, rawUrl: candidate, remainingText };
 }
