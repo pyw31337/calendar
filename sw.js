@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '3bc28952c5b402422f971bca9e312c94b4ac3f3c';
+const BUILD_SHA = '5fb9df7af01686e8d331ae715bc00693a06c7d69';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -158,19 +158,66 @@ async function fetchFreshDocument(req) {
   try {
     const response = await fetch(req, { cache: 'no-store' });
     if (response && response.ok) return response;
+
+    const url = new URL(req.url);
+    // Dynamic share link (e.g. /share/cw/memo/memo_123/): redirect to canonical SPA route
+    const shareMatch = url.pathname.match(/^(.*)\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
+    if (shareMatch) {
+      const basePath = shareMatch[1] ? `${shareMatch[1]}/` : '/';
+      const calendarId = shareMatch[2];
+      const view = shareMatch[3] || '';
+      const extraId = shareMatch[4] || '';
+      const redirectUrl = new URL(basePath, url.origin);
+      redirectUrl.searchParams.set('id', calendarId);
+      if (view === 'memo') {
+        redirectUrl.searchParams.set('view', 'memo');
+        if (extraId) redirectUrl.searchParams.set('memo', extraId);
+      } else if (view && ['chat', 'places', 'gallery', 'settlement'].includes(view)) {
+        redirectUrl.searchParams.set('view', view);
+        if (extraId) redirectUrl.searchParams.set('detail', extraId);
+      } else if (view) {
+        redirectUrl.searchParams.set('view', view);
+      }
+      for (const [k, v] of url.searchParams.entries()) {
+        if (!redirectUrl.searchParams.has(k)) redirectUrl.searchParams.set(k, v);
+      }
+      try {
+        return Response.redirect(redirectUrl.toString(), 302);
+      } catch (_) {
+        const res = await fetch(redirectUrl.toString(), { cache: 'no-store' });
+        if (res && (res.ok || res.status === 404)) return res;
+      }
+    }
+
+    // Allow 404 status (to let 404.html execute client-side redirection on GitHub Pages)
+    if (response && response.status === 404) return response;
     throw new Error(`document status ${response?.status || 0}`);
   } catch (_) {
     try {
       const url = new URL(req.url);
       const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)\/?$/);
-      if (!appPath) return Response.error();
-      const fallback = new URL(`${appPath[1]}/`, url.origin);
-      fallback.search = url.search;
-      if (!fallback.searchParams.get('id') && !fallback.searchParams.get('cal')) {
-        fallback.searchParams.set('id', appPath[2]);
+      if (appPath) {
+        const fallback = new URL(`${appPath[1]}/`, url.origin);
+        fallback.search = url.search;
+        if (!fallback.searchParams.get('id') && !fallback.searchParams.get('cal')) {
+          fallback.searchParams.set('id', appPath[2]);
+        }
+        const response = await fetch(fallback.toString(), { cache: 'no-store' });
+        if (response && (response.ok || response.status === 404)) return response;
       }
-      const response = await fetch(fallback.toString(), { cache: 'no-store' });
-      return response?.ok ? response : Response.error();
+
+      const sharePath = url.pathname.match(/^(.*)\/share\/([A-Za-z0-9_-]+)/);
+      if (sharePath) {
+        const basePath = sharePath[1] ? `${sharePath[1]}/` : '/';
+        const fallback = new URL(basePath, url.origin);
+        fallback.searchParams.set('id', sharePath[2]);
+        for (const [k, v] of url.searchParams.entries()) {
+          if (!fallback.searchParams.has(k)) fallback.searchParams.set(k, v);
+        }
+        const response = await fetch(fallback.toString(), { cache: 'no-store' });
+        if (response && (response.ok || response.status === 404)) return response;
+      }
+      return Response.error();
     } catch (_) {
       return Response.error();
     }
@@ -246,10 +293,12 @@ self.addEventListener('push', event => {
     }
   } catch (_) {}
   const title = payload.title || '모여라 캘린더';
+  const scopeUrl = self.registration?.scope || (self.location.origin + '/calendar/');
+  const iconUrl = new URL('icons/icon-v6-192.png', scopeUrl).href;
   const options = {
     body: payload.body || '',
-    icon: 'icons/icon-v6-192.png',
-    badge: 'icons/icon-v6-192.png',
+    icon: iconUrl,
+    badge: iconUrl,
     tag: payload.tag || 'gather-push',
     renotify: true,
     data: payload.url || './',
@@ -257,7 +306,12 @@ self.addEventListener('push', event => {
   };
   event.waitUntil(
     self.registration.showNotification(title, options).catch(function () {
-      return self.registration.showNotification(title, { body: options.body, tag: 'gather-push-fallback', data: options.data });
+      return self.registration.showNotification(title, {
+        body: options.body,
+        icon: iconUrl,
+        tag: 'gather-push-fallback',
+        data: options.data
+      });
     })
   );
 });
