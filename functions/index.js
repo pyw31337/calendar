@@ -328,12 +328,12 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const ownersByAsset = new Map();
   const addOwners = (sourceType, snapshot, idField = null) => snapshot.docs.forEach(doc => {
     getPhotoIndexEntries(sourceType, idField ? String(doc.data()?.[idField] || doc.id) : doc.id, doc.data() || {}).forEach(entry => {
-    const owners = ownersByAsset.get(entry.assetKey) || [];
-    if (!owners.some(owner => owner.sourceOwner === entry.sourceOwner)) owners.push(entry);
-    // Keep the complete set while rebuilding. The persisted row keeps a bounded owner preview,
-    // but its completeness marker lets mutation commands avoid reading unrelated meetings.
-    // Older rows without this marker deliberately retain the safe full-scan behaviour.
-    ownersByAsset.set(entry.assetKey, owners);
+      const owners = ownersByAsset.get(entry.assetKey) || [];
+      if (!owners.some(owner => owner.sourceOwner === entry.sourceOwner)) owners.push(entry);
+      // Keep the complete set while rebuilding. The persisted row keeps a bounded owner preview,
+      // but its completeness marker lets mutation commands avoid reading unrelated meetings.
+      // Older rows without this marker deliberately retain the safe full-scan behaviour.
+      ownersByAsset.set(entry.assetKey, owners);
     });
   });
   addOwners('message', byName.messages);

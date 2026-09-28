@@ -234,6 +234,7 @@ export function renderCalendarViews({
         },
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
+        onSaveImageTags: handleSaveImageTags,
         onBulkSaveImageTags: handleBulkSaveImageTags,
         photoCommentCounts: photoCommentCounts,
         // Before the canonical index resolves, pass an explicit empty indexed set instead of

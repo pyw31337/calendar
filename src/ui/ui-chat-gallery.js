@@ -15,10 +15,12 @@ import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const AI_REVIEW_MAX_TAGS = 20;
 const GALLERY_PAGE_SIZE = 100;
+const ANALYSIS_BATCH_FETCH_CONCURRENCY = 6;
 function normalizeAnalysisTagList(values) {
-  const input = Array.isArray(values) ? values : String(values || '').split(/[\s,#]+/);
+  const input = (Array.isArray(values) ? values : [values])
+    .flatMap(value => String(value || '').split(/[\s,#]+/));
   return Array.from(new Set(input
-    .map(value => String(value || '').replace(/^#+/, '').replace(/\s+/g, ' ').trim())
+    .map(value => String(value || '').replace(/^#+/, '').trim())
     .filter(Boolean))).slice(0, AI_REVIEW_MAX_TAGS);
 }
 function getAnalysisSuggestedTags(item) {
@@ -28,6 +30,27 @@ function getAnalysisSuggestedTags(item) {
     ...(Array.isArray(item?.places) ? item.places : []),
     ...(Array.isArray(item?.meetings) ? item.meetings : [])
   ]);
+}
+
+function createAnalysisTagChange(item, photo, finalTags) {
+  const assetKey = String(item?.assetKey || photo?.assetKey || '').trim();
+  const imageUrl = String(photo?.full || photo?.imageUrl || photo?.url || photo?.directMediaUrl || photo?.thumb || '').trim();
+  const thumbUrl = String(photo?.thumb || photo?.thumbUrl || imageUrl).trim();
+  return {
+    assetKey,
+    beforeTags: normalizeAnalysisTagList(photo?.tags || '').join(' '),
+    tags: normalizeAnalysisTagList(finalTags).join(' '),
+    photo: {
+      ...photo,
+      assetKey,
+      mediaKey: assetKey,
+      refKey: assetKey,
+      full: imageUrl,
+      imageUrl,
+      thumb: thumbUrl,
+      thumbUrl,
+    },
+  };
 }
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getPhotoCommentIdentity(...args) {
@@ -593,37 +616,46 @@ export function ChatGalleryModal({
   const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied', { silent = false } = {}) => {
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
-    if (!onSaveImageTags) throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
+    const saveBulk = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (!onSaveImageTags && typeof saveBulk !== 'function') throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
     if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
     setAnalysisSavingAssetKey(item.assetKey);
     try {
       const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
       const finalTags = normalizeAnalysisTagList([photo.tags || '', ...requestedTags]);
-      const sourceOwner = String(photo.tagSourceOwner || photo.sourceOwner || photo.owners?.[0]?.sourceOwner || '');
-      const ownerMatch = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
-      if (!ownerMatch) throw new Error('사진의 저장 위치를 찾지 못했습니다.');
-      const [, sourceType, sourceId, sourceIndex] = ownerMatch;
-      const imageIndex = Number(sourceIndex);
-      const source = sourceType === 'message' ? 'chat' : sourceType;
       const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo.tags || '').join(' ');
       if (changed) {
-        const ok = await onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
-          source,
-          sourceOwner,
-          imageIndex,
-          sourceImageIndex: imageIndex,
-          meetingDate: sourceType === 'meeting' ? sourceId : '',
-          photoId: String(photo.photoId || ''),
-          imageUrl: photo.full || photo.thumb || '',
-          thumb: photo.thumb || photo.full || '',
-          assetKey: item.assetKey,
-          mediaKey: item.assetKey,
-          refKey: item.assetKey,
-          directMediaUrl: String(photo.directMediaUrl || ''),
-          readFresh: true,
-          silent: true
-        });
-        if (!ok) throw new Error('태그 저장에 실패했습니다.');
+        // The gallery's server command is the canonical write-through path. It updates every
+        // source and meeting copy in one transaction and works even when this page was mounted
+        // without the legacy single-photo callback.
+        if (typeof saveBulk === 'function') {
+          const result = await saveBulk([createAnalysisTagChange(item, photo, finalTags)]);
+          if (!result?.ok) throw new Error('태그 저장에 실패했습니다.');
+        } else {
+          const sourceOwner = String(photo.tagSourceOwner || photo.sourceOwner || photo.owners?.[0]?.sourceOwner || '');
+          const ownerMatch = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
+          if (!ownerMatch) throw new Error('사진의 저장 위치를 찾지 못했습니다.');
+          const [, sourceType, sourceId, sourceIndex] = ownerMatch;
+          const imageIndex = Number(sourceIndex);
+          const source = sourceType === 'message' ? 'chat' : sourceType;
+          const ok = await onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
+            source,
+            sourceOwner,
+            imageIndex,
+            sourceImageIndex: imageIndex,
+            meetingDate: sourceType === 'meeting' ? sourceId : '',
+            photoId: String(photo.photoId || ''),
+            imageUrl: photo.full || photo.thumb || '',
+            thumb: photo.thumb || photo.full || '',
+            assetKey: item.assetKey,
+            mediaKey: item.assetKey,
+            refKey: item.assetKey,
+            directMediaUrl: String(photo.directMediaUrl || ''),
+            readFresh: true,
+            silent: true
+          });
+          if (!ok) throw new Error('태그 저장에 실패했습니다.');
+        }
       }
       await saveAnalysisReview(item, decision, finalTags, requestedTags);
       setAnalysisAction({ assetKey: '', mode: '', draft: '' });
@@ -633,33 +665,90 @@ export function ChatGalleryModal({
     } finally {
       setAnalysisSavingAssetKey('');
     }
-  }, [calendar?.id, onSaveImageTags, saveAnalysisReview, showToast]);
+  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, saveAnalysisReview, showToast]);
   const handleBatchApplyAnalysis = React.useCallback(async () => {
     const unreviewed = (mediaAnalysis.items || []).filter(item => !item.review && item.assetKey);
     if (!unreviewed.length) {
       showToast('처리할 미검토 항목이 없습니다.', 'info');
       return;
     }
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId) {
+      showToast('분석 대상 캘린더를 찾을 수 없습니다.', 'error');
+      return;
+    }
+    const saveBulk = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof saveBulk !== 'function') {
+      showToast('사진 태그 일괄 저장 기능을 준비하지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
     setIsBatchApplying(true);
     setBatchProgress({ current: 0, total: unreviewed.length });
-    let successCount = 0;
+    const resolved = [];
+    const failures = [];
+    let cursor = 0;
     try {
-      for (let i = 0; i < unreviewed.length; i++) {
-        const item = unreviewed[i];
-        setBatchProgress({ current: i + 1, total: unreviewed.length });
-        try {
-          await applyAnalysisTags(item, getAnalysisSuggestedTags(item), 'applied', { silent: true });
-          successCount++;
-        } catch (e) {
-          console.warn('Batch apply failed for', item.assetKey, e);
+      const workers = Array.from({ length: Math.min(ANALYSIS_BATCH_FETCH_CONCURRENCY, unreviewed.length) }, async () => {
+        while (cursor < unreviewed.length) {
+          const index = cursor++;
+          const item = unreviewed[index];
+          try {
+            const photo = await fetchMediaAnalysisPhoto({
+              calendarId,
+              projectId,
+              assetKey: item.assetKey,
+            });
+            resolved.push({
+              item,
+              finalTags: normalizeAnalysisTagList([photo.tags || '', ...getAnalysisSuggestedTags(item)]),
+              photo,
+            });
+          } catch (error) {
+            failures.push({ item, error });
+            console.warn('AI batch photo lookup failed for', item.assetKey, error);
+          } finally {
+            setBatchProgress({ current: index + 1, total: unreviewed.length });
+          }
         }
+      });
+      await Promise.all(workers);
+
+      const changed = resolved
+        .map(({ item, photo, finalTags }) => ({ item, finalTags, photo, change: createAnalysisTagChange(item, photo, finalTags) }))
+        .filter(record => record.change.tags !== record.change.beforeTags);
+      if (changed.length) {
+        const result = await saveBulk(changed.map(record => record.change));
+        if (!result?.ok) throw new Error('AI 추천 태그 일괄 저장에 실패했습니다.');
       }
-      showToast(`미검토 사진 ${successCount}장에 AI 추천 태그를 일괄 적용했습니다.`, 'success');
+      // Reviews are audit records, so keep them after the canonical tag write and use bounded
+      // parallelism. A failed review never rolls back an already successful photo mutation.
+      let reviewCursor = 0;
+      const reviewWorkers = Array.from({ length: Math.min(ANALYSIS_BATCH_FETCH_CONCURRENCY, resolved.length) }, async () => {
+        while (reviewCursor < resolved.length) {
+          const record = resolved[reviewCursor++];
+          try {
+            await saveAnalysisReview(record.item, 'applied', record.finalTags, getAnalysisSuggestedTags(record.item));
+          } catch (error) {
+            failures.push({ item: record.item, error });
+            console.warn('AI batch review save failed for', record.item.assetKey, error);
+          }
+        }
+      });
+      await Promise.all(reviewWorkers);
+      const failedAssetCount = new Set(failures.map(({ item }) => item?.assetKey).filter(Boolean)).size;
+      const message = failedAssetCount
+        ? `사진 태그 ${resolved.length}장을 반영했습니다. 분석 기록 ${failedAssetCount}건은 다시 시도해 주세요.`
+        : `미검토 사진 ${resolved.length}장에 AI 추천 태그를 일괄 적용했습니다.`;
+      showToast(message, failures.length ? 'error' : 'success');
+    } catch (error) {
+      console.error('AI batch tag apply failed:', error);
+      showToast(String(error?.message || 'AI 추천 태그 일괄 저장에 실패했습니다.'), 'error');
     } finally {
       setIsBatchApplying(false);
       setBatchProgress({ current: 0, total: 0 });
     }
-  }, [mediaAnalysis.items, applyAnalysisTags, showToast]);
+  }, [calendar?.id, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast]);
   const rejectAnalysisTags = React.useCallback(async item => {
     if (!item?.assetKey) return;
     setAnalysisSavingAssetKey(item.assetKey);
@@ -2674,6 +2763,9 @@ export function ChatGalleryModal({
   const renderGalleryContent = () => {
     if (activeTab === 'analysis') {
       const unreviewedCount = (mediaAnalysis.items || []).filter(item => !item.review).length;
+      const canSaveAnalysisTags = typeof onSaveImageTags === 'function'
+        || typeof onBulkSaveImageTags === 'function'
+        || typeof window.__gatherBulkSaveImageTags === 'function';
       const renderChips = (values, colorType = 'accent') => {
         const bgMap = {
           people: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
@@ -3193,7 +3285,7 @@ export function ChatGalleryModal({
                           /*#__PURE__*/React.createElement('button', {
                             type: 'button',
                             className: 'btn btn-action',
-                            disabled: isSaving || !onSaveImageTags,
+                            disabled: isSaving || isBatchApplying || !canSaveAnalysisTags,
                             onClick: () => {
                               void applyAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error'));
                             },
@@ -3232,7 +3324,7 @@ export function ChatGalleryModal({
                           /*#__PURE__*/React.createElement('button', {
                             type: 'button',
                             className: 'btn btn-action',
-                            disabled: isSaving || !onSaveImageTags,
+                            disabled: isSaving || isBatchApplying || !canSaveAnalysisTags,
                             onClick: () => setAnalysisAction({
                               assetKey: item.assetKey,
                               mode: 'edit',
