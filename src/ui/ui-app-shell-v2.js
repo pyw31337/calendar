@@ -266,7 +266,7 @@ function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenA
       React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-plain-icon-btn'), 'aria-label': '기념일 설정', title: '기념일 설정', onClick: onOpenAnniversaries },
         React.createElement(TabIcon, { id: 'cake', size: 18 })
       ),
-      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-search-icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
         React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
           React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
           React.createElement('path', { d: 'm21 21-4.3-4.3' })
@@ -1301,6 +1301,8 @@ function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
+  const hasUpcomingMeeting = Array.isArray(calendarContext?.upcomingMeetings)
+    && calendarContext.upcomingMeetings.length > 0;
   const mergedCalendar = React.useMemo(() => {
     const base = calendarContext?.calendar || {};
     const recPlaces = recordsContext?.placesProps?.calendar?.places;
@@ -1310,7 +1312,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
     return base;
   }, [calendarContext?.calendar, recordsContext?.placesProps?.calendar?.places]);
   return React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'bp-hero-zone' },
+    React.createElement('div', { className: `bp-hero-zone${hasUpcomingMeeting ? '' : ' bp-hero-zone--no-dday'}` },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
       React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }),
       React.createElement(HeroQuickNav, { onChangeView, settlementBalanceBadge }),

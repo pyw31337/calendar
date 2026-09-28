@@ -4938,6 +4938,43 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   stroke: currentColor !important;
 }
 
+/* Calendar hero without an upcoming D-day: the prior generic hero retained
+ * the D-day strip's bottom spacer, which pulled the title row upward.  Keep a
+ * fixed, symmetric header track and let the standalone/PWA safe-area remain
+ * on the hero itself. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone.bp-hero-zone--no-dday {
+  padding-block-end: 0;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone.bp-hero-zone--no-dday .bp-bento-title {
+  box-sizing: border-box;
+  min-block-size: var(--v2-hero-idle-block-size);
+  padding-block: 0;
+  padding-inline: var(--v2-hero-idle-inline-pad);
+  align-items: center;
+}
+
+/* The hero's search shortcut is an independent hit target, not a flexible
+ * icon. Explicit inline/block dimensions and flex-basis preserve a true 1:1
+ * circle at every phone width. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-search-icon-btn {
+  box-sizing: border-box;
+  inline-size: var(--v2-hero-search-control-size);
+  block-size: var(--v2-hero-search-control-size);
+  min-inline-size: var(--v2-hero-search-control-size);
+  min-block-size: var(--v2-hero-search-control-size);
+  flex: 0 0 var(--v2-hero-search-control-size);
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-search-icon-btn > svg {
+  inline-size: var(--v2-hero-search-icon-size);
+  block-size: var(--v2-hero-search-icon-size);
+  flex: 0 0 var(--v2-hero-search-icon-size);
+}
+
 /* iPhone landscape (viewport-fit=cover): the notch / Dynamic Island moves to a side edge and the
    page header's back button and right-hand icons were drawn under it. Inset the whole shell by
    the side safe areas (0 in portrait and on devices without a cutout); the fixed menu FAB sits

@@ -48,6 +48,15 @@
   --v2-primary: #7C2FE5;
   --v2-primary-glow: 0 6px 18px rgba(124, 47, 229, 0.40);
   --v2-primary-glow-sm: 0 3px 10px rgba(124, 47, 229, 0.32);
+
+  /* The no-D-day hero remains a deliberate, vertically centred header instead
+   * of inheriting the D-day section's bottom spacer.  Header search geometry
+   * is shared across every viewport so flex compression cannot turn it into
+   * an oval on a narrow phone. */
+  --v2-hero-idle-block-size: 72px;
+  --v2-hero-idle-inline-pad: 16px;
+  --v2-hero-search-control-size: 36px;
+  --v2-hero-search-icon-size: 18px;
   /* Apple-like card chrome */
   --v2-card-border: #eceaf5;
   --v2-card-shadow: 0 1px 3px rgba(30, 27, 46, 0.04), 0 4px 12px rgba(30, 27, 46, 0.03);
