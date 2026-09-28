@@ -1946,7 +1946,6 @@ export function HistoryView({
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
   const placePhotoGroups = React.useMemo(() => {
-    if (historyTab !== 'places') return { groups: [], unclassified: [], unclassifiedCount: 0 };
     return buildPlacePhotoGroups({
       places: getCalendarPlaces(calendar),
       photos: historyPhotoEntries,
@@ -1957,7 +1956,7 @@ export function HistoryView({
       },
       doesPlaceMatchDate
     });
-  }, [historyTab, calendar, historyPhotoEntries]);
+  }, [calendar, historyPhotoEntries]);
   const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
     ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
     : null;
@@ -2119,7 +2118,6 @@ export function HistoryView({
     return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
   const travelMemoryGroups = React.useMemo(() => {
-    if (historyTab !== 'memories') return [];
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
@@ -2146,7 +2144,7 @@ export function HistoryView({
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
-  }, [historyTab, anniversaries, historyPhotoEntries]);
+  }, [anniversaries, historyPhotoEntries]);
 
     const handleExcludeMemoryGroups = async () => {
     const ids = Array.from(selectedMemoryGroupIds);
@@ -2461,7 +2459,7 @@ export function HistoryView({
     options: [
       { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
       { value: 'people', label: '인물', badge: personTagChips.length },
-      { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : undefined },
+      { value: 'places', label: '장소', badge: placePhotoGroups.groups.length },
       { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
     ]
   })
