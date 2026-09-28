@@ -295,7 +295,9 @@
 /* The full V2 memo page uses the same quiet count/action footer without changing V1. */
 .v2-design .v2-memo .memo-card-comment-footer,
 .v2-design .date-modal-memo-list .memo-card-comment-footer,
-.v2-design .v2-home-memo-module .memo-card-comment-footer {
+.v2-design .v2-home-memo-module .memo-card-comment-footer,
+.v2-chat .chat-memo-share-card .memo-card-comment-footer,
+.v2-design .chat-memo-share-card .memo-card-comment-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -307,10 +309,14 @@
 }
 .v2-design .v2-memo .memo-card-comment-count,
 .v2-design .date-modal-memo-list .memo-card-comment-count,
-.v2-design .v2-home-memo-module .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
+.v2-design .v2-home-memo-module .memo-card-comment-count,
+.v2-chat .chat-memo-share-card .memo-card-comment-count,
+.v2-design .chat-memo-share-card .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
 .v2-design .v2-memo .memo-card-comment-footer .memo-card-comment-toggle,
 .v2-design .date-modal-memo-list .memo-card-comment-footer .memo-card-comment-toggle,
-.v2-design .v2-home-memo-module .memo-card-comment-footer .memo-card-comment-toggle {
+.v2-design .v2-home-memo-module .memo-card-comment-footer .memo-card-comment-toggle,
+.v2-chat .chat-memo-share-card .memo-card-comment-footer .memo-card-comment-toggle,
+.v2-design .chat-memo-share-card .memo-card-comment-footer .memo-card-comment-toggle {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -356,7 +362,10 @@
    this module owns the visual rhythm used by both the home preview and the memo page. */
 .v2-memo .v2-memo-card-wrap > .v2-name-pill, .v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-name-pill { display: none; }
 .v2-memo .v2-memo-card-wrap > .v2-bubble-meta, .v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-contract, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-contract,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract,
+.v2-chat .chat-memo-share-card .v2-memo-card-contract,
+.v2-design .chat-memo-share-card .v2-memo-card-contract {
   background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-left: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -364,22 +373,34 @@
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   padding: 14px 16px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-title, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-title {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-title,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-title,
+.v2-chat .chat-memo-share-card .v2-memo-card-title,
+.v2-design .chat-memo-share-card .v2-memo-card-title {
   font-size: 1rem !important;
   line-height: 1.25 !important;
   margin-bottom: 3px !important;
   padding-right: 30px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-meta, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-meta,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta,
+.v2-chat .chat-memo-share-card .v2-memo-card-meta,
+.v2-design .chat-memo-share-card .v2-memo-card-meta {
   display: none;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-body, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-body {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-body,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-body,
+.v2-chat .chat-memo-share-card .v2-memo-card-body,
+.v2-design .chat-memo-share-card .v2-memo-card-body {
   font-size: .76rem !important;
   color: var(--v2-ink-2, #6b6580) !important;
   line-height: 1.5 !important;
   margin-bottom: 10px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-tags, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-tags,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags,
+.v2-chat .chat-memo-share-card .v2-memo-card-tags,
+.v2-design .chat-memo-share-card .v2-memo-card-tags {
   gap: 5px !important;
   margin-top: 4px !important;
 }
@@ -390,23 +411,33 @@
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle,
 .v2-design .date-modal-memo-list .v2-memo-card-tags > .memo-card-comment-toggle,
-.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle,
+.v2-chat .chat-memo-share-card .v2-memo-card-tags > .memo-card-comment-toggle,
+.v2-design .chat-memo-share-card .v2-memo-card-tags > .memo-card-comment-toggle {
   display: none !important;
 }
 .v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle,
 .v2-design .date-modal-memo-list .memo-card-comment-footer > .memo-card-comment-toggle,
-.v2-design .v2-home-memo-module .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle,
+.v2-chat .chat-memo-share-card .memo-card-comment-footer > .memo-card-comment-toggle,
+.v2-design .chat-memo-share-card .memo-card-comment-footer > .memo-card-comment-toggle {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   padding: 3px 2px !important;
 }
-.v2-design .v2-memo .comment-composer .participant-picker-button, .v2-design .v2-home-memo-module .comment-composer .participant-picker-button {
+.v2-design .v2-memo .comment-composer .participant-picker-button,
+.v2-design .v2-home-memo-module .comment-composer .participant-picker-button,
+.v2-chat .chat-memo-share-card .comment-composer .participant-picker-button,
+.v2-design .chat-memo-share-card .comment-composer .participant-picker-button {
   height: auto !important;
   padding: 6px 10px !important;
   font-size: .7rem !important;
 }
-.v2-design .v2-memo .comment-composer-buttons button, .v2-design .v2-home-memo-module .comment-composer-buttons button {
+.v2-design .v2-memo .comment-composer-buttons button,
+.v2-design .v2-home-memo-module .comment-composer-buttons button,
+.v2-chat .chat-memo-share-card .comment-composer-buttons button,
+.v2-design .chat-memo-share-card .comment-composer-buttons button {
   font-size: .7rem !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle),

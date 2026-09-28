@@ -905,7 +905,9 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   align-items: center !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot), .renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot) {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot),
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot),
+.renewal-shell.v2-design .chat-memo-share-card .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot) {
   display: inline !important;
   padding: 0 !important;
   border: 0 !important;
@@ -919,14 +921,16 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments,
 .renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments,
-.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments {
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments,
+.renewal-shell.v2-design .chat-memo-share-card .v2-memo-card-comments {
   gap: 4px !important;
   margin-top: 8px !important;
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div,
 .renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments > div,
-.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments > div {
+.renewal-shell.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments > div,
+.renewal-shell.v2-design .chat-memo-share-card .v2-memo-card-comments > div {
   gap: 8px !important;
   padding: 7px 10px !important;
   border: 0 !important;

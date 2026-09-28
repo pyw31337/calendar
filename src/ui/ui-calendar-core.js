@@ -1800,12 +1800,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       if (typeof onOpenEdit === 'function') onOpenEdit(memo);
     },
     style: {
-      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : '#fff')),
-      border: variant === 'date-modal' ? '1px solid var(--border-subtle)' : '0',
-      borderRadius: 'var(--radius-md)',
-      padding: '12px',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : 'var(--bg-card)')),
+      border: isPageLayout ? '1px solid var(--v2-card-border, #eceaf5)' : (variant === 'date-modal' ? '1px solid var(--border-subtle)' : '0'),
+      borderRadius: isPageLayout ? '14px' : 'var(--radius-md)',
+      padding: isPageLayout ? '14px 16px' : '12px',
       cursor: 'pointer',
-      boxShadow: variant === 'date-modal' ? 'none' : '0 2px 5px rgba(0,0,0,0.03)',
+      boxShadow: isPageLayout ? 'var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03))' : (variant === 'date-modal' ? 'none' : '0 2px 5px rgba(0,0,0,0.03)'),
       display: 'flex',
       flexDirection: 'column',
       position: 'relative',
@@ -1875,7 +1875,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
     memo.title && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-title",
-      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
+      style: {
+        fontSize: '1rem',
+        fontWeight: isPageLayout ? 800 : 'bold',
+        color: 'var(--text-main)',
+        marginBottom: isPageLayout ? '3px' : '8px',
+        lineHeight: isPageLayout ? '1.25' : undefined,
+        paddingRight: hidePinButton ? '30px' : '44px',
+        wordBreak: 'break-all'
+      }
     }, highlightKeyword(memo.title, searchQuery)),
     variant !== 'preview' && !isPageLayout && memoMeta && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-meta",
@@ -1891,9 +1899,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     displayMemoText && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-body",
       style: {
-        fontSize: 'var(--font-size-md)',
-        color: 'var(--text-main)',
-        lineHeight: '1.4',
+        fontSize: isPageLayout ? '0.76rem' : 'var(--font-size-md)',
+        color: isPageLayout ? 'var(--v2-ink-2, #6b6580)' : 'var(--text-main)',
+        lineHeight: '1.5',
+        marginBottom: isPageLayout ? '10px' : undefined,
         whiteSpace: 'pre-wrap',
         overflowWrap: 'break-word',
         wordBreak: 'break-all'
@@ -1976,7 +1985,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-tags",
-      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: isPageLayout ? '5px' : '6px',
+        marginTop: isPageLayout ? '4px' : '10px'
+      }
     },
       /* Writer badge:
          In V2 (variant === 'v2-page' or V2 shell active): 8px x 8px circle, no text, no shadow/border.
@@ -1993,7 +2008,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           title: writer.name || '작성자',
           onClick: e => e.stopPropagation(),
           style: {
-            backgroundColor: writer.color || '#94A3B8'
+            width: '8px',
+            height: '8px',
+            minWidth: '8px',
+            minHeight: '8px',
+            maxWidth: '8px',
+            maxHeight: '8px',
+            borderRadius: '50%',
+            backgroundColor: writer.color || '#94A3B8',
+            flexShrink: 0
           }
         });
       })(),
@@ -2005,7 +2028,19 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           e.stopPropagation();
           onSelectTag(tag);
         },
-        style: {
+        style: isPageLayout ? {
+          display: 'inline',
+          padding: 0,
+          border: 0,
+          borderRadius: 0,
+          backgroundColor: 'transparent',
+          color: 'var(--brand, #7C2FE5)',
+          fontSize: '0.62rem',
+          fontWeight: 700,
+          lineHeight: 1.2,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap'
+        } : {
           fontSize: 'var(--font-size-xs)', fontWeight: '600',
           color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
           padding: '3px 8px', borderRadius: '4px',
@@ -2014,8 +2049,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }
       }, highlightKeyword(tag, searchQuery))),
 
-      /* Comment toggle button -- pushed to the far right of the row */
-      /*#__PURE__*/React.createElement("button", {
+      /* Comment toggle button -- only in legacy/non-page layout (in page layout it sits in footer) */
+      !isPageLayout && /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: (e) => {
           e.stopPropagation();
@@ -2039,48 +2074,80 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Comment list -- no background, thin divider line between rows instead */
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-comments",
-      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' }
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: isPageLayout ? '4px' : '2px',
+        marginTop: '8px'
+      }
     },
       /*#__PURE__*/React.createElement(MemoCommentFold, {
         comments,
         forceExpanded: isCommentComposerOpen,
         renderComment: (comment, commentIdx) => {
-      const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
-      return /*#__PURE__*/React.createElement("div", {
-        key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
-        onClick: e => e.stopPropagation(),
-        style: {
-          display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 2px',
-          borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
-        }
-      },
-        /*#__PURE__*/React.createElement("span", {
-          className: "memo-comment-author-dot",
-          role: "img",
-          tabIndex: 0,
-          "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
-          "data-author-name": author?.name || '알 수 없는 작성자',
-          title: author?.name || '알 수 없는 작성자',
-          style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
-        }),
-        /*#__PURE__*/React.createElement("span", {
-          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
-        }, typeof (window.GATHER_UI_DEPS || {}).renderTextWithUrlBadge === 'function'
-          ? window.GATHER_UI_DEPS.renderTextWithUrlBadge(comment.text)
-          : comment.text),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
-      );
+          const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+          return /*#__PURE__*/React.createElement("div", {
+            key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
+            onClick: e => e.stopPropagation(),
+            style: {
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              padding: isPageLayout ? '7px 10px' : '6px 2px',
+              borderRadius: isPageLayout ? '10px' : 0,
+              backgroundColor: isPageLayout ? 'var(--brand-soft, #f3eeff)' : 'transparent',
+              borderTop: (!isPageLayout && commentIdx > 0) ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
+            }
+          },
+            /*#__PURE__*/React.createElement("span", {
+              className: "memo-comment-author-dot",
+              role: "img",
+              tabIndex: 0,
+              "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+              "data-author-name": author?.name || '알 수 없는 작성자',
+              title: author?.name || '알 수 없는 작성자',
+              style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+            }),
+            /*#__PURE__*/React.createElement("span", {
+              style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
+            }, typeof (window.GATHER_UI_DEPS || {}).renderTextWithUrlBadge === 'function'
+              ? window.GATHER_UI_DEPS.renderTextWithUrlBadge(comment.text)
+              : comment.text),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
+              style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
+            }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
+          );
         }
       })),
 
     variant !== 'preview' && /*#__PURE__*/React.createElement("div", {
       className: "memo-card-comment-footer",
-      onClick: e => e.stopPropagation()
+      onClick: e => e.stopPropagation(),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        marginTop: '8px',
+        paddingTop: 0,
+        color: 'var(--v2-ink-3, #9793a3)',
+        fontSize: '0.62rem',
+        fontWeight: 500,
+        width: '100%',
+        boxSizing: 'border-box'
+      }
     },
-      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
+      /*#__PURE__*/React.createElement("span", {
+        className: "memo-card-comment-count",
+        style: {
+          marginRight: 'auto',
+          color: 'var(--v2-ink-3, #9793a3)',
+          fontWeight: 500,
+          fontSize: '0.62rem',
+          lineHeight: 1.2
+        }
+      }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "memo-card-comment-toggle",
@@ -2091,11 +2158,23 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           setIsCommentComposerOpen(v => !v);
         },
         title: "댓글 입력",
-        "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력"
+        "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력",
+        style: {
+          border: 0,
+          background: 'transparent',
+          boxShadow: 'none',
+          padding: '3px 2px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '3px',
+          color: 'var(--brand, #7C2FE5)',
+          fontSize: '0.68rem',
+          fontWeight: 700,
+          cursor: 'pointer'
+        }
       }, isPageLayout
         ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
-        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), /* Count as plain brand-coloured text ("댓글 2"), same as the home memo section -- no
-           filled badge. */
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }),
         comments.length > 0 ? `댓글 ${comments.length}` : "댓글")
     ),
 

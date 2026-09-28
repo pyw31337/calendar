@@ -81,6 +81,107 @@
        images, inline video player and comment controls. */
     .v2-chat .chat-memo-share-card { width: min(100%, 420px); }
     .v2-chat .chat-memo-share-card .memo-card-hover { width: 100%; min-width: 0; }
+    .v2-chat .chat-memo-share-card .v2-memo-card-contract {
+      background: var(--bg-card) !important;
+      border: 1px solid var(--v2-card-border, #eceaf5) !important;
+      border-radius: 14px !important;
+      box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
+      padding: 14px 16px !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-title {
+      font-size: 1rem !important;
+      font-weight: 800 !important;
+      line-height: 1.25 !important;
+      margin-bottom: 3px !important;
+      padding-right: 30px !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-meta {
+      display: none !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-body {
+      font-size: .76rem !important;
+      color: var(--v2-ink-2, #6b6580) !important;
+      line-height: 1.5 !important;
+      margin-bottom: 10px !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-tags {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: 5px !important;
+      margin-top: 4px !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-tags > span:not(.v2-memo-author-pill):not(.v2-memo-author-dot) {
+      display: inline !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      color: var(--brand, #7c2fe5) !important;
+      font-size: .62rem !important;
+      font-weight: 700 !important;
+      line-height: 1.2 !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-tags > .memo-card-comment-toggle {
+      display: none !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-comments {
+      margin-top: 8px !important;
+      padding-top: 0 !important;
+      border-top: 0 !important;
+      gap: 4px !important;
+    }
+    .v2-chat .chat-memo-share-card .v2-memo-card-comments > div {
+      gap: 8px !important;
+      padding: 7px 10px !important;
+      border: 0 !important;
+      border-radius: 10px !important;
+      background: var(--brand-soft, #f3eeff) !important;
+    }
+    .v2-chat .chat-memo-share-card .memo-card-comment-footer {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      margin-top: 8px !important;
+      padding-top: 0 !important;
+      color: var(--v2-ink-3, #9793a3) !important;
+      font-size: .62rem !important;
+      font-weight: 500 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    .v2-chat .chat-memo-share-card .memo-card-comment-count {
+      margin-right: auto !important;
+      color: var(--v2-ink-3, #9793a3) !important;
+      font-weight: 500 !important;
+      font-size: .62rem !important;
+      line-height: 1.2 !important;
+    }
+    .v2-chat .chat-memo-share-card .memo-card-comment-footer > .memo-card-comment-toggle {
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      padding: 3px 2px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 3px !important;
+      color: var(--brand, #7c2fe5) !important;
+      font-size: .68rem !important;
+      font-weight: 700 !important;
+      cursor: pointer !important;
+    }
+    .v2-chat .chat-memo-share-card .memo-card-pin-btn {
+      color: var(--brand, #7c2fe5) !important;
+    }
+    .v2-chat .chat-memo-share-card .comment-composer .participant-picker-button {
+      height: auto !important;
+      padding: 6px 10px !important;
+      font-size: .7rem !important;
+    }
+    .v2-chat .chat-memo-share-card .comment-composer-buttons button {
+      font-size: .7rem !important;
+    }
     .v2-chat .chat-memo-share-loading,
     .v2-chat .chat-memo-share-fallback {
       display: flex; align-items: center; min-height: 44px; padding: 10px 12px;

@@ -232,7 +232,7 @@ function ChatMemoShareCard({ share, calendar, onEditMemo, memoOverride = null, o
     }, '삭제된 메모입니다.');
   }
   return /*#__PURE__*/React.createElement('div', {
-    className: 'chat-memo-share-card', 'data-stop-card-open': 'true',
+    className: 'chat-memo-share-card v2-memo-card-wrap', 'data-stop-card-open': 'true',
     onClick: event => event.stopPropagation()
   }, /*#__PURE__*/React.createElement(MemoCard, {
     memo,
