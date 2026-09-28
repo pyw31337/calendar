@@ -8,6 +8,8 @@ import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTime, recordMediaAnalysisFeedback } from '../core/media-analysis-feed.js';
+import { ClipboardPasteIcon } from './ui-icons.js';
+import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1548,8 +1550,11 @@ export function ChatGalleryModal({
       onPaste ? /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-outline",
         onClick: onPaste, disabled: pasteDisabled || isBulkDeleting,
-        style: { ...textBtn, cursor: (pasteDisabled || isBulkDeleting) ? 'wait' : 'pointer' }
-      }, "붙여넣기") : null,
+        style: { ...textBtn, cursor: (pasteDisabled || isBulkDeleting) ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }
+      },
+        ClipboardPasteIcon ? /*#__PURE__*/React.createElement(ClipboardPasteIcon, { size: 14 }) : null,
+        "붙여넣기"
+      ) : null,
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-dark",
         onClick: handleClickBulkShare,
@@ -1846,6 +1851,40 @@ export function ChatGalleryModal({
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
   }, [onUploadImages, onPasteGatherPhoto, onPasteGatherPhotos, onAddFiles, onAddLink, showToast]);
+
+  React.useEffect(() => {
+    const handleGalleryKeyDown = e => {
+      const target = e.target;
+      if (target && ((target.closest && target.closest('input, textarea, select, [contenteditable="true"]')) || target.isContentEditable)) return;
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && (e.key === 'a' || e.key === 'A')) {
+        if (isBulkShareMode && activeTab === 'photos') {
+          e.preventDefault();
+          const allKeys = (visiblePhotos || []).map(getPhotoKey);
+          const isAll = allKeys.length > 0 && allKeys.every(k => selectedBulkShareKeys.has(k));
+          setSelectedBulkShareKeys(isAll ? new Set() : new Set(allKeys));
+        }
+      } else if (isCmdOrCtrl && (e.key === 'c' || e.key === 'C')) {
+        if (isBulkShareMode && selectedBulkPhotos.length > 0) {
+          e.preventDefault();
+          const tokens = [];
+          selectedBulkPhotos.forEach(p => normalizePhotoTagTokens(p.tags).forEach(t => { if (!tokens.includes(t)) tokens.push(t); }));
+          if (tokens.length) {
+            setTagClipboard(tokens);
+            showToast?.(`태그 ${tokens.length}개를 복사했습니다.`, 'success');
+          }
+        }
+      } else if (isCmdOrCtrl && (e.key === 'v' || e.key === 'V')) {
+        if (isBulkShareMode && selectedBulkPhotos.length > 0 && getTagClipboard().length > 0) {
+          e.preventDefault();
+          const tags = getTagClipboard();
+          void applyBulkPhotoTags('add', tags.map(t => `#${t}`).join(' '));
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGalleryKeyDown);
+    return () => window.removeEventListener('keydown', handleGalleryKeyDown);
+  }, [isBulkShareMode, activeTab, visiblePhotos, selectedBulkShareKeys, selectedBulkPhotos, showToast]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {
@@ -2461,7 +2500,40 @@ export function ChatGalleryModal({
         style: { minHeight: '26px', padding: '2px 9px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer' }
       }, `#${tag}${count === selectedBulkPhotos.length ? '' : ` · ${count}`}`))
     ),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-outline",
+          onClick: () => {
+            const tokens = selectedBulkTagTokens.map(t => t.tag);
+            if (!tokens.length) {
+              showToast?.('선택한 사진에 등록된 태그가 없습니다.', 'info');
+              return;
+            }
+            setTagClipboard(tokens);
+            showToast?.(`태그 ${tokens.length}개를 복사했습니다.`, 'success');
+          },
+          title: "선택한 사진 태그 복사 (Ctrl+C)",
+          style: { minHeight: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700 }
+        }, "태그 복사"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-outline",
+          disabled: isBulkTagSaving || getTagClipboard().length === 0,
+          onClick: () => {
+            const tags = getTagClipboard();
+            if (!tags.length) {
+              showToast?.('복사된 태그가 없습니다.', 'info');
+              return;
+            }
+            void applyBulkPhotoTags('add', tags.map(t => `#${t}`).join(' '));
+          },
+          title: "복사한 태그 붙여넣기 (Ctrl+V)",
+          style: { minHeight: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }
+        },
+          ClipboardPasteIcon ? /*#__PURE__*/React.createElement(ClipboardPasteIcon, { size: 14 }) : null,
+          `붙여넣기${getTagClipboard().length > 0 ? ` (${getTagClipboard().length})` : ''}`
+        )
+      ),
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-danger", disabled: isBulkTagSaving || !bulkTagDraft.trim(),
         onClick: () => { void applyBulkPhotoTags('remove'); },

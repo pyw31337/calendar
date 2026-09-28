@@ -3,8 +3,8 @@
  */
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
-const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
-function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+const GATHER_APP_UTILS = typeof window !== 'undefined' ? (window.GATHER_APP_UTILS || {}) : {};
+function __gatherUiDeps() { return typeof window !== 'undefined' ? (window.GATHER_UI_DEPS || {}) : {}; }
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -1318,6 +1318,30 @@ export function ImageDownIcon({ size = 24 } = {}) {
     cy: "9",
     r: "2"
   }));
+}
+
+export function ClipboardPasteIcon({ size = 16, style = {}, className = "" } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: `lucide lucide-clipboard-paste ${className}`.trim(),
+    style
+  },
+    /*#__PURE__*/React.createElement("rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16 4h2a2 2 0 0 1 2 2v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M21 14H11" }),
+    /*#__PURE__*/React.createElement("path", { d: "m15 10-4 4 4 4" })
+  );
 }
 
 export function PlaceSectionIcon({ size = 20 } = {}) {

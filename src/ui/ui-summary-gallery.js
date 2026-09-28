@@ -11,8 +11,10 @@ import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken } from './archive-place-groups.js';
+import { PhotoBulkActionBar, setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
+const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
 // Archive routes can contain thousands of photos. Keeping the gallery interactive matters more
 // than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
 // first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
@@ -1939,10 +1941,118 @@ export function HistoryView({
     return buckets;
   }, [historyTab, historyPhotoEntries, personTagChips]);
   const getPhotosForTagLabel = React.useCallback(label => personPhotosByLabel.get(label) || [], [personPhotosByLabel]);
+  const unclassifiedPeoplePhotos = React.useMemo(() => {
+    if (historyTab !== 'people') return [];
+    const matchers = personTagChips.map(tag => ({
+      label: tag.label,
+      variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
+    }));
+    return historyPhotoEntries.filter(entry => {
+      const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
+      if (!tokens.length) return true;
+      const hasPerson = matchers.some(({ variants }) =>
+        variants.some(value => value.length <= 1 ? tokens.includes(value) : tokens.some(token => token.includes(value)))
+      );
+      return !hasPerson;
+    });
+  }, [historyTab, historyPhotoEntries, personTagChips]);
+
   const photosForPersonTag = React.useMemo(
-    () => getPhotosForTagLabel(selectedPersonTag),
-    [getPhotosForTagLabel, selectedPersonTag]
+    () => selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? unclassifiedPeoplePhotos : getPhotosForTagLabel(selectedPersonTag),
+    [getPhotosForTagLabel, selectedPersonTag, unclassifiedPeoplePhotos]
   );
+
+  const [peopleSelectMode, setPeopleSelectMode] = React.useState(false);
+  const [peopleSelectedKeys, setPeopleSelectedKeys] = React.useState(() => new Set());
+  const [isPeopleBulkSaving, setIsPeopleBulkSaving] = React.useState(false);
+  const [isPeopleBulkDeleting, setIsPeopleBulkDeleting] = React.useState(false);
+  const peopleAnchorKeyRef = React.useRef('');
+
+  React.useEffect(() => {
+    setPeopleSelectMode(false);
+    setPeopleSelectedKeys(new Set());
+    peopleAnchorKeyRef.current = '';
+  }, [selectedPersonTag, historyTab]);
+
+  const togglePeopleSelectedKey = (key, options = {}) => {
+    setPeopleSelectedKeys(prev => {
+      const next = new Set(prev);
+      const orderedKeys = options.orderedKeys || (photosForPersonTag || []).map((p, idx) => archivePhotoSelectKey(p, idx));
+      if (options.shiftKey && peopleAnchorKeyRef.current && orderedKeys.includes(peopleAnchorKeyRef.current) && orderedKeys.includes(key)) {
+        const fromIdx = orderedKeys.indexOf(peopleAnchorKeyRef.current);
+        const toIdx = orderedKeys.indexOf(key);
+        const [start, end] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
+        for (let i = start; i <= end; i += 1) {
+          next.add(orderedKeys[i]);
+        }
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      peopleAnchorKeyRef.current = key;
+      return next;
+    });
+  };
+
+  const handleToggleAllPeople = () => {
+    const keys = (photosForPersonTag || []).map((p, idx) => archivePhotoSelectKey(p, idx));
+    const allSelected = keys.length > 0 && keys.every(k => peopleSelectedKeys.has(k));
+    if (allSelected) {
+      setPeopleSelectedKeys(new Set());
+    } else {
+      setPeopleSelectedKeys(new Set(keys));
+    }
+  };
+
+  const handleApplyPeopleTags = async (tagText) => {
+    const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
+    if (!photos.length) return;
+    const save = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof save !== 'function') {
+      showToast?.('일괄 태그 저장 기능을 준비하지 못했습니다.', 'error');
+      return;
+    }
+    const changes = buildBulkPhotoTagChanges(photos, 'add', tagText);
+    if (!changes.length) {
+      showToast?.('선택한 사진에 이미 해당 태그가 지정되어 있습니다.', 'info');
+      return;
+    }
+    setIsPeopleBulkSaving(true);
+    try {
+      const result = await save(changes);
+      if (!result?.ok) throw new Error('태그 저장 실패');
+      showToast?.(`사진 ${changes.length}장에 태그를 적용했습니다.`, 'success');
+      setPeopleSelectedKeys(new Set());
+    } catch (err) {
+      showToast?.(String(err?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
+    } finally {
+      setIsPeopleBulkSaving(false);
+    }
+  };
+
+  const handleDeleteSelectedPeoplePhotos = async () => {
+    const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
+    if (!photos.length || typeof onDeletePhoto !== 'function') return;
+    setIsPeopleBulkDeleting(true);
+    try {
+      for (const photo of photos) {
+        await onDeletePhoto(photo);
+      }
+      showToast?.(`사진 ${photos.length}장을 삭제했습니다.`, 'success');
+      setPeopleSelectedKeys(new Set());
+    } catch (err) {
+      showToast?.('사진 삭제에 실패했습니다.', 'error');
+    } finally {
+      setIsPeopleBulkDeleting(false);
+    }
+  };
+
+  const handleMovePeopleGroup = async (targetGroup) => {
+    const targetLabel = targetGroup.label || targetGroup.name || targetGroup;
+    await handleApplyPeopleTags(`#${targetLabel}`);
+  };
+
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
   const placePhotoGroups = React.useMemo(() => {
@@ -1970,16 +2080,31 @@ export function HistoryView({
   const [placeSelectMode, setPlaceSelectMode] = React.useState(false);
   const [placeSelectedKeys, setPlaceSelectedKeys] = React.useState(() => new Set());
   const [placeAssignProgress, setPlaceAssignProgress] = React.useState(null);
+  const placeAnchorKeyRef = React.useRef('');
   const saveImageTagsRef = React.useRef(onSaveImageTags);
   saveImageTagsRef.current = onSaveImageTags;
   const bulkSaveImageTagsRef = React.useRef(onBulkSaveImageTags);
   bulkSaveImageTagsRef.current = onBulkSaveImageTags;
   React.useEffect(() => {
     if (selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY) { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }
+    placeAnchorKeyRef.current = '';
   }, [selectedPlaceKey]);
-  const togglePlaceSelectedKey = key => setPlaceSelectedKeys(prev => {
+  const togglePlaceSelectedKey = (key, options = {}) => setPlaceSelectedKeys(prev => {
     const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
+    const orderedKeys = options.orderedKeys || (options.photos ? options.photos.map((p, i) => archivePhotoSelectKey(p, i)) : []);
+    if (options.shiftKey && placeAnchorKeyRef.current && orderedKeys.includes(placeAnchorKeyRef.current) && orderedKeys.includes(key)) {
+      const fromIdx = orderedKeys.indexOf(placeAnchorKeyRef.current);
+      const toIdx = orderedKeys.indexOf(key);
+      const [start, end] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
+      for (let i = start; i <= end; i += 1) {
+        next.add(orderedKeys[i]);
+      }
+    } else if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    placeAnchorKeyRef.current = key;
     return next;
   });
   const unclassifiedPhotoByKey = React.useMemo(() => {
@@ -2072,7 +2197,7 @@ export function HistoryView({
       key: photo.mediaKey || photo.refKey || `${keyPrefix}_${idx}`,
       type: "button",
       className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
-      onClick: () => selection ? selection.onToggle(selectKey) : openHistoryLightbox(photos, idx),
+      onClick: (e) => selection ? selection.onToggle(selectKey, { shiftKey: Boolean(e?.shiftKey), index: idx, photos, key: selectKey }) : openHistoryLightbox(photos, idx),
       "aria-pressed": selection ? isSelected : undefined,
       style: {
         position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s`,
@@ -2822,7 +2947,31 @@ export function HistoryView({
                   /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(getTaggedDate(tagPhotos[0])) || '최근 일정')
                 )
               );
-            })
+            }),
+            unclassifiedPeoplePhotos.length > 0 && /*#__PURE__*/React.createElement("button", {
+              key: PERSON_UNCLASSIFIED_KEY,
+              type: "button",
+              onClick: () => setSelectedPersonTag(PERSON_UNCLASSIFIED_KEY),
+              "aria-label": `분류 필요 사진 ${unclassifiedPeoplePhotos.length}장`,
+              className: 'archive-photo-cell',
+              style: {
+                position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                border: '1px dashed var(--border-subtle)', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-secondary, #F1F5F9)'
+              }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(unclassifiedPeoplePhotos.length)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(unclassifiedPeoplePhotos) }),
+              /*#__PURE__*/React.createElement("div", {
+                style: {
+                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                  display: 'flex', flexDirection: 'column', gap: '1px', textAlign: 'left'
+                }
+              },
+                /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, "분류 필요"),
+                /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, "인물 태그 없는 사진")
+              )
+            )
           )
     )),
     // 인물 상세 페이지: 특정 인물 칸을 눌렀을 때 그 사람으로 태그된 사진만 모아 보여준다.
@@ -2831,7 +2980,7 @@ export function HistoryView({
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-detail", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '12px' } },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setSelectedPersonTag(null), "aria-label": "인물 목록으로",
           style: {
@@ -2839,72 +2988,115 @@ export function HistoryView({
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
           }
         }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-        isEditingPersonTagLabel
-          ? /*#__PURE__*/React.createElement(React.Fragment, null,
-              /*#__PURE__*/React.createElement("input", {
-                type: "text",
-                autoFocus: true,
-                value: editPersonTagLabelDraft,
-                onChange: e => setEditPersonTagLabelDraft(e.target.value),
-                onKeyDown: e => {
-                  if (e.key === 'Enter') { e.preventDefault(); handleConfirmEditPersonTag(); }
-                  if (e.key === 'Escape') { e.preventDefault(); handleCancelEditPersonTag(); }
-                },
-                style: {
-                  flex: 1, minWidth: 0, height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
-                  color: 'var(--text-main)', fontSize: 'var(--font-size-lg)', fontWeight: 800
-                }
-              }),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", onClick: handleConfirmEditPersonTag,
-                disabled: isSavingPersonTagLabel || !editPersonTagLabelDraft.trim(),
-                "aria-label": "이름 저장",
-                style: {
-                  flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: 'none',
-                  backgroundColor: '#111827', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', opacity: (isSavingPersonTagLabel || !editPersonTagLabelDraft.trim()) ? 0.5 : 1
-                }
-              }, "✓"),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", onClick: handleCancelEditPersonTag, disabled: isSavingPersonTagLabel, "aria-label": "취소",
-                style: {
-                  flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                }
-              }, "✕")
+        selectedPersonTag === PERSON_UNCLASSIFIED_KEY
+          ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, "분류 필요"),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } }, `${unclassifiedPeoplePhotos.length}장 · 인물 태그가 없는 사진이에요.`)
             )
-          : /*#__PURE__*/React.createElement(React.Fragment, null,
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
-              // 참여자 태그(캘린더 참여자 명단에서 온 것)는 여기서 이름을 바꾸거나 지울 수 없다 --
-              // 참여자 관리는 캘린더 설정의 몫이고, 이 화면은 사진과 별개로 관리되는 customPersonTags
-              // 커스텀 태그만 손댈 수 있어야 한다.
-              customPersonTags.includes(selectedPersonTag) && /*#__PURE__*/React.createElement("div", {
-                style: { display: 'flex', gap: '6px', marginLeft: 'auto', flexShrink: 0 }
-              },
-                typeof onRenamePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
-                  type: "button", onClick: handleStartEditPersonTag, "aria-label": "태그 이름 수정",
+          : (isEditingPersonTagLabel
+            ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("input", {
+                  type: "text",
+                  autoFocus: true,
+                  value: editPersonTagLabelDraft,
+                  onChange: e => setEditPersonTagLabelDraft(e.target.value),
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleConfirmEditPersonTag(); }
+                    if (e.key === 'Escape') { e.preventDefault(); handleCancelEditPersonTag(); }
+                  },
                   style: {
-                    width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                    flex: 1, minWidth: 0, height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-main)', fontSize: 'var(--font-size-lg)', fontWeight: 800
+                  }
+                }),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button", onClick: handleConfirmEditPersonTag,
+                  disabled: isSavingPersonTagLabel || !editPersonTagLabelDraft.trim(),
+                  "aria-label": "이름 저장",
+                  style: {
+                    flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: 'none',
+                    backgroundColor: '#111827', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', opacity: (isSavingPersonTagLabel || !editPersonTagLabelDraft.trim()) ? 0.5 : 1
+                  }
+                }, "✓"),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button", onClick: handleCancelEditPersonTag, disabled: isSavingPersonTagLabel, "aria-label": "취소",
+                  style: {
+                    flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
                   }
-                }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎"),
-                typeof onDeletePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
-                  type: "button", onClick: handleDeletePersonTagClick, "aria-label": "태그 삭제",
-                  style: {
-                    width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
-                    border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                  }
-                }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕")
+                }, "✕")
               )
-            )
+            : /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
+                customPersonTags.includes(selectedPersonTag) && /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', gap: '6px', marginLeft: 'auto', flexShrink: 0 }
+                },
+                  typeof onRenamePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
+                    type: "button", onClick: handleStartEditPersonTag, "aria-label": "태그 이름 수정",
+                    style: {
+                      width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                    }
+                  }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎"),
+                  typeof onDeletePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
+                    type: "button", onClick: handleDeletePersonTagClick, "aria-label": "태그 삭제",
+                    style: {
+                      width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                      border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                    }
+                  }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕")
+                )
+              )
+          ),
+        photosForPersonTag.length > 0 && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "v2-archive-people-select-toggle",
+          onClick: () => {
+            setPeopleSelectMode(mode => !mode);
+            setPeopleSelectedKeys(new Set());
+            peopleAnchorKeyRef.current = '';
+          },
+          style: {
+            marginLeft: selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'auto' : (customPersonTags.includes(selectedPersonTag) ? '8px' : 'auto'),
+            flexShrink: 0, minHeight: '32px', padding: '0 12px', borderRadius: '999px',
+            border: '1px solid var(--border-color)',
+            background: peopleSelectMode ? 'var(--brand, #7C3AED)' : 'var(--bg-secondary)',
+            color: peopleSelectMode ? 'var(--on-brand, #fff)' : 'var(--text-main)',
+            fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer'
+          }
+        }, peopleSelectMode ? '선택 취소' : '여러 장 선택')
       ),
       photosForPersonTag.length === 0
-        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)
-        : renderArchivePhotoGrid(photosForPersonTag, `person_${selectedPersonTag}`)
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } },
+            selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? '인물 태그가 없는 사진이 없습니다.' : `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`
+          )
+        : renderArchivePhotoGrid(
+            photosForPersonTag,
+            selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'unclassified_people' : `person_${selectedPersonTag}`,
+            peopleSelectMode ? { keys: peopleSelectedKeys, onToggle: togglePeopleSelectedKey } : null
+          ),
+      peopleSelectMode && /*#__PURE__*/React.createElement(PhotoBulkActionBar, {
+        selectedKeys: peopleSelectedKeys,
+        allKeys: photosForPersonTag.map((p, idx) => archivePhotoSelectKey(p, idx)),
+        selectedPhotos: photosForPersonTag.filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx))),
+        onToggleAll: handleToggleAllPeople,
+        onClearSelection: () => setPeopleSelectedKeys(new Set()),
+        personCandidates: personTagChips.filter(c => c.label !== selectedPersonTag),
+        groupOptions: selectedPersonTag !== PERSON_UNCLASSIFIED_KEY ? personTagChips.filter(c => c.label !== selectedPersonTag).map(c => ({ id: c.id, label: c.label })) : [],
+        onMoveToGroup: handleMovePeopleGroup,
+        onApplyTags: handleApplyPeopleTags,
+        onDeletePhotos: handleDeleteSelectedPeoplePhotos,
+        showToast,
+        onRequestConfirm,
+        isSaving: isPeopleBulkSaving,
+        isDeleting: isPeopleBulkDeleting,
+        mode: 'people'
+      })
     )),
 
     // 장소 목록: 등록된 장소마다 그 장소로 분류된 사진을 모은 칸(인물 탭과 같은 벤또 그리드).
