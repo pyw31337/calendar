@@ -434,6 +434,15 @@ export function ChatRoomView({
   const [chatMemoEditingTarget, setChatMemoEditingTarget] = React.useState(null);
   const [chatMemoOverrides, setChatMemoOverrides] = React.useState({});
   const [isMemoViewReady, setIsMemoViewReady] = React.useState(() => !!(window.GATHER_UI_COMPONENTS?.MemoView || window.GATHER_UI_DEPS?.MemoView));
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
+  const visibleChatMessages = React.useMemo(() => {
+    return Array.isArray(chatMessages)
+      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery' && !meetingPhotoMessageIds.has(msg.id))
+      : [];
+  }, [chatMessages, meetingPhotoMessageIds]);
+
   React.useEffect(() => {
     if (chatMemoEditingTarget && !isMemoViewReady) {
       const loader = typeof window.__gatherLoadViewUi === 'function'
@@ -449,14 +458,6 @@ export function ChatRoomView({
       }
     }
   }, [visibleChatMessages, isMemoViewReady]);
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
-  const visibleChatMessages = React.useMemo(() => {
-    return Array.isArray(chatMessages)
-      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery' && !meetingPhotoMessageIds.has(msg.id))
-      : [];
-  }, [chatMessages, meetingPhotoMessageIds]);
 
   // Ordered list of message IDs matching the current search query (for ▲▼ navigation)
   const searchMatchIds = React.useMemo(() => {
@@ -2417,7 +2418,7 @@ export function ChatRoomView({
   // Keep a memo share inside the conversation. The existing full editor is rendered in
   // editor-only mode, so closing it returns precisely to this scroll position instead of
   // changing the page or constructing a reduced chat-specific editor.
-  const activeMemoView = window.GATHER_UI_COMPONENTS?.MemoView || __comp.MemoView || __deps.MemoView || MemoView;
+  const activeMemoView = (typeof window !== 'undefined' && (window.GATHER_UI_COMPONENTS?.MemoView || window.GATHER_UI_DEPS?.MemoView)) || MemoView;
   const chatMemoEditorHost = chatMemoEditingTarget && typeof activeMemoView === 'function'
     ? /*#__PURE__*/React.createElement(activeMemoView, {
         key: `${chatMemoEditingTarget.memo?.id || ''}:${chatMemoEditingTarget.memo?.updatedAt || ''}`,
