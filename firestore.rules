@@ -264,6 +264,13 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Durable accepted/rejected/edit feedback is written only through the rate-limited
+      // server endpoint. It is calibration data for the local worker, not shared calendar
+      // content, so browsers must neither enumerate nor forge it.
+      match /mediaAnalysisFeedback/{feedbackId} {
+        allow read, write: if false;
+      }
+
       match /mediaAnalysisRuns/{runId} {
         allow read: if isCalendarDoc(calendarDocId);
         allow write: if false;

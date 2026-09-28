@@ -9,7 +9,7 @@ const nodemailer = require('nodemailer');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
-const { MAX_BATCH_ITEMS, sanitizeAnalysisItem, summarize } = require('./media-analysis');
+const { MAX_BATCH_ITEMS, MAX_TAGS, sanitizeAnalysisItem, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
@@ -2480,6 +2480,117 @@ exports.ingestMediaAnalysis = functions.runWith({
   } catch (error) {
     console.error('ingestMediaAnalysis failed:', error);
     res.status(500).json({ ok: false, message: 'Analysis upload failed' });
+  }
+});
+
+const MEDIA_ANALYSIS_REVIEW_DECISIONS = new Set(['applied', 'edited', 'rejected']);
+function sanitizeMediaAnalysisFeedbackTags(value) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from(new Set(source
+    .map(item => String(item || '').replace(/^#+/, '').replace(/\s+/g, ' ').trim().slice(0, 80))
+    .filter(Boolean))).slice(0, MAX_TAGS);
+}
+
+// A review is an explicit user action, never a worker write. It remains beside the analysis
+// result for cross-device visibility and is also recorded as a compact calibration signal for a
+// future local-only personalized model. It cannot touch the original photo, tags, or comments.
+exports.recordMediaAnalysisFeedback = functions.runWith({
+  timeoutSeconds: 30,
+  memory: '256MB'
+}).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const calendarId = String(req.body?.calendarId || '');
+  const assetKey = String(req.body?.assetKey || '');
+  const decision = String(req.body?.decision || '');
+  if (!CALENDAR_ID_RE.test(calendarId) || !PHOTO_ASSET_KEY_RE.test(assetKey) || !MEDIA_ANALYSIS_REVIEW_DECISIONS.has(decision)) {
+    res.status(400).json({ ok: false, message: 'Invalid analysis feedback' });
+    return;
+  }
+  if (!(await checkProxyRateLimit('mediaAnalysisFeedback', req.ip, 60 * 1000, 40))) {
+    res.status(429).json({ ok: false, message: 'Too many review requests' });
+    return;
+  }
+  const proposedTags = sanitizeMediaAnalysisFeedbackTags(req.body?.proposedTags);
+  const acceptedTags = decision === 'rejected' ? [] : sanitizeMediaAnalysisFeedbackTags(req.body?.acceptedTags);
+  const finalTags = decision === 'rejected' ? [] : sanitizeMediaAnalysisFeedbackTags(req.body?.finalTags);
+  const now = Date.now();
+  const analysisId = stableAnalysisId(assetKey);
+  const calendarRef = admin.firestore().collection('calendars').doc(`cal_${calendarId}`);
+  const photoRef = calendarRef.collection('photoIndex').doc(assetKey);
+  const analysisRef = calendarRef.collection('mediaAnalysis').doc(analysisId);
+  try {
+    const [photoSnap, analysisSnap] = await admin.firestore().getAll(photoRef, analysisRef);
+    if (!photoSnap.exists) { res.status(404).json({ ok: false, message: 'Source photo no longer exists' }); return; }
+    if (!analysisSnap.exists) { res.status(404).json({ ok: false, message: 'Analysis result no longer exists' }); return; }
+    const previousReview = analysisSnap.data()?.review || {};
+    const review = {
+      decision,
+      proposedTags,
+      acceptedTags,
+      finalTags,
+      reviewedAt: now,
+      reviewCount: Math.max(0, Number(previousReview.reviewCount) || 0) + 1
+    };
+    const batch = admin.firestore().batch();
+    batch.set(analysisRef, { review }, { merge: true });
+    batch.set(calendarRef.collection('mediaAnalysisFeedback').doc(analysisId), {
+      assetKey,
+      analysisId,
+      decision,
+      proposedTags,
+      acceptedTags,
+      finalTags,
+      labels: Array.isArray(analysisSnap.data()?.labels)
+        ? analysisSnap.data().labels.map(label => String(label?.name || '')).filter(Boolean).slice(0, 16)
+        : [],
+      analysisVersion: Math.max(1, Number(analysisSnap.data()?.analysisVersion) || 1),
+      lastReviewedAt: now,
+      reviewCount: admin.firestore.FieldValue.increment(1)
+    }, { merge: true });
+    await batch.commit();
+    res.status(200).json({ ok: true, review });
+  } catch (error) {
+    console.error('recordMediaAnalysisFeedback failed:', error);
+    res.status(500).json({ ok: false, message: 'Analysis feedback save failed' });
+  }
+});
+
+// The local Mac receives only compact, user-reviewed calibration signals. The same worker secret
+// used for ingestion is required; no browser can enumerate this private feedback collection.
+exports.getMediaAnalysisCalibration = functions.runWith({
+  timeoutSeconds: 30,
+  memory: '256MB',
+  secrets: [MEDIA_WORKER_TOKEN]
+}).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  if (!hasValidMediaWorkerToken(req)) { res.status(401).json({ ok: false, message: 'Worker authorization failed' }); return; }
+  const calendarId = String(req.body?.calendarId || '');
+  if (!CALENDAR_ID_RE.test(calendarId)) { res.status(400).json({ ok: false, message: 'Invalid calendar' }); return; }
+  if (!(await checkProxyRateLimit('mediaAnalysisCalibration', req.ip, 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many calibration requests' });
+    return;
+  }
+  try {
+    const snapshot = await admin.firestore().collection('calendars').doc(`cal_${calendarId}`)
+      .collection('mediaAnalysisFeedback').orderBy('lastReviewedAt', 'desc').limit(300).get();
+    const signals = snapshot.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        decision: String(data.decision || ''),
+        labels: sanitizeMediaAnalysisFeedbackTags(data.labels).slice(0, 16),
+        proposedTags: sanitizeMediaAnalysisFeedbackTags(data.proposedTags),
+        acceptedTags: sanitizeMediaAnalysisFeedbackTags(data.acceptedTags),
+        reviewedAt: Math.max(0, Number(data.lastReviewedAt) || 0)
+      };
+    }).filter(signal => signal.labels.length && MEDIA_ANALYSIS_REVIEW_DECISIONS.has(signal.decision));
+    res.status(200).json({ ok: true, calendarId, signals, generatedAt: Date.now() });
+  } catch (error) {
+    console.error('getMediaAnalysisCalibration failed:', error);
+    res.status(500).json({ ok: false, message: 'Calibration read failed' });
   }
 });
 

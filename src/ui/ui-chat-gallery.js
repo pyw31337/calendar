@@ -6,10 +6,25 @@ import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } f
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
-import { fetchMediaAnalysisFeed, formatMediaAnalysisTime } from '../core/media-analysis-feed.js';
+import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTime, recordMediaAnalysisFeedback } from '../core/media-analysis-feed.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const AI_REVIEW_MAX_TAGS = 20;
+function normalizeAnalysisTagList(values) {
+  const input = Array.isArray(values) ? values : String(values || '').split(/[\s,#]+/);
+  return Array.from(new Set(input
+    .map(value => String(value || '').replace(/^#+/, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean))).slice(0, AI_REVIEW_MAX_TAGS);
+}
+function getAnalysisSuggestedTags(item) {
+  return normalizeAnalysisTagList([
+    ...(Array.isArray(item?.suggestedTags) ? item.suggestedTags : []),
+    ...(Array.isArray(item?.people) ? item.people : []),
+    ...(Array.isArray(item?.places) ? item.places : []),
+    ...(Array.isArray(item?.meetings) ? item.meetings : [])
+  ]);
+}
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getPhotoCommentIdentity(...args) {
   const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
@@ -432,6 +447,7 @@ export function ChatGalleryModal({
   onPasteGatherPhoto = null,
   onPasteGatherPhotos = null,
   syncStatus = null,
+  onSaveImageTags = null,
   onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -527,6 +543,8 @@ export function ChatGalleryModal({
     setSelectedBulkShareKeys(new Set());
   }; // 'photos' | 'links' | 'files' | 'analysis'
   const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
+  const [analysisAction, setAnalysisAction] = React.useState({ assetKey: '', mode: '', draft: '' });
+  const [analysisSavingAssetKey, setAnalysisSavingAssetKey] = React.useState('');
   const loadMediaAnalysis = React.useCallback((force = false) => {
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
@@ -539,6 +557,81 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (activeTab === 'analysis') void loadMediaAnalysis();
   }, [activeTab, loadMediaAnalysis]);
+  const updateAnalysisReview = React.useCallback((assetKey, review) => {
+    setMediaAnalysis(previous => ({
+      ...previous,
+      items: previous.items.map(item => item.assetKey === assetKey ? { ...item, review } : item)
+    }));
+  }, []);
+  const saveAnalysisReview = React.useCallback(async (item, decision, finalTags = [], acceptedTags = []) => {
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
+    const review = await recordMediaAnalysisFeedback({
+      calendarId,
+      projectId,
+      assetKey: item.assetKey,
+      decision,
+      proposedTags: getAnalysisSuggestedTags(item),
+      acceptedTags,
+      finalTags
+    });
+    updateAnalysisReview(item.assetKey, review);
+    return review;
+  }, [calendar?.id, updateAnalysisReview]);
+  const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied') => {
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!onSaveImageTags) throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
+    if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
+    setAnalysisSavingAssetKey(item.assetKey);
+    try {
+      const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
+      const finalTags = normalizeAnalysisTagList([photo.tags || '', ...requestedTags]);
+      const sourceOwner = String(photo.tagSourceOwner || photo.sourceOwner || photo.owners?.[0]?.sourceOwner || '');
+      const ownerMatch = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
+      if (!ownerMatch) throw new Error('사진의 저장 위치를 찾지 못했습니다.');
+      const [, sourceType, sourceId, sourceIndex] = ownerMatch;
+      const imageIndex = Number(sourceIndex);
+      const source = sourceType === 'message' ? 'chat' : sourceType;
+      const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo.tags || '').join(' ');
+      if (changed) {
+        const ok = await onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
+          source,
+          sourceOwner,
+          imageIndex,
+          sourceImageIndex: imageIndex,
+          meetingDate: sourceType === 'meeting' ? sourceId : '',
+          photoId: String(photo.photoId || ''),
+          imageUrl: photo.full || photo.thumb || '',
+          thumb: photo.thumb || photo.full || '',
+          assetKey: item.assetKey,
+          mediaKey: item.assetKey,
+          refKey: item.assetKey,
+          directMediaUrl: String(photo.directMediaUrl || ''),
+          readFresh: true,
+          silent: true
+        });
+        if (!ok) throw new Error('태그 저장에 실패했습니다.');
+      }
+      await saveAnalysisReview(item, decision, finalTags, requestedTags);
+      setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+      showToast(changed ? 'AI 제안 태그를 적용했어요.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했어요.', 'success');
+    } finally {
+      setAnalysisSavingAssetKey('');
+    }
+  }, [calendar?.id, onSaveImageTags, saveAnalysisReview, showToast]);
+  const rejectAnalysisTags = React.useCallback(async item => {
+    if (!item?.assetKey) return;
+    setAnalysisSavingAssetKey(item.assetKey);
+    try {
+      await saveAnalysisReview(item, 'rejected', []);
+      setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+      showToast('이 추천을 제외했어요. 이후 개인화 보정에 반영됩니다.', 'success');
+    } finally {
+      setAnalysisSavingAssetKey('');
+    }
+  }, [saveAnalysisReview, showToast]);
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -2342,7 +2435,35 @@ export function ChatGalleryModal({
           (item.people?.length || item.places?.length || item.meetings?.length) > 0 && /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
             chips(item.people, 'var(--status-danger)'), chips(item.places, 'var(--status-green)'), chips(item.meetings, 'var(--accent-primary)')
           ),
-          item.ocrText?.length > 0 && /*#__PURE__*/React.createElement('p', { style: { margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } }, item.ocrText.join(' · '))
+          item.ocrText?.length > 0 && /*#__PURE__*/React.createElement('p', { style: { margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } }, item.ocrText.join(' · ')),
+          item.review
+            ? /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 800 } },
+                /*#__PURE__*/React.createElement('span', { style: { display: 'inline-flex', minHeight: '24px', alignItems: 'center', padding: '2px 9px', borderRadius: 'var(--radius-full)', background: item.review.decision === 'rejected' ? 'var(--bg-secondary)' : 'var(--status-success-bg, #DCFCE7)', color: item.review.decision === 'rejected' ? 'var(--text-muted)' : 'var(--status-success, #15803D)' } },
+                  item.review.decision === 'rejected' ? '제외함' : item.review.decision === 'edited' ? '수정 적용함' : '적용함'),
+                item.review.finalTags?.length > 0 && /*#__PURE__*/React.createElement('span', null, item.review.finalTags.map(tag => `#${tag}`).join(' '))
+              )
+            : /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '2px' } },
+                analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit' && /*#__PURE__*/React.createElement('input', {
+                  type: 'text',
+                  value: analysisAction.draft,
+                  onChange: event => setAnalysisAction(previous => ({ ...previous, draft: event.target.value })),
+                  placeholder: '적용할 태그를 공백 또는 쉼표로 구분',
+                  maxLength: 640,
+                  style: { width: '100%', boxSizing: 'border-box', minHeight: '38px', padding: '0 12px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-main)' }
+                }),
+                /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+                  analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit'
+                    ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-dark', disabled: analysisSavingAssetKey === item.assetKey, onClick: () => { void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error')); }, style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, analysisSavingAssetKey === item.assetKey ? '저장 중' : '수정 적용'),
+                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', disabled: analysisSavingAssetKey === item.assetKey, onClick: () => setAnalysisAction({ assetKey: '', mode: '', draft: '' }), style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, '취소')
+                      )
+                    : /*#__PURE__*/React.createElement(React.Fragment, null,
+                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-dark', disabled: analysisSavingAssetKey === item.assetKey || !onSaveImageTags, onClick: () => { void applyAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error')); }, style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, analysisSavingAssetKey === item.assetKey ? '적용 중' : '태그 적용'),
+                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', disabled: analysisSavingAssetKey === item.assetKey || !onSaveImageTags, onClick: () => setAnalysisAction({ assetKey: item.assetKey, mode: 'edit', draft: getAnalysisSuggestedTags(item).join(' ') }), style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, '수정'),
+                        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-action btn-action-outline', disabled: analysisSavingAssetKey === item.assetKey, onClick: () => { void rejectAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error')); }, style: { minHeight: '34px', borderRadius: 'var(--radius-full)', fontWeight: 800 } }, analysisSavingAssetKey === item.assetKey ? '저장 중' : '제외')
+                      )
+                )
+              )
         ))
       );
     }

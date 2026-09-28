@@ -315,6 +315,10 @@ export async function fetchAllPhotoIndexPages({ calendarId, projectId, pageCount
     all.push(...rememberPhotoIndexPages(calendarId, page, rows, decodeDocument, cacheRevision));
     if (rows.length < count * PAGE_SIZE) break;
     cursor = cursorAfterRow(rows[rows.length - 1]);
+    // Yield between chunks. Large photo libraries otherwise monopolize the main thread while
+    // normalizing several hundred Firestore records, which can trigger the browser's "wait or
+    // close" dialog even though every individual request is asynchronous.
+    if (page + count <= pageCount) await new Promise(resolve => setTimeout(resolve, 0));
   }
   return all;
 }
@@ -607,17 +611,15 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       if (activeView === 'history') void loadAll();
       else void loadPage(1, { includeTotal: !shouldLoadPreview });
     };
-    if (!shouldLoadPreview) {
-      run();
-      return undefined;
-    }
+    const shouldDefer = shouldLoadPreview || activeView === 'history';
+    if (!shouldDefer) { run(); return undefined; }
     let cancelled = false;
     const start = () => { if (!cancelled) run(); };
     if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      const idleId = window.requestIdleCallback(start, { timeout: 900 });
+      const idleId = window.requestIdleCallback(start, { timeout: activeView === 'history' ? 650 : 900 });
       return () => { cancelled = true; window.cancelIdleCallback?.(idleId); };
     }
-    const timerId = setTimeout(start, 350);
+    const timerId = setTimeout(start, activeView === 'history' ? 120 : 350);
     return () => { cancelled = true; clearTimeout(timerId); };
   }, [calendarId, activeView, loadPage, loadAll]);
   return { ...state, loadPage, loadAll, patchItems };

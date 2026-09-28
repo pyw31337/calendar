@@ -969,7 +969,8 @@ function CalendarApp() {
   }, [activeCalId, allChatMessages, memos, calendars]);
   const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
-    allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
+    allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex,
+    canonicalPhotoIndexStatus: galleryPhotoIndex.status
   });
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)

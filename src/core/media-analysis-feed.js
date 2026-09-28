@@ -17,6 +17,10 @@ function decodeDocument(document) {
   return Object.fromEntries(Object.entries(document?.fields || {}).map(([key, value]) => [key, decodeFirestoreValue(value)]));
 }
 
+function firestoreDocumentUrl(projectId, calendarId, collectionId, documentId) {
+  return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/${collectionId}/${encodeURIComponent(documentId)}`;
+}
+
 export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = false } = {}) {
   if (!calendarId || !projectId) return [];
   const key = `${projectId}:${calendarId}`;
@@ -39,6 +43,36 @@ export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = fa
   }));
   cache.set(key, { savedAt: Date.now(), items });
   return items;
+}
+
+// The AI feed intentionally stores no image URL. Read the canonical row only when the user
+// chooses an action, so opening the review tab remains one bounded query rather than 40 reads.
+export async function fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey } = {}) {
+  if (!calendarId || !projectId || !assetKey) throw new Error('사진 분석 대상을 찾을 수 없습니다.');
+  const response = await fetch(firestoreDocumentUrl(projectId, calendarId, 'photoIndex', assetKey));
+  if (!response.ok) throw new Error(response.status === 404 ? '원본 사진이 삭제되었어요.' : `사진 정보 요청 실패 (${response.status})`);
+  const document = await response.json();
+  return { ...decodeDocument(document), assetKey: document.name.split('/').pop() };
+}
+
+export async function recordMediaAnalysisFeedback({ calendarId, projectId, assetKey, decision, proposedTags = [], acceptedTags = [], finalTags = [] } = {}) {
+  if (!calendarId || !projectId || !assetKey) throw new Error('분석 피드백 대상을 찾을 수 없습니다.');
+  const response = await fetch(`https://us-central1-${encodeURIComponent(projectId)}.cloudfunctions.net/recordMediaAnalysisFeedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ calendarId, assetKey, decision, proposedTags, acceptedTags, finalTags })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) throw new Error(payload?.message || `AI 피드백 저장 실패 (${response.status})`);
+  const key = `${projectId}:${calendarId}`;
+  const cached = cache.get(key);
+  if (cached) {
+    cache.set(key, {
+      ...cached,
+      items: cached.items.map(item => item.assetKey === assetKey ? { ...item, review: payload.review || item.review } : item)
+    });
+  }
+  return payload.review || null;
 }
 
 export function formatMediaAnalysisTime(timestamp) {

@@ -12,6 +12,11 @@ import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken } from './archive-place-groups.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
+// Archive routes can contain thousands of photos. Keeping the gallery interactive matters more
+// than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
+// first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
+const ARCHIVE_GRID_INITIAL_COUNT = 80;
+const ARCHIVE_GRID_PAGE_COUNT = 80;
 // The per-photo fields the lightbox (and its tag save) needs, shared with 장소 일괄 지정.
 const toArchiveLightboxMeta = p => ({
   timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
@@ -31,6 +36,28 @@ function ArchivePhotoThumb({ photo }) {
     fill: true,
     draggable: false,
   });
+}
+
+function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
+  const React = window.React;
+  const list = Array.isArray(photos) ? photos : [];
+  const [visibleCount, setVisibleCount] = React.useState(() => Math.min(list.length, ARCHIVE_GRID_INITIAL_COUNT));
+  React.useEffect(() => {
+    setVisibleCount(Math.min(list.length, ARCHIVE_GRID_INITIAL_COUNT));
+  }, [listKey, list.length]);
+  const visible = list.slice(0, visibleCount);
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', {
+      className: 'archive-photo-grid',
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
+    }, visible.map((photo, index) => renderPhoto(photo, index))),
+    visibleCount < list.length && React.createElement('button', {
+      type: 'button',
+      className: 'btn btn-action btn-action-outline',
+      onClick: () => setVisibleCount(count => Math.min(list.length, count + ARCHIVE_GRID_PAGE_COUNT)),
+      style: { alignSelf: 'center', minHeight: '40px', margin: '12px auto 4px', padding: '0 16px', borderRadius: 'var(--radius-full)', fontWeight: 800 }
+    }, `사진 더 보기 (${visibleCount}/${list.length})`)
+  );
 }
 
 // A memory's cover is "its first photo that actually loads": a deleted/missing file must not
@@ -1563,10 +1590,10 @@ export function HistoryView({
   });
 
   const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
-  const personTagChips = [
+  const personTagChips = React.useMemo(() => [
     ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, color: p.color || '#7C3AED' })),
     ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, participantId: null, label: t, color: '#64748B' }))
-  ];
+  ], [activeParticipants, customPersonTags]);
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
@@ -1814,30 +1841,47 @@ export function HistoryView({
   // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
   // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
   // 완전일치만 인정한다.
-  const getPhotosForTagLabel = React.useCallback((label) => {
-    if (!label) return [];
-    const variants = getPersonNameVariants(label).map(v => v.toLowerCase());
-    return historyPhotoEntries.filter(entry => {
-      const tokens = entryTagTokens(entry).map(t => t.toLowerCase());
-      return variants.some(v => v.length <= 1 ? tokens.includes(v) : tokens.some(t => t.includes(v)));
+  // Build person buckets once per People tab rather than scanning every photo once for every
+  // card and once again for the selected person. On large archives that repeated tokenization
+  // was a measurable long task before the first interaction.
+  const personPhotosByLabel = React.useMemo(() => {
+    const buckets = new Map(personTagChips.map(tag => [tag.label, []]));
+    if (historyTab !== 'people') return buckets;
+    const matchers = personTagChips.map(tag => ({
+      label: tag.label,
+      variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
+    }));
+    historyPhotoEntries.forEach(entry => {
+      const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
+      if (!tokens.length) return;
+      matchers.forEach(({ label, variants }) => {
+        if (variants.some(value => value.length <= 1 ? tokens.includes(value) : tokens.some(token => token.includes(value)))) {
+          buckets.get(label)?.push(entry);
+        }
+      });
     });
-  }, [historyPhotoEntries]);
+    return buckets;
+  }, [historyTab, historyPhotoEntries, personTagChips]);
+  const getPhotosForTagLabel = React.useCallback(label => personPhotosByLabel.get(label) || [], [personPhotosByLabel]);
   const photosForPersonTag = React.useMemo(
     () => getPhotosForTagLabel(selectedPersonTag),
     [getPhotosForTagLabel, selectedPersonTag]
   );
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
-  const placePhotoGroups = React.useMemo(() => buildPlacePhotoGroups({
-    places: getCalendarPlaces(calendar),
-    photos: historyPhotoEntries,
-    getPhotoDates: photo => {
-      const dates = parseHistoryDateTokens(photo?.tags || '');
-      const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
-      return /^\d{4}-\d{2}-\d{2}$/.test(meetingDate) ? [meetingDate, ...dates] : dates;
-    },
-    doesPlaceMatchDate
-  }), [calendar, historyPhotoEntries]);
+  const placePhotoGroups = React.useMemo(() => {
+    if (historyTab !== 'places') return { groups: [], unclassified: [], unclassifiedCount: 0 };
+    return buildPlacePhotoGroups({
+      places: getCalendarPlaces(calendar),
+      photos: historyPhotoEntries,
+      getPhotoDates: photo => {
+        const dates = parseHistoryDateTokens(photo?.tags || '');
+        const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(meetingDate) ? [meetingDate, ...dates] : dates;
+      },
+      doesPlaceMatchDate
+    });
+  }, [historyTab, calendar, historyPhotoEntries]);
   const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
     ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
     : null;
@@ -1907,9 +1951,10 @@ export function HistoryView({
     showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
   };
   // Same photo cell as the 인물 detail grid (comment badge + heartbeat), for the 장소 tab.
-  const renderArchivePhotoGrid = (photos, keyPrefix, selection = null) => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-  }, photos.map((photo, idx) => {
+  const renderArchivePhotoGrid = (photos, keyPrefix, selection = null) => /*#__PURE__*/React.createElement(ProgressiveArchivePhotoGrid, {
+    photos,
+    listKey: `${keyPrefix}:${photos.length}:${photos[0]?.assetKey || photos[0]?.mediaKey || ''}`,
+    renderPhoto: (photo, idx) => {
     const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
     const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
     const selectKey = selection ? archivePhotoSelectKey(photo, idx) : '';
@@ -1936,7 +1981,8 @@ export function HistoryView({
         }
       }, isSelected ? '✓' : '')
     );
-  }));
+    }
+  });
   // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
   // 넘겨서, 공유 라이트박스 호스트(app-main.js)가 받는 meta가 비어 태그 입력/삭제/교체 등 표준
   // 라이트박스 기능이 전혀 동작하지 않았다. PhotoGallery와 동일하게 이 탭 전용 라이트박스를
@@ -1963,6 +2009,7 @@ export function HistoryView({
     return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
   const travelMemoryGroups = React.useMemo(() => {
+    if (historyTab !== 'memories') return [];
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
@@ -1989,7 +2036,7 @@ export function HistoryView({
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
-  }, [anniversaries, historyPhotoEntries]);
+  }, [historyTab, anniversaries, historyPhotoEntries]);
 
     const handleExcludeMemoryGroups = async () => {
     const ids = Array.from(selectedMemoryGroupIds);
@@ -2213,9 +2260,10 @@ export function HistoryView({
     });
   };
   const renderPhotoThumbGrid = (photos, { checkable, selectedKeys, onToggle, onOpen, keyPrefix }) => (
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-    }, photos.map((photo, idx) => {
+    /*#__PURE__*/React.createElement(ProgressiveArchivePhotoGrid, {
+      photos,
+      listKey: `${keyPrefix}:${photos.length}:${photos[0]?.assetKey || photos[0]?.mediaKey || ''}`,
+      renderPhoto: (photo, idx) => {
       const ids = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
       const photoKey = ids[0] || photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
       const isChecked = checkable && selectedKeys.has(photoKey);
@@ -2245,7 +2293,8 @@ export function HistoryView({
           fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
         }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
       );
-    }))
+      }
+    })
   );
 
   const v2ArchiveTabsSlot = v2Embed && typeof document !== 'undefined'
@@ -2302,7 +2351,7 @@ export function HistoryView({
     options: [
       { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
       { value: 'people', label: '인물', badge: personTagChips.length },
-      { value: 'places', label: '장소', badge: placePhotoGroups.groups.length },
+      { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : undefined },
       { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
     ]
   })
@@ -2745,23 +2794,7 @@ export function HistoryView({
       ),
       photosForPersonTag.length === 0
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)
-        : /*#__PURE__*/React.createElement("div", {
-            style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-          }, photosForPersonTag.map((photo, idx) => {
-            const identity = getPhotoCommentIdentity(photo, photosForPersonTag, { source: photo.source, meetingDate: photo.meetingDate }) || {};
-            const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
-            return /*#__PURE__*/React.createElement("button", {
-              key: photo.mediaKey || photo.refKey || `person_${idx}`,
-              type: "button",
-              className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
-              onClick: () => openHistoryLightbox(photosForPersonTag, idx),
-              style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
-            },
-              /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
-              PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
-            );
-          })
-          )
+        : renderArchivePhotoGrid(photosForPersonTag, `person_${selectedPersonTag}`)
     )),
 
     // 장소 목록: 등록된 장소마다 그 장소로 분류된 사진을 모은 칸(인물 탭과 같은 벤또 그리드).

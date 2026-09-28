@@ -113,6 +113,64 @@ async function fetchCalendar(args) {
   return decodeDocument(doc)?.calendar || {};
 }
 
+function workerFunctionUrl(args, functionName) {
+  const ingest = args.endpoint || `https://us-central1-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
+  return ingest.replace(/\/[^/]+$/, `/${functionName}`);
+}
+
+async function fetchCalibration(args, token) {
+  const { payload } = await timedRequest(workerFunctionUrl(args, 'getMediaAnalysisCalibration'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ calendarId: args.calendar })
+  }, 'Calibration fetch', async response => ({ response, payload: await response.json().catch(() => null) }));
+  return Array.isArray(payload?.signals) ? payload.signals : [];
+}
+
+// This is deliberate calibration, not opaque auto-training. A label/tag relation needs two
+// independent accepted reviews before it can influence a later recommendation; a rejection
+// subtracts from the same relation. The signal stays local to one calendar and one Mac.
+function buildCalibration(signals) {
+  const byLabel = new Map();
+  for (const signal of Array.isArray(signals) ? signals : []) {
+    const decision = String(signal?.decision || '');
+    const delta = decision === 'rejected' ? -2 : (decision === 'edited' ? 2 : 1);
+    const tags = decision === 'rejected'
+      ? (Array.isArray(signal?.proposedTags) ? signal.proposedTags : [])
+      : (Array.isArray(signal?.acceptedTags) ? signal.acceptedTags : []);
+    if (!tags.length) continue;
+    for (const rawLabel of Array.isArray(signal?.labels) ? signal.labels : []) {
+      const label = String(rawLabel || '').trim().toLocaleLowerCase('en-US');
+      if (!label) continue;
+      const bucket = byLabel.get(label) || new Map();
+      for (const rawTag of tags) {
+        const tag = String(rawTag || '').replace(/^#+/, '').trim();
+        if (!tag) continue;
+        const current = bucket.get(tag) || { score: 0, approvals: 0 };
+        current.score += delta;
+        if (delta > 0) current.approvals += 1;
+        bucket.set(tag, current);
+      }
+      byLabel.set(label, bucket);
+    }
+  }
+  return byLabel;
+}
+
+function calibratedTags(insight, calibration) {
+  const candidates = new Map();
+  for (const label of Array.isArray(insight?.labels) ? insight.labels : []) {
+    const bucket = calibration.get(String(label?.name || '').toLocaleLowerCase('en-US'));
+    if (!bucket) continue;
+    for (const [tag, signal] of bucket.entries()) {
+      // Two reviews keeps a one-off accidental apply from becoming a persistent suggestion.
+      if (signal.approvals < 2 || signal.score < 2) continue;
+      candidates.set(tag, Math.max(candidates.get(tag) || 0, signal.score));
+    }
+  }
+  return Array.from(candidates.entries()).sort((left, right) => right[1] - left[1]).map(([tag]) => tag).slice(0, 5);
+}
+
 async function fetchPhotoRows(args, cursor) {
   const query = {
     from: [{ collectionId: 'photoIndex' }],
@@ -172,7 +230,7 @@ function nearestPlace(photo, places) {
   return nearest?.distance <= 250 ? nearest.name : '';
 }
 
-function classify(photo, insight, calendar) {
+function classify(photo, insight, calendar, calibration = new Map()) {
   const rawTags = String(photo.tags || '').split(/[\s,#]+/).map(value => value.trim()).filter(Boolean);
   const lowerTags = rawTags.map(value => value.toLocaleLowerCase('ko'));
   const includes = value => lowerTags.includes(String(value || '').toLocaleLowerCase('ko'));
@@ -186,8 +244,9 @@ function classify(photo, insight, calendar) {
   const meetings = meetingDate ? (Array.isArray(calendar.confirmedMeeting) ? calendar.confirmedMeeting : [])
     .filter(meeting => String(meeting?.date || meeting?.id || meeting?.targetDate || '') === meetingDate)
     .map(meeting => String(meeting?.title || meeting?.name || meetingDate)) : [];
+  const learned = calibratedTags(insight, calibration).filter(tag => !includes(tag));
   return {
-    suggestedTags: Array.from(new Set([...(insight.suggestedTags || []), ...places, ...meetings])).slice(0, 20),
+    suggestedTags: Array.from(new Set([...(insight.suggestedTags || []), ...places, ...meetings, ...learned])).slice(0, 20),
     people, places, meetings,
     scenes: Array.from(new Set((insight.labels || []).filter(label => Number(label?.confidence) >= 0.65).map(label => label.name))).slice(0, 12),
     confidence: Math.max(0, ...((insight.labels || []).map(label => Number(label?.confidence) || 0)))
@@ -195,7 +254,13 @@ function classify(photo, insight, calendar) {
 }
 
 async function inspectPhoto(photo, tempRoot, visionBinary) {
-  const url = String(photo.full || photo.imageUrl || photo.thumb || photo.thumbUrl || '');
+  // Vision cannot reliably create an NSImage from an animated GIF. A photoIndex row normally
+  // carries a JPEG/WebP thumbnail as well, which preserves a representative first frame and is
+  // both smaller and analyzable. For ordinary photos we keep the full original as before.
+  const candidates = [photo.full, photo.imageUrl, photo.thumb, photo.thumbUrl]
+    .map(value => String(value || '').trim()).filter(Boolean);
+  const isGif = value => /\.gif(?:$|[?#])/i.test(value);
+  const url = candidates.find(value => !isGif(value)) || candidates[0] || '';
   if (!/^https:\/\//.test(url)) throw new Error('Missing Firebase Storage URL');
   const { response, bytes } = await timedRequest(url, {}, 'Photo download', async response => {
     if (!response.ok) return { response, bytes: Buffer.alloc(0) };
@@ -226,7 +291,7 @@ async function upload(args, token, runId, items, window, { status = 'completed',
       calendarId: args.calendar,
       runId,
       workerId: 'macos-vision-m2',
-      workerVersion: '3',
+      workerVersion: '4',
       window,
       status,
       error,
@@ -257,7 +322,15 @@ async function main() {
     await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     return;
   }
-  const [calendar, rows] = await Promise.all([fetchCalendar(args), fetchPhotoRows(args, current.cursor)]);
+  const [calendar, rows, calibrationSignals] = await Promise.all([
+    fetchCalendar(args),
+    fetchPhotoRows(args, current.cursor),
+    fetchCalibration(args, token).catch(error => {
+      console.warn('Calibration unavailable; using base Vision suggestions:', String(error?.message || error));
+      return [];
+    })
+  ]);
+  const calibration = buildCalibration(calibrationSignals);
   const tempRoot = join(tmpdir(), `moyeora-analysis-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await mkdir(tempRoot, { recursive: true });
   const items = [];
@@ -270,7 +343,7 @@ async function main() {
         const photo = { ...row.data, assetKey: String(row.data.assetKey || basename(row.name)) };
         try {
           const insight = await inspectPhoto(photo, tempRoot, args.visionBinary);
-          items.push({ sourceKey: photo.assetKey, assetKey: photo.assetKey, sourceUpdatedAt: Number(photo.updatedAt) || 0, analyzedAt: now, source: 'photo-index', insight, ...classify(photo, insight, calendar) });
+          items.push({ sourceKey: photo.assetKey, assetKey: photo.assetKey, sourceUpdatedAt: Number(photo.updatedAt) || 0, analyzedAt: now, source: 'photo-index', insight, ...classify(photo, insight, calendar, calibration) });
         } catch (error) {
           const message = String(error?.message || error).slice(0, 240);
           failures.push({ assetKey: photo.assetKey, error: message });

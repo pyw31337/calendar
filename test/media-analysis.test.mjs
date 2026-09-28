@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { isAnalysisWindow, parseHolidayIcs } from '../tools/local-media-worker/run-scheduled-media-analysis.mjs';
 import { isRetryableAssetFailure } from '../tools/local-media-worker/analysis-retry-policy.mjs';
-import { fetchMediaAnalysisFeed } from '../src/core/media-analysis-feed.js';
+import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, recordMediaAnalysisFeedback } from '../src/core/media-analysis-feed.js';
 
 const require = createRequire(import.meta.url);
 const { sanitizeAnalysisItem, stableAnalysisId, summarize } = require('../functions/media-analysis.js');
@@ -61,6 +61,35 @@ test('live feed reads server-written analysis rows without exposing write creden
   try {
     const items = await fetchMediaAnalysisFeed({ calendarId: 'cw', projectId: 'metro-live-2918e', force: true });
     assert.deepEqual(items[0], { suggestedTags: ['하니랜드'], faceCount: 1, lastReceivedAt: 1000, id: 'item1' });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('AI review actions resolve a canonical photo only on demand and send bounded feedback to the server', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init = {}) => {
+    requests.push({ url: String(url), init });
+    if (String(url).includes('/photoIndex/asset%3Av1%3Aabc-123')) {
+      return new Response(JSON.stringify({
+        name: 'projects/x/databases/(default)/documents/calendars/cal_cw/photoIndex/asset:v1:abc-123',
+        fields: { tags: { stringValue: '기존' }, sourceOwner: { stringValue: 'message:m1:0' } }
+      }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ ok: true, review: { decision: 'applied', finalTags: ['기존', '하니랜드'] } }), { status: 200 });
+  };
+  try {
+    const photo = await fetchMediaAnalysisPhoto({ calendarId: 'cw', projectId: 'metro-live-2918e', assetKey: 'asset:v1:abc-123' });
+    assert.equal(photo.sourceOwner, 'message:m1:0');
+    const review = await recordMediaAnalysisFeedback({
+      calendarId: 'cw', projectId: 'metro-live-2918e', assetKey: 'asset:v1:abc-123',
+      decision: 'applied', proposedTags: ['하니랜드'], acceptedTags: ['하니랜드'], finalTags: ['기존', '하니랜드']
+    });
+    assert.deepEqual(review.finalTags, ['기존', '하니랜드']);
+    assert.equal(requests.length, 2);
+    assert.match(requests[1].url, /recordMediaAnalysisFeedback$/);
+    assert.deepEqual(JSON.parse(requests[1].init.body).acceptedTags, ['하니랜드']);
   } finally {
     globalThis.fetch = originalFetch;
   }

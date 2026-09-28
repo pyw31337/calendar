@@ -2200,7 +2200,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onDeleteGalleryLinks: handleDeleteGalleryLinks,
       onRequestConfirm: showConfirmDialog,
       onPasteGatherPhoto: handlePasteGatherPhoto, onPasteGatherPhotos: handlePasteGatherPhotos,
-      setActiveLightbox, onDeletePhoto: handleDeletePhoto, photoCommentCounts,
+      setActiveLightbox, onDeletePhoto: handleDeletePhoto, onSaveImageTags: handleSaveImageTags, photoCommentCounts,
       indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
         ? galleryPhotoIndex.items
         : (galleryPhotoIndex && galleryPhotoIndex.status === 'fallback' ? null : []),

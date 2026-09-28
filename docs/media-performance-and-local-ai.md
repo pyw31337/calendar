@@ -80,7 +80,7 @@ Cloud Run/Ollama 같은 외부 또는 네트워크 모델은 한국어 설명 �
 cd /Users/pyw31337/Developer/calendar
 MOYEORA_MEDIA_CALENDARS=cw,kkot,jhair \
   tools/local-media-worker/setup-media-analysis-worker.sh
-firebase deploy --only functions:ingestMediaAnalysis,firestore:rules
+firebase deploy --only functions:ingestMediaAnalysis,functions:recordMediaAnalysisFeedback,functions:getMediaAnalysisCalibration,firestore:rules
 ```
 
 설치기는 무작위 업로드 토큰을 macOS Keychain에만 저장하고, Cloud Secret Manager에는 그 검증값만
@@ -103,15 +103,33 @@ firebase deploy --only functions:ingestMediaAnalysis,firestore:rules
 원문은 포함하지 않는다. 발송 기록은 `operationsMediaBriefs`에 남아 이메일 보관함과 별도로 감사할 수
 있다.
 
-발송 서비스는 Resend를 사용한다. 한 번만 검증된 발신자와 API 키를 Secret Manager에 설정한다. 값은
-명령어 이력, 저장소, `launchd` 설정, 로컬 JSON에 남지 않는다.
+발송은 검증된 네이버 SMTP 발신 계정으로 처리한다. 앱 비밀번호는 Secret Manager에만 저장하며,
+명령어 이력, 저장소, `launchd` 설정, 로컬 JSON에는 남지 않는다. Resend는 비상용 보조 경로로만
+유지한다.
 
 ```bash
 cd /Users/pyw31337/Developer/calendar
-RESEND_API_KEY='re_…' \
-MEDIA_BRIEF_FROM='모아엘가 <brief@verified-domain.example>' \
+NAVER_SMTP_APP_PASSWORD='앱-비밀번호' \
+MEDIA_BRIEF_FROM='모여라 캘린더 <pyw213@naver.com>' \
   tools/local-media-worker/configure-media-brief-email.sh
 ```
+
+### 검토·개인화 피드백 루프
+
+갤러리의 **AI 분석** 탭은 각 추천에 `태그 적용`, `수정`, `제외`를 제공한다. 적용은 기존 태그를
+덮어쓰지 않고 합치며, 각 결정은 `mediaAnalysis.review`와 비공개 `mediaAnalysisFeedback`에 남는다.
+클라이언트는 이 피드백 컬렉션을 읽거나 쓸 수 없고, 로컬 분석 워커만 별도 토큰으로 압축된 신호를
+가져간다.
+
+- 같은 Vision 레이블과 태그의 조합이 서로 다른 사진에서 두 번 이상 수락되어야 다음 추천에 반영한다.
+- `제외`는 같은 조합의 점수를 낮춘다. 한 번의 우연한 적용이나 오인식은 학습 규칙이 되지 않는다.
+- 원본, 파일명, 댓글, 위치 URL은 피드백 API에 보내지지 않는다. 분석은 계속 로컬 M2에서만 수행한다.
+- 이 단계는 빠르게 되돌릴 수 있는 **개인화 보정**이다. 얼굴 식별·자동 인물 태깅·자동 태그 저장은
+  하지 않는다.
+
+진짜 모델 재학습(Core ML/Create ML)은 별도 동의와 평가 세트가 필요한 다음 단계다. 승인된 태그만
+내보내고, 인물 식별 정보는 제외하며, 클래스별 충분한 예시와 보류 검증 세트가 있을 때에만 후보
+모델을 비교·승인한다. 운영 Vision 모델은 검증 정확도가 기준보다 높을 때에만 교체한다.
 
 안전장치는 세 겹이다.
 

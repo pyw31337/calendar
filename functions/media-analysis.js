@@ -94,6 +94,7 @@ function summarize(items = []) {
 
 module.exports = {
   MAX_BATCH_ITEMS,
+  MAX_TAGS,
   sanitizeAnalysisItem,
   stableAnalysisId,
   summarize
