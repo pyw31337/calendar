@@ -1400,7 +1400,18 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
 // one(s). ChatParticipantSheet (ui-chat-sheets.js, single-select "\uC791\uC131\uC790 \uC120\uD0DD") and PollVoterSheet
 // (below, multi-voter "\uD22C\uD45C\uC790 \uC120\uD0DD") used to each hand-roll this exact same sheet -- differing only
 // in title text and selection semantics -- so this is the one place their shared chrome lives.
-export function ParticipantSelectSheet({ calendar, participants, title, isOptionSelected, onSelect, onClose }) {
+export function ParticipantSelectSheet({
+  calendar,
+  participants,
+  title,
+  isOptionSelected = () => false,
+  onSelect,
+  onClose,
+  selectedLabel = '선택됨',
+  disableSelected = false,
+  getOptionStatus = null,
+  isOptionDisabled = null
+}) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1436,15 +1447,27 @@ export function ParticipantSelectSheet({ calendar, participants, title, isOption
     style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, null))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
-  }, list.map(participant => /*#__PURE__*/React.createElement("button", {
-    key: participant.id,
-    type: "button",
-    className: "poll-voter-option",
-    onClick: () => onSelect(participant.id)
-  }, /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }),
-  isOptionSelected(participant.id) && /*#__PURE__*/React.createElement("span", {
-    style: { color: '#2563EB', fontWeight: 900 }
-  }, "\u2713")))))), document.body);
+  }, list.map(participant => {
+    const selected = Boolean(isOptionSelected(participant.id));
+    const status = typeof getOptionStatus === 'function'
+      ? getOptionStatus(participant, { selected })
+      : (selected ? selectedLabel : '');
+    const disabled = Boolean((disableSelected && selected) || (typeof isOptionDisabled === 'function' && isOptionDisabled(participant, { selected, status })));
+    return /*#__PURE__*/React.createElement("button", {
+      key: participant.id,
+      type: "button",
+      className: "poll-voter-option",
+      disabled: disabled,
+      "aria-label": `${participant.name}${status ? `, ${status}` : ''}`,
+      onClick: () => {
+        if (!disabled && typeof onSelect === 'function') onSelect(participant.id);
+      },
+      style: disabled ? { cursor: 'not-allowed', opacity: 0.58 } : undefined
+    }, /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }),
+    status && /*#__PURE__*/React.createElement("span", {
+      style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 900 }
+    }, status));
+  })))), document.body);
 }
 
 export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
@@ -1463,6 +1486,7 @@ export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }
     participants: participants,
     title: "\uD22C\uD45C\uC790 \uC120\uD0DD",
     isOptionSelected: id => selectedIds.has(id),
+    selectedLabel: '투표함',
     onSelect: id => {
       setStoredChatParticipantId(calendar?.id, id);
       onSelect(id);

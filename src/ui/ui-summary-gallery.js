@@ -409,7 +409,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         onClick: () => { if (!opt.disabled) { onSelect(opt.value); setIsOpen(false); } },
         style: opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined
       }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label,
-        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: 'var(--font-size-sm)', color: 'var(--text-light)' } }, "추가됨") : null))
+        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', flexShrink: 0, fontSize: 'var(--font-size-sm)', color: 'var(--accent-primary)', fontWeight: 800 } }, opt.statusText || '선택됨') : null))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,

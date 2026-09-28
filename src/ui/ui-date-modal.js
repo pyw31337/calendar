@@ -451,6 +451,11 @@ export function DateModal({
   };
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
+  const attendingParticipantIds = new Set(
+    dateEntries
+      .map(entry => entry.participantId)
+      .filter(id => id && id !== BULK_NO_PARTICIPANT_ID)
+  );
   const effectiveAnniversaries = (Array.isArray(anniversaries) && anniversaries.length > 0)
     ? anniversaries
     : (Array.isArray(calendar?.anniversaries) && calendar.anniversaries.length > 0
@@ -3564,19 +3569,26 @@ export function DateModal({
       }, "✕")
     ),
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
-      activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
-        key: p.id,
-        type: "button",
-        className: "bottom-sheet-item",
-        disabled: isSubmitting,
-        onClick: () => {
-          if (isSubmitting) return;
-          markDirty();
-          setParticipantId(p.id);
-          setNote(getExistingNoteForParticipant(p.id));
-          setIsSheetOpen(false);
-        }
-      }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name)))
+      activeParticipants.map(p => {
+        const status = attendingParticipantIds.has(p.id) ? '참석함' : (participantId === p.id ? '선택됨' : '');
+        const disabled = isSubmitting || Boolean(status);
+        return /*#__PURE__*/React.createElement("button", {
+          key: p.id,
+          type: "button",
+          className: "bottom-sheet-item",
+          disabled: disabled,
+          "aria-label": `${p.name}${status ? `, ${status}` : ''}`,
+          onClick: () => {
+            if (disabled) return;
+            markDirty();
+            setParticipantId(p.id);
+            setNote(getExistingNoteForParticipant(p.id));
+            setIsSheetOpen(false);
+          },
+          style: disabled ? { cursor: 'not-allowed', opacity: 0.58 } : undefined
+        }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name),
+        status && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 900 } }, status));
+      })
     )
   )) : null;
 

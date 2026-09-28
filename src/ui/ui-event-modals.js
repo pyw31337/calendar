@@ -1869,7 +1869,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       .filter(row => row?.id !== editingParticipantRowId)
       .map(row => row?.participantId)
       .filter(Boolean));
-    return participantPickerOptions.map(option => ({ ...option, disabled: selected.has(option.value) }));
+    return participantPickerOptions.map(option => ({
+      ...option,
+      disabled: selected.has(option.value),
+      statusText: selected.has(option.value) ? '선택됨' : ''
+    }));
   }, [participantPickerOptions, participantRows, editingParticipantRowId]);
   React.useEffect(() => {
     const editingRow = participantRows.find(row => row?.id === editingParticipantRowId);
