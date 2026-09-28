@@ -610,6 +610,112 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
   }));
 }
 
+function getPaginationWindowInline(currentPage, pageCount, windowSize) {
+  const f = (window.GATHER_APP_UTILS || {}).getPaginationWindow;
+  if (typeof f === 'function') return f(currentPage, pageCount, windowSize);
+  const current = Math.min(pageCount, Math.max(1, Number(currentPage) || 1));
+  const count = Math.max(1, Number(pageCount) || 1);
+  const size = Math.max(1, Number(windowSize) || 10);
+  if (count <= size) return Array.from({ length: count }, (_, i) => i + 1);
+  const half = Math.floor(size / 2);
+  let start = current - half;
+  let end = start + size - 1;
+  if (start < 1) {
+    start = 1;
+    end = Math.min(count, size);
+  } else if (end > count) {
+    end = count;
+    start = Math.max(1, count - size + 1);
+  }
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+export function CommonPagination({
+  currentPage = 1,
+  pageCount = 1,
+  onChange,
+  label = '페이지',
+  isMobile: isMobileProp,
+  loading = false,
+  className = '',
+  style = {}
+} = {}) {
+  const React = window.React;
+  const [internalMobile, setInternalMobile] = React.useState(() => {
+    return typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 640px)').matches : false;
+  });
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const handler = () => setInternalMobile(mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+
+  const isMobile = isMobileProp != null ? Boolean(isMobileProp) : internalMobile;
+  if (pageCount <= 1) return null;
+
+  const windowSize = isMobile ? 5 : 10;
+  const curr = Math.min(pageCount, Math.max(1, Number(currentPage) || 1));
+  const pages = getPaginationWindowInline(curr, pageCount, windowSize);
+
+  const go = page => {
+    if (loading || page < 1 || page > pageCount || page === curr || typeof onChange !== 'function') return;
+    onChange(page);
+  };
+
+  const chevron = (direction, key) => React.createElement('svg', {
+    key,
+    xmlns: 'http://www.w3.org/2000/svg', width: '16', height: '16', viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
+    className: 'icon icon-tabler icons-tabler-outline icon-tabler-chevron-down', 'aria-hidden': 'true'
+  },
+    React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+    React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+  );
+
+  const doubleChevron = direction => React.createElement('span', {
+    style: { display: 'inline-flex', alignItems: 'center' }
+  },
+    chevron(direction, `${direction}-a`),
+    React.createElement('span', { style: { display: 'inline-flex', marginLeft: '-10px' } },
+      chevron(direction, `${direction}-b`)
+    )
+  );
+
+  const arrow = (btnLabel, targetPage, disabled, glyph) => React.createElement('button', {
+    key: btnLabel, type: 'button',
+    className: 'gallery-pagination-button gallery-pagination-arrow',
+    'aria-label': btnLabel,
+    disabled: disabled || loading,
+    onClick: () => go(targetPage)
+  }, glyph);
+
+  return React.createElement('nav', {
+    className: `gallery-pagination${isMobile ? ' is-mobile' : ''}${className ? ` ${className}` : ''}`,
+    'aria-label': `${label} 페이지`,
+    style
+  },
+    arrow('첫 페이지', 1, curr <= 1, doubleChevron('left')),
+    arrow('이전 페이지', curr - 1, curr <= 1, chevron('left')),
+    pages.map(page => React.createElement('button', {
+      key: page,
+      type: 'button',
+      className: `gallery-pagination-button${page === curr ? ' is-active' : ''}`,
+      'aria-current': page === curr ? 'page' : undefined,
+      disabled: loading,
+      onClick: () => go(page)
+    }, String(page))),
+    arrow('다음 페이지', curr + 1, curr >= pageCount, chevron('right')),
+    arrow('마지막 페이지', pageCount, curr >= pageCount, doubleChevron('right'))
+  );
+}
+
 // Edit-mode selection checkbox. Spec taken from gallery 링크/파일 cards:
 // 8px inset, 20×20, radius 5. `onMedia` is the dark chip on photos/thumbnails;
 // `onCard` is the light chip on white list cards (장소).
@@ -2056,5 +2162,6 @@ export function ResizableListSection({
     Footer: Footer,
     MemoTagInputRow: MemoTagInputRow,
     ClickToPlayVideoCard: ClickToPlayVideoCard,
+    CommonPagination: CommonPagination,
   });
 }

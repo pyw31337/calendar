@@ -230,6 +230,30 @@ function nearestPlace(photo, places) {
   return nearest?.distance <= 250 ? nearest.name : '';
 }
 
+function toKstDateString(ts) {
+  if (!ts) return '';
+  const date = new Date(typeof ts === 'number' || /^\d+$/.test(ts) ? Number(ts) : String(ts));
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  const part = type => parts.find(value => value.type === type)?.value || '00';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function extractSmartKeywords(text) {
+  if (!text) return [];
+  const clean = String(text).replace(/[\r\n\t]/g, ' ').trim();
+  const words = clean.split(/[\s,#·•/]+/).map(w => w.trim()).filter(w => w.length >= 2);
+  const combined = clean.replace(/[\s_\-./(),[\]{}'"`~!@#$%^&*+=|\\:;<>?·•]+/g, '').trim();
+  const res = [];
+  if (combined && combined.length >= 2 && combined.length <= 15) res.push(combined);
+  for (const word of words) {
+    if (word.length >= 2 && word.length <= 15 && !res.includes(word)) res.push(word);
+  }
+  return res;
+}
+
 function classify(photo, insight, calendar, calibration = new Map()) {
   const rawTags = String(photo.tags || '').split(/[\s,#]+/).map(value => value.trim()).filter(Boolean);
   const lowerTags = rawTags.map(value => value.toLocaleLowerCase('ko'));
@@ -240,13 +264,40 @@ function classify(photo, insight, calendar, calibration = new Map()) {
     .map(place => String(place?.name || place?.title || '').trim()).filter(Boolean).filter(includes);
   const nearby = nearestPlace(photo, calendar.places);
   if (nearby && !places.includes(nearby)) places.push(nearby);
-  const meetingDate = String(photo.meetingDate || '').trim();
-  const meetings = meetingDate ? (Array.isArray(calendar.confirmedMeeting) ? calendar.confirmedMeeting : [])
-    .filter(meeting => String(meeting?.date || meeting?.id || meeting?.targetDate || '') === meetingDate)
-    .map(meeting => String(meeting?.title || meeting?.name || meetingDate)) : [];
+
+  // Date resolution from photo.meetingDate or timestamp / capturedAt
+  const dateStr = String(photo.meetingDate || '').trim() || toKstDateString(photo.timestamp || photo.capturedAt);
+  const matchedMeetings = [];
+  if (dateStr) {
+    const rawMeetings = Array.isArray(calendar.confirmedMeeting) ? calendar.confirmedMeeting : (calendar.confirmedMeeting ? [calendar.confirmedMeeting] : []);
+    for (const meeting of rawMeetings) {
+      if (!meeting || meeting.confirmed === false) continue;
+      const mDate = String(meeting.date || meeting.id || meeting.targetDate || '').trim();
+      if (mDate === dateStr) matchedMeetings.push(meeting);
+    }
+    const rawAnniversaries = Array.isArray(calendar.anniversaries) ? calendar.anniversaries : [];
+    for (const anniv of rawAnniversaries) {
+      if (!anniv || anniv.deletedAt) continue;
+      const aStart = String(anniv.startDate || anniv.date || '').trim();
+      const aEnd = String(anniv.endDate || aStart).trim();
+      if ((aStart && aStart === dateStr) || (aStart && aEnd && dateStr >= aStart && dateStr <= aEnd)) {
+        matchedMeetings.push(anniv);
+      }
+    }
+  }
+
+  const scheduleSmartTags = [];
+  for (const m of matchedMeetings) {
+    const title = String(m.title || m.name || '').trim();
+    const note = String(m.note || m.memo || '').trim();
+    if (title) scheduleSmartTags.push(...extractSmartKeywords(title));
+    if (note) scheduleSmartTags.push(...extractSmartKeywords(note));
+  }
+
+  const meetings = matchedMeetings.map(m => String(m.title || m.name || m.date || '')).filter(Boolean);
   const learned = calibratedTags(insight, calibration).filter(tag => !includes(tag));
   return {
-    suggestedTags: Array.from(new Set([...(insight.suggestedTags || []), ...places, ...meetings, ...learned])).slice(0, 20),
+    suggestedTags: Array.from(new Set([...(insight.suggestedTags || []), ...places, ...scheduleSmartTags, ...meetings, ...learned])).slice(0, 20),
     people, places, meetings,
     scenes: Array.from(new Set((insight.labels || []).filter(label => Number(label?.confidence) >= 0.65).map(label => label.name))).slice(0, 12),
     confidence: Math.max(0, ...((insight.labels || []).map(label => Number(label?.confidence) || 0)))

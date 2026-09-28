@@ -2866,39 +2866,55 @@ select.form-select {
 
 @media (max-width: 640px) {
   .gallery-pagination {
-    gap: 4px;
-    padding-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap !important;
+    gap: 3px;
+    padding: 12px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .gallery-pagination-button {
-    min-width: 40px;
-    min-height: 40px;
-    padding: 0 6px;
+    min-width: 30px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: var(--radius-sm, 6px);
+    flex-shrink: 1;
+    flex-grow: 0;
   }
 
-  /* Numbers only on phones -- arrow buttons are omitted in markup, keep CSS belt-and-suspenders. */
-  .gallery-pagination.is-mobile .gallery-pagination-arrow {
-    display: none;
+  /* 모바일에서도 양쪽 화살표(처음, 이전, 다음, 맨끝) 버튼 모두 표시 */
+  .gallery-pagination.is-mobile .gallery-pagination-arrow,
+  .gallery-pagination .gallery-pagination-arrow {
+    display: inline-flex;
+    min-width: 30px;
+    padding: 0;
   }
 
-  /* Horizontal drag pans the centered page window; keep a single row so numbers slide as a strip. */
+  /* 가로폭 제한으로 줄바꿈되지 않게 1줄 유지 */
   .gallery-pagination.is-mobile.is-swipeable {
-    flex-wrap: nowrap;
+    flex-wrap: nowrap !important;
     justify-content: center;
     overflow: hidden;
     touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
-    cursor: grab;
+    cursor: default;
   }
 
   .gallery-pagination.is-mobile.is-swipeable:active {
-    cursor: grabbing;
+    cursor: default;
   }
 
   .gallery-pagination.is-mobile.is-swipeable .gallery-pagination-button {
-    flex: 0 0 auto;
-    touch-action: none;
+    flex: 0 1 auto;
+    touch-action: manipulation;
   }
 
   .gallery-pagination-button.is-focus:not(.is-active) {

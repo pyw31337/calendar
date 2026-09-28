@@ -2,7 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, getPaginationWindow, paginateGalleryItems } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
@@ -12,6 +12,7 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken } from './archive-place-groups.js';
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
+import { CommonPagination } from './ui-shared.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
@@ -19,7 +20,6 @@ const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
 // than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
 // first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
 const PAGE_RENDER_SIZE = 100;
-const PAGE_WINDOW_SIZE = 7;
 const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
 
 // Gallery's existing number-window calculation is the single pagination rule. Archive and
@@ -28,24 +28,13 @@ const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
 function ExistingPageNavigation({ currentPage, pageCount, onChange, label = '목록' }) {
   const React = window.React;
   if (pageCount <= 1) return null;
-  const pages = getPaginationWindow(currentPage, pageCount, PAGE_WINDOW_SIZE);
-  const go = page => {
-    const target = Math.min(pageCount, Math.max(1, Number(page) || 1));
-    if (target !== currentPage) onChange(target);
-  };
-  const buttonStyle = active => ({
-    minWidth: '36px', minHeight: '36px', padding: '0 8px', borderRadius: 'var(--radius-full)',
-    border: '1px solid var(--border-subtle)', background: active ? 'var(--cta-fill)' : 'var(--bg-card)',
-    color: active ? 'var(--on-cta)' : 'var(--text-main)', fontWeight: 800, cursor: 'pointer'
+  return React.createElement(CommonPagination, {
+    currentPage,
+    pageCount,
+    onChange,
+    label,
+    style: { gridColumn: '1 / -1' }
   });
-  return React.createElement('nav', {
-    className: 'gallery-pagination', 'aria-label': `${label} 페이지`,
-    style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', flexWrap: 'wrap', gridColumn: '1 / -1', padding: '16px 0 4px' }
-  },
-    React.createElement('button', { type: 'button', 'aria-label': '이전 페이지', disabled: currentPage <= 1, onClick: () => go(currentPage - 1), style: { ...buttonStyle(false), opacity: currentPage <= 1 ? 0.42 : 1 } }, '‹'),
-    pages.map(page => React.createElement('button', { key: page, type: 'button', 'aria-current': page === currentPage ? 'page' : undefined, onClick: () => go(page), style: buttonStyle(page === currentPage) }, page)),
-    React.createElement('button', { type: 'button', 'aria-label': '다음 페이지', disabled: currentPage >= pageCount, onClick: () => go(currentPage + 1), style: { ...buttonStyle(false), opacity: currentPage >= pageCount ? 0.42 : 1 } }, '›')
-  );
 }
 // The per-photo fields the lightbox (and its tag save) needs, shared with 장소 일괄 지정.
 const toArchiveLightboxMeta = p => ({
@@ -2200,20 +2189,26 @@ export function HistoryView({
       onClick: (e) => selection ? selection.onToggle(selectKey, { shiftKey: Boolean(e?.shiftKey), index: idx, photos, key: selectKey }) : openHistoryLightbox(photos, idx),
       "aria-pressed": selection ? isSelected : undefined,
       style: {
-        position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s`,
-        outline: isSelected ? '3px solid var(--brand, #7C3AED)' : 'none', outlineOffset: '-3px'
+        position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s`
       }
     },
       /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo, onBroken: (_event, info) => markBrokenHistoryPhoto(photo, info) }),
       PhotoCommentCountBadge && !selection && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
-      selection && /*#__PURE__*/React.createElement("span", {
-        "aria-hidden": "true",
+      selection && (EditSelectCheckbox
+        ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isSelected, variant: "onMedia" })
+        : /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": true,
         style: {
-          position: 'absolute', top: '6px', right: '6px', width: '22px', height: '22px', borderRadius: '50%', zIndex: 3,
-          border: '2px solid #fff', background: isSelected ? 'var(--brand, #7C3AED)' : 'rgba(15,23,42,0.35)',
-          color: 'var(--on-brand, #fff)', fontSize: '13px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
+          border: isSelected ? 'none' : '2px solid rgba(255,255,255,0.95)',
+          backgroundColor: isSelected ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none'
         }
-      }, isSelected ? '✓' : '')
+      }, isSelected && /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+        fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
     );
     }
   });

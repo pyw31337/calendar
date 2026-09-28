@@ -450,6 +450,29 @@ export function buildMetadataTags(metadata, scheduledDateOrOptions = '') {
     String(metadata.location).split(/\s+/).forEach(part => addTag(tags, part));
   }
 
+  // Calendar schedules/meetings fusion (e.g. 제주도 가족여행, OO 어린이집 참관수업)
+  const targetDate = scheduledDate || captured || uploadDate;
+  if (targetDate && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    const rawMeetings = Array.isArray(options.meetings)
+      ? options.meetings
+      : (Array.isArray(options.calendar?.confirmedMeeting)
+        ? options.calendar.confirmedMeeting
+        : (options.calendar?.confirmedMeeting ? [options.calendar.confirmedMeeting] : []));
+    rawMeetings.forEach(meeting => {
+      if (!meeting || meeting.confirmed === false) return;
+      const mDate = String(meeting.date || meeting.id || meeting.targetDate || '').trim();
+      if (mDate === targetDate) {
+        const text = `${meeting.title || meeting.name || ''} ${meeting.note || meeting.memo || ''}`.trim();
+        if (text) {
+          addTag(tags, text);
+          text.split(/[\s,#·•/]+/).forEach(word => {
+            if (word.length >= 2) addTag(tags, word);
+          });
+        }
+      }
+    });
+  }
+
   if (metadata?.device) {
     const deviceTag = formatDeviceHashtag(metadata.device);
     if (deviceTag) addTag(tags, deviceTag);

@@ -3,15 +3,15 @@
  */
 
 import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
-import { preserveAnniversaryCurationFields, getPaginationWindow, paginateGalleryItems } from '../core/gallery-data.js';
+import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core/gallery-data.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { CommonPagination } from './ui-shared.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const SETTLEMENT_PAGE_SIZE = 100;
-const SETTLEMENT_PAGE_WINDOW_SIZE = 7;
 const BULK_WEEK_OPTIONS = Object.freeze([
   Object.freeze({ value: 1, label: '첫째주' }),
   Object.freeze({ value: 2, label: '둘째주' }),
@@ -3213,21 +3213,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, [isSettlementListOpen]);
   const renderSettlementPagination = ({ page, pageCount, onChange, label }) => {
     if (pageCount <= 1) return null;
-    const pages = getPaginationWindow(page, pageCount, SETTLEMENT_PAGE_WINDOW_SIZE);
-    const go = next => onChange(Math.min(pageCount, Math.max(1, Number(next) || 1)));
-    const style = active => ({
-      minWidth: '36px', minHeight: '36px', padding: '0 8px', borderRadius: 'var(--radius-full)',
-      border: '1px solid var(--border-subtle)', background: active ? 'var(--cta-fill)' : 'var(--bg-card)',
-      color: active ? 'var(--on-cta)' : 'var(--text-main)', fontWeight: 800, cursor: 'pointer'
+    return React.createElement(CommonPagination, {
+      currentPage: page,
+      pageCount,
+      onChange,
+      label,
+      style: { padding: '12px 0 2px' }
     });
-    return React.createElement('nav', {
-      className: 'gallery-pagination', 'aria-label': `${label} 페이지`,
-      style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', flexWrap: 'wrap', padding: '12px 0 2px' }
-    },
-      React.createElement('button', { type: 'button', disabled: page <= 1, onClick: () => go(page - 1), 'aria-label': '이전 페이지', style: { ...style(false), opacity: page <= 1 ? 0.42 : 1 } }, '‹'),
-      pages.map(item => React.createElement('button', { key: item, type: 'button', onClick: () => go(item), 'aria-current': item === page ? 'page' : undefined, style: style(item === page) }, item)),
-      React.createElement('button', { type: 'button', disabled: page >= pageCount, onClick: () => go(page + 1), 'aria-label': '다음 페이지', style: { ...style(false), opacity: page >= pageCount ? 0.42 : 1 } }, '›')
-    );
   };
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;

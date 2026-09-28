@@ -2569,8 +2569,8 @@ export function ChatGalleryModal({
       "aria-label": options?.label || "갤러리 페이지",
       ...mobileDragProps
     },
-      !isMobile && arrow('첫 페이지', 1, currentPage <= 1, doubleChevron('left')),
-      !isMobile && arrow('이전 페이지', currentPage - 1, currentPage <= 1, chevron('left')),
+      arrow('첫 페이지', 1, currentPage <= 1, doubleChevron('left')),
+      arrow('이전 페이지', currentPage - 1, currentPage <= 1, chevron('left')),
       pages.map(page => /*#__PURE__*/React.createElement("button", {
         key: page, type: "button", className: `gallery-pagination-button${page === currentPage ? ' is-active' : ''}${page === focusPage && page !== currentPage ? ' is-focus' : ''}`,
         "aria-current": page === currentPage ? 'page' : undefined,
@@ -2585,8 +2585,8 @@ export function ChatGalleryModal({
           go(page);
         }
       }, String(page))),
-      !isMobile && arrow('다음 페이지', currentPage + 1, currentPage >= pageCount, chevron('right')),
-      !isMobile && arrow('마지막 페이지', pageCount, currentPage >= pageCount, doubleChevron('right'))
+      arrow('다음 페이지', currentPage + 1, currentPage >= pageCount, chevron('right')),
+      arrow('마지막 페이지', pageCount, currentPage >= pageCount, doubleChevron('right'))
     );
   };
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
