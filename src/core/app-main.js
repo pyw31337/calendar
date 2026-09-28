@@ -124,6 +124,7 @@ import {
   setNotifyChannel,
   ensurePushSubscriptionHealthy,
   syncPushSubscriptionChannels,
+  syncPushSubscriptionParticipant,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush,
   notifyMeetingReminder,
@@ -1389,10 +1390,14 @@ function CalendarApp() {
 
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
-    if (activeCal) {
-      setChatParticipantId(((window.GATHER_APP_NOTIFICATIONS||{}).getStoredChatParticipantId||(()=>undefined))(activeCalId, activeCal));
+    if (activeCal && activeCalId) {
+      const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      const resolved = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
+      if (resolved && resolved !== chatParticipantIdRef.current) {
+        setChatParticipantId(resolved);
+      }
     }
-  }, [activeCalId, calendars]);
+  }, [activeCalId, activeCal]);
 
   // Live chat window, gallery live window and the stalled-listener watchdog: useChatMessageWindow.
 
@@ -2711,7 +2716,15 @@ function CalendarApp() {
     const hasText = !!chatInput.trim();
     const imageCount = chatImages.length;
     const fileCount = Array.isArray(chatFileAttachments) ? chatFileAttachments.length : 0;
-    if (!chatParticipantId) {
+    let effectiveParticipantId = chatParticipantId;
+    if (!effectiveParticipantId && activeCal && activeCalId) {
+      const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      effectiveParticipantId = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
+      if (effectiveParticipantId) {
+        setChatParticipantId(effectiveParticipantId);
+      }
+    }
+    if (!effectiveParticipantId) {
       showToast('참여자를 선택해 주세요.', 'error');
       return;
     }
@@ -2766,7 +2779,7 @@ function CalendarApp() {
           type: 'media-chat-send',
           calendarId: activeCalId,
           payload: {
-            participantId: chatParticipantId,
+            participantId: effectiveParticipantId,
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
@@ -2791,7 +2804,7 @@ function CalendarApp() {
       if (imageCount === 0) {
         const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const messageData = {
-          participantId: chatParticipantId,
+          participantId: effectiveParticipantId,
           text: chatInput.trim(),
           timestamp: Date.now(),
           uploadSource: 'chat'
@@ -2834,7 +2847,7 @@ function CalendarApp() {
           const chunkImages = chunks[i];
           const messageOperationId = `chat_${activeCalId}_${baseTimestamp}_${i}_${Math.random().toString(36).slice(2, 8)}`;
           const messageData = {
-            participantId: chatParticipantId,
+            participantId: effectiveParticipantId,
             text: i === 0 ? chatInput.trim() : '',
             imageUrl: chunkImages[0].imageUrl,
             thumbUrl: chunkImages[0].thumbUrl,
@@ -2904,12 +2917,20 @@ function CalendarApp() {
   // 업로드/오프라인 큐잉 로직이 전혀 필요 없다 -- 그 URL만 그대로 참조하는 메시지 한 건을 쓴다.
   const handleSendMemeImage = async (meme) => {
     if (!meme || (!meme.fullUrl && !meme.thumbUrl)) return;
-    if (!chatParticipantId) { showToast('참여자를 선택해 주세요.', 'error'); return; }
+    let effectiveParticipantId = chatParticipantId;
+    if (!effectiveParticipantId && activeCal && activeCalId) {
+      const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      effectiveParticipantId = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
+      if (effectiveParticipantId) {
+        setChatParticipantId(effectiveParticipantId);
+      }
+    }
+    if (!effectiveParticipantId) { showToast('참여자를 선택해 주세요.', 'error'); return; }
     const url = meme.fullUrl || meme.thumbUrl;
     const thumb = meme.thumbUrl || meme.fullUrl;
     const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const messageData = {
-      participantId: chatParticipantId,
+      participantId: effectiveParticipantId,
       text: '',
       imageUrl: url,
       thumbUrl: thumb,
@@ -5337,7 +5358,14 @@ function CalendarApp() {
       selectedId: chatParticipantId,
       onSelect: id => {
         setChatParticipantId(id);
-        setStoredChatParticipantId(activeCalId, id);
+        if (activeCalId) {
+          setStoredChatParticipantId(activeCalId, id);
+          try {
+            if (typeof syncPushSubscriptionParticipant === 'function') {
+              syncPushSubscriptionParticipant(activeCalId, id);
+            }
+          } catch (_) {}
+        }
       },
       onClose: () => setIsChatSheetOpen(false)
     }),

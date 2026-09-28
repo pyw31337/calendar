@@ -40,6 +40,7 @@ import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
+  syncPushSubscriptionParticipant,
   formatDDayLabel, formatConfirmedMeetingLabel, unionActivityLogs,
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
@@ -1818,7 +1819,14 @@ export function buildRenewalChatContext(calendar, deps) {
     onJumpToChatMessage: handleJumpToChatMessage,
     onSelectChatParticipant: id => {
       setChatParticipantId?.(id);
-      if (activeCalId) setStoredChatParticipantId?.(activeCalId, id);
+      if (activeCalId) {
+        setStoredChatParticipantId?.(activeCalId, id);
+        try {
+          if (typeof syncPushSubscriptionParticipant === 'function') {
+            syncPushSubscriptionParticipant(activeCalId, id);
+          }
+        } catch (_) {}
+      }
     },
     editingMessage,
     onSaveEditMessage: handleSaveEditMessage,

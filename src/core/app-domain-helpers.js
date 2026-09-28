@@ -1120,7 +1120,24 @@ function getSubscriptionHashId(endpoint) {
   return 'sub_' + Math.abs(hash) + '_' + endpoint.slice(-20).replace(/[^a-zA-Z0-9]/g, '');
 }
 
+let pushSubscribeInFlight = null;
+
 async function subscribeUserToPush(calendarId, activeParticipantId, options = {}) {
+  if (pushSubscribeInFlight) {
+    try { await pushSubscribeInFlight; } catch (_) {}
+  }
+  const task = (async () => {
+    return _subscribeUserToPushInternal(calendarId, activeParticipantId, options);
+  })();
+  pushSubscribeInFlight = task;
+  try {
+    return await task;
+  } finally {
+    if (pushSubscribeInFlight === task) pushSubscribeInFlight = null;
+  }
+}
+
+async function _subscribeUserToPushInternal(calendarId, activeParticipantId, options = {}) {
   if (!calendarId) return { ok: false, reason: 'missing-calendar' };
   if (!activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
@@ -1281,6 +1298,44 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
     return saved?.success ? { ok: true, subId } : { ok: false, reason: 'subscription-update-failed' };
   } catch (err) {
     console.warn('Failed to sync push notification channels:', err);
+    return { ok: false, reason: err?.message || 'subscription-update-failed' };
+  }
+}
+
+async function syncPushSubscriptionParticipant(calendarId, activeParticipantId) {
+  if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-args' };
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return { ok: false, reason: 'service-worker-unsupported' };
+  }
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
+    if (!subscription || !window.__gatherFirebaseDb) return { ok: false, reason: 'no-browser-subscription' };
+    const nowTs = Date.now();
+    const subId = getSubscriptionHashId(subscription.endpoint);
+    const participantPatch = {
+      participantId: activeParticipantId,
+      updatedAt: nowTs,
+      lastSeenAt: nowTs
+    };
+    let saved = await writeSharedCollection('push_subscriptions', calendarId, subId, participantPatch, 'update', '참여자 변경 푸시 구독 동기화');
+    if (!saved?.success) {
+      saved = await writeSharedCollection('push_subscriptions', calendarId, subId, participantPatch, 'set', '참여자 변경 푸시 구독 동기화', { merge: true });
+    }
+    try {
+      getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
+        subId,
+        participantId: activeParticipantId,
+        endpointTail: String(subscription.endpoint || '').slice(-32),
+        updatedAt: nowTs
+      }));
+    } catch (_) {}
+    return saved?.success ? { ok: true, subId } : { ok: false, reason: 'subscription-update-failed' };
+  } catch (err) {
+    console.warn('Failed to sync push notification participant:', err);
     return { ok: false, reason: err?.message || 'subscription-update-failed' };
   }
 }
@@ -3078,6 +3133,7 @@ export {
   subscribeUserToPush,
   ensurePushSubscriptionHealthy,
   syncPushSubscriptionChannels,
+  syncPushSubscriptionParticipant,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush,
   notifyNewChatMessage,

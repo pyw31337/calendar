@@ -39,12 +39,24 @@ export function parseMemoShareUrl(value, options = {}) {
   ].filter(Boolean));
   if (!allowedHosts.has(url.host)) return null;
 
+  let calendarId = '';
+  let memoId = '';
+
   const parts = url.pathname.split('/').filter(Boolean);
   const shareIndex = parts.indexOf('share');
-  if (shareIndex < 0 || parts[shareIndex + 2] !== 'memo' || !parts[shareIndex + 3]) return null;
+  if (shareIndex >= 0 && parts[shareIndex + 2] === 'memo' && parts[shareIndex + 3]) {
+    calendarId = decodeURIComponent(parts[shareIndex + 1] || '');
+    memoId = decodeURIComponent(parts[shareIndex + 3] || '');
+  } else {
+    const qCal = url.searchParams.get('id') || url.searchParams.get('cal');
+    const qMemo = url.searchParams.get('memo');
+    if (qCal && qMemo) {
+      calendarId = decodeURIComponent(qCal);
+      memoId = decodeURIComponent(qMemo);
+    }
+  }
 
-  const calendarId = decodeURIComponent(parts[shareIndex + 1] || '');
-  const memoId = decodeURIComponent(parts[shareIndex + 3] || '');
+  if (!calendarId || !memoId) return null;
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId) || !/^[A-Za-z0-9_-]{1,128}$/.test(memoId)) return null;
 
   const publicCalendarIds = configuredPublicCalendarIds(options.publicCalendarIds);

@@ -26,3 +26,18 @@ test('only a standalone pasted memo URL replaces a chat bubble body', () => {
   });
   assert.equal(embedded?.isOnlyUrl, false);
 });
+
+test('memo share parser also recognises query-string deep links (?id=cw&memo=...) in chat bubbles', () => {
+  const queryUrl = 'https://pyw31337.github.io/calendar/?id=cw&view=memo&memo=memo_1790569102511_icdks6';
+  const parsed = parseMemoShareUrl(queryUrl, {
+    locationLike: { host: 'pyw31337.github.io' }, publicCalendarIds: ['cw']
+  });
+  assert.deepEqual(parsed && { calendarId: parsed.calendarId, memoId: parsed.memoId }, {
+    calendarId: 'cw', memoId: 'memo_1790569102511_icdks6'
+  });
+  const only = findMemoShareUrlInText(queryUrl, {
+    locationLike: { host: 'pyw31337.github.io' }, publicCalendarIds: ['cw']
+  });
+  assert.equal(only?.isOnlyUrl, true);
+  assert.equal(only?.memoId, 'memo_1790569102511_icdks6');
+});
