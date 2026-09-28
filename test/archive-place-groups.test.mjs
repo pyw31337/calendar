@@ -18,6 +18,14 @@ test('place tags match names and aliases, including longer tags', () => {
   assert.ok(!photoMatchesPlaceTag({ tags: '#서울 #260926' }, places[0]));
 });
 
+test('a legacy-truncated generated place tag still files under its expanded registered place', () => {
+  const place = { name: '다낭 빌라드네일&풋마사지(DaNang Villa De Nail&Foot spa)' };
+  // This is the exact 30-character tag the former place assignment control generated.
+  const legacyTag = '다낭빌라드네일&풋마사지(DaNangVillaDeNail';
+  assert.ok(photoMatchesPlaceTag({ tags: `#${legacyTag} #250626` }, place));
+  assert.ok(!photoMatchesPlaceTag({ tags: '#다낭 #250626' }, place), 'short free-form tags remain conservative');
+});
+
 test('a date with exactly one place claims the photo; several places go to 분류 필요', () => {
   const photos = [
     { id: 'a', tags: '#260926 #260925 아이폰17 서준' },
