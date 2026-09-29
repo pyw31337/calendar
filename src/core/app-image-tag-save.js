@@ -180,21 +180,8 @@ export function createImageTagSaveHandler(context) {
     try {
       const saved = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장', { requirePersisted: true });
       if (!saved?.success || saved?.queued) throw new Error('Image tags update failed');
-      // A write acknowledgement is authoritative. Verification refreshes state only and cannot
-      // turn a confirmed tag save into the false "태그 저장 실패" result from the old flow.
-      let verified = null;
-      try {
-        if (firebaseDb) {
-          const snapshot = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 5000, 'image tag verification read');
-          verified = snapshot?.exists ? { id: messageId, ...snapshot.data() } : null;
-        }
-        if (!verified) verified = await fetchMessageRest(activeCalId, messageId);
-      } catch (err) { console.warn('Image tag verification read skipped:', err); }
-      if (verified) {
-        const actual = direct ? getDirectMediaTagsForUrl(verified, meta.directMediaUrl) : getMessageImageEntries(verified).find(item => item.imageIndex === targetIndex)?.tags || '';
-        if (String(actual) !== tags) throw new Error('Image tags verification mismatch');
-      }
-      patchLocalChatMessage(messageId, verified || { ...message, ...data, id: messageId });
+      // 직렬 검증 읽기(verification read 5초 대기) 제거 -> 즉시 로컬 상태 패치로 초고속 처리
+      patchLocalChatMessage(messageId, { ...message, ...data, id: messageId });
       const identity = getMediaIdentityKeys({ messageId, imageIndex: direct ? 0 : targetIndex, directMediaUrl: direct ? meta.directMediaUrl : '', source: 'chat' }, { source: 'chat', messageId });
       const resource = { resourceType: 'photo-tag', resourceId: identity.mediaKey, source: 'chat', sourceMessageId: messageId, imageIndex: direct ? 0 : targetIndex, before: previousTokens.join(' '), after: tags };
       const addedTokens = nextTokens.filter(token => !previousTokens.includes(token));
@@ -204,19 +191,23 @@ export function createImageTagSaveHandler(context) {
         ...addedTokens.map((token, index) => createActivityLog(activeCalId, 'tag_add', '', '', activityTimestamp + index, `#${token}`, resource)),
         ...removedTokens.map((token, index) => createActivityLog(activeCalId, 'tag_remove', '', '', activityTimestamp + addedTokens.length + index, `#${token}`, resource))
       ].filter(Boolean);
-      if (logs.length) try { await writeActivityLogsToFirestore(activeCalId, logs); } catch (err) { console.warn('Image tag activity log write skipped:', err); }
+      if (logs.length) {
+        writeActivityLogsToFirestore(activeCalId, logs).catch(err => console.warn('Image tag activity log write skipped:', err));
+      }
     } catch (err) {
       console.error('Image tag save failed:', err);
       showToast('태그 저장 실패', 'error');
       return false;
     }
-    // Before the date-link step: that step writes the tagged dates' meetings with these same tags,
-    // so running it last means a meeting touched by both still ends with the new tags.
-    if (!direct) await writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags);
+    // 부가 작업(미팅 복사본 동기화 및 날짜 태그 연결)은 백그라운드로 실행하여 사용자 UI 대기 제거
+    if (!direct) {
+      writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags).catch(() => {});
+    }
     const imageUrl = String(meta.imageUrl || meta.directMediaUrl || entry?.full || entry?.thumb || '').trim();
     if (imageUrl) {
-      try { await linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, message, tags); }
-      catch (err) { console.warn('Image tag date link skipped:', err); showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000); }
+      linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, message, tags).catch(err => {
+        console.warn('Image tag date link skipped:', err);
+      });
     }
     patchIndex(messageId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || getPhotoAssetCommentKey(entry) }, direct);
     if (!meta?.silent) showToast('태그 저장완료', 'success');

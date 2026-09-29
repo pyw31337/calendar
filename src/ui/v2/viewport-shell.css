@@ -38,6 +38,47 @@ html:has(.v2-design) #root {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
+  animation: bp-screen-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes bp-screen-fade-in {
+  0% {
+    opacity: 0.88;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .v2-destination,
+  .v2-design .is-bento-home {
+    animation: none !important;
+  }
+}
+
+html:has(.v2-design)::view-transition-old(root) {
+  animation: 160ms cubic-bezier(0.4, 0, 1, 1) both bp-view-fade-out;
+}
+
+html:has(.v2-design)::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0, 0, 0.2, 1) both bp-view-fade-in;
+}
+
+@keyframes bp-view-fade-out {
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes bp-view-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .v2-design .v2-fullscreen {

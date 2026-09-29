@@ -2001,6 +2001,12 @@ exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
     };
     if (!doc.thumbUrl && !doc.fullUrl) { res.status(400).json({ ok: false, message: 'thumbUrl or fullUrl required' }); return; }
     await ref.set(doc);
+    try {
+      await admin.firestore().collection('memePool').doc('_metadata').set({
+        updatedAt: now,
+        version: 1
+      }, { merge: true });
+    } catch (_) {}
     res.status(200).json({ ok: true, id });
   } catch (err) {
     console.error('memePoolUpsert failed:', err);
@@ -2022,6 +2028,12 @@ exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
     await admin.firestore().collection('memePool').doc(id).delete();
+    try {
+      await admin.firestore().collection('memePool').doc('_metadata').set({
+        updatedAt: Date.now(),
+        version: 1
+      }, { merge: true });
+    } catch (_) {}
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('memePoolDelete failed:', err);

@@ -2345,3 +2345,12 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     margin-right: -12px;
   }
 }
+
+/* OS-like tactile press micro-interactions */
+.v2-design .bp-cat-chip:active,
+.v2-design .bp-icon-btn:active,
+.v2-design .bp-side-nav-item:active,
+.v2-design .tag-capsule:active {
+  transform: scale(0.96);
+  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1);
+}

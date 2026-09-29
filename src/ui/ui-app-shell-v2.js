@@ -178,8 +178,19 @@ function navigateV2Destination(viewOrId, { push = true, setTab, setSub } = {}) {
     subTabId = DEFAULT_RECORDS_SUBTAB;
   }
   writeLocationState(tabId, subTabId, { push });
-  if (typeof setTab === 'function') setTab(tabId);
-  if (typeof setSub === 'function') setSub(tabId === 'records' ? subTabId : DEFAULT_RECORDS_SUBTAB);
+  const applyState = () => {
+    if (typeof setTab === 'function') setTab(tabId);
+    if (typeof setSub === 'function') setSub(tabId === 'records' ? subTabId : DEFAULT_RECORDS_SUBTAB);
+  };
+  if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function' && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+    try {
+      document.startViewTransition(applyState);
+    } catch (_) {
+      applyState();
+    }
+  } else {
+    applyState();
+  }
   return { tab: tabId, sub: subTabId };
 }
 

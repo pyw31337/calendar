@@ -1167,14 +1167,37 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
-        const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {
-          ...currentMeta,
-          imageIndex: currentImageIndex,
-          sourceImageIndex: currentSourceImageIndex,
-          imageUrl: currentUrl
-        });
-        if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));
-        return ok;
+        const prevOverride = tagOverrideKey ? tagOverrides[tagOverrideKey] : undefined;
+        const normalized = normalizeTagsForDisplay(tagsText);
+        // 0ms 낙관적 UI 업데이트: 클릭 즉시 태그 추가/삭제가 화면에 즉시 반영됨
+        if (tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalized }));
+        try {
+          const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {
+            ...currentMeta,
+            imageIndex: currentImageIndex,
+            sourceImageIndex: currentSourceImageIndex,
+            imageUrl: currentUrl
+          });
+          if (!ok && tagOverrideKey) {
+            setTagOverrides(prev => {
+              const next = { ...prev };
+              if (prevOverride !== undefined) next[tagOverrideKey] = prevOverride;
+              else delete next[tagOverrideKey];
+              return next;
+            });
+          }
+          return ok;
+        } catch (err) {
+          if (tagOverrideKey) {
+            setTagOverrides(prev => {
+              const next = { ...prev };
+              if (prevOverride !== undefined) next[tagOverrideKey] = prevOverride;
+              else delete next[tagOverrideKey];
+              return next;
+            });
+          }
+          throw err;
+        }
       }
     : null;
   // Memo photos support delete/replace and per-photo tags (imageTags[imageIndex]).

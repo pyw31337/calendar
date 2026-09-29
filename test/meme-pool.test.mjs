@@ -77,3 +77,22 @@ test('sniffImageFormat reads magic bytes even when the name lies', async () => {
   ], 'photo.png', ''));
   assert.equal(mif1.kind, 'heic');
 });
+
+test('getCachedMemePool returns empty array when storage is empty or missing', async () => {
+  globalThis.window ||= {};
+  const { getCachedMemePool } = await import('../src/core/app-firebase-data.js');
+  assert.deepEqual(getCachedMemePool(), []);
+});
+
+test('getCachedMemePool parses and returns items from localStorage', async () => {
+  globalThis.window ||= {};
+  const sample = [{ id: 'm1', hashtags: ['눈물'] }];
+  globalThis.window.localStorage = {
+    getItem: (k) => k === 'gather_memepool_cache_v2' ? JSON.stringify({ cachedAt: Date.now(), items: sample }) : null,
+    setItem: () => {}
+  };
+  const { getCachedMemePool } = await import('../src/core/app-firebase-data.js');
+  assert.deepEqual(getCachedMemePool(), sample);
+});
+
+

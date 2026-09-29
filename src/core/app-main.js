@@ -290,6 +290,7 @@ import {
   fetchAnniversariesRest,
   fetchCustomCultureItemsRest,
   fetchMemePoolRest,
+  getCachedMemePool,
   writeCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
@@ -794,21 +795,28 @@ function CalendarApp() {
   // 어드민이 다른 탭에서 태그를 편집하는 동안 이 세션은 그 변경을 영영 못 본다 -- 탭을 다시
   // 활성화할 때마다(포커스/가시성 복귀) 재조회해서, 새로고침 없이도 몇 분 안에 반영되게 한다.
   // 너무 잦은 재조회를 막기 위해 최소 재조회 간격을 둔다.
-  const [memePool, setMemePool] = React.useState([]);
+  const [memePool, setMemePool] = React.useState(() => {
+    try {
+      if (typeof getCachedMemePool === 'function') return getCachedMemePool();
+    } catch (_) {}
+    return [];
+  });
   React.useEffect(() => {
     let cancelled = false;
     let lastFetchAt = 0;
-    const MIN_REFETCH_INTERVAL_MS = 20000;
-    const load = () => {
+    const MIN_REFETCH_INTERVAL_MS = 10 * 60 * 1000; // 10분 주기 메타 검사 (탭 전환 시 불필요한 1,035건 재조회 방지)
+    const load = (force = false) => {
       const now = Date.now();
-      if (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS) return;
+      if (!force && (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS)) return;
       lastFetchAt = now;
-      fetchMemePoolRest().then(list => { if (!cancelled) setMemePool(list); }).catch(() => {});
+      fetchMemePoolRest().then(list => {
+        if (!cancelled && Array.isArray(list) && list.length > 0) setMemePool(list);
+      }).catch(() => {});
     };
-    load();
+    load(true);
     const onVisibilityOrFocus = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      load();
+      load(false);
     };
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityOrFocus);
     if (typeof window !== 'undefined') window.addEventListener('focus', onVisibilityOrFocus);
@@ -1454,19 +1462,17 @@ function CalendarApp() {
       }).catch(() => {});
       return () => { isMounted = false; };
     }
-    // A years-old family calendar's anniversaries collection only ever grows, and the plain
-    // subscribeAnniversaries() listener below has no limit -- every single reconnect (a phone
-    // waking up, a network handoff, a fresh tab) re-reads the ENTIRE collection from scratch,
-    // regardless of how little actually changed. Same fix already applied to customCultureItems:
-    // hydrate the complete archive once via REST, then attach a listener bounded to just the
-    // newest documents to catch live edits/additions, merging (never replacing) into local state
-    // so older entries hydrated via REST are never dropped.
-    fetchAnniversariesRest(activeCalId).then(list => {
-      if (Array.isArray(list) && list.length > 0) applyList(list);
-    }).catch(err => console.warn('Anniversaries archive hydration failed:', err));
-    // orderBy(createdAt) is safe ONLY for this bounded recent-window listener -- legacy docs
-    // missing createdAt (excluded by this orderBy) are already covered by the REST hydration
-    // above, which sorts client-side instead of relying on the field being present.
+    // 200개 이하인 일반적인 캘린더는 onSnapshot 하나로 전체 데이터가 즉시 수신되므로,
+    // 매 로드마다 REST 전체 조회를 동시 실행하던 중복 읽기를 제거한다.
+    // 스냅샷이 200건 한도에 도달한 대규모 캘린더이거나 에러 발생 시에만 REST 아카이브를 보충한다.
+    let hydratedArchive = false;
+    const maybeHydrateArchive = (count) => {
+      if (hydratedArchive || count < 200) return;
+      hydratedArchive = true;
+      fetchAnniversariesRest(activeCalId).then(list => {
+        if (isMounted && Array.isArray(list) && list.length > 0) applyList(list);
+      }).catch(err => console.warn('Anniversaries archive hydration failed:', err));
+    };
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
       .orderBy('createdAt', 'desc').limit(200)
       .onSnapshot(snapshot => {
@@ -1474,6 +1480,7 @@ function CalendarApp() {
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         applyList(list, true);
+        maybeHydrateArchive(snapshot.size);
       }, err => {
         console.warn(`Firestore anniversaries subscription error:`, err);
         fetchAnniversariesRest(activeCalId).then(list => {
@@ -1970,21 +1977,23 @@ function CalendarApp() {
       });
       return () => { isMounted = false; };
     }
-    // Keep the realtime window bounded. The REST fallback above remains the authoritative
-    // archive path, while the listener only tracks the newest registrations and prevents an
-    // ever-growing collection from being re-sent on every reconnect.
-    // Hydrate the complete archive once, then keep only a bounded recent listener attached.
-    // This preserves older individually registered cards without making every reconnect stream
-    // the entire collection.
-    fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
-      console.warn('Custom culture archive hydration failed:', err);
-    });
+    // 200개 이하인 일반적인 캘린더는 onSnapshot 하나로 전체 데이터가 즉시 수신되므로,
+    // 매 로드마다 REST 전체 조회를 동시 실행하던 중복 읽기를 제거한다.
+    let hydratedArchive = false;
+    const maybeHydrateArchive = (count) => {
+      if (hydratedArchive || count < 200) return;
+      hydratedArchive = true;
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+        console.warn('Custom culture archive hydration failed:', err);
+      });
+    };
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
       .orderBy('createdAt', 'desc').limit(200)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         applyList(list, true);
+        maybeHydrateArchive(snapshot.size);
       }, err => {
         console.warn('Firestore customCultureItems subscription error:', err);
         // A transient listener failure must never replace a previously received authoritative
@@ -2075,11 +2084,16 @@ function CalendarApp() {
       (Array.isArray(incomingList) ? incomingList : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
       return Array.from(byId.values());
     };
-    fetchPlacesFromFirestore(activeCalId).then(list => {
-      if (isMounted && Array.isArray(list) && list.length > 0) {
-        setPlacesSubcollection(prev => mergePlacesById(prev, list));
-      }
-    }).catch(err => console.warn('Places archive hydration failed:', err));
+    let hydratedPlacesArchive = false;
+    const maybeHydratePlacesArchive = (count) => {
+      if (hydratedPlacesArchive || count < 200) return;
+      hydratedPlacesArchive = true;
+      fetchPlacesFromFirestore(activeCalId).then(list => {
+        if (isMounted && Array.isArray(list) && list.length > 0) {
+          setPlacesSubcollection(prev => mergePlacesById(prev, list));
+        }
+      }).catch(err => console.warn('Places archive hydration failed:', err));
+    };
     const unsubPlaces = subscribePlaces(activeCalId, { orderBy: 'updatedAt', direction: 'desc', limit: 200 }, snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -2089,6 +2103,7 @@ function CalendarApp() {
           return;
         }
         setPlacesSubcollection(prev => mergePlacesById(prev, list));
+        maybeHydratePlacesArchive(snapshot.size);
       }, err => {
         console.warn(`Firestore places subscription error:`, err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `places:${String(err?.code || 'unknown')}`, getClientAuditContext());
@@ -3797,19 +3812,7 @@ function CalendarApp() {
     const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
     const saved = await commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
-    if (!saved) return false;
-    // Confirm the subcollection write before reporting success. The calendar document and its
-    // confirmedMeetings mirror can briefly diverge when a fallback request races a realtime
-    // snapshot; silently keeping the optimistic local tag makes it disappear on re-entry.
-    const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
-    const serverPhoto = Array.isArray(serverMeetings)
-      ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
-      : null;
-    if (!serverPhoto || String(serverPhoto.tags || '') !== cleanTags) {
-      showToast('태그 저장 확인에 실패했습니다. 다시 시도해 주세요.', 'error', 5000);
-      return false;
-    }
-    return true;
+    return Boolean(saved);
   };
 
   // Persist hashtags onto anniversary.photos[i].tags (anniversary docs live in the

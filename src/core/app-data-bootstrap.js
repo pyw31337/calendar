@@ -175,19 +175,35 @@ export function subscribeFirestoreForegroundRecovery({
   setCloudReloadToken
 }) {
   if (typeof document === 'undefined' || !activeCalId) return () => {};
-  let lastVisibleAt = 0;
+  let hiddenAt = 0;
+  let lastRefreshAt = 0;
   let deferredRefreshId = null;
-  const refresh = () => {
+
+  const refresh = (reason = '') => {
     if (document.visibilityState !== 'visible' || isSavingRef.current) return;
     const now = Date.now();
-    if (now - lastVisibleAt < 1200) return;
-    lastVisibleAt = now;
-    // No firebaseDb.enableNetwork() here: on a live stream it re-sends every target and the
-    // backend answers "Target ID already exists", killing all listeners (see app-firebase-data.js).
+    // 최소 10초 쿨다운을 두어 과도한 연속 리스너 재부착 방지
+    if (now - lastRefreshAt < 10000) return;
+    lastRefreshAt = now;
     // Re-attaching the listeners (the token bump) is safe and is what actually recovers.
     setCloudReloadToken(token => token + 1);
   };
-  const onVisibility = () => refresh('visibilitychange');
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+    } else if (document.visibilityState === 'visible') {
+      const now = Date.now();
+      // 30초 미만으로 잠깐 다른 탭을 다녀온 경우 웹채널이 살아있으므로 불필요한 리스너 재생성(읽기 폭증) 방지
+      if (hiddenAt > 0 && now - hiddenAt < 30000) {
+        hiddenAt = 0;
+        return;
+      }
+      hiddenAt = 0;
+      refresh('visibilitychange');
+    }
+  };
+
   const onPageShow = () => refresh('pageshow');
   const onOnline = () => refresh('online');
   const scheduleDeferredRefresh = () => {
@@ -197,6 +213,7 @@ export function subscribeFirestoreForegroundRecovery({
       refresh('deferred-resume');
     }, 1800);
   };
+
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pageshow', onPageShow);
   window.addEventListener('online', onOnline);
