@@ -622,7 +622,8 @@ async function resolveLocationCoordinates(queryName, fallbackLat = 37.566, fallb
           return {
             lat: parseFloat(data.results[0].latitude),
             lon: parseFloat(data.results[0].longitude),
-            name: clean
+            name: clean,
+            areaName: [data.results[0].admin1, data.results[0].admin2].filter(Boolean).join(' ')
           };
         }
       }
@@ -638,10 +639,15 @@ async function resolveLocationCoordinates(queryName, fallbackLat = 37.566, fallb
     if (res && res.ok) {
       const data = await res.json();
       if (data && data[0]) {
+        const address = data[0].address || {};
         return {
           lat: parseFloat(data[0].lat),
           lon: parseFloat(data[0].lon),
-          name: clean
+          name: clean,
+          areaName: [address.state, address.province, address.city, address.county, address.city_district, address.town, address.village]
+            .filter(Boolean)
+            .filter((value, index, list) => list.indexOf(value) === index)
+            .join(' ')
         };
       }
     }
@@ -691,6 +697,7 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
         setIsLocating(false);
         onSelectLocation?.({
           name: '현재 위치',
+          regionName: '현재 위치',
           lat: pos.coords.latitude,
           lon: pos.coords.longitude
         });
@@ -721,6 +728,7 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
       const resolved = await resolveLocationCoordinates(searchTarget, activeRegion.lat, activeRegion.lon);
       onSelectLocation?.({
         name: searchTarget,
+        regionName: `${activeRegion.fullName || activeRegion.label} ${draftGugun}`,
         lat: resolved.lat,
         lon: resolved.lon
       });
@@ -728,6 +736,7 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
     } else {
       onSelectLocation?.({
         name: activeRegion.fullName || activeRegion.label,
+        regionName: activeRegion.fullName || activeRegion.label,
         lat: activeRegion.lat,
         lon: activeRegion.lon
       });
@@ -850,6 +859,77 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
   return modalNode;
 }
 
+const WEATHER_WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function getWeatherDateParts(dateStr) {
+  const date = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    date,
+    monthDay: `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`,
+    weekday: WEATHER_WEEKDAY_LABELS[date.getDay()]
+  };
+}
+
+function formatWeatherDayChoice(day) {
+  const parts = getWeatherDateParts(day?.dateStr);
+  if (!parts) return day?.label || '';
+  return day?.offset === 0 ? `오늘(${parts.weekday})` : `${parts.monthDay}(${parts.weekday})`;
+}
+
+function formatWeatherLocationArea(location) {
+  const raw = String(location?.regionName || location?.areaName || location?.address || location?.name || '지역').trim();
+  if (!raw) return '지역';
+  return raw
+    .replace(/^서울특별시(?:\s|$)/, '서울시 ')
+    .replace(/^서울(?:\s|$)/, '서울시 ')
+    .replace(/^부산광역시(?:\s|$)/, '부산시 ')
+    .replace(/^대구광역시(?:\s|$)/, '대구시 ')
+    .replace(/^인천광역시(?:\s|$)/, '인천시 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function WeatherPlaceMarkerIcon({ size = 16 }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    'aria-hidden': 'true',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    style: { display: 'block', shapeRendering: 'geometricprecision' }
+  },
+  /*#__PURE__*/React.createElement('path', { d: 'M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0' }),
+  /*#__PURE__*/React.createElement('path', { d: 'M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0' }));
+}
+
+function WeatherRegionSettingsIcon({ size = 20 }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+  /*#__PURE__*/React.createElement('path', { d: 'M12 2v2' }),
+  /*#__PURE__*/React.createElement('path', { d: 'M12 8a4 4 0 0 0-1.645 7.647' }),
+  /*#__PURE__*/React.createElement('path', { d: 'M2 12h2' }),
+  /*#__PURE__*/React.createElement('path', { d: 'M20 14.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0z' }),
+  /*#__PURE__*/React.createElement('path', { d: 'm4.93 4.93 1.41 1.41' }),
+  /*#__PURE__*/React.createElement('path', { d: 'm6.34 17.66-1.41 1.41' }));
+}
+
 export function WeatherDetailModal({
   dateStr: initialDateStr,
   weatherLocation,
@@ -868,6 +948,9 @@ export function WeatherDetailModal({
     return weatherLocation || { name: '서울특별시', lat: 37.566, lon: 126.9784 };
   });
   const [showLocationPicker, setShowLocationPicker] = React.useState(false);
+  const dayStripRef = React.useRef(null);
+  const dayStripDragRef = React.useRef(null);
+  const ignoreDayClickRef = React.useRef(false);
 
   React.useEffect(() => {
     if (weatherLocation) {
@@ -887,6 +970,7 @@ export function WeatherDetailModal({
               lat: resolved.lat,
               lon: resolved.lon,
               name: resolved.name || prev.name,
+              areaName: resolved.areaName || prev.areaName,
               needsGeocode: false
             }));
           }
@@ -899,6 +983,7 @@ export function WeatherDetailModal({
   const lat = currentLocation.lat || 37.566;
   const lon = currentLocation.lon || 126.9784;
   const locationName = currentLocation.name || '지역';
+  const locationAreaLabel = formatWeatherLocationArea(currentLocation);
 
   React.useEffect(() => {
     let active = true;
@@ -979,26 +1064,51 @@ export function WeatherDetailModal({
     onClose?.();
   };
 
+  const beginDayStripDrag = (event) => {
+    const strip = dayStripRef.current;
+    if (!strip || !event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    dayStripDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: strip.scrollLeft,
+      moved: false
+    };
+    try { strip.setPointerCapture?.(event.pointerId); } catch (_) {}
+  };
+  const moveDayStripDrag = (event) => {
+    const strip = dayStripRef.current;
+    const drag = dayStripDragRef.current;
+    if (!strip || !drag || drag.pointerId !== event.pointerId) return;
+    const distance = event.clientX - drag.startX;
+    if (Math.abs(distance) > 4) {
+      drag.moved = true;
+      ignoreDayClickRef.current = true;
+      strip.scrollLeft = drag.startScrollLeft - distance;
+      if (event.cancelable) event.preventDefault();
+    }
+  };
+  const endDayStripDrag = (event) => {
+    const strip = dayStripRef.current;
+    const drag = dayStripDragRef.current;
+    if (!drag || (event && drag.pointerId !== event.pointerId)) return;
+    if (drag.moved) {
+      window.setTimeout(() => { ignoreDayClickRef.current = false; }, 0);
+    }
+    try { strip?.releasePointerCapture?.(drag.pointerId); } catch (_) {}
+    dayStripDragRef.current = null;
+  };
+
   const modalNode = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay weather-detail-modal-overlay",
     onClick: onClose,
     style: { zIndex: 12500 }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container weather-detail-modal-container",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": `${locationAreaLabel} 날씨 상세`,
     onClick: e => e.stopPropagation(),
-    style: {
-      maxWidth: '520px',
-      width: '92%',
-      maxHeight: 'min(90vh, 820px)',
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: 'var(--bg-card, #FFFFFF)',
-      borderRadius: '24px',
-      border: '1px solid var(--border-subtle, rgba(0,0,0,0.08))',
-      boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.28)',
-      overflow: 'hidden',
-      boxSizing: 'border-box'
-    }
+    style: { maxWidth: '520px' }
   },
     /* Mobile drag affordance */
     /*#__PURE__*/React.createElement("div", {
@@ -1013,139 +1123,73 @@ export function WeatherDetailModal({
       }
     }),
 
-    /* Header */
+    /* Header: schedule place and forecast area are intentionally separate. */
     /*#__PURE__*/React.createElement("div", {
-      className: "modal-header weather-detail-header",
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '14px 20px',
-        borderBottom: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-        flexShrink: 0
-      }
+      className: "weather-detail-header"
     },
-      /* Location & Date Title */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '4px' }
+        className: "weather-detail-location-copy"
       },
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', gap: '6px' }
+          className: "weather-detail-place"
         },
-          /* Interactive Location Change Button */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setShowLocationPicker(true),
-            className: "weather-location-chip-btn",
-            title: "지역 설정 변경",
-            "aria-label": `현재 지역: ${locationName}. 클릭하여 지역 설정 변경`,
-            style: {
-              fontSize: 'var(--font-size-xs, 0.75rem)',
-              fontWeight: 800,
-              backgroundColor: 'rgba(59, 130, 246, 0.12)',
-              color: '#3B82F6',
-              padding: '3px 10px',
-              borderRadius: '9999px',
-              border: '1px solid rgba(59, 130, 246, 0.25)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              fontFamily: 'inherit'
-            }
-          },
-            /*#__PURE__*/React.createElement("span", { "aria-hidden": "true" }, "📍"),
-            /*#__PURE__*/React.createElement("span", null, locationName),
-            /*#__PURE__*/React.createElement("svg", {
-              width: 12, height: 12, viewBox: "0 0 24 24", fill: "none",
-              stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round",
-              style: { opacity: 0.7, marginLeft: '1px' }
-            }, /*#__PURE__*/React.createElement("polyline", { points: "6 9 12 15 18 9" }))
+          /*#__PURE__*/React.createElement("span", { className: "weather-detail-place-icon" },
+            /*#__PURE__*/React.createElement(WeatherPlaceMarkerIcon, { size: 16 })
           ),
-          dayBadge && /*#__PURE__*/React.createElement("span", {
-            style: {
-              fontSize: 'var(--font-size-xs, 0.75rem)',
-              fontWeight: 800,
-              color: dayBadge === '오늘' ? '#10B981' : 'var(--text-muted)',
-              backgroundColor: dayBadge === '오늘' ? 'rgba(16, 185, 129, 0.1)' : 'var(--border-subtle, rgba(0,0,0,0.05))',
-              padding: '3px 9px',
-              borderRadius: '9999px'
-            }
-          }, dayBadge)
+          /*#__PURE__*/React.createElement("span", { className: "weather-detail-place-name", title: locationName }, locationName)
         ),
-        /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
-        }, formattedDateTitle)
+        /*#__PURE__*/React.createElement("span", { className: "weather-detail-region", title: locationAreaLabel },
+          `${locationAreaLabel} 날씨`
+        )
       ),
-      /* Close Button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onClose,
-        className: "modal-close-btn",
-        "aria-label": "닫기",
-        style: {
-          width: '34px',
-          height: '34px',
-          borderRadius: '50%',
-          border: 'none',
-          backgroundColor: 'var(--border-subtle, rgba(0,0,0,0.04))',
-          color: 'var(--text-muted, #64748B)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          padding: 0,
-          transition: 'background-color 0.15s ease'
-        }
-      },
-        /*#__PURE__*/React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" },
-          /*#__PURE__*/React.createElement("path", { d: "M18 6L6 18M6 6l12 12" })
+      /*#__PURE__*/React.createElement("div", { className: "weather-detail-header-actions" },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setShowLocationPicker(true),
+          className: "weather-detail-icon-button",
+          title: "날씨 지역 설정",
+          "aria-label": `날씨 지역 설정. 현재 ${locationAreaLabel}`
+        }, /*#__PURE__*/React.createElement(WeatherRegionSettingsIcon, { size: 20 })),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onClose,
+          className: "weather-detail-icon-button weather-detail-close-button",
+          "aria-label": "날씨 상세 닫기"
+        },
+          /*#__PURE__*/React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+            /*#__PURE__*/React.createElement("path", { d: "M18 6L6 18M6 6l12 12" })
+          )
         )
       )
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "weather-detail-date-line" },
+      /*#__PURE__*/React.createElement("span", { className: "weather-detail-date-eyebrow" }, dayBadge || '일일 예보'),
+      /*#__PURE__*/React.createElement("strong", null, formattedDateTitle)
     ),
 
     /* Days Carousel Selector */
     Array.isArray(days) && days.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "weather-detail-days-strip",
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '10px 16px',
-        overflowX: 'auto',
-        borderBottom: '1px solid var(--border-subtle, rgba(0,0,0,0.05))',
-        backgroundColor: 'var(--bg-primary, rgba(0,0,0,0.01))',
-        scrollbarWidth: 'none',
-        flexShrink: 0
-      }
+      ref: dayStripRef,
+      role: "tablist",
+      "aria-label": "날짜별 날씨 선택",
+      onPointerDown: beginDayStripDrag,
+      onPointerMove: moveDayStripDrag,
+      onPointerUp: endDayStripDrag,
+      onPointerCancel: endDayStripDrag
     },
       days.map(d => {
         const isSelected = d.dateStr === selectedDate;
         return /*#__PURE__*/React.createElement("button", {
           key: d.dateStr,
           type: "button",
-          onClick: () => setSelectedDate(d.dateStr),
-          style: {
-            padding: '6px 12px',
-            fontSize: 'var(--font-size-xs, 0.78rem)',
-            fontWeight: isSelected ? 800 : 600,
-            borderRadius: '9999px',
-            border: isSelected ? '1px solid var(--v2-accent, #7C3AED)' : '1px solid var(--border-subtle, rgba(0,0,0,0.08))',
-            backgroundColor: isSelected ? 'var(--v2-accent, #7C3AED)' : 'var(--bg-card, #FFFFFF)',
-            color: isSelected ? '#FFFFFF' : 'var(--text-main, #334155)',
-            cursor: 'pointer',
-            flexShrink: 0,
-            transition: 'all 0.15s ease',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px'
+          role: "tab",
+          "aria-selected": isSelected,
+          className: `weather-detail-day-choice${isSelected ? ' is-selected' : ''}`,
+          onClick: () => {
+            if (!ignoreDayClickRef.current) setSelectedDate(d.dateStr);
           }
-        },
-          /*#__PURE__*/React.createElement("span", null, d.label),
-          d.offset !== 0 && d.dateStr && /*#__PURE__*/React.createElement("span", {
-            style: { opacity: isSelected ? 0.9 : 0.6, fontSize: '0.72rem' }
-          }, d.dateStr.slice(5).replace('-', '.'))
+        }, formatWeatherDayChoice(d)
         );
       })
     ),
@@ -1193,69 +1237,48 @@ export function WeatherDetailModal({
       !loading && !error && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Primary Highlight Card */
         /*#__PURE__*/React.createElement("div", {
-          className: "weather-highlight-card",
-          style: {
-            padding: '18px 20px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(59, 130, 246, 0.1) 100%)',
-            border: '1px solid rgba(124, 58, 237, 0.22)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px'
-          }
+          className: "weather-highlight-card"
         },
           /* Left: Icon & Description */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '14px' }
+            className: "weather-highlight-summary"
           },
             /*#__PURE__*/React.createElement("div", {
-              style: {
-                width: '54px',
-                height: '54px',
-                borderRadius: '16px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--v2-accent, #7C3AED)',
-                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.18)',
-                flexShrink: 0
-              }
+              className: "weather-highlight-icon"
             }, getWeatherIcon(weatherCode, 32)),
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', flexDirection: 'column' }
+              className: "weather-highlight-copy"
             },
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main, #0F172A)' }
+                className: "weather-highlight-condition"
               }, weatherDesc),
               apparentMax != null && /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: 'var(--font-size-xs, 0.78rem)', color: 'var(--text-muted, #64748B)', marginTop: '2px' }
+                className: "weather-highlight-feels-like"
               }, `체감온도 약 ${apparentMax}°C`)
             )
           ),
           /* Right: High & Low Temperatures */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }
+            className: "weather-highlight-temperatures"
           },
             maxTemp != null && /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'baseline', gap: '4px' }
+              className: "weather-highlight-temperature weather-highlight-temperature-high"
             },
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '0.72rem', fontWeight: 700, color: '#EF4444' }
+                className: "weather-highlight-temperature-label"
               }, "최고"),
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '1.4rem', fontWeight: 900, color: '#EF4444', lineHeight: 1 }
+                className: "weather-highlight-temperature-value"
               }, `${maxTemp}°`)
             ),
             minTemp != null && /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'baseline', gap: '4px' }
+              className: "weather-highlight-temperature weather-highlight-temperature-low"
             },
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '0.72rem', fontWeight: 700, color: '#3B82F6' }
+                className: "weather-highlight-temperature-label"
               }, "최저"),
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '1.15rem', fontWeight: 800, color: '#3B82F6', lineHeight: 1 }
+                className: "weather-highlight-temperature-value"
               }, `${minTemp}°`)
             )
           )
@@ -1263,57 +1286,37 @@ export function WeatherDetailModal({
 
         /* 4 Key Indicators Grid */
         /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '10px'
-          }
+          className: "weather-detail-metrics"
         },
           /* 1. Precipitation */
           /*#__PURE__*/React.createElement("div", {
-            style: {
-              padding: '14px',
-              borderRadius: '16px',
-              backgroundColor: 'var(--bg-primary, rgba(0,0,0,0.02))',
-              border: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }
+            className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted, #64748B)', fontSize: '0.76rem', fontWeight: 700 }
+              className: "weather-detail-metric-label"
             },
-              /*#__PURE__*/React.createElement("span", null, "💧"), "강수량 및 확률"
+              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "강수량 및 확률"
             ),
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'baseline', gap: '6px' }
+              className: "weather-detail-metric-value-row"
             },
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
+                className: "weather-detail-metric-value"
               }, `${precipSum} mm`),
               /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '0.8rem', fontWeight: 700, color: precipProb > 0 ? '#3B82F6' : 'var(--text-muted)' }
+                className: `weather-detail-metric-note${precipProb > 0 ? ' is-accent' : ''}`
               }, `(확률 ${precipProb}%)`)
             )
           ),
 
           /* 2. Fine Dust (Air Quality) */
           /*#__PURE__*/React.createElement("div", {
-            style: {
-              padding: '14px',
-              borderRadius: '16px',
-              backgroundColor: 'var(--bg-primary, rgba(0,0,0,0.02))',
-              border: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }
+            className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted, #64748B)', fontSize: '0.76rem', fontWeight: 700 }
+              className: "weather-detail-metric-label"
             },
-              /*#__PURE__*/React.createElement("span", null, "🍃"), "대기질 (미세먼지)"
+              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "대기질 (미세먼지)"
             ),
             airQuality ? /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', gap: '3px' }
@@ -1355,20 +1358,12 @@ export function WeatherDetailModal({
 
           /* 3. Wind Speed */
           /*#__PURE__*/React.createElement("div", {
-            style: {
-              padding: '14px',
-              borderRadius: '16px',
-              backgroundColor: 'var(--bg-primary, rgba(0,0,0,0.02))',
-              border: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }
+            className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted, #64748B)', fontSize: '0.76rem', fontWeight: 700 }
+              className: "weather-detail-metric-label"
             },
-              /*#__PURE__*/React.createElement("span", null, "💨"), "최대 풍속"
+              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "최대 풍속"
             ),
             /*#__PURE__*/React.createElement("span", {
               style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
@@ -1377,20 +1372,12 @@ export function WeatherDetailModal({
 
           /* 4. UV Index */
           /*#__PURE__*/React.createElement("div", {
-            style: {
-              padding: '14px',
-              borderRadius: '16px',
-              backgroundColor: 'var(--bg-primary, rgba(0,0,0,0.02))',
-              border: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }
+            className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted, #64748B)', fontSize: '0.76rem', fontWeight: 700 }
+              className: "weather-detail-metric-label"
             },
-              /*#__PURE__*/React.createElement("span", null, "☀️"), "자외선 지수"
+              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "자외선 지수"
             ),
             /*#__PURE__*/React.createElement("span", {
               style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
@@ -1464,63 +1451,30 @@ export function WeatherDetailModal({
 
     /* Footer */
     /*#__PURE__*/React.createElement("div", {
-      className: "modal-footer weather-detail-footer",
-      style: {
-        padding: '14px 20px',
-        borderTop: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '8px',
-        backgroundColor: 'var(--bg-card)',
-        flexShrink: 0
-      }
+      className: "weather-detail-footer"
     },
       /* Windy live radar button */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: handleOpenWindy,
-        style: {
-          padding: '8px 12px',
-          fontSize: 'var(--font-size-xs, 0.78rem)',
-          fontWeight: 700,
-          color: 'var(--v2-accent, #7C3AED)',
-          backgroundColor: 'rgba(124, 58, 237, 0.08)',
-          border: '1px solid rgba(124, 58, 237, 0.2)',
-          borderRadius: 'var(--radius-md, 10px)',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '5px'
-        }
+        className: "weather-detail-secondary-action"
       },
         /*#__PURE__*/React.createElement("span", null, "🌐"),
         "Windy 레이더"
       ),
       /* Right actions */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '8px' }
+        className: "weather-detail-footer-actions"
       },
         onSelectDate && /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: handleSelectDateCalendar,
-          className: "btn btn-primary",
-          style: {
-            padding: '8px 14px',
-            fontSize: 'var(--font-size-sm, 0.82rem)',
-            fontWeight: 800,
-            borderRadius: 'var(--radius-md, 10px)'
-          }
+          className: "weather-detail-primary-action"
         }, "캘린더로 이동"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: onClose,
-          className: "btn btn-secondary",
-          style: {
-            padding: '8px 14px',
-            fontSize: 'var(--font-size-sm, 0.82rem)',
-            borderRadius: 'var(--radius-md, 10px)'
-          }
+          className: "weather-detail-close-action"
         }, "닫기")
       )
     ),
@@ -1556,4 +1510,3 @@ if (typeof window !== 'undefined') {
     WeatherLocationSettingModal: WeatherLocationSettingModal,
   });
 }
-

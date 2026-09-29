@@ -1454,7 +1454,8 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
         return {
           lat: Number(withCoords.lat),
           lon: Number(withCoords.lng),
-          name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim()
+          name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim(),
+          areaName: String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim()
         };
       }
       const firstPlace = places[0];
@@ -1467,6 +1468,7 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
           lat: effectiveBaseLocation.lat,
           lon: effectiveBaseLocation.lon,
           name: placeName,
+          areaName: String(firstPlace?.address || firstPlace?.roadAddress || firstPlace?.addressName || effectiveBaseLocation.regionName || effectiveBaseLocation.name || '').trim(),
           needsGeocode: true
         };
       }
