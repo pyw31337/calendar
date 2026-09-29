@@ -1628,13 +1628,26 @@ button, input, textarea, select {
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
   border-radius: 9999px;
+  box-sizing: border-box;
   font-size: 0.68rem;
   font-weight: 800;
   line-height: 1;
   background-color: var(--border-subtle);
   color: var(--text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.main-menu-badge:is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: 18px;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+}
+.main-menu-badge:is([data-digits="multi"], .is-multi-digit) {
+  width: auto;
+  padding: 0 5px;
+  aspect-ratio: auto;
 }
 .main-menu-badge.is-unread {
   background-color: #EF4444;
@@ -3044,10 +3057,10 @@ select.form-select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
+  min-width: 20px;
   height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-full, 9999px);
+  box-sizing: border-box;
   /* Plain fallback first (ignored by browsers that support color-mix, kept as-is by those that
      don't -- an unsupported color-mix() value makes the whole declaration invalid, so it never
      overwrites this one) so the badge still has a visible pill background everywhere. */
@@ -3057,6 +3070,19 @@ select.form-select {
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.section-count-badge:is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: 20px;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+}
+.section-count-badge:is([data-digits="multi"], .is-multi-digit) {
+  width: auto;
+  padding: 0 5.5px;
+  aspect-ratio: auto;
 }
 .sync-status-chip {
   display: inline-flex;
@@ -4381,11 +4407,35 @@ select.form-select {
   background: var(--accent-primary); border-color: var(--accent-primary); color: var(--on-brand, white);
 }
 .region-filter-chip-count {
-  padding: 1px 6px; border-radius: var(--radius-full); background: rgba(100, 116, 139, 0.14);
-  color: var(--text-muted); font-size: var(--font-size-sm); font-weight: 800; line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full, 9999px);
+  box-sizing: border-box;
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.region-filter-chip-count:is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: 18px;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+}
+.region-filter-chip-count:is([data-digits="multi"], .is-multi-digit) {
+  width: auto;
+  padding: 0 5px;
+  aspect-ratio: auto;
 }
 .region-filter-chip.is-active .region-filter-chip-count {
-  background: rgba(255, 255, 255, 0.25); color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
 }
 .region-filter-reset-btn {
   background: none; border: none; color: var(--accent-primary); font-size: var(--font-size-sm);

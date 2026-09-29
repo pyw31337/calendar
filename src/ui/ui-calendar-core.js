@@ -2892,16 +2892,23 @@ export function GlobalSearchModal({
     value: activeTab,
     options: tabDefs.map(t => {
       const hasCount = (t.count || 0) >= 1;
+      const isMulti = String(t.count || 0).length > 1;
       return {
         value: t.key,
         label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
-          className: `global-search-count-badge${hasCount ? ' has-count' : ''}`,
+          className: `global-search-count-badge${hasCount ? ' has-count' : ''} ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+          "data-digits": isMulti ? "multi" : "single",
           style: {
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-            borderRadius: 'var(--radius-full)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            minWidth: '18px', height: '18px',
+            width: isMulti ? 'auto' : '18px',
+            aspectRatio: isMulti ? 'auto' : '1 / 1',
+            borderRadius: '9999px',
             backgroundColor: hasCount ? 'var(--brand, #7C2FE5)' : 'var(--bg-secondary, #E2E8F0)',
             color: hasCount ? 'var(--on-brand, #FFFFFF)' : 'var(--text-muted, #475569)',
-            fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+            fontSize: 'var(--font-size-sm)', fontWeight: 'bold',
+            padding: isMulti ? '0 5px' : '0',
+            marginLeft: '4px'
           }
         }, t.count))
       };

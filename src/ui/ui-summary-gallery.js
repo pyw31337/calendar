@@ -298,9 +298,12 @@ export function SectionCountBadge({ count }) {
   const normalizedCount = Number(count || 0);
 
   if (!Number.isFinite(normalizedCount) || normalizedCount <= 0) return null;
+  const countStr = String(normalizedCount);
+  const isMulti = countStr.length > 1;
 
   return /*#__PURE__*/React.createElement("span", {
-    className: "section-count-badge"
+    className: `section-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+    "data-digits": isMulti ? "multi" : "single"
   }, normalizedCount);
 }
 
@@ -595,11 +598,25 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
+    const countStr = String(count);
+    const isMulti = countStr.length > 1;
     return React.createElement('span', {
-      className: 'photo-comment-count-badge',
+      className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+      'data-digits': isMulti ? 'multi' : 'single',
       'aria-label': `댓글 ${count}개`,
-      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
-    }, String(count));
+      style: {
+        position: 'absolute', top: '6px', right: '6px', zIndex: 3,
+        minWidth: '22px', height: '22px',
+        width: isMulti ? 'auto' : '22px',
+        aspectRatio: isMulti ? 'auto' : '1 / 1',
+        padding: isMulti ? '0 5.5px' : '0',
+        borderRadius: '9999px',
+        background: 'rgba(15,23,42,0.78)', color: '#fff',
+        fontSize: 'var(--font-size-xs)', fontWeight: 800,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', lineHeight: 1
+      }
+    }, countStr);
   };
       const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
@@ -1408,11 +1425,25 @@ export function HistoryView({
   };
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
+    const countStr = String(count);
+    const isMulti = countStr.length > 1;
     return /*#__PURE__*/React.createElement('span', {
-      className: 'photo-comment-count-badge',
+      className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+      'data-digits': isMulti ? 'multi' : 'single',
       "aria-label": `댓글 ${count}개`,
-      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
-    }, String(count));
+      style: {
+        position: 'absolute', top: '6px', right: '6px', zIndex: 3,
+        minWidth: '22px', height: '22px',
+        width: isMulti ? 'auto' : '22px',
+        aspectRatio: isMulti ? 'auto' : '1 / 1',
+        padding: isMulti ? '0 5.5px' : '0',
+        borderRadius: '9999px',
+        background: 'rgba(15,23,42,0.78)', color: '#fff',
+        fontSize: 'var(--font-size-xs)', fontWeight: 800,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', lineHeight: 1
+      }
+    }, countStr);
   };
   const formatHistoryDate = value => {
     const text = String(value || '').slice(0, 10);
@@ -4230,27 +4261,48 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
       ),
       /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "시/도"),
       /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
-        KOREA_REGIONS.map(r => /*#__PURE__*/React.createElement("button", {
-          key: r.code,
-          type: "button",
-          className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
-          onClick: () => { setQuery(''); setExpandedSido(r.code); setDraftGugun(''); }
-        }, r.label, /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, regionCounts[r.code] || 0)))
+        KOREA_REGIONS.map(r => {
+          const c = regionCounts[r.code] || 0;
+          const isMulti = String(c).length > 1;
+          return /*#__PURE__*/React.createElement("button", {
+            key: r.code,
+            type: "button",
+            className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
+            onClick: () => { setQuery(''); setExpandedSido(r.code); setDraftGugun(''); }
+          }, r.label, /*#__PURE__*/React.createElement("span", {
+            className: `region-filter-chip-count ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+            "data-digits": isMulti ? "multi" : "single"
+          }, c));
+        })
       ),
       activeRegion && /*#__PURE__*/React.createElement(React.Fragment, null,
         /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "군/구"),
         /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: `region-filter-chip${!draftGugun ? ' is-active' : ''}`,
-            onClick: () => setDraftGugun('')
-          }, "전체", /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, regionCounts[activeRegion.code] || 0)),
-          activeRegion.gugun.map(g => /*#__PURE__*/React.createElement("button", {
-            key: g,
-            type: "button",
-            className: `region-filter-chip${g === draftGugun ? ' is-active' : ''}`,
-            onClick: () => setDraftGugun(g)
-          }, g, /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, gugunCounts[g] || 0)))
+          (() => {
+            const c = regionCounts[activeRegion.code] || 0;
+            const isMulti = String(c).length > 1;
+            return /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: `region-filter-chip${!draftGugun ? ' is-active' : ''}`,
+              onClick: () => setDraftGugun('')
+            }, "전체", /*#__PURE__*/React.createElement("span", {
+              className: `region-filter-chip-count ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+              "data-digits": isMulti ? "multi" : "single"
+            }, c));
+          })(),
+          activeRegion.gugun.map(g => {
+            const c = gugunCounts[g] || 0;
+            const isMulti = String(c).length > 1;
+            return /*#__PURE__*/React.createElement("button", {
+              key: g,
+              type: "button",
+              className: `region-filter-chip${g === draftGugun ? ' is-active' : ''}`,
+              onClick: () => setDraftGugun(g)
+            }, g, /*#__PURE__*/React.createElement("span", {
+              className: `region-filter-chip-count ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+              "data-digits": isMulti ? "multi" : "single"
+            }, c));
+          })
         )
       )
     ),

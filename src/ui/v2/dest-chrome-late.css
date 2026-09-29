@@ -940,13 +940,8 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .bp-side-nav-item-meta.chat-name-pill,
 .v2-design .bp-side-nav-item-badge,
 .v2-design .bp-hero-quick-nav-badge,
-.v2-design .v2-bubble-comment-badge,
-.v2-design .v2-memo .memo-card-comment-badge,
-.v2-design .bp-comment-badge,
 .v2-design .bp-settlement-card-badge,
 .v2-design .bp-side-nav-cal-badge,
-.v2-design .underline-tabs [role="tab"] > .underline-tabs-count,
-.v2-design .section-count-badge,
 .v2-design .participant-badge,
 .v2-design .status-badge,
 .v2-design .bp-ann-cat-chip,
@@ -954,8 +949,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .bp-expense-cat-chip,
 .v2-design .bp-tag-chip,
 .v2-design .region-selection-badges-row > button,
-.v2-design .region-filter-reset-btn,
-.v2-design .v2-home-memo-module .memo-card-comment-badge {
+.v2-design .region-filter-reset-btn {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -969,6 +963,115 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   border-radius: 999px !important;
   vertical-align: middle;
   text-align: center;
+}
+
+/* ==========================================================================
+   Numeric Count Badges: Single-digit Circle (1:1) / Multi-digit Capsule (Pill)
+   Strictly prevents any ellipse distortion by enforcing border-radius: 9999px
+   ========================================================================== */
+.v2-design :is(
+  .section-count-badge,
+  .underline-tabs-count,
+  .photo-comment-count-badge,
+  .comment-badge,
+  .bp-comment-badge,
+  .memo-card-comment-badge,
+  .v2-bubble-comment-badge,
+  .main-menu-badge,
+  .global-search-count-badge,
+  .region-filter-chip-count
+),
+html:has(.renewal-shell.v2-design) :is(
+  .section-count-badge,
+  .underline-tabs-count,
+  .photo-comment-count-badge,
+  .comment-badge,
+  .bp-comment-badge,
+  .memo-card-comment-badge,
+  .v2-bubble-comment-badge,
+  .main-menu-badge,
+  .global-search-count-badge,
+  .region-filter-chip-count
+) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  height: var(--v2-badge-h, 20px) !important;
+  min-height: var(--v2-badge-h, 20px) !important;
+  border-radius: 9999px !important;
+  line-height: 1 !important;
+  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-variant-numeric: tabular-nums !important;
+  flex-shrink: 0 !important;
+}
+
+/* Single-digit (0~9): exact 1:1 circle, no extra padding to prevent ellipse */
+.v2-design :is(
+  .section-count-badge,
+  .underline-tabs-count,
+  .photo-comment-count-badge,
+  .comment-badge,
+  .bp-comment-badge,
+  .memo-card-comment-badge,
+  .v2-bubble-comment-badge,
+  .main-menu-badge,
+  .global-search-count-badge,
+  .region-filter-chip-count
+):is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)),
+html:has(.renewal-shell.v2-design) :is(
+  .section-count-badge,
+  .underline-tabs-count,
+  .photo-comment-count-badge,
+  .comment-badge,
+  .bp-comment-badge,
+  .memo-card-comment-badge,
+  .v2-bubble-comment-badge,
+  .main-menu-badge,
+  .global-search-count-badge,
+  .region-filter-chip-count
+):is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: var(--v2-badge-h, 20px) !important;
+  min-width: var(--v2-badge-h, 20px) !important;
+  padding: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 9999px !important;
+}
+
+/* Multi-digit (10+, 100+): expands to a smooth horizontal capsule/pill with semi-circular caps */
+.v2-design :is(
+  .section-count-badge,
+  .underline-tabs-count,
+  .photo-comment-count-badge,
+  .comment-badge,
+  .bp-comment-badge,
+  .memo-card-comment-badge,
+  .v2-bubble-comment-badge,
+  .main-menu-badge,
+  .global-search-count-badge,
+  .region-filter-chip-count
+):is([data-digits="multi"], .is-multi-digit),
+html:has(.renewal-shell.v2-design) :is(
+  .section-count-badge,
+  .underline-tabs-count,
+  .photo-comment-count-badge,
+  .comment-badge,
+  .bp-comment-badge,
+  .memo-card-comment-badge,
+  .v2-bubble-comment-badge,
+  .main-menu-badge,
+  .global-search-count-badge,
+  .region-filter-chip-count
+):is([data-digits="multi"], .is-multi-digit) {
+  width: auto !important;
+  min-width: var(--v2-badge-h, 20px) !important;
+  padding: 0 5.5px !important;
+  aspect-ratio: auto !important;
+  flex: 0 0 auto !important;
+  border-radius: 9999px !important;
 }
 
 /* Calendar's only live rail status: a nearest confirmed-meeting D-day.  It intentionally
@@ -1656,11 +1759,7 @@ html:has(.renewal-shell.v2-design) .bp-month-picker-apply {
 }
 
 /* Extra labelled pills that share the same 22px geometry. */
-.v2-design .main-menu-badge,
 .v2-design .side-menu-meta-pill,
-.v2-design .memo-card-comment-badge,
-.v2-design .photo-comment-count-badge,
-.v2-design .bp-comment-badge,
 .v2-design .date-item-badge,
 .v2-design .dday-badge,
 .v2-design .poll-deadline-badge,

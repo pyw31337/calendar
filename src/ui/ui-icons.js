@@ -1757,17 +1757,24 @@ export function ClapperboardIcon({ size = 18 } = {}) {
 export function PhotoCommentCountBadge({ count = 0 } = {}) {
   const React = window.React;
   if (!count) return null;
+  const countStr = String(count);
+  const isMulti = countStr.length > 1;
   return /*#__PURE__*/React.createElement('span', {
-    className: 'photo-comment-count-badge',
+    className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+    "data-digits": isMulti ? "multi" : "single",
     "aria-label": `댓글 ${count}개`,
     style: {
       position: 'absolute', top: '6px', right: '6px', zIndex: 3,
-      minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px',
+      minWidth: '22px', height: '22px',
+      width: isMulti ? 'auto' : '22px',
+      aspectRatio: isMulti ? 'auto' : '1 / 1',
+      padding: isMulti ? '0 5.5px' : '0',
+      borderRadius: '9999px',
       background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none', lineHeight: 1
     }
-  }, String(count));
+  }, countStr);
 }
 
   if (typeof window !== 'undefined') {

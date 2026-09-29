@@ -413,12 +413,32 @@
 }
 
 .renewal-shell.v2-design .section-count-badge {
-  width: var(--v2-badge-min-height, 20px) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   min-width: var(--v2-badge-min-height, 20px) !important;
   height: var(--v2-badge-min-height, 20px) !important;
-  padding: 0 !important;
+  border-radius: 9999px !important;
+  box-sizing: border-box !important;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  line-height: 1 !important;
+}
+
+/* Single digit (0~9): exact 1:1 square circle */
+.renewal-shell.v2-design .section-count-badge:not(.is-multi-digit):not([data-digits="multi"]) {
+  width: var(--v2-badge-min-height, 20px) !important;
+  padding: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+/* Multi-digit (10+): expands to a smooth capsule/pill (never an ellipse) */
+.renewal-shell.v2-design .section-count-badge.is-multi-digit,
+.renewal-shell.v2-design .section-count-badge[data-digits="multi"] {
+  width: auto !important;
+  padding: 0 5.5px !important;
+  aspect-ratio: auto !important;
+  flex: 0 0 auto !important;
 }
 
 /* An active category owns its count badge; inactive counts retain a neutral,
@@ -440,7 +460,7 @@
 .renewal-shell.v2-design .v2-places .places-category-sticky-tabs .section-count-badge,
 .renewal-shell.v2-design .v2-places-legacy .places-category-sticky-tabs .section-count-badge {
   align-self: center !important;
-  flex: 0 0 var(--v2-badge-min-height, 20px) !important;
+  flex: 0 0 auto !important;
 }
 
 /* The memo composer is a separate creation task, not the first list card.

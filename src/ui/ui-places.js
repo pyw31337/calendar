@@ -1635,32 +1635,48 @@ export function PlacesView({
           options: [
             {
               value: 'all',
-              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
-                className: "section-count-badge",
-                style: {
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                  borderRadius: 'var(--radius-full)',
-                  backgroundColor: searchedPlaces.length >= 1 ? 'var(--v2-primary, #2563EB)' : '#E2E8F0',
-                  color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
-                  fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
-                }
-              }, searchedPlaces.length))
+              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", (() => {
+                const isMulti = searchedPlaces.length > 9;
+                return /*#__PURE__*/React.createElement("span", {
+                  className: `section-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+                  "data-digits": isMulti ? "multi" : "single",
+                  style: {
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    minWidth: '20px', height: '20px',
+                    width: isMulti ? 'auto' : '20px',
+                    aspectRatio: isMulti ? 'auto' : '1 / 1',
+                    borderRadius: '9999px',
+                    backgroundColor: searchedPlaces.length >= 1 ? 'var(--v2-primary, #2563EB)' : '#E2E8F0',
+                    color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
+                    fontSize: 'var(--font-size-sm)', fontWeight: 'bold',
+                    padding: isMulti ? '0 5.5px' : '0',
+                    marginLeft: '4px'
+                  }
+                }, searchedPlaces.length);
+              })())
             },
             ...categories.map(category => {
               const cCount = countsByCategory[category.id] || 0;
+              const isMulti = cCount > 9;
               return {
                 value: category.id,
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
                   /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category, size: 18 }),
                   " ",
                   /*#__PURE__*/React.createElement("span", {
-                    className: "section-count-badge",
+                    className: `section-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+                    "data-digits": isMulti ? "multi" : "single",
                     style: {
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                      borderRadius: 'var(--radius-full)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      minWidth: '20px', height: '20px',
+                      width: isMulti ? 'auto' : '20px',
+                      aspectRatio: isMulti ? 'auto' : '1 / 1',
+                      borderRadius: '9999px',
                       backgroundColor: cCount >= 1 ? (category.color || '#2563EB') : '#E2E8F0',
                       color: cCount >= 1 ? '#FFFFFF' : '#475569',
-                      fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+                      fontSize: 'var(--font-size-sm)', fontWeight: 'bold',
+                      padding: isMulti ? '0 5.5px' : '0',
+                      marginLeft: '4px'
                     }
                   }, cCount)
                 )

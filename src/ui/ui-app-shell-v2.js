@@ -2231,7 +2231,13 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                 onBroken: (_e, info) => markBrokenThumb(info?.src, info?.fallbackSrc, info?.currentSrc),
                 style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
               }),
-              photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
+              photo.commentCount > 0 ? (() => {
+                const isMulti = String(photo.commentCount).length > 1;
+                return React.createElement('span', {
+                  className: `${bentoClass('comment-badge')} ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+                  'data-digits': isMulti ? 'multi' : 'single',
+                }, photo.commentCount);
+              })() : null
             );
           }))
           })

@@ -647,19 +647,31 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
       }
     },
       labelWithOptionalDot,
-      showBadge && !isDotBadge ? /*#__PURE__*/React.createElement('span', {
-        className: 'underline-tabs-count',
-        style: {
-          fontSize: 'var(--font-size-xs)',
-          fontWeight: 800,
-          padding: '1px 7px',
-          borderRadius: 'var(--radius-full)',
-          backgroundColor: isActive ? 'rgba(124, 58, 237, 0.12)' : 'var(--border-subtle)',
-          color: isActive ? activeColor : 'var(--text-muted)',
-          minWidth: '18px',
-          textAlign: 'center'
-        }
-      }, String(badge)) : null
+      showBadge && !isDotBadge ? (() => {
+        const badgeStr = String(badge);
+        const isMulti = badgeStr.length > 1;
+        return /*#__PURE__*/React.createElement('span', {
+          className: 'underline-tabs-count' + (isMulti ? ' is-multi-digit' : ' is-single-digit'),
+          'data-digits': isMulti ? 'multi' : 'single',
+          style: {
+            fontSize: 'var(--font-size-xs)',
+            fontWeight: 800,
+            padding: isMulti ? '0 5.5px' : '0',
+            width: isMulti ? 'auto' : '18px',
+            minWidth: '18px',
+            height: '18px',
+            aspectRatio: isMulti ? 'auto' : '1 / 1',
+            borderRadius: '9999px',
+            backgroundColor: isActive ? 'rgba(124, 58, 237, 0.12)' : 'var(--border-subtle)',
+            color: isActive ? activeColor : 'var(--text-muted)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+            textAlign: 'center'
+          }
+        }, badgeStr);
+      })() : null
     );
   }));
 }
