@@ -56,6 +56,7 @@ import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
+import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem } from '../core/app-weather.js';
 
 /** Legacy 5-tab labels kept for PlaceholderPane; primary IA is V2_PRIMARY side-nav. */
 const TABS = [
@@ -1353,42 +1354,152 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 /** Destinations for the hero quick-nav row above the D-day badge.
  * Mobile (<768): icon stacked over label. Tablet (768–1199): icon + label in a row.
  * Desktop (>=1200) keeps the persistent side rail, so the row is hidden there. */
-const HERO_QUICK_NAV_ITEMS = [
-  { id: 'chat', label: '채팅', icon: 'chat' },
-  { id: 'settlement', label: '정산', icon: 'settlement' },
-  { id: 'memo', label: '메모', icon: 'memo' },
-  { id: 'gallery', label: '갤러리', icon: 'gallery' },
-  { id: 'content', label: '컨텐츠', icon: 'content' },
-];
-
-function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
+function HeroWeatherBox({ weatherLocation, onSelectDate }) {
   const React = window.React;
-  return React.createElement('div', { className: bentoClass('hero-quick-nav'), role: 'navigation', 'aria-label': '빠른 이동' },
-    HERO_QUICK_NAV_ITEMS.map(item => React.createElement('button', {
-      type: 'button',
-      key: item.id,
-      className: bentoClass('hero-quick-nav-item'),
-      'aria-label': item.label,
-      title: item.label,
-      onClick: () => onChangeView?.(item.id),
-    },
-      React.createElement('span', { className: bentoClass('hero-quick-nav-icon'), 'aria-hidden': 'true' },
-        React.createElement(TabIcon, { id: item.icon, size: 24 })
-      ),
-      React.createElement('span', { className: bentoClass('hero-quick-nav-label') }, item.label),
-      item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
-        className: bentoClass('hero-quick-nav-badge'),
-        style: { backgroundColor: settlementBalanceBadge.bgColor || '#EF4444' },
-        title: '정산 잔액',
-      }, settlementBalanceBadge.text)
-    ))
+  const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
+  const lat = effectiveLocation.lat || 37.566;
+  const lon = effectiveLocation.lon || 126.9784;
+
+  const days = React.useMemo(() => {
+    const res = [];
+    const labels = ['어제', '오늘', '내일', '모레'];
+    const now = new Date();
+    for (let offset = -1; offset <= 2; offset += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      res.push({
+        offset,
+        label: labels[offset + 1],
+        dateStr,
+        isToday: offset === 0,
+      });
+    }
+    return res;
+  }, []);
+
+  const [weatherData, setWeatherData] = React.useState(() => readFourDayWeatherMem(lat, lon));
+
+  React.useEffect(() => {
+    let active = true;
+    fetchFourDayForecast(lat, lon)
+      .then(data => {
+        if (active && data) setWeatherData(data);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [lat, lon]);
+
+  return React.createElement('div', {
+    className: 'bp-hero-weather-row',
+    role: 'region',
+    'aria-label': `${effectiveLocation.name || '지역'} 날씨`
+  },
+    days.map(day => {
+      const forecast = weatherData ? weatherData[day.dateStr] : null;
+      const code = forecast?.code ?? 1;
+      const maxTemp = forecast?.max != null ? Math.round(forecast.max) : null;
+      const minTemp = forecast?.min != null ? Math.round(forecast.min) : null;
+      const tempText = maxTemp != null ? `${maxTemp}°` : (weatherData ? '-' : '...');
+      const fullTitle = `${day.label} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''}`;
+
+      return React.createElement('button', {
+        type: 'button',
+        key: day.dateStr,
+        className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}`,
+        title: fullTitle,
+        'aria-label': fullTitle,
+        onClick: () => onSelectDate?.(day.dateStr),
+      },
+        React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
+        React.createElement('span', { className: 'bp-hero-weather-icon', 'aria-hidden': 'true' },
+          getWeatherIcon(code, 22)
+        ),
+        React.createElement('span', { className: 'bp-hero-weather-temp' }, tempText)
+      );
+    })
   );
+}
+
+function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
+  const React = window.React;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const todayMeeting = React.useMemo(() => {
+    const fromUpcoming = Array.isArray(upcomingMeetings) ? upcomingMeetings.find(m => m.date === todayStr) : null;
+    if (fromUpcoming) return fromUpcoming;
+    const all = getTrulyConfirmedMeetings(calendar);
+    return all.find(m => m.date === todayStr || (Array.isArray(m?.dates) && m.dates.includes(todayStr))) || null;
+  }, [calendar, upcomingMeetings, todayStr]);
+
+  const todayAnniversary = React.useMemo(() => {
+    const list = getAnniversariesForDate(calendar?.anniversaries || [], todayStr);
+    return list && list.length > 0 ? list[0] : null;
+  }, [calendar?.anniversaries, todayStr]);
+
+  const todayPlace = React.useMemo(() => {
+    const allPlaces = getCalendarPlaces(calendar);
+    const matched = allPlaces.filter(p => doesPlaceMatchDate(p, todayStr));
+    return matched[0] || null;
+  }, [calendar, todayStr]);
+
+  const todaySchedule = todayMeeting || todayAnniversary;
+
+  if (todaySchedule) {
+    const isMeeting = !!todayMeeting;
+    const title = todayMeeting?.title
+      || todayMeeting?.place
+      || todayPlace?.name
+      || todayMeeting?.note
+      || todayAnniversary?.title
+      || (isMeeting ? '오늘 확정된 모임' : '오늘의 일정');
+    const subtitle = (todayPlace?.name && todayPlace.name !== title)
+      ? todayPlace.name
+      : (todayMeeting?.note && todayMeeting.note !== title
+        ? todayMeeting.note
+        : (todayMeeting?.time || (todayAnniversary ? '기념일' : '')));
+
+    return React.createElement('div', {
+      className: 'bp-hero-today-box',
+      role: 'button',
+      tabIndex: 0,
+      'aria-label': `오늘 일정: ${title}`,
+      onClick: () => onSelectDate?.(todayStr),
+      onKeyDown: (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectDate?.(todayStr);
+        }
+      }
+    },
+      React.createElement('div', { className: 'bp-hero-today-left' },
+        React.createElement('span', { className: 'bp-hero-today-badge' }, 'TODAY'),
+        React.createElement('div', { className: 'bp-hero-today-text' },
+          React.createElement('span', { className: 'bp-hero-today-title' }, title),
+          subtitle ? React.createElement('span', { className: 'bp-hero-today-subtitle' }, subtitle) : null
+        )
+      ),
+      React.createElement('span', { className: 'bp-hero-today-arrow', 'aria-hidden': 'true' },
+        React.createElement('svg', {
+          width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+          strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round'
+        }, React.createElement('path', { d: 'M9 18l6-6-6-6' }))
+      )
+    );
+  }
+
+  // 오늘 일정이 없을 때는 주간 날씨 ('어제 오늘 내일 모레')
+  return React.createElement(HeroWeatherBox, {
+    weatherLocation: calendar?.weatherLocation,
+    onSelectDate
+  });
 }
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
-  const hasUpcomingMeeting = Array.isArray(calendarContext?.upcomingMeetings)
-    && calendarContext.upcomingMeetings.length > 0;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
   const mergedCalendar = React.useMemo(() => {
     const base = calendarContext?.calendar || {};
     const recPlaces = recordsContext?.placesProps?.calendar?.places;
@@ -1397,12 +1508,33 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
     }
     return base;
   }, [calendarContext?.calendar, recordsContext?.placesProps?.calendar?.places]);
+
+  const todayMeeting = React.useMemo(() => {
+    const fromUpcoming = Array.isArray(calendarContext?.upcomingMeetings)
+      ? calendarContext.upcomingMeetings.find(m => m.date === todayStr)
+      : null;
+    if (fromUpcoming) return fromUpcoming;
+    const all = getTrulyConfirmedMeetings(mergedCalendar);
+    return all.find(m => m.date === todayStr || (Array.isArray(m?.dates) && m.dates.includes(todayStr))) || null;
+  }, [calendarContext?.upcomingMeetings, mergedCalendar, todayStr]);
+
+  const remainingUpcomingMeetings = React.useMemo(() => {
+    const all = calendarContext?.upcomingMeetings || [];
+    return todayMeeting ? all.filter(m => m.date !== todayStr) : all;
+  }, [calendarContext?.upcomingMeetings, todayMeeting, todayStr]);
+
+  const hasUpcomingMeeting = (todayMeeting || remainingUpcomingMeetings.length > 0);
+
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: `bp-hero-zone${hasUpcomingMeeting ? '' : ' bp-hero-zone--no-dday'}` },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
       React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }),
-      React.createElement(HeroQuickNav, { onChangeView, settlementBalanceBadge }),
-      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: mergedCalendar, onSelectDate: onOpenDate })
+      React.createElement(HeroTodayOrWeather, {
+        calendar: mergedCalendar,
+        upcomingMeetings: calendarContext?.upcomingMeetings,
+        onSelectDate: onOpenDate,
+      }),
+      React.createElement(RenewalHero, { meetings: remainingUpcomingMeetings, calendar: mergedCalendar, onSelectDate: onOpenDate })
     ),
     React.createElement('button', {
       type: 'button',

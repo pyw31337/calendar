@@ -3842,6 +3842,15 @@ html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-her
   font-size: clamp(0.62rem, 0.45rem + 1.2vw, 0.8rem) !important;
 }
 
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-today-box,
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-row {
+  width: calc(100% - 32px) !important;
+  max-width: 520px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+}
+
 /* Expanded D-day cards keep the closed capsule's glass, and each one
    opens on its own with a height animation. */
 html:has(.renewal-shell.v2-design) .bp-dday-reveal {

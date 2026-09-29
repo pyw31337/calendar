@@ -63,3 +63,47 @@ export function translateKoreanToEnglish(query) {
   }
   return query;
 }
+
+const FOUR_DAY_WEATHER_TTL_MS = 60 * 60 * 1000; // 1 hour
+const __fourDayWeatherMem = typeof Map !== 'undefined' ? new Map() : null;
+
+export function readFourDayWeatherMem(lat, lon) {
+  if (!__fourDayWeatherMem) return null;
+  const key = `${Number(lat).toFixed(3)}_${Number(lon).toFixed(3)}`;
+  const entry = __fourDayWeatherMem.get(key);
+  if (entry && (Date.now() - entry.fetchedAt) < FOUR_DAY_WEATHER_TTL_MS) {
+    return entry.value;
+  }
+  return null;
+}
+
+export function fetchFourDayForecast(lat, lon) {
+  const key = `${Number(lat).toFixed(3)}_${Number(lon).toFixed(3)}`;
+  const hit = readFourDayWeatherMem(lat, lon);
+  if (hit) return Promise.resolve(hit);
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FSeoul&past_days=1&forecast_days=3`;
+
+  return fetch(url)
+    .then(res => {
+      if (!res.ok) throw new Error(`Weather fetch failed: ${res.status}`);
+      return res.json();
+    })
+    .then(data => {
+      const daily = data && data.daily;
+      if (!daily || !Array.isArray(daily.time)) return null;
+      const result = {};
+      daily.time.forEach((t, i) => {
+        result[t] = {
+          code: daily.weather_code?.[i] ?? 0,
+          max: daily.temperature_2m_max?.[i],
+          min: daily.temperature_2m_min?.[i],
+        };
+      });
+      if (__fourDayWeatherMem) {
+        __fourDayWeatherMem.set(key, { value: result, fetchedAt: Date.now() });
+      }
+      return result;
+    });
+}
+

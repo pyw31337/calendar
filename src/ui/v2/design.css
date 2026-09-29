@@ -151,6 +151,162 @@
   .v2-design .bp-hero-quick-nav { display: none; }
 }
 
+/* Hero TODAY schedule box */
+.v2-design .bp-hero-today-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: calc(100% - 32px);
+  max-width: 480px;
+  margin: 0 auto 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.14s ease, box-shadow 0.16s ease;
+  user-select: none;
+}
+.v2-design .bp-hero-today-box:hover {
+  background: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.v2-design .bp-hero-today-box:active {
+  transform: scale(0.99);
+}
+.v2-design .bp-hero-today-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.v2-design .bp-hero-today-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-full, 9999px);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--brand, #7C2FE5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+.v2-design .bp-hero-today-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.v2-design .bp-hero-today-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+.v2-design .bp-hero-today-subtitle {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v2-design .bp-hero-today-arrow {
+  color: rgba(255, 255, 255, 0.8);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Hero Weather Row ('어제 오늘 내일 모레') */
+.v2-design .bp-hero-weather-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 6px;
+  width: calc(100% - 32px);
+  max-width: 480px;
+  margin: 0 auto 12px;
+  padding: 8px 8px 10px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+}
+.v2-design .bp-hero-weather-col {
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+  font-family: inherit;
+}
+.v2-design .bp-hero-weather-col:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+.v2-design .bp-hero-weather-col:active {
+  transform: scale(0.97);
+}
+.v2-design .bp-hero-weather-col.is-today {
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.v2-design .bp-hero-weather-day {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.01em;
+}
+.v2-design .bp-hero-weather-col.is-today .bp-hero-weather-day {
+  font-weight: 900;
+  color: #fff;
+}
+.v2-design .bp-hero-weather-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  height: 26px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+.v2-design .bp-hero-weather-icon svg {
+  display: block;
+}
+.v2-design .bp-hero-weather-temp {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
 /* Hero vivid purple mesh + dramatic aurora blobs — reinforces reference-home under .v2-design */
 .v2-design .bp-hero-zone {
   background:
