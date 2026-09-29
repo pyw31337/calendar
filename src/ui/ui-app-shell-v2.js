@@ -2772,7 +2772,6 @@ export function buildRenewalRecordsContext(calendar, deps) {
       indexedPhotoStatus: galleryPhotoIndex ? galleryPhotoIndex.status : undefined,
       indexedPhotoComplete: galleryPhotoIndex ? galleryPhotoIndex.complete : false,
       onIndexedPhotoPageChange: galleryPhotoIndex ? galleryPhotoIndex.loadPage : undefined,
-      onIndexedPhotoLoadAll: galleryPhotoIndex ? galleryPhotoIndex.loadAll : undefined,
       photoCommentCounts,
     },
     isHistoryShareOpen: !!isHistoryShareOpen,

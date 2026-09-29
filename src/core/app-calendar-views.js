@@ -375,7 +375,6 @@ export function renderCalendarViews({
         indexedPhotoStatus: galleryPhotoIndex.status,
         indexedPhotoComplete: galleryPhotoIndex.complete,
         onIndexedPhotoPageChange: galleryPhotoIndex.loadPage,
-        onIndexedPhotoLoadAll: galleryPhotoIndex.loadAll,
         photoCommentCounts: photoCommentCounts,
         ...navMenuProps
       }),

@@ -625,7 +625,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       // 대형 캘린더에서는 수백 장의 이미지 메타를 한 프레임에 그룹화하면서 Long Task가
       // 발생했고, 모바일 브라우저가 "페이지를 닫을까요"를 표시할 정도로 악화됐다.
       // 첫 진입은 다른 사진 화면과 동일하게 최근 한 페이지로 제한한다. 전체 읽기는
-      // 검색/월별 보기 또는 화면의 명시적 "전체 분석" 동작에서만 loadAll()을 호출한다.
+      // 갤러리 검색·월별 보기처럼 전체 결과가 필요한 작업에서만 호출한다.
       void loadPage(1, { includeTotal: !shouldLoadPreview });
     };
     const shouldDefer = shouldLoadPreview || activeView === 'history';

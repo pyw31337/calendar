@@ -1347,7 +1347,7 @@ export function HistoryView({
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
-  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null, onIndexedPhotoLoadAll = null,
+  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null,
   photoCommentCounts = {}, onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -1753,20 +1753,11 @@ export function HistoryView({
       })
     }));
   }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, usesCanonicalPhotoIndex, usesLegacyPhotoFallback]);
-  // Do not turn opening 보관함 into a full-index network request. Large archives can opt into
-  // the complete historical scan through the visible control below.
+  // Do not turn opening 보관함 into a full-index network request. The archive stays bounded to
+  // the canonical first page; a broad scan without clear progress or a durable result is not a
+  // useful user action.
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
   // chat window is incomplete. Memories need the same for anniversary date ranges.
-  const [isLoadingEntireArchive, setIsLoadingEntireArchive] = React.useState(false);
-  const loadEntireArchive = React.useCallback(async () => {
-    if (indexedPhotoComplete || typeof onIndexedPhotoLoadAll !== 'function' || isLoadingEntireArchive) return;
-    setIsLoadingEntireArchive(true);
-    try {
-      await onIndexedPhotoLoadAll();
-    } finally {
-      setIsLoadingEntireArchive(false);
-    }
-  }, [indexedPhotoComplete, onIndexedPhotoLoadAll, isLoadingEntireArchive]);
   const incompleteArchiveNotice = archivePhotoIndexHasError
     ? /*#__PURE__*/React.createElement('p', { role: 'alert' },
       '보관함 사진을 불러오지 못했습니다. ',
@@ -1784,23 +1775,7 @@ export function HistoryView({
         fontSize: 'var(--font-size-xs)'
       }
     }, /*#__PURE__*/React.createElement('span', { "aria-hidden": true }, '⏳'), /*#__PURE__*/React.createElement('span', null, '보관함 사진을 준비하는 중입니다.'))
-    : !indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function'
-    ? /*#__PURE__*/React.createElement('div', {
-      role: 'status',
-      style: {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-        padding: '9px 10px', marginBottom: '8px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', color: 'var(--text-muted)',
-        fontSize: 'var(--font-size-xs)'
-      }
-    },
-      /*#__PURE__*/React.createElement('span', null, '최근 사진만 먼저 표시합니다. 전체 과거 사진 분석은 필요할 때 실행하세요.'),
-      /*#__PURE__*/React.createElement('button', {
-        type: 'button', onClick: () => { void loadEntireArchive(); }, disabled: isLoadingEntireArchive,
-        className: 'btn btn-action btn-action-outline',
-        style: { flexShrink: 0, minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
-      }, isLoadingEntireArchive ? '분석 중…' : '전체 분석')
-    ) : null;
+    : null;
   const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
   // People badges and Memories groups share historyPhotoEntries. Only hydrating the meeting
   // photo index on the Memories tab made People counts jump after the first Memories visit.
@@ -1809,10 +1784,10 @@ export function HistoryView({
   // and drift easily -- session hydrate of the existing index is cheaper and stays accurate.
   const indexedMeetingDatesKeyRef = React.useRef('');
   React.useEffect(() => {
-    // New callers provide the complete canonical photoIndex. Do not also fan out one
+    // New callers provide the canonical photoIndex status. Do not also fan out one
     // meetingPhotoIndex request per anniversary date; that was the main reason History felt
     // slower than Gallery on mobile. Keep the legacy date loader only as a compatibility fallback.
-    if (typeof onIndexedPhotoLoadAll === 'function') {
+    if (hasExplicitIndexedPhotoStatus) {
       setIndexedMeetingPhotoEntries([]);
       indexedMeetingDatesKeyRef.current = '';
       return;
@@ -1900,7 +1875,7 @@ export function HistoryView({
       setIndexedMeetingPhotoEntries(entries);
     });
     return () => { cancelled = true; };
-  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, onIndexedPhotoLoadAll]);
+  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, hasExplicitIndexedPhotoStatus]);
   const [deletedPhotoKeys, setDeletedPhotoKeys] = React.useState(() => new Set());
   const historyPhotoEntries = React.useMemo(() => {
     const list = indexedMeetingPhotoEntries.length
