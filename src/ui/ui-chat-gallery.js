@@ -1257,9 +1257,6 @@ export function ChatGalleryModal({
     () => asPage && !usingPhotoIndex ? pagedFallbackPhotos.items : visiblePhotos,
     [asPage, visiblePhotos, pagedFallbackPhotos.items, usingPhotoIndex]
   );
-  const loadMorePhotos = () => {
-    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-  };
   const handleGalleryContentScroll = handleGalleryScroll;
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
@@ -1362,37 +1359,6 @@ export function ChatGalleryModal({
           .map(entry => entry.item)
       }));
   }, [galleryViewMode, pagedDateModeItems.items]);
-
-  // Per-month photo count for the active galleryMonthKey (already-loaded visiblePhotos only).
-  const monthVisiblePhotoCount = React.useMemo(() => {
-    if (galleryViewMode !== 'date' || activeTab !== 'photos') return 0;
-    return dateModeSourceItems.length;
-  }, [galleryViewMode, activeTab, dateModeSourceItems]);
-
-  // When an older-chat load finishes without adding any photos for the current month,
-  // mark that month exhausted so date-mode auto load-more stops bouncing at the bottom.
-  const [exhaustedGalleryMonthKey, setExhaustedGalleryMonthKey] = React.useState(null);
-  const prevLoadingOlderChatRef = React.useRef(!!loadingOlderChat);
-  const prevMonthVisiblePhotoCountRef = React.useRef(monthVisiblePhotoCount);
-  const prevGalleryMonthKeyForExhaustRef = React.useRef(galleryMonthKey);
-  React.useEffect(() => {
-    if (prevGalleryMonthKeyForExhaustRef.current !== galleryMonthKey) {
-      prevGalleryMonthKeyForExhaustRef.current = galleryMonthKey;
-      setExhaustedGalleryMonthKey(null);
-      prevMonthVisiblePhotoCountRef.current = monthVisiblePhotoCount;
-      prevLoadingOlderChatRef.current = !!loadingOlderChat;
-      return;
-    }
-    const wasLoading = prevLoadingOlderChatRef.current;
-    prevLoadingOlderChatRef.current = !!loadingOlderChat;
-    if (monthVisiblePhotoCount > prevMonthVisiblePhotoCountRef.current) {
-      setExhaustedGalleryMonthKey(prev => prev === galleryMonthKey ? null : prev);
-    }
-    if (wasLoading && !loadingOlderChat && monthVisiblePhotoCount <= prevMonthVisiblePhotoCountRef.current) {
-      setExhaustedGalleryMonthKey(galleryMonthKey);
-    }
-    prevMonthVisiblePhotoCountRef.current = monthVisiblePhotoCount;
-  }, [loadingOlderChat, monthVisiblePhotoCount, galleryMonthKey]);
 
   const toggleGalleryDate = dateKey => {
     setCollapsedGalleryDates(prev => {
@@ -2472,31 +2438,6 @@ export function ChatGalleryModal({
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
   );
-  // Older chat-derived links/files may not have an indexed page yet. Keep their explicit
-  // continuation action, but never fetch another batch merely because a user reached the
-  // bottom: automatic loading made long history pages expand unpredictably and could issue
-  // repeated reads while the viewport stayed at the sentinel.
-  const GalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => {
-    return /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onClick,
-        disabled: !!disabled,
-        style: {
-          width: '100%',
-          marginTop: '4px',
-          padding: '12px 0',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: 'var(--text-main)',
-          fontSize: 'var(--font-size-base)',
-          fontWeight: 700,
-          cursor: disabled ? 'wait' : 'pointer',
-          textAlign: 'center'
-        }
-      }, disabled ? loadingLabel : label);
-  };
-  const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
   // Mobile pagination has no arrows -- a horizontal drag pans the centered page window so more
   // numbers can be revealed, then a tap (or drag-release past the threshold) selects a page.
   const [paginationDragPage, setPaginationDragPage] = React.useState(null);
@@ -3447,33 +3388,6 @@ export function ChatGalleryModal({
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
       const isFileMode = activeTab === 'files';
-      const monthExhausted = activeTab === 'photos' && exhaustedGalleryMonthKey === galleryMonthKey;
-      // Date mode has its own explicit 100-row page. Older chat history is only requested from
-      // the visible continuation button, and is hidden when this month was exhausted by a load
-      // that added zero month photos.
-      const showLoadMore = isLinkMode
-        ? (hasMoreOlderChat || hasMoreMemos)
-        : (isFileMode ? hasMoreOlderChat : ((hasMoreOlderChat || loadingOlderChat) && !monthExhausted));
-      const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
-        isLinkMode
-          ? renderGalleryLoadMoreButton({
-              label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
-              loadingLabel: '이전 링크를 불러오는 중…',
-              disabled: !!loadingOlderChat,
-              onClick: () => {
-                if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-                if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
-              }
-            })
-          : renderGalleryLoadMoreButton({
-              label: isFileMode ? `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
-              loadingLabel: isFileMode ? '이전 파일을 불러오는 중…' : '이전 사진을 불러오는 중…',
-              disabled: !!loadingOlderChat,
-              onClick: () => {
-                if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-              }
-            })
-      );
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         // Keep 전체|일자 + 붙여넣기/추가 toolbar visible in date mode (same mobile header as flat).
         isLinkMode ? renderLinkListHeader() : (isFileMode ? renderFileListHeader() : renderPhotoListHeader()),
@@ -3527,8 +3441,7 @@ export function ChatGalleryModal({
           pageCount: pagedDateModeItems.pageCount,
           onChange: setGalleryListPage,
           label: '일자별 갤러리 페이지'
-        }),
-        loadMoreNode
+        })
       );
     }
     if (activeTab === 'files') {
@@ -3544,14 +3457,6 @@ export function ChatGalleryModal({
           pageCount: pagedFiles.pageCount,
           onChange: setGalleryListPage,
           label: '파일 갤러리 페이지'
-        }),
-        (hasMoreOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-          label: `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)`,
-          loadingLabel: '이전 파일을 불러오는 중…',
-          disabled: !!loadingOlderChat,
-          onClick: () => {
-            if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-          }
         })
       );
     }
@@ -3568,15 +3473,6 @@ export function ChatGalleryModal({
           pageCount: pagedLinks.pageCount,
           onChange: setGalleryListPage,
           label: '링크 갤러리 페이지'
-        }),
-        (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-          label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
-          loadingLabel: '이전 링크를 불러오는 중…',
-          disabled: !!loadingOlderChat,
-          onClick: () => {
-            if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-            if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
-          }
         })
       );
     }
@@ -3598,13 +3494,7 @@ export function ChatGalleryModal({
           pageCount: pagedFallbackPhotos.pageCount,
           onChange: setGalleryListPage,
           label: '사진 갤러리 페이지'
-        }),
-      (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-        label: `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
-        loadingLabel: '이전 사진을 불러오는 중…',
-        disabled: !!loadingOlderChat,
-        onClick: loadMorePhotos
-      })
+        })
     );
   };
 

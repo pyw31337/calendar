@@ -69,5 +69,8 @@ test('Gallery tabs render clean labels without status dots or numeric count pill
   assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs \.underline-tabs-label[\s\S]*?font-size:\s*var\(--v2-event-sheet-tab-label-fs\);/, 'gallery tabs use shared 0.9rem event-sheet font size');
   assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs-label\.has-status-dot::after[\s\S]*?display:\s*none !important;/, 'gallery tabs suppress status dots');
   assert.match(destLateCss, /:is\(\.v2-gallery, \.gallery-page-tabs, \.gallery-page-tabs-mobile, \.v2-gallery-tabs-slot\) \.underline-tabs \.underline-tabs-count[\s\S]*?display:\s*none !important;/, 'numeric count pills are hidden in gallery tabs');
+  assert.doesNotMatch(galleryJs, /이전 사진 더 보기/, 'gallery does not render redundant load more photos button');
+  assert.doesNotMatch(galleryJs, /renderGalleryLoadMoreButton/, 'gallery does not render redundant load more buttons');
 });
+
 
