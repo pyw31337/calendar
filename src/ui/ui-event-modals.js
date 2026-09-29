@@ -3738,6 +3738,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             card.depositorName
           );
           const settlementTransfers = calculateSettlementTransfers(cardParticipantRows);
+          const personGridCols = 1 + (cardParticipantRows.length || 1);
 
           return React.createElement("article", {
             key: card.id,
@@ -3868,7 +3869,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
             /* Total expense is the first card; participant cards follow it in the responsive grid. */
             React.createElement("div", {
-              className: "settlement-person-grid"
+              className: "settlement-person-grid",
+              style: {
+                '--settlement-cols': personGridCols
+              }
             }, React.createElement("div", { className: "settlement-person-card settlement-total-card" },
               React.createElement("div", { className: "settlement-person-name" }, "총 지출"),
               React.createElement("strong", { className: "settlement-person-amount" }, `${(Number(card.amount) || allTimeExpense).toLocaleString()}원`)

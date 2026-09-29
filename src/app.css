@@ -3823,11 +3823,14 @@ select.form-select {
 }
 .settlement-person-grid {
   display: grid;
-  /* Auto-fill: fills the row with as many cards as will fit without wrapping.
-     min 110px ensures names are readable; max 1fr distributes remaining space
-     so every card stretches to fill the full width with no trailing gap. */
-  grid-template-columns: repeat(auto-fill, minmax(min(110px, 100%), 1fr));
+  /* Auto-fit: distributes width evenly across cards without trailing empty gaps. */
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
   gap: 10px;
+}
+@media (min-width: 768px) {
+  .settlement-person-grid {
+    grid-template-columns: repeat(var(--settlement-cols, 3), minmax(0, 1fr));
+  }
 }
 .settlement-person-card {
   min-width: 0;

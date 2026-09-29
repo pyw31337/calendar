@@ -1774,7 +1774,13 @@
   gap: 2px !important;
 }
 .v2-design .v2-settlement .settlement-person-grid {
-  gap: 5px !important;
+  gap: 8px !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
+}
+@media (min-width: 768px) {
+  .v2-design .v2-settlement .settlement-person-grid {
+    grid-template-columns: repeat(var(--settlement-cols, 3), minmax(0, 1fr)) !important;
+  }
 }
 .v2-design .v2-settlement .settlement-person-card {
   padding: 7px 7px 6px !important;
