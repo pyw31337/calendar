@@ -264,7 +264,7 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
           {
             key: item.id,
             type: 'button',
-            className: bentoClass(`mobile-bottom-nav-item is-center ${isActive ? 'is-active' : ''}`.trim()),
+            className: bentoClass(`mobile-bottom-nav-item item-${item.id} is-center ${isActive ? 'is-active' : ''}`.trim()),
             'aria-label': item.label,
             'aria-current': isActive ? 'page' : undefined,
             onClick: () => {
@@ -283,7 +283,7 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
         {
           key: item.id,
           type: 'button',
-          className: bentoClass(`mobile-bottom-nav-item ${isActive ? 'is-active' : ''}`.trim()),
+          className: bentoClass(`mobile-bottom-nav-item item-${item.id} ${isActive ? 'is-active' : ''}`.trim()),
           'aria-label': item.label,
           'aria-current': isActive ? 'page' : undefined,
           onClick: () => {

@@ -2800,6 +2800,22 @@ html:has(.renewal-shell.v2-design) {
   box-sizing: border-box !important;
 }
 
+.v2-design .bp-mobile-bottom-nav-item.bp-item-settlement {
+  transform: translateX(10px) !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-item-memo {
+  transform: translateX(-8px) !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-item-chat {
+  transform: translateX(8px) !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-item-more {
+  transform: translateX(-10px) !important;
+}
+
 .v2-design .bp-mobile-bottom-nav-item.bp-is-center {
   overflow: visible !important;
   justify-content: center !important;
@@ -2815,28 +2831,61 @@ html:has(.renewal-shell.v2-design) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background:
-    linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
-    linear-gradient(90deg, #8019E0 0%, #3604FD 44%, #12CDF0 100%) !important;
-  background-size: auto, 300% 300% !important;
-  animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
-  box-shadow: 0 6px 18px rgba(128, 25, 224, 0.42), 0 2px 6px rgba(54, 4, 253, 0.28) !important;
-  color: #ffffff !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45), 0 2px 8px rgba(37, 99, 235, 0.35) !important;
   flex-shrink: 0 !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 
+.v2-design .bp-mobile-bottom-nav-center-circle::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -65% !important;
+  background:
+    radial-gradient(circle at 25% 25%, rgba(192, 132, 252, 0.95) 0%, transparent 45%),
+    radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.9) 0%, transparent 45%),
+    linear-gradient(125deg, #9333EA 0%, #6366F1 30%, #2563EB 58%, #06B6D4 82%, #A855F7 100%) !important;
+  background-size: 200% 200% !important;
+  animation: bp-cal-aurora-wave 3s ease-in-out infinite alternate, bp-cal-aurora-spin 6.5s linear infinite !important;
+  border-radius: 42% !important;
+}
+
 .v2-design .bp-mobile-bottom-nav-center-circle svg {
+  position: relative !important;
+  z-index: 2 !important;
   width: 26px !important;
   height: 26px !important;
   display: block !important;
   color: #ffffff !important;
   stroke: #ffffff !important;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.28)) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
-  transform: scale(1.05) !important;
-  box-shadow: 0 8px 24px rgba(128, 25, 224, 0.55), 0 3px 8px rgba(54, 4, 253, 0.35) !important;
+  transform: scale(1.08) !important;
+  box-shadow: 0 8px 26px rgba(147, 51, 234, 0.6), 0 3px 10px rgba(37, 99, 235, 0.45) !important;
+}
+
+@keyframes bp-cal-aurora-wave {
+  0% {
+    background-position: 0% 15%;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    background-position: 100% 85%;
+    transform: scale(1.18) rotate(180deg);
+  }
+  100% {
+    background-position: 15% 100%;
+    transform: scale(1) rotate(360deg);
+  }
+}
+
+@keyframes bp-cal-aurora-spin {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(36deg); }
+  100% { filter: hue-rotate(0deg); }
 }
 
 .v2-design .bp-mobile-bottom-nav-indicator {

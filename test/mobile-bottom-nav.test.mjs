@@ -50,7 +50,13 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
   assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-indicator \{/);
   assert.match(css, /background:\s*var\(--brand\)\s*!important;/);
 
-  // 7. Center circle has PC hero zone aurora gradient & animation
-  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-center-circle \{/);
-  assert.match(css, /animation:\s*bp-hero-mesh-shift 8\.6s ease-in-out infinite\s*!important;/);
+  // 7. Center circle has exaggerated aurora wave animation & vibrant purple-blue gradient
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-center-circle::before \{/);
+  assert.match(css, /animation:\s*bp-cal-aurora-wave 3s ease-in-out infinite alternate,\s*bp-cal-aurora-spin 6\.5s linear infinite\s*!important;/);
+
+  // 8. Lateral item offset positioning for spacing balance
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-settlement\s*\{\s*transform:\s*translateX\(10px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-memo\s*\{\s*transform:\s*translateX\(-8px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-chat\s*\{\s*transform:\s*translateX\(8px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-more\s*\{\s*transform:\s*translateX\(-10px\)\s*!important;\s*\}/);
 });
