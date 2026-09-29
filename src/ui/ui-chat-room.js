@@ -1934,11 +1934,11 @@ export function ChatRoomView({
   },
     /* Inner card wrapper (same border/radius as CommentsSection input card) */
       /*#__PURE__*/React.createElement("div", {
-        className: `chat-composer-input-surface${composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT ? ' is-multiline' : ''}`,
+        className: `chat-composer-input-surface${(composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT || (chatInput && (chatInput.includes('\n') || chatInput.length > 30))) ? ' is-multiline' : ''}`,
         style: {
           backgroundColor: 'var(--bg-card)',
           border: '1px solid var(--border-subtle)',
-          borderRadius: composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT ? 'var(--field-radius-multiline)' : 'var(--field-radius-single-line)',
+          borderRadius: (composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT || (chatInput && (chatInput.includes('\n') || chatInput.length > 30))) ? 'var(--field-radius-multiline)' : 'var(--field-radius-single-line)',
         padding: '10px 12px 12px',
         display: 'flex',
         flexDirection: 'column',
@@ -2067,7 +2067,8 @@ export function ChatRoomView({
       ),
       /* Textarea at top */
       /*#__PURE__*/React.createElement("textarea", {
-        className: "chat-composer-textarea",
+        className: `chat-composer-textarea${(composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT || (chatInput && (chatInput.includes('\n') || chatInput.length > 30))) ? ' is-multiline' : ''}`,
+        "data-field-lines": (composerInputHeight > COMPOSER_MIN_INPUT_HEIGHT || (chatInput && (chatInput.includes('\n') || chatInput.length > 30))) ? 'multi' : '1',
         ref: chatTextareaRef,
         "aria-label": "메시지 입력",
         placeholder: "메시지를 입력하세요...",

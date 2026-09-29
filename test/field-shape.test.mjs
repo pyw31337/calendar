@@ -25,3 +25,18 @@ test('V2 applies capsule geometry to picker controls and one-line settlement mem
   assert.match(css, /\.settlement-participant-row\.is-multiline[\s\S]{0,220}border-radius:\s*var\(--field-radius-multiline\) !important/, 'memo-bearing member remains a rounded box');
   assert.match(modal, /className: `settlement-participant-row\$\{row\.memo \? ' is-multiline' : ''\}`/, 'member row exposes its actual line count to the style system');
 });
+
+test('Chat composer field maintains capsule on single line and transitions to rounded rectangle on multi-line', async () => {
+  const [appCss, destLateCss, screensCss, screensJs] = await Promise.all([
+    readFile(new URL('../src/app.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/screens.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(appCss, /--field-radius-single-line:\s*calc\(var\(--field-single-line-height,\s*44px\)\s*\/\s*2\);/, '--field-radius-single-line is half the single-line height for exact capsule geometry');
+  assert.match(destLateCss, /\.bp-composer-input:not\(\.is-multiline\):not\(\[data-field-lines="multi"\]\)[\s\S]{0,160}border-radius:\s*var\(--field-radius-single-line\) !important;/, 'single-line composer input gets capsule radius');
+  assert.match(destLateCss, /\.bp-composer-input\.is-multiline[\s\S]{0,160}border-radius:\s*var\(--field-radius-multiline\) !important;/, 'multiline composer input gets rounded rectangle radius');
+  assert.match(screensCss, /\.bp-composer-input\.is-multiline[\s\S]{0,200}white-space:\s*pre-wrap !important;/, 'multiline composer wraps text');
+  assert.match(screensJs, /isMultiline/, 'ChatScreen computes multiline status for composer input');
+});
+

@@ -1338,17 +1338,26 @@ export function ChatScreen(p) {
       h(
         'div',
         { className: 'v2-chat-compose-row' },
-        clone(slots.textarea, {
-          className: 'bp-composer-input',
-          placeholder: slots.textarea.props.placeholder || '메시지를 입력하세요...',
-          style: {
-            ...slots.textarea.props.style,
-            minHeight: '44px',
-            padding: '8px 14px',
-            borderRadius: 'var(--radius-md)',
-            resize: 'none',
-          },
-        }),
+        (() => {
+          const rawHeight = slots.textarea.props?.style?.height;
+          const parsedHeight = typeof rawHeight === 'number' ? rawHeight : (typeof rawHeight === 'string' ? parseInt(rawHeight, 10) : 0);
+          const val = slots.textarea.props?.value ? String(slots.textarea.props.value) : '';
+          const isMultiline = parsedHeight > 44
+            || slots.textarea.props?.['data-field-lines'] === 'multi'
+            || (val && (val.includes('\n') || val.length > 30));
+          return clone(slots.textarea, {
+            className: `bp-composer-input${isMultiline ? ' is-multiline' : ''}`,
+            'data-field-lines': isMultiline ? 'multi' : '1',
+            placeholder: slots.textarea.props.placeholder || '메시지를 입력하세요...',
+            style: {
+              ...slots.textarea.props.style,
+              minHeight: '44px',
+              padding: isMultiline ? '10px 14px' : '8px 14px',
+              borderRadius: isMultiline ? 'var(--field-radius-multiline, 14px)' : 'var(--field-radius-single-line, 22px)',
+              resize: 'none',
+            },
+          });
+        })(),
         clone(
           slots.send,
           { 'aria-label': '메시지 전송', className: 'bp-composer-send' },

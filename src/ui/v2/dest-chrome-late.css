@@ -1784,6 +1784,15 @@ html:has(.renewal-shell.v2-design) .chat-composer-input-surface.is-multiline {
   border-radius: var(--field-radius-multiline);
 }
 
+html:has(.renewal-shell.v2-design) .bp-composer-input:not(.is-multiline):not([data-field-lines="multi"]) {
+  border-radius: var(--field-radius-single-line) !important;
+  transition: border-radius var(--motion-fast, 140ms) ease;
+}
+html:has(.renewal-shell.v2-design) .bp-composer-input.is-multiline,
+html:has(.renewal-shell.v2-design) .bp-composer-input[data-field-lines="multi"] {
+  border-radius: var(--field-radius-multiline) !important;
+}
+
 /* The settlement member area is a list container (a rounded box), but each member with no
    memo is a one-line field.  Give those rows the same capsule ends as title, picker and bank
    controls; a memo explicitly makes the row a multi-line card. */
