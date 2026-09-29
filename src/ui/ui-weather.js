@@ -921,7 +921,11 @@ function formatWeatherDayChoice(day) {
 }
 
 function formatWeatherLocationArea(location) {
-  const raw = String(location?.regionName || location?.areaName || location?.address || location?.name || '지역').trim();
+  const regionName = String(location?.regionName || '').trim();
+  // "현재 위치" is only a GPS-source label. Prefer the reverse-geocoded
+  // administrative area once it is available so the forecast always states
+  // the actual region being shown.
+  const raw = String((regionName && regionName !== '현재 위치' ? regionName : '') || location?.areaName || location?.address || location?.name || '지역').trim();
   if (!raw) return '지역';
   return raw
     .replace(/^서울특별시(?:\s|$)/, '서울시 ')
