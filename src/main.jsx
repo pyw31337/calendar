@@ -38,7 +38,8 @@ function resolveFirebaseSdkUrl(src) {
 function dismissSplashScreen() {
   const splash = document.getElementById('app-splash');
   if (!splash) return;
-  const MIN_SPLASH_MS = 650;
+  // Cinematic VFX splash timing (~1s for shockwave, glint flare, shimmer title, and warp dismiss)
+  const MIN_SPLASH_MS = 1050;
   const startTime = (typeof window !== 'undefined' && window.__GATHER_SPLASH_START__) || Date.now();
   const elapsed = Date.now() - startTime;
   const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
@@ -46,7 +47,7 @@ function dismissSplashScreen() {
     splash.classList.add('is-hidden');
     setTimeout(() => {
       try { splash.remove(); } catch (_) {}
-    }, 520);
+    }, 580);
   }, remaining);
 }
 
