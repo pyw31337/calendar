@@ -1354,12 +1354,61 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 /** Destinations for the hero quick-nav row above the D-day badge.
  * Mobile (<768): icon stacked over label. Tablet (768–1199): icon + label in a row.
  * Desktop (>=1200) keeps the persistent side rail, so the row is hidden there. */
-function HeroWeatherBox({ weatherLocation, onSelectDate }) {
+function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeetings }) {
   const React = window.React;
-  const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
-  const lat = effectiveLocation.lat || 37.566;
-  const lon = effectiveLocation.lon || 126.9784;
+
+  // 1. 사용자 지역 설정 우선순위: localStorage -> weatherLocation -> 서울특별시
+  const readSavedUserLocation = () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('gather_weather_user_location');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.name && parsed.lat != null && parsed.lon != null) {
+            return { name: String(parsed.name).trim(), lat: Number(parsed.lat), lon: Number(parsed.lon) };
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const [savedUserLoc, setSavedUserLoc] = React.useState(() => readSavedUserLocation());
+  const effectiveBaseLocation = savedUserLoc
+    || weatherLocation
+    || { name: '서울특별시', lat: 37.566, lon: 126.9784 };
+
+  const handleSaveLocation = (loc) => {
+    if (loc && loc.lat != null && loc.lon != null) {
+      setSavedUserLoc(loc);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('gather_weather_user_location', JSON.stringify(loc));
+        }
+      } catch (_) {}
+    }
+  };
+
+  const lat = effectiveBaseLocation.lat || 37.566;
+  const lon = effectiveBaseLocation.lon || 126.9784;
   const [selectedWeatherDate, setSelectedWeatherDate] = React.useState(null);
+
+  // 2. 모임확정 일자 집합 (D-day 뱃지 타깃)
+  const confirmedMeetingDates = React.useMemo(() => {
+    const dates = new Set();
+    if (Array.isArray(upcomingMeetings)) {
+      upcomingMeetings.forEach(m => {
+        if (m?.date) dates.add(m.date);
+        if (Array.isArray(m?.dates)) m.dates.forEach(d => dates.add(d));
+      });
+    }
+    const truly = getTrulyConfirmedMeetings(calendar);
+    truly.forEach(m => {
+      if (m?.date) dates.add(m.date);
+      if (Array.isArray(m?.dates)) m.dates.forEach(d => dates.add(d));
+    });
+    return dates;
+  }, [calendar, upcomingMeetings]);
 
   const days = React.useMemo(() => {
     const res = [];
@@ -1391,13 +1440,47 @@ function HeroWeatherBox({ weatherLocation, onSelectDate }) {
     return () => { active = false; };
   }, [lat, lon]);
 
+  // 3. 모달 오픈 시 위치 결정: 모임확정 일자이면 등록된 장소 우선, 그 외는 사용자 기본 위치
+  const modalWeatherLocation = React.useMemo(() => {
+    if (!selectedWeatherDate) return effectiveBaseLocation;
+    if (confirmedMeetingDates.has(selectedWeatherDate)) {
+      const places = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, selectedWeatherDate)).slice().sort((a, b) => {
+        const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+        const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+        return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
+      });
+      const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
+      if (withCoords) {
+        return {
+          lat: Number(withCoords.lat),
+          lon: Number(withCoords.lng),
+          name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim()
+        };
+      }
+      const firstPlace = places[0];
+      const meeting = (Array.isArray(upcomingMeetings) ? upcomingMeetings : [])
+        .find(m => m?.date === selectedWeatherDate || (Array.isArray(m?.dates) && m.dates.includes(selectedWeatherDate)))
+        || getTrulyConfirmedMeetings(calendar).find(m => m?.date === selectedWeatherDate || (Array.isArray(m?.dates) && m.dates.includes(selectedWeatherDate)));
+      const placeName = firstPlace ? String(firstPlace.name || firstPlace.alias || firstPlace.address || '').trim() : (typeof meeting?.place === 'string' ? meeting.place.trim() : '');
+      if (placeName) {
+        return {
+          lat: effectiveBaseLocation.lat,
+          lon: effectiveBaseLocation.lon,
+          name: placeName,
+          needsGeocode: true
+        };
+      }
+    }
+    return effectiveBaseLocation;
+  }, [selectedWeatherDate, confirmedMeetingDates, calendar, upcomingMeetings, effectiveBaseLocation]);
+
   const WeatherDetailModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal) || null;
 
   return React.createElement(React.Fragment, null,
     React.createElement('div', {
       className: 'bp-hero-weather-row',
       role: 'region',
-      'aria-label': `${effectiveLocation.name || '지역'} 날씨`
+      'aria-label': `${effectiveBaseLocation.name || '지역'} 날씨`
     },
       days.map(day => {
         const forecast = weatherData ? weatherData[day.dateStr] : null;
@@ -1405,17 +1488,22 @@ function HeroWeatherBox({ weatherLocation, onSelectDate }) {
         const maxTemp = forecast?.max != null ? Math.round(forecast.max) : null;
         const minTemp = forecast?.min != null ? Math.round(forecast.min) : null;
         const tempText = maxTemp != null ? `${maxTemp}°` : (weatherData ? '-' : '...');
-        const fullTitle = `${day.label} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''} - 일기예보 상세 보기`;
+
+        const isConfirmed = confirmedMeetingDates.has(day.dateStr);
+        const ddayText = isConfirmed ? formatDDayLabel(day.dateStr) : null;
+        const fullTitle = `${day.label}${ddayText ? ` (${ddayText} 모임확정)` : ''} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''} - 일기예보 상세 보기`;
 
         return React.createElement('button', {
           type: 'button',
           key: day.dateStr,
-          className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}`,
+          className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}${isConfirmed ? ' has-dday' : ''}`,
           title: fullTitle,
           'aria-label': fullTitle,
           onClick: () => setSelectedWeatherDate(day.dateStr),
         },
-          React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
+          isConfirmed && ddayText
+            ? React.createElement('span', { className: 'bp-hero-weather-day bp-hero-weather-dday-badge' }, ddayText)
+            : React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
           React.createElement('span', { className: 'bp-hero-weather-icon', 'aria-hidden': 'true' },
             getWeatherIcon(code, 22)
           ),
@@ -1425,9 +1513,10 @@ function HeroWeatherBox({ weatherLocation, onSelectDate }) {
     ),
     selectedWeatherDate && WeatherDetailModal && React.createElement(WeatherDetailModal, {
       dateStr: selectedWeatherDate,
-      weatherLocation: effectiveLocation,
+      weatherLocation: modalWeatherLocation,
       days,
       onClose: () => setSelectedWeatherDate(null),
+      onSaveLocation: handleSaveLocation,
       onSelectDate: (targetDate) => {
         setSelectedWeatherDate(null);
         onSelectDate?.(targetDate);
@@ -1507,7 +1596,9 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   // 오늘 일정이 없을 때는 5일 날씨 ('어제 오늘 내일 모레 M.DD')
   return React.createElement(HeroWeatherBox, {
     weatherLocation: calendar?.weatherLocation,
-    onSelectDate
+    onSelectDate,
+    calendar,
+    upcomingMeetings
   });
 }
 

@@ -301,6 +301,34 @@
   font-weight: 900;
   color: #fff;
 }
+.v2-design .bp-hero-weather-dday-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: var(--v2-accent, #5B4BEB) !important;
+  font-size: 0.68rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  padding: 2px 7px !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+  animation: bp-hero-dday-heartbeat 0.75s ease-in-out infinite !important;
+  transform-origin: center !important;
+  letter-spacing: -0.02em;
+}
+@keyframes bp-hero-dday-heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.10); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.12); }
+  70% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .bp-hero-weather-dday-badge {
+    animation: none !important;
+  }
+}
 .v2-design .bp-hero-weather-icon {
   display: inline-flex;
   align-items: center;

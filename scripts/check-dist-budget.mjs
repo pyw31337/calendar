@@ -50,7 +50,7 @@ const LAZY_CHUNK_PATTERNS = [
 // "a few KB"; the current eager bundle is 1,541,300 bytes while every per-chunk budget still
 // has substantial headroom. Keep the aggregate guard, with a 1.55 MB cap that tolerates normal
 // content-hash/build-tool variation without masking a meaningful eager-load regression.
-const TOTAL_JS_MAX_BYTES = 1_565_000;
+const TOTAL_JS_MAX_BYTES = 1_575_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

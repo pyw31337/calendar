@@ -573,11 +573,289 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
   ));
 }
 
+// --- Korea Regions Geo Coordinates & District Mapping ---
+const KOREA_REGIONS_GEO = [
+  { code: 'seoul', label: '서울', fullName: '서울특별시', lat: 37.5665, lon: 126.9780, gugun: '종로구,중구,용산구,성동구,광진구,동대문구,중랑구,성북구,강북구,도봉구,노원구,은평구,서대문구,마포구,양천구,강서구,구로구,금천구,영등포구,동작구,관악구,서초구,강남구,송파구,강동구'.split(',') },
+  { code: 'busan', label: '부산', fullName: '부산광역시', lat: 35.1796, lon: 129.0756, gugun: '중구,서구,동구,영도구,부산진구,동래구,남구,북구,해운대구,사하구,금정구,강서구,연제구,수영구,사상구,기장군'.split(',') },
+  { code: 'daegu', label: '대구', fullName: '대구광역시', lat: 35.8714, lon: 128.6014, gugun: '중구,동구,서구,남구,북구,수성구,달서구,달성군,군위군'.split(',') },
+  { code: 'incheon', label: '인천', fullName: '인천광역시', lat: 37.4563, lon: 126.7052, gugun: '중구,동구,미추홀구,연수구,남동구,부평구,계양구,서구,강화군,옹진군'.split(',') },
+  { code: 'gwangju', label: '광주', fullName: '광주광역시', lat: 35.1595, lon: 126.8526, gugun: '동구,서구,남구,북구,광산구'.split(',') },
+  { code: 'daejeon', label: '대전', fullName: '대전광역시', lat: 36.3504, lon: 127.3845, gugun: '동구,중구,서구,유성구,대덕구'.split(',') },
+  { code: 'ulsan', label: '울산', fullName: '울산광역시', lat: 35.5384, lon: 129.3114, gugun: '중구,남구,동구,북구,울주군'.split(',') },
+  { code: 'sejong', label: '세종', fullName: '세종특별자치시', lat: 36.4800, lon: 127.2890, gugun: ['세종시'] },
+  { code: 'gyeonggi', label: '경기', fullName: '경기도', lat: 37.2636, lon: 127.0286, gugun: '수원시,성남시,의정부시,안양시,부천시,광명시,평택시,동두천시,안산시,고양시,과천시,구리시,남양주시,오산시,시흥시,군포시,의왕시,하남시,용인시,파주시,이천시,안성시,김포시,화성시,광주시,양주시,포천시,여주시,연천군,가평군,양평군'.split(',') },
+  { code: 'gangwon', label: '강원', fullName: '강원특별자치도', lat: 37.8854, lon: 127.7298, gugun: '춘천시,원주시,강릉시,동해시,태백시,속초시,삼척시,홍천군,횡성군,영월군,평창군,정선군,철원군,화천군,양구군,인제군,고성군,양양군'.split(',') },
+  { code: 'chungbuk', label: '충북', fullName: '충청북도', lat: 36.6424, lon: 127.4890, gugun: '청주시,충주시,제천시,보은군,옥천군,영동군,증평군,진천군,괴산군,음성군,단양군'.split(',') },
+  { code: 'chungnam', label: '충남', fullName: '충청남도', lat: 36.6012, lon: 126.6608, gugun: '천안시,공주시,보령시,아산시,서산시,논산시,계룡시,당진시,금산군,부여군,서천군,청양군,홍성군,예산군,태안군'.split(',') },
+  { code: 'jeonbuk', label: '전북', fullName: '전북특별자치도', lat: 35.8242, lon: 127.1480, gugun: '전주시,군산시,익산시,정읍시,남원시,김제시,완주군,진안군,무주군,장수군,임실군,순창군,고창군,부안군'.split(',') },
+  { code: 'jeonnam', label: '전남', fullName: '전라남도', lat: 34.8160, lon: 126.4630, gugun: '목포시,여수시,순천시,나주시,광양시,담양군,곡성군,구례군,고흥군,보성군,화순군,장흥군,강진군,해남군,영암군,무안군,함평군,영광군,장성군,완도군,진도군,신안군'.split(',') },
+  { code: 'gyeongbuk', label: '경북', fullName: '경상북도', lat: 36.5684, lon: 128.7294, gugun: '포항시,경주시,김천시,안동시,구미시,영주시,영천시,상주시,문경시,경산시,의성군,청송군,영양군,영덕군,청도군,고령군,성주군,칠곡군,예천군,봉화군,울진군,울릉군'.split(',') },
+  { code: 'gyeongnam', label: '경남', fullName: '경상남도', lat: 35.2280, lon: 128.6811, gugun: '창원시,진주시,통영시,사천시,김해시,밀양시,거제시,양산시,의령군,함안군,창녕군,고성군,남해군,하동군,산청군,함양군,거창군,합천군'.split(',') },
+  { code: 'jeju', label: '제주', fullName: '제주특별자치도', lat: 33.4996, lon: 126.5312, gugun: ['제주시', '서귀포시'] }
+];
+
+const KOREA_REGION_GUGUN_MAP = KOREA_REGIONS_GEO.flatMap(region =>
+  region.gugun.map(gugun => ({ code: region.code, label: region.label, fullName: region.fullName, gugun }))
+);
+
+async function resolveLocationCoordinates(queryName, fallbackLat = 37.566, fallbackLon = 126.9784) {
+  const clean = String(queryName || '').trim();
+  if (!clean) return { lat: fallbackLat, lon: fallbackLon, name: '서울특별시' };
+
+  // Match Si/Do
+  const directSido = KOREA_REGIONS_GEO.find(r => r.label === clean || r.fullName === clean || r.code === clean);
+  if (directSido) {
+    return { lat: directSido.lat, lon: directSido.lon, name: directSido.fullName || directSido.label };
+  }
+
+  // Geocoding via Open-Meteo
+  try {
+    const translated = translateKoreanToEnglish(clean);
+    if (translated) {
+      const res = await withWeatherTimeout(
+        fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(translated)}&count=1&language=ko&format=json`),
+        3500
+      );
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.results && data.results[0]) {
+          return {
+            lat: parseFloat(data.results[0].latitude),
+            lon: parseFloat(data.results[0].longitude),
+            name: clean
+          };
+        }
+      }
+    }
+  } catch (_) {}
+
+  // Nominatim fallback
+  try {
+    const res = await withWeatherTimeout(
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(clean)}&format=json&limit=1&accept-language=ko`),
+      3500
+    );
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && data[0]) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lon: parseFloat(data[0].lon),
+          name: clean
+        };
+      }
+    }
+  } catch (_) {}
+
+  return { lat: fallbackLat, lon: fallbackLon, name: clean };
+}
+
+/**
+ * WeatherLocationSettingModal
+ * 첨부파일(media_1790669586844.png) 규격의 지역 설정 모달
+ */
+export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation, currentLocationName }) {
+  const React = window.React;
+  const [query, setQuery] = React.useState('');
+  const [expandedSido, setExpandedSido] = React.useState('');
+  const [draftGugun, setDraftGugun] = React.useState('');
+  const [isLocating, setIsLocating] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setExpandedSido('');
+      setDraftGugun('');
+      setQuery('');
+    }
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    const match = KOREA_REGION_GUGUN_MAP.find(entry => entry.gugun.includes(trimmed) || entry.label === trimmed);
+    if (match) {
+      setExpandedSido(match.code);
+      if (match.gugun.includes(trimmed)) setDraftGugun(match.gugun);
+    }
+  }, [query]);
+
+  if (!isOpen) return null;
+
+  const activeRegion = KOREA_REGIONS_GEO.find(r => r.code === expandedSido);
+
+  const handleLocate = () => {
+    if (isLocating || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setIsLocating(false);
+        onSelectLocation?.({
+          name: '현재 위치',
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude
+        });
+        onClose?.();
+      },
+      err => {
+        console.warn('Geolocation error:', err);
+        setIsLocating(false);
+      },
+      { timeout: 7000, enableHighAccuracy: true }
+    );
+  };
+
+  const handleSave = async () => {
+    if (!expandedSido && !query.trim()) return;
+
+    if (query.trim() && !activeRegion) {
+      const resolved = await resolveLocationCoordinates(query.trim());
+      onSelectLocation?.(resolved);
+      onClose?.();
+      return;
+    }
+
+    if (!activeRegion) return;
+
+    if (draftGugun && draftGugun !== '전체') {
+      const searchTarget = `${activeRegion.label} ${draftGugun}`;
+      const resolved = await resolveLocationCoordinates(searchTarget, activeRegion.lat, activeRegion.lon);
+      onSelectLocation?.({
+        name: searchTarget,
+        lat: resolved.lat,
+        lon: resolved.lon
+      });
+      onClose?.();
+    } else {
+      onSelectLocation?.({
+        name: activeRegion.fullName || activeRegion.label,
+        lat: activeRegion.lat,
+        lon: activeRegion.lon
+      });
+      onClose?.();
+    }
+  };
+
+  const modalNode = /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay region-filter-overlay",
+    onClick: onClose,
+    style: { zIndex: 13500 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container region-filter-sheet",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "지역 설정",
+    onClick: e => e.stopPropagation()
+  },
+    /* Drag Handle for Mobile */
+    /*#__PURE__*/React.createElement("div", {
+      className: "v2-modal-drag-handle",
+      style: { width: '36px', height: '4px', backgroundColor: 'var(--border-subtle, rgba(0,0,0,0.15))', borderRadius: '9999px', margin: '8px auto 0' }
+    }),
+    /* Header */
+    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+      /*#__PURE__*/React.createElement("h3", null, "지역 설정"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+        (expandedSido || draftGugun || query) && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "region-filter-reset-btn",
+          onClick: () => { setExpandedSido(''); setDraftGugun(''); setQuery(''); }
+        }, "초기화"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "modal-close-btn",
+          onClick: onClose,
+          "aria-label": "닫기",
+          style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }
+        }, "✕")
+      )
+    ),
+    /* Body */
+    /*#__PURE__*/React.createElement("div", { className: "modal-body region-filter-body" },
+      /* Search Input & GPS */
+      /*#__PURE__*/React.createElement("div", { className: "region-filter-search-row" },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          placeholder: "지역명으로 검색 (예: 부천)",
+          value: query,
+          onChange: e => setQuery(e.target.value),
+          onKeyDown: e => { if (e.key === 'Enter') handleSave(); },
+          autoFocus: true
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "region-filter-locate-btn",
+          disabled: isLocating,
+          onClick: handleLocate,
+          title: "현재 위치로 검색",
+          "aria-label": "현재 위치로 검색"
+        },
+          /* GPS Crosshair Icon */
+          /*#__PURE__*/React.createElement("svg", {
+            width: 18, height: 18, viewBox: "0 0 24 24", fill: "none",
+            stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round"
+          },
+            /*#__PURE__*/React.createElement("line", { x1: 2, y1: 12, x2: 5, y2: 12 }),
+            /*#__PURE__*/React.createElement("line", { x1: 19, y1: 12, x2: 22, y2: 12 }),
+            /*#__PURE__*/React.createElement("line", { x1: 12, y1: 2, x2: 12, y2: 5 }),
+            /*#__PURE__*/React.createElement("line", { x1: 12, y1: 19, x2: 12, y2: 22 }),
+            /*#__PURE__*/React.createElement("circle", { cx: 12, cy: 12, r: 7 }),
+            /*#__PURE__*/React.createElement("circle", { cx: 12, cy: 12, r: 2 })
+          )
+        )
+      ),
+      /* 시/도 Section */
+      /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "시/도"),
+      /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
+        KOREA_REGIONS_GEO.map(r => /*#__PURE__*/React.createElement("button", {
+          key: r.code,
+          type: "button",
+          className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
+          onClick: () => { setQuery(''); setExpandedSido(r.code); setDraftGugun(''); }
+        }, r.label))
+      ),
+      /* 군/구 Section */
+      activeRegion && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "군/구"),
+        /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: `region-filter-chip${!draftGugun ? ' is-active' : ''}`,
+            onClick: () => setDraftGugun('')
+          }, "전체"),
+          activeRegion.gugun.map(g => /*#__PURE__*/React.createElement("button", {
+            key: g,
+            type: "button",
+            className: `region-filter-chip${g === draftGugun ? ' is-active' : ''}`,
+            onClick: () => setDraftGugun(g)
+          }, g))
+        )
+      )
+    ),
+    /* Footer */
+    /*#__PURE__*/React.createElement("div", { className: "modal-footer region-filter-footer" },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "region-filter-save-btn",
+        disabled: !expandedSido && !query.trim(),
+        onClick: handleSave
+      }, "지역 저장")
+    )
+  ));
+
+  const ReactDOM = window.ReactDOM;
+  if (typeof document !== 'undefined' && ReactDOM?.createPortal) {
+    return ReactDOM.createPortal(modalNode, document.body);
+  }
+  return modalNode;
+}
+
 export function WeatherDetailModal({
   dateStr: initialDateStr,
   weatherLocation,
   onClose,
   onSelectDate,
+  onSaveLocation,
   days = []
 }) {
   const React = window.React;
@@ -586,10 +864,41 @@ export function WeatherDetailModal({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
-  const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
-  const lat = effectiveLocation.lat || 37.566;
-  const lon = effectiveLocation.lon || 126.9784;
-  const locationName = effectiveLocation.name || '지역';
+  const [currentLocation, setCurrentLocation] = React.useState(() => {
+    return weatherLocation || { name: '서울특별시', lat: 37.566, lon: 126.9784 };
+  });
+  const [showLocationPicker, setShowLocationPicker] = React.useState(false);
+
+  React.useEffect(() => {
+    if (weatherLocation) {
+      setCurrentLocation(weatherLocation);
+    }
+  }, [weatherLocation]);
+
+  // If a location has a place name but needs geocoding:
+  React.useEffect(() => {
+    if (currentLocation?.needsGeocode && currentLocation?.name) {
+      let active = true;
+      resolveLocationCoordinates(currentLocation.name, currentLocation.lat || 37.566, currentLocation.lon || 126.9784)
+        .then(resolved => {
+          if (active && resolved) {
+            setCurrentLocation(prev => ({
+              ...prev,
+              lat: resolved.lat,
+              lon: resolved.lon,
+              name: resolved.name || prev.name,
+              needsGeocode: false
+            }));
+          }
+        })
+        .catch(() => {});
+      return () => { active = false; };
+    }
+  }, [currentLocation?.needsGeocode, currentLocation?.name]);
+
+  const lat = currentLocation.lat || 37.566;
+  const lon = currentLocation.lon || 126.9784;
+  const locationName = currentLocation.name || '지역';
 
   React.useEffect(() => {
     let active = true;
@@ -670,7 +979,7 @@ export function WeatherDetailModal({
     onClose?.();
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  const modalNode = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay weather-detail-modal-overlay",
     onClick: onClose,
     style: { zIndex: 12500 }
@@ -686,11 +995,24 @@ export function WeatherDetailModal({
       backgroundColor: 'var(--bg-card, #FFFFFF)',
       borderRadius: '24px',
       border: '1px solid var(--border-subtle, rgba(0,0,0,0.08))',
-      boxShadow: '0 20px 48px -8px rgba(0, 0, 0, 0.22)',
+      boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.28)',
       overflow: 'hidden',
       boxSizing: 'border-box'
     }
   },
+    /* Mobile drag affordance */
+    /*#__PURE__*/React.createElement("div", {
+      className: "v2-modal-drag-handle",
+      style: {
+        width: '38px',
+        height: '4px',
+        backgroundColor: 'var(--border-subtle, rgba(0,0,0,0.18))',
+        borderRadius: '9999px',
+        margin: '8px auto 0',
+        flexShrink: 0
+      }
+    }),
+
     /* Header */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-header weather-detail-header",
@@ -698,38 +1020,56 @@ export function WeatherDetailModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 20px',
+        padding: '14px 20px',
         borderBottom: '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
         flexShrink: 0
       }
     },
       /* Location & Date Title */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '2px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '4px' }
       },
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
         },
-          /*#__PURE__*/React.createElement("span", {
+          /* Interactive Location Change Button */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setShowLocationPicker(true),
+            className: "weather-location-chip-btn",
+            title: "지역 설정 변경",
+            "aria-label": `현재 지역: ${locationName}. 클릭하여 지역 설정 변경`,
             style: {
               fontSize: 'var(--font-size-xs, 0.75rem)',
-              fontWeight: 700,
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fontWeight: 800,
+              backgroundColor: 'rgba(59, 130, 246, 0.12)',
               color: '#3B82F6',
-              padding: '2px 8px',
+              padding: '3px 10px',
               borderRadius: '9999px',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '3px'
+              gap: '4px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              fontFamily: 'inherit'
             }
-          }, `📍 ${locationName}`),
+          },
+            /*#__PURE__*/React.createElement("span", { "aria-hidden": "true" }, "📍"),
+            /*#__PURE__*/React.createElement("span", null, locationName),
+            /*#__PURE__*/React.createElement("svg", {
+              width: 12, height: 12, viewBox: "0 0 24 24", fill: "none",
+              stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round",
+              style: { opacity: 0.7, marginLeft: '1px' }
+            }, /*#__PURE__*/React.createElement("polyline", { points: "6 9 12 15 18 9" }))
+          ),
           dayBadge && /*#__PURE__*/React.createElement("span", {
             style: {
               fontSize: 'var(--font-size-xs, 0.75rem)',
               fontWeight: 800,
               color: dayBadge === '오늘' ? '#10B981' : 'var(--text-muted)',
               backgroundColor: dayBadge === '오늘' ? 'rgba(16, 185, 129, 0.1)' : 'var(--border-subtle, rgba(0,0,0,0.05))',
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '9999px'
             }
           }, dayBadge)
@@ -791,8 +1131,8 @@ export function WeatherDetailModal({
             fontSize: 'var(--font-size-xs, 0.78rem)',
             fontWeight: isSelected ? 800 : 600,
             borderRadius: '9999px',
-            border: isSelected ? '1px solid #3B82F6' : '1px solid var(--border-subtle, rgba(0,0,0,0.08))',
-            backgroundColor: isSelected ? '#3B82F6' : 'var(--bg-card, #FFFFFF)',
+            border: isSelected ? '1px solid var(--v2-accent, #7C3AED)' : '1px solid var(--border-subtle, rgba(0,0,0,0.08))',
+            backgroundColor: isSelected ? 'var(--v2-accent, #7C3AED)' : 'var(--bg-card, #FFFFFF)',
             color: isSelected ? '#FFFFFF' : 'var(--text-main, #334155)',
             cursor: 'pointer',
             flexShrink: 0,
@@ -857,8 +1197,8 @@ export function WeatherDetailModal({
           style: {
             padding: '18px 20px',
             borderRadius: '20px',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(147, 51, 234, 0.1) 100%)',
-            border: '1px solid rgba(59, 130, 246, 0.22)',
+            background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(59, 130, 246, 0.1) 100%)',
+            border: '1px solid rgba(124, 58, 237, 0.22)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -874,12 +1214,12 @@ export function WeatherDetailModal({
                 width: '54px',
                 height: '54px',
                 borderRadius: '16px',
-                backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#3B82F6',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.18)',
+                color: 'var(--v2-accent, #7C3AED)',
+                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.18)',
                 flexShrink: 0
               }
             }, getWeatherIcon(weatherCode, 32)),
@@ -1092,8 +1432,8 @@ export function WeatherDetailModal({
                   width: '62px',
                   padding: '10px 4px',
                   borderRadius: '14px',
-                  backgroundColor: isNow ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-primary, rgba(0,0,0,0.02))',
-                  border: isNow ? '1.5px solid #3B82F6' : '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
+                  backgroundColor: isNow ? 'rgba(124, 58, 237, 0.12)' : 'var(--bg-primary, rgba(0,0,0,0.02))',
+                  border: isNow ? '1.5px solid var(--v2-accent, #7C3AED)' : '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -1102,7 +1442,7 @@ export function WeatherDetailModal({
                 }
               },
                 /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.72rem', fontWeight: isNow ? 800 : 600, color: isNow ? '#3B82F6' : 'var(--text-muted)' }
+                  style: { fontSize: '0.72rem', fontWeight: isNow ? 800 : 600, color: isNow ? 'var(--v2-accent, #7C3AED)' : 'var(--text-muted)' }
                 }, isNow ? '현재' : h.time),
                 /*#__PURE__*/React.createElement("div", {
                   style: { height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
@@ -1144,9 +1484,9 @@ export function WeatherDetailModal({
           padding: '8px 12px',
           fontSize: 'var(--font-size-xs, 0.78rem)',
           fontWeight: 700,
-          color: '#3B82F6',
-          backgroundColor: 'rgba(59, 130, 246, 0.08)',
-          border: '1px solid rgba(59, 130, 246, 0.2)',
+          color: 'var(--v2-accent, #7C3AED)',
+          backgroundColor: 'rgba(124, 58, 237, 0.08)',
+          border: '1px solid rgba(124, 58, 237, 0.2)',
           borderRadius: 'var(--radius-md, 10px)',
           cursor: 'pointer',
           display: 'inline-flex',
@@ -1183,8 +1523,28 @@ export function WeatherDetailModal({
           }
         }, "닫기")
       )
-    )
+    ),
+
+    /* Location Setting Modal */
+    showLocationPicker && /*#__PURE__*/React.createElement(WeatherLocationSettingModal, {
+      isOpen: true,
+      currentLocationName: locationName,
+      onClose: () => setShowLocationPicker(false),
+      onSelectLocation: (newLoc) => {
+        setShowLocationPicker(false);
+        if (newLoc && newLoc.lat != null && newLoc.lon != null) {
+          setCurrentLocation(newLoc);
+          onSaveLocation?.(newLoc);
+        }
+      }
+    })
   ));
+
+  const ReactDOM = window.ReactDOM;
+  if (typeof document !== 'undefined' && ReactDOM?.createPortal) {
+    return ReactDOM.createPortal(modalNode, document.body);
+  }
+  return modalNode;
 }
 
 if (typeof window !== 'undefined') {
@@ -1193,6 +1553,7 @@ if (typeof window !== 'undefined') {
     WeatherLocationModal: WeatherLocationModal,
     DailyWeatherIcon: DailyWeatherIcon,
     WeatherDetailModal: WeatherDetailModal,
+    WeatherLocationSettingModal: WeatherLocationSettingModal,
   });
 }
 
