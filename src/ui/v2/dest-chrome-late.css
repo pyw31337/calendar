@@ -3058,7 +3058,7 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
     /* The drawer is fixed to the physical screen (top/bottom 0), so in an iOS home-screen app
        (black-translucent status bar) its brand row sat under the status bar and 접기 under the
        home indicator. The insets are 0 everywhere else. */
-    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0 !important;
+    padding: var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) env(safe-area-inset-right, 0px) var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)) 0 !important;
     box-sizing: border-box !important;
     border-right: none !important;
     border-left: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -3247,7 +3247,7 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
     height: var(--app-vv-height, 100dvh) !important;
     min-height: var(--app-vv-height, 100dvh) !important;
     max-height: var(--app-vv-height, 100dvh) !important;
-    padding-top: calc(env(safe-area-inset-top, 0px) + var(--v2-sheet-top-gap)) !important;
+    padding-top: calc(var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) + var(--v2-sheet-top-gap)) !important;
     box-sizing: border-box !important;
   }
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
@@ -3257,7 +3257,7 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
   html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
     max-height: min(
       var(--gather-vv-modal-max, 860px),
-      calc(var(--app-vv-height, 100dvh) - env(safe-area-inset-top, 0px) - var(--v2-sheet-top-gap) - env(safe-area-inset-bottom, 0px))
+      calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)))
     ) !important;
   }
 }
@@ -3633,7 +3633,7 @@ html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-footer.region-fil
 html:has(.renewal-shell.v2-design) .v2-page-header.bp-header {
   min-height: 0 !important;
   height: auto !important;
-  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-top: var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) !important;
   padding-bottom: 0 !important;
   background: var(--bg-card) !important;
 }
@@ -3643,7 +3643,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header:not(.is-sc
   max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-top: var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) !important;
   padding-bottom: 0 !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -3659,7 +3659,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header > .bp-header-row {
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
 html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
-  padding-top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+  padding-top: calc(56px + var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px))) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .v2-chat-scroll > div:first-child,
 html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .chat-messages-scroll > div:first-child {
@@ -3683,7 +3683,7 @@ html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
   display: inline-flex !important;
   position: fixed !important;
   z-index: 80 !important;
-  top: calc(6px + env(safe-area-inset-top, 0px)) !important;
+  top: calc(6px + var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px))) !important;
   left: 16px !important;
   width: 44px !important;
   height: 44px !important;
@@ -5397,5 +5397,24 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-he
   .v2-design .bp-home-menu-fab,
   .v2-design .bp-menu-fab {
     right: calc(20px + env(safe-area-inset-right, 0px)) !important;
+  }
+}
+
+/* A few older sheets declare their own 100dvh maximum (notably calendar
+ * settings). That more-specific rule bypassed the overlay's safety cap and
+ * let the sheet header overlap the iPhone status indicator. Keep every
+ * bottom-aligned V2 sheet inside the same measured, safe viewport. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container.admin-settings-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container.v2-settings-modal {
+    max-height: min(
+      var(--gather-vv-modal-max, 860px),
+      calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap, 12px) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)))
+    ) !important;
+  }
+  html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body {
+    max-height: calc(
+      var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap, 12px) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)) - 120px
+    ) !important;
   }
 }

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 const css = fs.readFileSync('src/ui/v2/dest-chrome-late.css', 'utf8');
 
 test('the phone/tablet side-nav drawer pads for the status bar, home indicator and side notch', () => {
-  assert.match(css, /padding: env\(safe-area-inset-top, 0px\) env\(safe-area-inset-right, 0px\) env\(safe-area-inset-bottom, 0px\) 0 !important;/);
+  assert.match(css, /padding: var\(--v2-pwa-safe-top, env\(safe-area-inset-top, 0px\)\) env\(safe-area-inset-right, 0px\) var\(--v2-pwa-safe-bottom, env\(safe-area-inset-bottom, 0px\)\) 0 !important;/);
   assert.doesNotMatch(css.slice(css.indexOf('Mobile/tablet drawer uses the same expanded PC rail'), css.indexOf('Mobile/tablet drawer uses the same expanded PC rail') + 1600), /\n {4}padding: 0 !important;/);
 });
 

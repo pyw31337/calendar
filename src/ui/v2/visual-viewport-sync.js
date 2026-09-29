@@ -86,6 +86,12 @@
     // How far the real screen extends past what WebKit reports (iOS standalone only, see
     // standaloneScreenHeight). viewport-shell.css uses the class to stretch fixed layers too.
     const extended = !keyboard && height > Math.round(layoutH) + 1;
+    // When standalone WebKit needs the physical-screen correction, the extra
+    // pixels represent the status-bar strip above the layout viewport.  Keep
+    // that fact as a separate token: fixed sheets and drawers must reserve it
+    // even on installations where env(safe-area-inset-top) incorrectly
+    // resolves to zero.
+    const standaloneTopInset = extended ? Math.max(0, height - Math.round(layoutH)) : 0;
     if (root.hasAttribute('data-v2-keyboard') !== keyboard) {
       if (keyboard) root.setAttribute('data-v2-keyboard', '');
       else root.removeAttribute('data-v2-keyboard');
@@ -100,6 +106,7 @@
     const heightPx = `${height}px`;
     const topPx = `${offsetTop}px`;
     const leftPx = `${offsetLeft}px`;
+    const standaloneTopInsetPx = `${standaloneTopInset}px`;
     if (root.style.getPropertyValue('--app-vv-height') !== heightPx) {
       root.style.setProperty('--app-vv-height', heightPx);
     }
@@ -108,6 +115,9 @@
     }
     if (root.style.getPropertyValue('--app-vv-offset-left') !== leftPx) {
       root.style.setProperty('--app-vv-offset-left', leftPx);
+    }
+    if (root.style.getPropertyValue('--app-vv-standalone-top-inset') !== standaloneTopInsetPx) {
+      root.style.setProperty('--app-vv-standalone-top-inset', standaloneTopInsetPx);
     }
 
     if (typeof window.scrollTo === 'function' && window.scrollY !== 0) {
@@ -173,6 +183,7 @@
     root.style.removeProperty('--app-vv-height');
     root.style.removeProperty('--app-vv-offset-top');
     root.style.removeProperty('--app-vv-offset-left');
+    root.style.removeProperty('--app-vv-standalone-top-inset');
     root.removeAttribute('data-v2-standalone-extended');
     root.removeAttribute('data-v2-keyboard');
   };
@@ -185,6 +196,116 @@
   syncActive();
   new MutationObserver(syncActive).observe(root, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(apply).observe(document.body, { childList: true });
+})();
+
+/*
+ * Most legacy pickers render only a decorative ::before drag pill.  A pseudo
+ * element cannot receive pointer input, which made those sheets look
+ * resizable while doing nothing on touch devices.  Add one real, inert DOM
+ * handle to every un-managed sheet and resize it with pointer capture.
+ * ResizableModalContainer and the emoji picker own their respective handles,
+ * so they are intentionally left alone.
+ */
+(function installSheetResizeHandles() {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !document.body || typeof document.addEventListener !== 'function') return;
+
+  const HANDLE_CLASS = 'bp-sheet-handle v2-modal-drag-handle';
+  const MIN_SHEET_HEIGHT = 180;
+  const SHEET_SELECTOR = [
+    '.bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet',
+    '.modal-overlay:not(.meme-preview-overlay) > .modal-container',
+    '.modal-overlay:not(.meme-preview-overlay) > .modal',
+    '.modal-overlay:not(.meme-preview-overlay) > .bp-event-sheet',
+  ].join(', ');
+
+  let activeResize = null;
+
+  const isV2Active = () => document.documentElement.classList.contains('v2-html-active');
+  const hasDirectHandle = sheet => Array.from(sheet.children).some(child =>
+    child.classList && (child.classList.contains('bp-sheet-handle') || child.classList.contains('v2-modal-drag-handle'))
+  );
+  const isEligibleSheet = sheet => sheet instanceof Element && (
+    (sheet.matches('.bottom-sheet') && sheet.parentElement?.matches('.bottom-sheet-overlay:not(.emoji-sheet-overlay)'))
+    || (sheet.matches('.modal-container, .modal, .bp-event-sheet') && sheet.parentElement?.matches('.modal-overlay:not(.meme-preview-overlay)'))
+  );
+  const enhanceSheet = sheet => {
+    if (!isV2Active() || !isEligibleSheet(sheet) || hasDirectHandle(sheet)) return;
+    const handle = document.createElement('div');
+    handle.className = HANDLE_CLASS;
+    handle.dataset.v2InjectedSheetHandle = 'true';
+    handle.setAttribute('role', 'separator');
+    handle.setAttribute('aria-label', '위아래로 드래그해서 크기 조절');
+    handle.setAttribute('aria-orientation', 'horizontal');
+    sheet.insertBefore(handle, sheet.firstChild);
+  };
+  const enhance = () => {
+    if (!isV2Active()) return;
+    document.querySelectorAll(SHEET_SELECTOR).forEach(enhanceSheet);
+  };
+  const viewportHeight = () => {
+    const rootHeight = Number.parseFloat(document.documentElement.style.getPropertyValue('--app-vv-height'));
+    return rootHeight || window.visualViewport?.height || window.innerHeight || 0;
+  };
+  const availableHeight = sheet => {
+    const overlay = sheet.closest('.modal-overlay, .bottom-sheet-overlay');
+    const overlayStyle = overlay ? window.getComputedStyle(overlay) : null;
+    const topClearance = Number.parseFloat(overlayStyle?.paddingTop || '0') || 0;
+    const bottomClearance = Number.parseFloat(overlayStyle?.paddingBottom || '0') || 0;
+    return Math.max(MIN_SHEET_HEIGHT, Math.floor(viewportHeight() - topClearance - bottomClearance));
+  };
+  const endResize = () => {
+    if (!activeResize) return;
+    const { handle, pointerId, onMove, onEnd } = activeResize;
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onEnd);
+    document.removeEventListener('pointercancel', onEnd);
+    try { handle.releasePointerCapture?.(pointerId); } catch (_) {}
+    activeResize = null;
+  };
+  const onPointerDown = event => {
+    const handle = event.target?.closest?.('[data-v2-injected-sheet-handle="true"]');
+    if (!handle || !event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    const sheet = handle.parentElement;
+    if (!sheet) return;
+    event.preventDefault();
+    event.stopPropagation();
+    endResize();
+    const pointerId = event.pointerId;
+    const startY = event.clientY;
+    const startHeight = sheet.getBoundingClientRect().height;
+    const maxHeight = availableHeight(sheet);
+    const onMove = moveEvent => {
+      if (!moveEvent.isPrimary || moveEvent.pointerId !== pointerId) return;
+      if (moveEvent.cancelable) moveEvent.preventDefault();
+      const nextHeight = Math.max(MIN_SHEET_HEIGHT, Math.min(maxHeight, Math.round(startHeight - (moveEvent.clientY - startY))));
+      sheet.style.setProperty('height', `${nextHeight}px`, 'important');
+      sheet.style.setProperty('max-height', `${maxHeight}px`, 'important');
+      sheet.style.setProperty('min-height', `${MIN_SHEET_HEIGHT}px`, 'important');
+    };
+    const onEnd = endEvent => {
+      if (!endEvent.isPrimary || endEvent.pointerId !== pointerId) return;
+      endResize();
+    };
+    activeResize = { handle, pointerId, onMove, onEnd };
+    try { handle.setPointerCapture?.(pointerId); } catch (_) {}
+    document.addEventListener('pointermove', onMove, { passive: false });
+    document.addEventListener('pointerup', onEnd);
+    document.addEventListener('pointercancel', onEnd);
+  };
+
+  document.addEventListener('pointerdown', onPointerDown, true);
+  // Chat rows and live data can mutate thousands of descendants. Inspect only
+  // newly mounted sheet roots instead of querying the whole document per row.
+  const observer = new MutationObserver(records => {
+    records.forEach(record => record.addedNodes.forEach(node => {
+      if (!(node instanceof Element)) return;
+      if (isEligibleSheet(node)) enhanceSheet(node);
+      node.querySelectorAll?.('.bottom-sheet, .modal-container, .modal, .bp-event-sheet').forEach(enhanceSheet);
+    }));
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(enhance).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  enhance();
 })();
 
 

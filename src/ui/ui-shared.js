@@ -145,10 +145,18 @@ export function ResizableModalContainer({ className, style, children, ...props }
   };
 
   const getVisibleHeight = () => {
+    const syncedHeight = Number.parseFloat(document.documentElement.style.getPropertyValue('--app-vv-height'));
+    if (syncedHeight) return syncedHeight;
     const vv = window.visualViewport;
     return vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
   };
-  const getResizeMaxHeight = () => Math.max(220, Math.floor(getVisibleHeight() - 16));
+  const getResizeMaxHeight = () => {
+    const overlay = containerRef.current?.closest('.modal-overlay, .bottom-sheet-overlay');
+    const overlayStyle = overlay ? window.getComputedStyle(overlay) : null;
+    const topClearance = Number.parseFloat(overlayStyle?.paddingTop || '0') || 0;
+    const bottomClearance = Number.parseFloat(overlayStyle?.paddingBottom || '0') || 0;
+    return Math.max(220, Math.floor(getVisibleHeight() - topClearance - bottomClearance));
+  };
 
   const handleMouseDown = e => {
     if (e.button !== 0) return; // Only left-click
@@ -366,12 +374,9 @@ export function ResizableModalContainer({ className, style, children, ...props }
       const vv = window.visualViewport;
       const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
       const vvTop = vv && typeof vv.offsetTop === 'number' ? Math.max(0, vv.offsetTop) : 0;
-      const isAdminSettings = containerRef.current && containerRef.current.classList.contains('admin-settings-modal');
       const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
       const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
-      const maxPx = Math.max(180, Math.floor(isAdminSettings
-        ? Math.max(180, vvH - vvTop - 8)
-        : isMemoEdit
+      const maxPx = Math.max(180, Math.floor(isMemoEdit
           ? Math.min(780, vvH - vvTop - reserved)
         : Math.min(860, vvH - vvTop - reserved)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);

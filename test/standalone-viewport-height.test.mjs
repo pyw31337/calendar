@@ -29,22 +29,29 @@ function runShell({ userAgent, innerHeight, screenHeight, width, innerWidth = wi
   };
   const context = { window, document, MutationObserver: class { observe() {} }, requestAnimationFrame: fn => fn(), cancelAnimationFrame() {} };
   vm.runInNewContext(source, context);
-  return props.get('--app-vv-height');
+  return {
+    height: props.get('--app-vv-height'),
+    standaloneTopInset: props.get('--app-vv-standalone-top-inset'),
+  };
 }
 
 test('Android home-screen app keeps the reported window height', () => {
   const ua = 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36';
-  assert.equal(runShell({ userAgent: ua, innerHeight: 835, screenHeight: 915, width: 412 }), '835px');
+  const result = runShell({ userAgent: ua, innerHeight: 835, screenHeight: 915, width: 412 });
+  assert.equal(result.height, '835px');
+  assert.equal(result.standaloneTopInset, '0px');
 });
 
 test('iOS home-screen app still extends over the status-bar shortfall', () => {
   const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-  assert.equal(runShell({ userAgent: ua, innerHeight: 793, screenHeight: 852, width: 393, navStandalone: true }), '852px');
+  const result = runShell({ userAgent: ua, innerHeight: 793, screenHeight: 852, width: 393, navStandalone: true });
+  assert.equal(result.height, '852px');
+  assert.equal(result.standaloneTopInset, '59px');
 });
 
 test('compact iOS standalone keeps its full height while a focused control has changed the viewport width', () => {
   const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';
-  assert.equal(runShell({
+  const result = runShell({
     userAgent: ua,
     innerHeight: 793,
     screenHeight: 852,
@@ -52,7 +59,9 @@ test('compact iOS standalone keeps its full height while a focused control has c
     innerWidth: 327,
     navStandalone: true,
     visualViewport: { height: 660, scale: 1.2 },
-  }), '852px');
+  });
+  assert.equal(result.height, '852px');
+  assert.equal(result.standaloneTopInset, '59px');
 });
 
 test('iOS input controls use a 16px-equivalent mobile token so Safari does not auto-zoom', () => {

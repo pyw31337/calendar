@@ -191,9 +191,16 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
  * this is a no-op.  Desktop retains its rail/viewport sizing unchanged.
  */
 @media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) {
+    /* On certain standalone iOS installations env(safe-area-inset-top)
+       reports zero even though the visual viewport is one status bar short.
+       visual-viewport-sync publishes that measured shortfall as a fallback. */
+    --v2-pwa-safe-top: max(env(safe-area-inset-top, 0px), var(--app-vv-standalone-top-inset, 0px));
+    --v2-pwa-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .renewal-shell.v2-design {
-    --v2-safe-top: env(safe-area-inset-top, 0px);
-    --v2-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --v2-safe-top: var(--v2-pwa-safe-top);
+    --v2-safe-bottom: var(--v2-pwa-safe-bottom);
   }
 
   /* The home is its own scrollport.  Keep the purple hero under the status
