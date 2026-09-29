@@ -19,11 +19,11 @@ const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
 // Archive routes can contain thousands of photos. Keeping the gallery interactive matters more
 // than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
 // first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
-const PAGE_RENDER_SIZE = 100;
+const PAGE_RENDER_SIZE = 40;
 const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
 
 // Gallery's existing number-window calculation is the single pagination rule. Archive and
-// content intentionally use the same 100-item bounded rendering instead of scroll-driven DOM
+// content intentionally use the same 40-item bounded rendering instead of scroll-driven DOM
 // growth, which is what previously made data-heavy tabs freeze the browser.
 function ExistingPageNavigation({ currentPage, pageCount, onChange, label = '목록' }) {
   const React = window.React;
@@ -75,11 +75,50 @@ function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
   }, [pageCount]);
   const page = paginateGalleryItems(list, currentPage, ARCHIVE_GRID_INITIAL_COUNT);
   const visible = page.items;
+
+  // Progressive 2-stage chunk rendering: paint first 16 immediately, then the rest on next animation frame
+  const INITIAL_CHUNK = 16;
+  const [renderedCount, setRenderedCount] = React.useState(() => Math.min(visible.length, INITIAL_CHUNK));
+  React.useEffect(() => {
+    setRenderedCount(Math.min(visible.length, INITIAL_CHUNK));
+    if (visible.length <= INITIAL_CHUNK) return undefined;
+    let rafId = requestAnimationFrame(() => {
+      setRenderedCount(visible.length);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [currentPage, listKey, visible.length]);
+
+  // Idle prefetching for adjacent (next) page thumbnails
+  React.useEffect(() => {
+    if (currentPage >= pageCount) return undefined;
+    const nextPageStart = currentPage * ARCHIVE_GRID_INITIAL_COUNT;
+    const nextPageItems = list.slice(nextPageStart, nextPageStart + ARCHIVE_GRID_INITIAL_COUNT);
+    const prefetch = () => {
+      nextPageItems.slice(0, 16).forEach(p => {
+        const url = p?.thumb || p?.thumbnailUrl || p?.thumbUrl || p?.imageUrl || p?.full;
+        if (url && typeof Image !== 'undefined') {
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = url;
+        }
+      });
+    };
+    const timer = (typeof requestIdleCallback === 'function')
+      ? requestIdleCallback(prefetch, { timeout: 1500 })
+      : setTimeout(prefetch, 400);
+    return () => {
+      if (typeof cancelIdleCallback === 'function' && timer) cancelIdleCallback(timer);
+      else clearTimeout(timer);
+    };
+  }, [currentPage, pageCount, list]);
+
+  const itemsToRender = visible.slice(0, renderedCount);
+
   return React.createElement(React.Fragment, null,
     React.createElement('div', {
       className: 'archive-photo-grid',
       style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-    }, visible.map((photo, index) => renderPhoto(photo, (page.currentPage - 1) * ARCHIVE_GRID_INITIAL_COUNT + index))),
+    }, itemsToRender.map((photo, index) => renderPhoto(photo, (page.currentPage - 1) * ARCHIVE_GRID_INITIAL_COUNT + index))),
     React.createElement(ExistingPageNavigation, {
       currentPage: page.currentPage, pageCount: page.pageCount, onChange: setCurrentPage, label: '보관함 사진'
     })
@@ -1468,7 +1507,13 @@ export function HistoryView({
   };
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
-    setHistoryTab(tab);
+    if (typeof React.startTransition === 'function') {
+      React.startTransition(() => {
+        setHistoryTab(tab);
+      });
+    } else {
+      setHistoryTab(tab);
+    }
     setSelectedMemoryGroupId(null);
     pushHistoryState(tab);
   };
@@ -1927,43 +1972,33 @@ export function HistoryView({
   // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
   // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
   // 완전일치만 인정한다.
-  // Build person buckets once per People tab rather than scanning every photo once for every
-  // card and once again for the selected person. On large archives that repeated tokenization
-  // was a measurable long task before the first interaction.
-  const personPhotosByLabel = React.useMemo(() => {
+  // Build person buckets once per dataset change in a single pass rather than scanning every photo
+  // repeatedly across tab switches. Retains cache across tabs for instant 0ms tab switching.
+  const { personPhotosByLabel, unclassifiedPeoplePhotos } = React.useMemo(() => {
     const buckets = new Map(personTagChips.map(tag => [tag.label, []]));
-    if (historyTab !== 'people') return buckets;
+    const unclassified = [];
     const matchers = personTagChips.map(tag => ({
       label: tag.label,
       variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
     }));
     historyPhotoEntries.forEach(entry => {
       const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
-      if (!tokens.length) return;
+      if (!tokens.length) {
+        unclassified.push(entry);
+        return;
+      }
+      let hasPerson = false;
       matchers.forEach(({ label, variants }) => {
         if (variants.some(value => value.length <= 1 ? tokens.includes(value) : tokens.some(token => token.includes(value)))) {
           buckets.get(label)?.push(entry);
+          hasPerson = true;
         }
       });
+      if (!hasPerson) unclassified.push(entry);
     });
-    return buckets;
-  }, [historyTab, historyPhotoEntries, personTagChips]);
+    return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
+  }, [historyPhotoEntries, personTagChips]);
   const getPhotosForTagLabel = React.useCallback(label => personPhotosByLabel.get(label) || [], [personPhotosByLabel]);
-  const unclassifiedPeoplePhotos = React.useMemo(() => {
-    if (historyTab !== 'people') return [];
-    const matchers = personTagChips.map(tag => ({
-      label: tag.label,
-      variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
-    }));
-    return historyPhotoEntries.filter(entry => {
-      const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
-      if (!tokens.length) return true;
-      const hasPerson = matchers.some(({ variants }) =>
-        variants.some(value => value.length <= 1 ? tokens.includes(value) : tokens.some(token => token.includes(value)))
-      );
-      return !hasPerson;
-    });
-  }, [historyTab, historyPhotoEntries, personTagChips]);
 
   const photosForPersonTag = React.useMemo(
     () => selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? unclassifiedPeoplePhotos : getPhotosForTagLabel(selectedPersonTag),

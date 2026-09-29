@@ -8339,3 +8339,9 @@ button.toggle-switch[role="switch"] {
   background: #C9FD58 !important;
   color: #0D0D0D !important;
 }
+
+/* Photo grids performance: skip layout/paint of offscreen thumbnails */
+.archive-photo-grid > * {
+  content-visibility: auto;
+  contain-intrinsic-size: 90px 90px;
+}
