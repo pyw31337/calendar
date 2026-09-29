@@ -437,8 +437,20 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
-      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
+      try {
+        canvas.toBlob(webpBlob => {
+          if (webpBlob && webpBlob.type === 'image/webp' && webpBlob.size > 0) {
+            res(webpBlob);
+          } else if (isPng) {
+            canvas.toBlob(pngBlob => res(pngBlob), 'image/png');
+          } else {
+            canvas.toBlob(jpgBlob => res(jpgBlob), 'image/jpeg', 0.85);
+          }
+        }, 'image/webp', 0.85);
+      } catch (_) {
+        if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+        else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
+      }
     });
   };
 
@@ -1107,7 +1119,7 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // request -- Firebase Storage's download endpoint doesn't send a CORS header by default, so
     // a plain fetch() to read Content-Length from a different origin (like this app's GitHub
     // Pages host) is silently blocked by the browser and would never work.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, compressed.originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
     const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, 'webp');
     const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
     const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
@@ -1543,7 +1555,7 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     const rand = Math.random().toString(36).slice(2, 8);
     const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
     // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, compressed.originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
     const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, 'webp');
     const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
     const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
@@ -1589,7 +1601,7 @@ function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, ti
     const stamp = Date.now();
     const rand = Math.random().toString(36).slice(2, 8);
     const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, compressed.originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
     const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, 'webp');
     const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
     const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
