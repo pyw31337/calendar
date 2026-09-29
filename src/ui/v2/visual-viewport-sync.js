@@ -110,6 +110,10 @@
       root.style.setProperty('--app-vv-offset-left', leftPx);
     }
 
+    if (typeof window.scrollTo === 'function' && window.scrollY !== 0) {
+      window.scrollTo(0, 0);
+    }
+
     // Keep portaled lightbox overlays inside the visual viewport.
     document.body.querySelectorAll(':scope > .lightbox-overlay').forEach(overlay => {
       overlay.style.setProperty('width', '100vw', 'important');
@@ -126,6 +130,17 @@
     raf = requestAnimationFrame(apply);
   };
 
+  const onFocusIn = () => {
+    onVp();
+    setTimeout(onVp, 50);
+    setTimeout(onVp, 300);
+  };
+
+  const onFocusOut = () => {
+    onVp();
+    setTimeout(onVp, 100);
+  };
+
   let started = false;
   const start = () => {
     if (started) return;
@@ -136,6 +151,10 @@
       window.visualViewport.addEventListener('scroll', onVp);
     }
     window.addEventListener('resize', onVp);
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('focusin', onFocusIn);
+      document.addEventListener('focusout', onFocusOut);
+    }
   };
 
   const stop = () => {
@@ -147,6 +166,10 @@
       window.visualViewport.removeEventListener('scroll', onVp);
     }
     window.removeEventListener('resize', onVp);
+    if (typeof document !== 'undefined' && document.removeEventListener) {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    }
     root.style.removeProperty('--app-vv-height');
     root.style.removeProperty('--app-vv-offset-top');
     root.style.removeProperty('--app-vv-offset-left');

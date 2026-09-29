@@ -1410,7 +1410,7 @@ export function ChatScreen(p) {
           className: 'chat-room-container v2-chat-root',
           style: {
             ...(originalRoot.props?.style || {}),
-            bottom: p.viewportBottom ? `${p.viewportBottom}px` : 0,
+            bottom: 0,
             height: '100%',
             overflow: 'hidden',
           },

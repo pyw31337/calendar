@@ -2777,6 +2777,14 @@ html:has(.renewal-shell.v2-design) {
   }
 }
 
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] {
+  --mobile-bottom-nav-total: 0px !important;
+}
+
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
+  display: none !important;
+}
+
 .v2-design .bp-mobile-bottom-nav-item {
   position: relative !important;
   flex: 1 1 0 !important;
@@ -3280,6 +3288,8 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-root {
   position: relative !important;
+  top: 0 !important;
+  bottom: 0 !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header {
   position: absolute !important;

@@ -59,4 +59,17 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
   assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-memo\s*\{\s*transform:\s*translateX\(-8px\)\s*!important;\s*\}/);
   assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-chat\s*\{\s*transform:\s*translateX\(8px\)\s*!important;\s*\}/);
   assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-more\s*\{\s*transform:\s*translateX\(-10px\)\s*!important;\s*\}/);
+
+  // 9. When virtual keyboard is open, hide bottom nav and zero out nav clearance
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\{\s*--mobile-bottom-nav-total:\s*0px\s*!important;\s*\}/);
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*none\s*!important;\s*\}/);
+
+  // 10. v2-chat-root is pinned to top: 0 and bottom: 0 so it never lifts upward on keyboard open
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\s*\.v2-chat\s*\.v2-chat-root\s*\{[\s\S]*top:\s*0\s*!important;[\s\S]*bottom:\s*0\s*!important;/);
+});
+
+test('ChatScreen in screens.js does not shift v2-chat-root by viewportBottom', () => {
+  const js = fs.readFileSync('src/ui/v2/screens.js', 'utf8');
+  assert.doesNotMatch(js, /className:\s*'chat-room-container v2-chat-root',\s*style:\s*\{[\s\S]*bottom:\s*p\.viewportBottom/);
+  assert.match(js, /className:\s*'chat-room-container v2-chat-root',\s*style:\s*\{[\s\S]*bottom:\s*0,/);
 });
