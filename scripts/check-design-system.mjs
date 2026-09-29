@@ -71,7 +71,10 @@ requireText(shared, /export const PAGE_HEADER_BACK_BTN_STYLE/, 'page header back
 requireText(shared, /export const PAGE_HEADER_ACTIONS_WRAP_STYLE/, 'page header actions wrap token missing');
 requireText(shared, /export const PAGE_HEADER_TITLE_STYLE/, 'page header title token missing');
 requireText(icons, /function ThreeLinesIcon\(\{ size = 22 \}/, 'ThreeLinesIcon default size must be 22 to match 보관함');
-requireText(picker, /value: 'memories', label: '추억', badge: travelMemoryGroups\.length/, 'history 추억 tab must show a count badge');
+// 추억/장소 집계는 사진 수에 비례하는 분류 작업이다. 첫 진입에서 숨겨진 탭까지 계산하면
+// 보관함이 멈추므로, 활성 탭일 때만 실측 badge를 계산한다. 단순히 badge를 없애는 회귀는
+// 막되, 지연 집계 계약도 허용한다.
+requireText(picker, /value: 'memories', label: '추억', badge: historyTab === 'memories' \? travelMemoryGroups\.length : null/, 'history 추억 tab must show its count after the active facet is prepared');
 requireText(picker, /value: 'people', label: '인물', badge: personTagChips\.length/, 'history 인물 tab must show a count badge');
 requireText(picker, /value: 'meetings', label: '지난모임', badge: confirmedDates\.length/, 'history 지난모임 tab must show a count badge');
 requireText(picker, /historyScrollPadTop/, 'memories scroll must use measured header height like gallery');
