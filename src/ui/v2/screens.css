@@ -1293,7 +1293,12 @@
   opacity: 0;
   pointer-events: none;
 }
-.v2-design .v2-chat .msg-row-hover:hover .msg-actions-group,
+@media (hover: hover) and (pointer: fine) {
+  .v2-design .v2-chat .msg-row-hover:hover .msg-actions-group {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .v2-design .v2-chat .msg-row-hover.msg-actions-revealed .msg-actions-group {
   opacity: 1;
   pointer-events: auto;

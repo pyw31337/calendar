@@ -61,10 +61,34 @@ function getImageFilesFromClipboardEvent(...args) {
   const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function useTapRevealedMsgId() {
+function useTapRevealedMsgId(...args) {
+  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
+  if (typeof f === 'function') return f(...args);
   const React = window.React;
-  const [tapRevealedMsgId, setTapRevealedMsgId] = React.useState(null);
-  return [tapRevealedMsgId, setTapRevealedMsgId];
+  const [revealedId, setRevealedId] = React.useState(null);
+  React.useEffect(() => {
+    let timer = null;
+    const handler = e => {
+      if (e.target && e.target.closest && e.target.closest('.msg-actions-group, .msg-actions-group-inline')) {
+        return;
+      }
+      const target = e.target && e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
+      const id = target ? target.getAttribute('data-msg-row-id') : null;
+      setRevealedId(prev => (prev === id ? null : id));
+      if (timer) clearTimeout(timer);
+      if (id) {
+        timer = setTimeout(() => setRevealedId(null), 4000);
+      }
+    };
+    document.addEventListener('touchstart', handler, { passive: true });
+    document.addEventListener('mousedown', handler);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, []);
+  return revealedId;
 }
 function getConfirmedMeetings(...args) {
   const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;

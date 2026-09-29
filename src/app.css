@@ -2373,13 +2373,15 @@ select.form-select {
    tap (mobile, via the .msg-actions-revealed class toggled in JS). Tapping elsewhere
    clears the revealed state so the buttons hide again. */
 .msg-actions-group { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
-.msg-row-hover:hover .msg-actions-group,
+@media (hover: hover) and (pointer: fine) {
+  .msg-row-hover:hover .msg-actions-group { opacity: 1; pointer-events: auto; }
+  .msg-row-hover:hover .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
+}
 .msg-row-hover.msg-actions-revealed .msg-actions-group { opacity: 1; pointer-events: auto; }
 /* Same reveal behavior, but also collapses its own width to 0 while hidden (instead of
    just fading) so it doesn't reserve empty space next to the timestamp -- used where the
    actions sit inline in a header row (CommentsSection) rather than in their own column. */
 .msg-actions-group-inline { max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; transition: max-width 0.15s ease, opacity 0.15s ease; }
-.msg-row-hover:hover .msg-actions-group-inline,
 .msg-row-hover.msg-actions-revealed .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
 .registered-at-text {
   color: #A7B0BF;

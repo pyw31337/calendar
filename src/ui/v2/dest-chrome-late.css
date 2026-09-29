@@ -3752,6 +3752,13 @@ html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group {
   box-shadow: none !important;
   border-radius: 6px !important;
 }
+
+@media (hover: none), (pointer: coarse) {
+  html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not(.msg-actions-revealed) .msg-actions-group {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
 html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) {
   align-items: flex-end !important;
 }

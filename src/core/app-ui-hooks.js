@@ -12,13 +12,24 @@ export function useTapRevealedMsgId() {
   const React = window.React;
   const [revealedId, setRevealedId] = React.useState(null);
   React.useEffect(() => {
+    let timer = null;
     const handler = e => {
-      const target = e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
-      setRevealedId(target ? target.getAttribute('data-msg-row-id') : null);
+      // If clicking inside the actions group itself (reply/edit button), let the action proceed
+      if (e.target && e.target.closest && e.target.closest('.msg-actions-group, .msg-actions-group-inline')) {
+        return;
+      }
+      const target = e.target && e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
+      const id = target ? target.getAttribute('data-msg-row-id') : null;
+      setRevealedId(prev => (prev === id ? null : id));
+      if (timer) clearTimeout(timer);
+      if (id) {
+        timer = setTimeout(() => setRevealedId(null), 4000);
+      }
     };
     document.addEventListener('touchstart', handler, { passive: true });
     document.addEventListener('mousedown', handler);
     return () => {
+      if (timer) clearTimeout(timer);
       document.removeEventListener('touchstart', handler);
       document.removeEventListener('mousedown', handler);
     };
