@@ -243,7 +243,7 @@ function TabIcon({ id, active, size = 16 }) {
 export const MOBILE_BOTTOM_NAV_ITEMS = [
   { id: 'settlement', label: '정산', icon: 'settlement' },
   { id: 'memo', label: '메모', icon: 'memo' },
-  { id: 'calendar', label: '캘린더', icon: 'calendar' },
+  { id: 'calendar', label: '캘린더', icon: 'calendar', isCenter: true },
   { id: 'chat', label: '채팅', icon: 'chat' },
   { id: 'more', label: '더보기', icon: 'more' },
 ];
@@ -258,6 +258,26 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
     },
     MOBILE_BOTTOM_NAV_ITEMS.map((item) => {
       const isActive = isSideNavOpen ? item.id === 'more' : activeTab === item.id;
+      if (item.isCenter) {
+        return React.createElement(
+          'button',
+          {
+            key: item.id,
+            type: 'button',
+            className: bentoClass(`mobile-bottom-nav-item is-center ${isActive ? 'is-active' : ''}`.trim()),
+            'aria-label': item.label,
+            'aria-current': isActive ? 'page' : undefined,
+            onClick: () => {
+              if (typeof onSelectTab === 'function') onSelectTab(item.id);
+            },
+          },
+          React.createElement(
+            'span',
+            { className: bentoClass('mobile-bottom-nav-center-circle'), 'aria-hidden': 'true' },
+            React.createElement(TabIcon, { id: item.icon, active: true, size: 26 })
+          )
+        );
+      }
       return React.createElement(
         'button',
         {

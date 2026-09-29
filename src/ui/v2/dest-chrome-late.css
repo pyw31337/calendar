@@ -2757,16 +2757,21 @@ html:has(.renewal-shell.v2-design) {
   height: var(--mobile-bottom-nav-total, calc(58px + env(safe-area-inset-bottom, 0px))) !important;
   padding-bottom: env(safe-area-inset-bottom, 0px) !important;
   background: var(--bg-card) !important;
-  border-top: 1px solid var(--border-subtle) !important;
-  box-shadow: 0 -2px 10px rgba(30, 27, 46, 0.05) !important;
+  border-top: none !important;
+  border-radius: 24px 24px 0 0 !important;
+  box-shadow: 0 -4px 24px rgba(30, 27, 46, 0.08) !important;
   display: flex !important;
   align-items: stretch !important;
   justify-content: space-around !important;
   z-index: 520 !important;
   box-sizing: border-box !important;
+  overflow: visible !important;
 }
 
 @media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) {
+    --mobile-bottom-nav-total: 0px;
+  }
   .v2-design .bp-mobile-bottom-nav {
     display: none !important;
   }
@@ -2793,6 +2798,45 @@ html:has(.renewal-shell.v2-design) {
   -webkit-tap-highlight-color: transparent !important;
   transition: color 0.15s ease !important;
   box-sizing: border-box !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-is-center {
+  overflow: visible !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-center-circle {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 50% !important;
+  margin-top: -20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background:
+    linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
+    linear-gradient(90deg, #8019E0 0%, #3604FD 44%, #12CDF0 100%) !important;
+  background-size: auto, 300% 300% !important;
+  animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
+  box-shadow: 0 6px 18px rgba(128, 25, 224, 0.42), 0 2px 6px rgba(54, 4, 253, 0.28) !important;
+  color: #ffffff !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-center-circle svg {
+  width: 26px !important;
+  height: 26px !important;
+  display: block !important;
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
+  transform: scale(1.05) !important;
+  box-shadow: 0 8px 24px rgba(128, 25, 224, 0.55), 0 3px 8px rgba(54, 4, 253, 0.35) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-indicator {
@@ -3216,7 +3260,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
   position: absolute !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
+  bottom: var(--mobile-bottom-nav-total, 0px) !important;
   top: auto !important;
   z-index: 20 !important;
   width: 100% !important;
@@ -3229,16 +3273,16 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
   overflow: visible !important;
   margin: 0 !important;
   opacity: 1 !important;
-  transform: translateY(110%) !important;
+  transform: translateY(calc(100% + var(--mobile-bottom-nav-total, 0px) + 20px)) !important;
   pointer-events: none !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
 html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
-  bottom: calc(var(--v2-chat-composer-space, 168px) + 8px) !important;
+  bottom: calc(var(--v2-chat-composer-space, 168px) + var(--mobile-bottom-nav-total, 0px) + 8px) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
 html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  bottom: calc(var(--mobile-bottom-nav-total, 0px) + 12px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* Header action icons sit close together on every page (mobile used to force 12px). */
@@ -3573,11 +3617,11 @@ html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > [role="img"
    is the only way to scroll that bubble out from under the button. */
 html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
 html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
-  padding-bottom: calc(var(--v2-chat-composer-space, 168px) + 76px) !important;
+  padding-bottom: calc(var(--v2-chat-composer-space, 168px) + var(--mobile-bottom-nav-total, 0px) + 76px) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-scroll,
 html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .chat-messages-scroll {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(80px + var(--mobile-bottom-nav-total, 0px) + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* v1 meta: time / edit / reply sit beside the bubble, not under it.
