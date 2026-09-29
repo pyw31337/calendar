@@ -1322,24 +1322,25 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             },
               /* Title input - Styled precisely as user requested */
               /*#__PURE__*/React.createElement("input", {
-                className: "memo-edit-title-input field-edge-bottom",
+                className: "memo-edit-title-input form-input",
                 type: "text",
                 ref: newTitleInputRef,
                 placeholder: "제목",
                 value: newTitle,
                 onChange: e => setNewTitle(e.target.value),
                 style: {
-                  padding: '8px 8px',
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  padding: '0 16px',
                   background: 'transparent',
-                  border: 'none',
-                  borderRadius: 0,
+                  border: '1px solid var(--v2-card-border, var(--border-subtle))',
+                  borderRadius: 'var(--field-radius-single-line)',
                   outline: 'none',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
                   color: 'var(--text-main)',
                   width: '100%',
-                  minHeight: '44px',
-                  borderBottom: '1px solid var(--border-subtle)',
+                  minHeight: 'var(--field-single-line-height)',
                   boxSizing: 'border-box'
                 }
               }),
@@ -1730,23 +1731,24 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         },
           /* Title input - Styled precisely as user requested */
           /*#__PURE__*/React.createElement("input", {
-            className: "memo-edit-title-input field-edge-bottom",
+            className: "memo-edit-title-input form-input",
             type: "text",
             placeholder: "제목",
             value: editTitle,
             onChange: e => setEditTitle(e.target.value),
             style: {
-              padding: '8px 8px',
+              flex: '1 1 auto',
+              minWidth: 0,
+              padding: '0 16px',
               background: 'transparent',
-              border: 'none',
-              borderRadius: 0,
+              border: '1px solid var(--v2-card-border, var(--border-subtle))',
+              borderRadius: 'var(--field-radius-single-line)',
               outline: 'none',
               fontSize: '0.95rem',
               fontWeight: 'bold',
               color: 'var(--text-main)',
               width: '100%',
-              minHeight: '44px',
-              borderBottom: '1px solid var(--border-subtle)',
+              minHeight: 'var(--field-single-line-height)',
               boxSizing: 'border-box'
             }
           }),

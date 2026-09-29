@@ -259,7 +259,7 @@ function layerPopup({ label, title, onClose, children }) {
       },
       h(
         'div',
-        { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+        { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: 'none' } },
         h('h3', { style: { margin: 0, fontSize: '1.02rem', fontWeight: 900, color: 'var(--text-main)' } }, title),
         h(IconButton, { label: '닫기', icon: 'close', onClick: onClose })
       ),

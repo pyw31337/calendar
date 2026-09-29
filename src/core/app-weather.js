@@ -82,7 +82,9 @@ export function fetchFourDayForecast(lat, lon) {
   const hit = readFourDayWeatherMem(lat, lon);
   if (hit) return Promise.resolve(hit);
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FSeoul&past_days=1&forecast_days=3`;
+  // One past day plus today and the next three days gives the hero its five compact
+  // columns: 어제 · 오늘 · 내일 · 모레 · M.DD. Keep this in the same cached request.
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FSeoul&past_days=1&forecast_days=4`;
 
   return fetch(url)
     .then(res => {
@@ -106,4 +108,3 @@ export function fetchFourDayForecast(lat, lon) {
       return result;
     });
 }
-

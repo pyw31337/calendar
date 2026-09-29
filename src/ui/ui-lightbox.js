@@ -1866,7 +1866,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         height: `calc(100vh - ${reservedBottomPx}px)`,
         maxHeight: `calc(100vh - ${reservedBottomPx}px)`,
         overflow: 'hidden',
-        position: 'relative'
+        position: 'relative',
+        transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
       }
     : {
         width: isLandscape ? '100vw' : '92vw',
@@ -1875,7 +1876,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
         overflow: 'hidden',
         position: 'relative',
-        flexShrink: 0
+        flexShrink: 0,
+        transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
       };
 
   const stageWidthPx = typeof window === 'undefined'
@@ -1900,8 +1902,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
     const slideThumb = String(slideMeta.thumb || slideMeta.thumbUrl || '').trim();
     const isSlideThumbBroken = slideThumb && getBrokenThumbSet().has(slideThumb);
-    const visualUrl = slideThumb && slideThumb !== url && !isSlideThumbBroken
-      && !loadedOriginalUrls.has(url) && !failedOriginalUrls.has(url) ? slideThumb : url;
+    const hasThumb = Boolean(slideThumb && slideThumb !== url && !isSlideThumbBroken);
+    const isOriginalLoaded = loadedOriginalUrls.has(url);
+    const isOriginalFailed = failedOriginalUrls.has(url);
+    const showOriginal = isOriginalLoaded && !isOriginalFailed;
 
     if (slot === 'current') {
       if (imageLoadFailed) {
@@ -1941,28 +1945,58 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           overflow: 'hidden'
         },
         onClick: handleImageTap
-      }, /*#__PURE__*/React.createElement("img", {
-        ref: zoomedImgRef,
-        src: visualUrl,
-        alt: "원본 이미지",
-        "data-slide": slot,
-        draggable: false,
-        decoding: 'async',
-        referrerPolicy: 'no-referrer',
-        onLoad: e => recordImageDimensions(url, e),
-        onError: handleCurrentImageError,
-        onMouseDown: handleZoomedImageMouseDown,
-        style: {
-          width: isLandscape ? '100%' : 'auto',
-          maxWidth: '100%',
-          height: isPortrait ? '100%' : 'auto',
-          maxHeight: '100%',
-          objectFit: 'contain',
-          borderRadius: isLandscape ? 0 : 'var(--radius-md)',
-          display: 'block',
-          ...zoomImageStyle
-        }
-      }), renderPhotoActions(),
+      },
+        hasThumb && /*#__PURE__*/React.createElement("img", {
+          src: slideThumb,
+          alt: "썸네일",
+          className: "lightbox-thumb-img",
+          draggable: false,
+          style: {
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            width: isLandscape ? '100%' : 'auto',
+            maxWidth: '100%',
+            height: isPortrait ? '100%' : 'auto',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+            display: 'block',
+            opacity: showOriginal ? 0 : 1,
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+            pointerEvents: 'none',
+            ...zoomImageStyle
+          }
+        }),
+        /*#__PURE__*/React.createElement("img", {
+          ref: zoomedImgRef,
+          src: url,
+          alt: "원본 이미지",
+          "data-slide": slot,
+          draggable: false,
+          decoding: 'async',
+          referrerPolicy: 'no-referrer',
+          onLoad: e => {
+            recordImageDimensions(url, e);
+            setLoadedOriginalUrls(prev => new Set(prev).add(url));
+          },
+          onError: handleCurrentImageError,
+          onMouseDown: handleZoomedImageMouseDown,
+          style: {
+            position: hasThumb ? 'relative' : 'static',
+            width: isLandscape ? '100%' : 'auto',
+            maxWidth: '100%',
+            height: isPortrait ? '100%' : 'auto',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+            display: 'block',
+            opacity: showOriginal ? 1 : (hasThumb ? 0 : 1),
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+            ...zoomImageStyle
+          }
+        }),
+        renderPhotoActions(),
         showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
           key: `meta-${tagOverrideKey || String(currentUrl || index)}`,
           info: currentInfo,
@@ -1973,19 +2007,64 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       ));
     }
 
-    return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
-      src: visualUrl,
-      alt: "원본 이미지",
-      "data-slide": slot,
-      draggable: false,
-      decoding: 'async',
-      referrerPolicy: 'no-referrer',
-      onLoad: e => recordImageDimensions(url, e),
-      onClick: e => e.stopPropagation(),
-      style: {
-        maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)'
-      }
-    }));
+    return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle },
+      /*#__PURE__*/React.createElement("div", {
+        className: "lightbox-slide-frame",
+        style: {
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          minWidth: 0,
+          overflow: 'hidden'
+        }
+      },
+        hasThumb && /*#__PURE__*/React.createElement("img", {
+          src: slideThumb,
+          alt: "썸네일",
+          className: "lightbox-thumb-img",
+          draggable: false,
+          style: {
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: 'var(--radius-md)',
+            opacity: showOriginal ? 0 : 1,
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+            pointerEvents: 'none'
+          }
+        }),
+        /*#__PURE__*/React.createElement("img", {
+          src: url,
+          alt: "원본 이미지",
+          "data-slide": slot,
+          draggable: false,
+          decoding: 'async',
+          referrerPolicy: 'no-referrer',
+          onLoad: e => {
+            recordImageDimensions(url, e);
+            setLoadedOriginalUrls(prev => new Set(prev).add(url));
+          },
+          onClick: e => e.stopPropagation(),
+          style: {
+            position: hasThumb ? 'relative' : 'static',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: 'var(--radius-md)',
+            opacity: showOriginal ? 1 : (hasThumb ? 0 : 1),
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)'
+          }
+        })
+      )
+    );
   };
 
   const lightboxNode = /*#__PURE__*/React.createElement("div", {
@@ -2118,6 +2197,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-single-stage",
     style: {
       position: 'relative',
       display: 'inline-flex',
@@ -2127,41 +2207,73 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       maxWidth: '100vw',
       height: isPortrait ? (isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`) : 'auto',
       maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
-      touchAction: 'none'
+      touchAction: 'none',
+      transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
     },
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
     onTouchEnd: handleTouchEnd,
     onTouchCancel: handleTouchEnd,
     onClick: handleImageTap
-  }, /*#__PURE__*/React.createElement("img", {
-    ref: zoomedImgRef,
-    src: currentVisualUrl,
-    alt: "원본 이미지",
-    draggable: false,
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
-    onLoad: e => recordImageDimensions(currentUrl, e),
-    onError: handleCurrentImageError,
-    onMouseDown: handleZoomedImageMouseDown,
-    style: {
-      width: isLandscape ? '100%' : 'auto',
-      maxWidth: '100vw',
-      height: isPortrait ? '100%' : 'auto',
-      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
-      borderRadius: isLandscape ? 0 : 'var(--radius-md)',
-      objectFit: 'contain',
-      display: 'block',
-      ...zoomImageStyle
-    }
-  }), renderPhotoActions(),
+  },
+    Boolean(currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) && /*#__PURE__*/React.createElement("img", {
+      src: currentThumbUrl,
+      alt: "썸네일",
+      className: "lightbox-thumb-img",
+      draggable: false,
+      style: {
+        position: 'absolute',
+        inset: 0,
+        margin: 'auto',
+        width: isLandscape ? '100%' : 'auto',
+        maxWidth: '100vw',
+        height: isPortrait ? '100%' : 'auto',
+        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+        borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+        objectFit: 'contain',
+        display: 'block',
+        opacity: (loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)) ? 0 : 1,
+        transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+        pointerEvents: 'none',
+        ...zoomImageStyle
+      }
+    }),
+    /*#__PURE__*/React.createElement("img", {
+      ref: zoomedImgRef,
+      src: currentUrl,
+      alt: "원본 이미지",
+      draggable: false,
+      decoding: 'async',
+      referrerPolicy: 'no-referrer',
+      onLoad: e => {
+        recordImageDimensions(currentUrl, e);
+        setLoadedOriginalUrls(prev => new Set(prev).add(currentUrl));
+      },
+      onError: handleCurrentImageError,
+      onMouseDown: handleZoomedImageMouseDown,
+      style: {
+        position: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'relative' : 'static',
+        width: isLandscape ? '100%' : 'auto',
+        maxWidth: '100vw',
+        height: isPortrait ? '100%' : 'auto',
+        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+        borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+        objectFit: 'contain',
+        display: 'block',
+        opacity: (loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)) ? 1 : ((currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 0 : 1),
+        transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+        ...zoomImageStyle
+      }
+    }),
+    renderPhotoActions(),
     showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
       key: `meta-${tagOverrideKey || String(currentUrl || index)}`,
       info: currentInfo,
       sourceInfo: sourceInfo,
       onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
       isRemovingFromMemory: isRemovingFromMemory
-    })),
+    })
+  ),
   showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
     key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
     tags: currentTagsWithUploadDate,

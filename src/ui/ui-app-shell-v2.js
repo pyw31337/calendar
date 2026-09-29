@@ -1364,12 +1364,13 @@ function HeroWeatherBox({ weatherLocation, onSelectDate }) {
     const res = [];
     const labels = ['어제', '오늘', '내일', '모레'];
     const now = new Date();
-    for (let offset = -1; offset <= 2; offset += 1) {
+    for (let offset = -1; offset <= 3; offset += 1) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       res.push({
         offset,
-        label: labels[offset + 1],
+        // The fifth slot remains clear across month boundaries, e.g. 09.30 → 10.01.
+        label: labels[offset + 1] || `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
         dateStr,
         isToday: offset === 0,
       });
@@ -1488,7 +1489,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
     );
   }
 
-  // 오늘 일정이 없을 때는 주간 날씨 ('어제 오늘 내일 모레')
+  // 오늘 일정이 없을 때는 5일 날씨 ('어제 오늘 내일 모레 M.DD')
   return React.createElement(HeroWeatherBox, {
     weatherLocation: calendar?.weatherLocation,
     onSelectDate

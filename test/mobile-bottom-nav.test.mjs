@@ -55,10 +55,10 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
   assert.match(css, /animation:\s*bp-cal-aurora-wave 3s ease-in-out infinite alternate,\s*bp-cal-aurora-spin 6\.5s linear infinite\s*!important;/);
 
   // 8. Lateral item offset positioning for spacing balance
-  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-settlement\s*\{\s*transform:\s*translateX\(10px\)\s*!important;\s*\}/);
-  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-memo\s*\{\s*transform:\s*translateX\(-8px\)\s*!important;\s*\}/);
-  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-chat\s*\{\s*transform:\s*translateX\(8px\)\s*!important;\s*\}/);
-  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-more\s*\{\s*transform:\s*translateX\(-10px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-settlement\s*\{\s*transform:\s*translate\(6px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-memo\s*\{\s*transform:\s*translate\(-6px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-chat\s*\{\s*transform:\s*translate\(6px\)\s*!important;\s*\}/);
+  assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-more\s*\{\s*transform:\s*translate\(-6px\)\s*!important;\s*\}/);
 
   // 9. When virtual keyboard is open, hide bottom nav and zero out nav clearance
   assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\{\s*--mobile-bottom-nav-total:\s*0px\s*!important;\s*\}/);

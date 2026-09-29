@@ -40,3 +40,32 @@ test('Chat composer field maintains capsule on single line and transitions to ro
   assert.match(screensJs, /isMultiline/, 'ChatScreen computes multiline status for composer input');
 });
 
+test('Memo titles use full capsule borders while actual edge-only fields keep straight lines', async () => {
+  const [destLateCss, auditCss, screensJs, memoView] = await Promise.all([
+    readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/responsive-audit.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/ui-memo-view.js', import.meta.url), 'utf8')
+  ]);
+  assert.doesNotMatch(destLateCss, /\.memo-edit-title-input[\s\S]{0,160}border-radius:\s*0 !important;/, 'memo title input is no longer treated as an edge-only field');
+  assert.match(memoView, /className: "memo-edit-title-input form-input"/, 'memo title fields opt into the shared single-line form geometry');
+  assert.match(memoView, /borderRadius: 'var\(--field-radius-single-line\)'/, 'memo title fields render as capsules');
+  assert.match(destLateCss, /input:is\(\.field-edge-bottom, \[class\*="field-edge-"\]\)[\s\S]{0,100}border-radius:\s*0 !important;/, 'genuine edge-only fields retain straight border ends');
+  assert.match(destLateCss, /\.modal-header,[\s\S]*?\.bottom-sheet-header[\s\S]*?border-bottom:\s*none !important;/, 'modal-overlay header border-bottom is removed');
+  assert.match(auditCss, /\.modal-overlay \.modal-header[\s\S]*?border-bottom:\s*none !important;/, 'responsive audit modal-header removes divider');
+  assert.match(screensJs, /className:\s*'modal-header',\s*style:\s*\{[^}]*borderBottom:\s*'none'/, 'screens.js layerPopup modal-header sets borderBottom to none');
+});
+
+test('Gallery tabs use dot badge mode and match event-sheet text style without numeric count pills', async () => {
+  const [galleryJs, destLateCss] = await Promise.all([
+    readFile(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8')
+  ]);
+  assert.match(galleryJs, /\{ value: 'photos', label: '사진', badge: displayPhotoTabCount, badgeMode: 'dot' \}/, 'photos tab uses dot badge mode');
+  assert.match(galleryJs, /\{ value: 'links', label: '링크', badge: filteredLinks\.length, badgeMode: 'dot' \}/, 'links tab uses dot badge mode');
+  assert.match(galleryJs, /\{ value: 'files', label: '파일', badge: filteredFiles\.length, badgeMode: 'dot' \}/, 'files tab uses dot badge mode');
+  assert.match(galleryJs, /\{ value: 'analysis', label: 'AI 분석', badge: mediaAnalysis\.items\.length \|\| undefined, badgeMode: 'dot' \}/, 'analysis tab uses dot badge mode');
+  assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs \.underline-tabs-label[\s\S]*?font-size:\s*var\(--v2-event-sheet-tab-label-fs\);/, 'gallery tabs use shared 0.9rem event-sheet font size');
+  assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs-label\.has-status-dot::after/, 'gallery tabs render shared purple status dot');
+  assert.match(destLateCss, /:is\(\.v2-gallery, \.gallery-page-tabs, \.gallery-page-tabs-mobile, \.v2-gallery-tabs-slot\) \.underline-tabs \.underline-tabs-count[\s\S]*?display:\s*none !important;/, 'numeric count pills are hidden in gallery tabs');
+});

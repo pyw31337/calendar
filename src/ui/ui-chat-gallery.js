@@ -3787,14 +3787,16 @@ export function ChatGalleryModal({
     },
       UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
         ariaLabel: "갤러리 탭",
+        variant: "flush",
+        activeColor: "var(--brand, #7C2FE5)",
         value: activeTab,
         onChange: v => setGalleryTab(v),
         style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
         options: [
-          { value: 'photos', label: '사진', badge: displayPhotoTabCount },
-          { value: 'links', label: '링크', badge: filteredLinks.length },
-          { value: 'files', label: '파일', badge: filteredFiles.length },
-          { value: 'analysis', label: 'AI 분석', badge: mediaAnalysis.items.length || undefined }
+          { value: 'photos', label: '사진', badge: displayPhotoTabCount, badgeMode: 'dot' },
+          { value: 'links', label: '링크', badge: filteredLinks.length, badgeMode: 'dot' },
+          { value: 'files', label: '파일', badge: filteredFiles.length, badgeMode: 'dot' },
+          { value: 'analysis', label: 'AI 분석', badge: mediaAnalysis.items.length || undefined, badgeMode: 'dot' }
         ]
       })
     );

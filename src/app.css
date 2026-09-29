@@ -1115,6 +1115,44 @@ summary.is-pressing,
   max-height: 100%;
   object-fit: contain;
 }
+.lightbox-overlay .lightbox-stage,
+.lightbox-overlay .lightbox-single-stage,
+.lightbox-overlay .lightbox-slide,
+.lightbox-overlay .lightbox-slide-frame {
+  transition: height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lightbox-overlay .lightbox-slide img,
+.lightbox-overlay .lightbox-single-stage img {
+  transition: width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lightbox-tag-panel-card {
+  animation: lightbox-panel-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.lightbox-info-panel {
+  animation: lightbox-panel-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.lightbox-comment-thread {
+  transition: max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              min-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              padding 0.25s ease,
+              opacity 0.25s ease !important;
+}
+@keyframes lightbox-panel-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 .motion-ripple {
   position: absolute;
   left: var(--ripple-x, 50%);

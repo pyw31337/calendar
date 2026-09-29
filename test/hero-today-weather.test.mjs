@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { URL } from 'node:url';
 
-test('Hero zone replaces redundant quick nav with TODAY schedule box and 4-day weather', async () => {
+test('Hero zone replaces redundant quick nav with TODAY schedule box and compact five-day weather', async () => {
   const [appShellJs, weatherJs, designCss, destLateCss] = await Promise.all([
     readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/core/app-weather.js', import.meta.url), 'utf8'),
@@ -25,14 +25,16 @@ test('Hero zone replaces redundant quick nav with TODAY schedule box and 4-day w
     'CalendarPane renders HeroTodayOrWeather'
   );
 
-  // 4 day labels are defined for weather
+  // Four relative labels plus a fifth date label are defined for weather.
   assert.match(
     appShellJs,
     /labels\s*=\s*\['어제',\s*'오늘',\s*'내일',\s*'모레'\]/,
-    'HeroWeatherBox defines 4 day labels (어제, 오늘, 내일, 모레)'
+    'HeroWeatherBox retains the four relative labels before its dated fifth column'
   );
+  assert.match(appShellJs, /offset\s*<=\s*3/, 'HeroWeatherBox renders five days through the third future day');
+  assert.match(appShellJs, /padStart\(2, '0'\)\}\.\$\{String\(d\.getDate\(\)\)\.padStart\(2, '0'\)/, 'the fifth weather label uses a stable M.DD date');
 
-  // app-weather exports 4-day forecast helpers
+  // The cached forecast helper retrieves all five displayed days.
   assert.match(
     weatherJs,
     /export function fetchFourDayForecast/,
@@ -40,8 +42,8 @@ test('Hero zone replaces redundant quick nav with TODAY schedule box and 4-day w
   );
   assert.match(
     weatherJs,
-    /past_days=1&forecast_days=3/,
-    'fetchFourDayForecast requests past_days=1 and forecast_days=3'
+    /past_days=1&forecast_days=4/,
+    'fetchFourDayForecast requests yesterday through the third future day in one request'
   );
 
   // CSS contains styling for both TODAY box and weather row

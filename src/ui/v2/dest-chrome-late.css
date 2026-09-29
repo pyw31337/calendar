@@ -1000,10 +1000,12 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   justify-content: center;
   min-width: 0;
 }
-.v2-design .bp-event-sheet .underline-tabs.underline-tabs--flush .underline-tabs-label {
+.v2-design .bp-event-sheet .underline-tabs.underline-tabs--flush .underline-tabs-label,
+.v2-design :is(.gallery-page-tabs, .gallery-page-tabs-mobile, .v2-gallery, .v2-gallery-tabs-slot) .underline-tabs .underline-tabs-label {
   font-size: var(--v2-event-sheet-tab-label-fs);
 }
-.v2-design .bp-event-sheet .underline-tabs-label.has-status-dot::after {
+.v2-design .bp-event-sheet .underline-tabs-label.has-status-dot::after,
+.v2-design :is(.gallery-page-tabs, .gallery-page-tabs-mobile, .v2-gallery, .v2-gallery-tabs-slot) .underline-tabs-label.has-status-dot::after {
   content: '';
   position: absolute;
   top: var(--v2-tab-status-dot-offset-block-start);
@@ -1146,9 +1148,13 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 
 /* Anniversary labelled badges: size and label visibility are owned by the lock at the end of this file. */
 
-/* ---- Content 2nd-level tabs: underline, equal columns, brand purple ---- */
+/* ---- Content & Gallery tabs: underline, equal columns, brand purple ---- */
 .v2-design .v2-content .underline-tabs,
-.v2-design .v2-archive .underline-tabs {
+.v2-design .v2-archive .underline-tabs,
+.v2-design .v2-gallery .underline-tabs,
+.v2-design .gallery-page-tabs .underline-tabs,
+.v2-design .gallery-page-tabs-mobile .underline-tabs,
+.v2-design .v2-gallery-tabs-slot .underline-tabs {
   display: flex !important;
   width: 100% !important;
   height: 48px !important;
@@ -1159,7 +1165,11 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 .v2-design .v2-content .underline-tabs [role="tab"],
-.v2-design .v2-archive .underline-tabs [role="tab"] {
+.v2-design .v2-archive .underline-tabs [role="tab"],
+.v2-design .v2-gallery .underline-tabs [role="tab"],
+.v2-design .gallery-page-tabs .underline-tabs [role="tab"],
+.v2-design .gallery-page-tabs-mobile .underline-tabs [role="tab"],
+.v2-design .v2-gallery-tabs-slot .underline-tabs [role="tab"] {
   flex: 1 1 0 !important;
   height: 48px !important;
   min-width: 0 !important;
@@ -1177,8 +1187,15 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   gap: 6px !important;
 }
 .v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"],
-.v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] {
+.v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"],
+.v2-design .v2-gallery .underline-tabs [role="tab"][aria-selected="true"],
+.v2-design .gallery-page-tabs .underline-tabs [role="tab"][aria-selected="true"],
+.v2-design .gallery-page-tabs-mobile .underline-tabs [role="tab"][aria-selected="true"],
+.v2-design .v2-gallery-tabs-slot .underline-tabs [role="tab"][aria-selected="true"] {
   color: var(--brand, #7C2FE5) !important;
+}
+.v2-design :is(.v2-gallery, .gallery-page-tabs, .gallery-page-tabs-mobile, .v2-gallery-tabs-slot) .underline-tabs .underline-tabs-count {
+  display: none !important;
 }
 .v2-design .v2-content .underline-tabs [role="tab"] > .underline-tabs-count,
 .v2-design .v2-archive .underline-tabs [role="tab"] > .underline-tabs-count {
@@ -1361,13 +1378,29 @@ html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet {
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header,
 html:has(.renewal-shell.v2-design) .bottom-sheet-header {
   padding: 14px 18px !important;
-  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  border-bottom: none !important;
   background: var(--bg-card) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   min-height: 52px !important;
   box-sizing: border-box !important;
+}
+
+/* In all modal/sheet backdrops, remove the horizontal divider line below the title */
+html:has(.renewal-shell.v2-design) :is(
+  .modal-overlay,
+  .bottom-sheet-overlay,
+  .admin-side-menu-overlay,
+  .bp-sheet-backdrop,
+  body
+) :is(
+  .modal-header,
+  .bottom-sheet-header,
+  .memo-edit-modal-header,
+  .dialog-header
+) {
+  border-bottom: none !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3,
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h2,
@@ -1769,11 +1802,40 @@ html:has(.renewal-shell.v2-design) :is(
  * are often portaled. An edge-only field is the explicit exception: rounding
  * would curve the end of its single border, so keep that line perfectly
  * straight. */
-html:has(.renewal-shell.v2-design) .field-edge-bottom,
-html:has(.renewal-shell.v2-design) .field-edge-top,
-html:has(.renewal-shell.v2-design) .field-edge-left,
-html:has(.renewal-shell.v2-design) .field-edge-right {
-  border-radius: var(--field-radius-edge) !important;
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay,
+  body
+) :is(
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input[type="password"],
+  input
+):is(
+  .field-edge-bottom,
+  .field-edge-top,
+  .field-edge-left,
+  .field-edge-right,
+  [class*="field-edge-"]
+),
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay,
+  body
+) :is(
+  .field-edge-bottom,
+  .field-edge-top,
+  .field-edge-left,
+  .field-edge-right
+),
+html:has(.renewal-shell.v2-design) input:is(.field-edge-bottom, [class*="field-edge-"]) {
+  border-radius: 0 !important;
 }
 
 html:has(.renewal-shell.v2-design) .chat-composer-input-surface {
@@ -2818,19 +2880,19 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-item-settlement {
-  transform: translateX(10px) !important;
+  transform: translate(6px) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-item-memo {
-  transform: translateX(-8px) !important;
+  transform: translate(-6px) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-item-chat {
-  transform: translateX(8px) !important;
+  transform: translate(6px) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-item-more {
-  transform: translateX(-10px) !important;
+  transform: translate(-6px) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-is-center {
@@ -2859,11 +2921,10 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
   content: '' !important;
   position: absolute !important;
   inset: -65% !important;
-  background:
+  background-image:
     radial-gradient(circle at 25% 25%, rgba(192, 132, 252, 0.95) 0%, transparent 45%),
     radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.9) 0%, transparent 45%),
     linear-gradient(125deg, #9333EA 0%, #6366F1 30%, #2563EB 58%, #06B6D4 82%, #A855F7 100%) !important;
-  background-size: 200% 200% !important;
   animation: bp-cal-aurora-wave 3s ease-in-out infinite alternate, bp-cal-aurora-spin 6.5s linear infinite !important;
   border-radius: 42% !important;
 }
@@ -2880,7 +2941,6 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
 }
 
 .v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
-  transform: scale(1.08) !important;
   box-shadow: 0 8px 26px rgba(147, 51, 234, 0.6), 0 3px 10px rgba(37, 99, 235, 0.45) !important;
 }
 
