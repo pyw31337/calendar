@@ -20,7 +20,13 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
   assert.match(weatherJs, /dayStripRef/, 'the days strip owns a dedicated scroll surface');
   assert.match(weatherJs, /onPointerMove: moveDayStripDrag/, 'the days strip supports pointer drag on desktop and touch devices');
   assert.match(weatherJs, /regionName: `\$\{activeRegion\.fullName \|\| activeRegion\.label\} \$\{draftGugun\}`/, 'selected Korean districts retain an explicit display region');
-  assert.match(appShellJs, /areaName: String\(withCoords\.address/, 'meeting places provide their address context to the forecast');
+  assert.match(weatherJs, /addressdetails=1/, 'place lookups request the address fields needed for an exact forecast region');
+  assert.match(weatherJs, /reverseGeocodeWeatherArea/, 'coordinate-only places resolve a forecast area without changing the place coordinates');
+  assert.match(weatherJs, /일정 장소 기준 날씨/, 'a coordinate-only meeting place is never mislabeled as an unrelated forecast region while its area resolves');
+  assert.match(weatherJs, /onSaveLocationRef/, 'reverse-geocoding is insulated from parent re-renders so it does not duplicate requests');
+  assert.match(appShellJs, /const placeAreaName = String\(withCoords\.address/, 'meeting places provide their address context to the forecast');
+  assert.match(appShellJs, /needsReverseGeocode: !placeAreaName/, 'coordinate-only meeting places explicitly request an area-label lookup');
+  assert.match(appShellJs, /areaName: String\(parsed\.areaName \|\| ''\)/, 'saved user weather regions retain their resolved area after a refresh');
 
   assert.match(css, /\.weather-detail-days-strip\s*\{[\s\S]*?touch-action:\s*pan-x;/, 'the horizontal date selector permits native horizontal panning');
   assert.match(css, /\.weather-detail-region/, 'the forecast area receives a dedicated V2 text treatment');

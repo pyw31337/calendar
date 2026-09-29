@@ -1376,7 +1376,17 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.name && parsed.lat != null && parsed.lon != null) {
-            return { name: String(parsed.name).trim(), lat: Number(parsed.lat), lon: Number(parsed.lon) };
+            const lat = Number(parsed.lat);
+            const lon = Number(parsed.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return {
+              name: String(parsed.name).trim(),
+              lat,
+              lon,
+              regionName: String(parsed.regionName || '').trim(),
+              areaName: String(parsed.areaName || '').trim(),
+              needsReverseGeocode: Boolean(parsed.needsReverseGeocode)
+            };
           }
         }
       }
@@ -1462,11 +1472,14 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
       });
       const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
       if (withCoords) {
+        const placeAreaName = String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim();
         return {
           lat: Number(withCoords.lat),
           lon: Number(withCoords.lng),
           name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim(),
-          areaName: String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim()
+          areaName: placeAreaName,
+          isMeetingPlace: true,
+          needsReverseGeocode: !placeAreaName
         };
       }
       const firstPlace = places[0];
@@ -1479,8 +1492,10 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
           lat: effectiveBaseLocation.lat,
           lon: effectiveBaseLocation.lon,
           name: placeName,
-          areaName: String(firstPlace?.address || firstPlace?.roadAddress || firstPlace?.addressName || effectiveBaseLocation.regionName || effectiveBaseLocation.name || '').trim(),
-          needsGeocode: true
+          areaName: String(firstPlace?.address || firstPlace?.roadAddress || firstPlace?.addressName || '').trim(),
+          isMeetingPlace: true,
+          needsGeocode: true,
+          needsReverseGeocode: false
         };
       }
     }

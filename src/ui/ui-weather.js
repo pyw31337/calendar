@@ -633,27 +633,69 @@ async function resolveLocationCoordinates(queryName, fallbackLat = 37.566, fallb
   // Nominatim fallback
   try {
     const res = await withWeatherTimeout(
-      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(clean)}&format=json&limit=1&accept-language=ko`),
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(clean)}&format=json&addressdetails=1&limit=1&accept-language=ko`),
       3500
     );
     if (res && res.ok) {
       const data = await res.json();
       if (data && data[0]) {
-        const address = data[0].address || {};
         return {
           lat: parseFloat(data[0].lat),
           lon: parseFloat(data[0].lon),
           name: clean,
-          areaName: [address.state, address.province, address.city, address.county, address.city_district, address.town, address.village]
-            .filter(Boolean)
-            .filter((value, index, list) => list.indexOf(value) === index)
-            .join(' ')
+          areaName: getWeatherAreaName(data[0].address)
         };
       }
     }
   } catch (_) {}
 
   return { lat: fallbackLat, lon: fallbackLon, name: clean };
+}
+
+/**
+ * Preserve an understandable, geographically meaningful forecast label.  We
+ * deliberately keep this to administrative fields: a venue name is useful in
+ * the title, but it must not masquerade as the forecast region.
+ */
+function getWeatherAreaName(address) {
+  if (!address || typeof address !== 'object') return '';
+  const parts = [
+    address.state,
+    address.province,
+    address.city,
+    address.county,
+    address.city_district,
+    address.district,
+    address.town,
+    address.village
+  ]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index);
+  return parts.join(' ');
+}
+
+/**
+ * A saved place can have coordinates without an address (for example an
+ * imported pin).  Resolve only its display-area label so the forecast remains
+ * tied to the original coordinates and never silently falls back to Seoul.
+ */
+async function reverseGeocodeWeatherArea(lat, lon) {
+  const latitude = Number(lat);
+  const longitude = Number(lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+
+  try {
+    const response = await withWeatherTimeout(
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&format=jsonv2&addressdetails=1&zoom=10&accept-language=ko`),
+      3500
+    );
+    if (!response?.ok) return '';
+    const data = await response.json();
+    return getWeatherAreaName(data?.address);
+  } catch (_) {
+    return '';
+  }
 }
 
 /**
@@ -699,7 +741,8 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
           name: '현재 위치',
           regionName: '현재 위치',
           lat: pos.coords.latitude,
-          lon: pos.coords.longitude
+          lon: pos.coords.longitude,
+          needsReverseGeocode: true
         });
         onClose?.();
       },
@@ -951,10 +994,25 @@ export function WeatherDetailModal({
   const dayStripRef = React.useRef(null);
   const dayStripDragRef = React.useRef(null);
   const ignoreDayClickRef = React.useRef(false);
+  const onSaveLocationRef = React.useRef(onSaveLocation);
+
+  React.useEffect(() => {
+    onSaveLocationRef.current = onSaveLocation;
+  }, [onSaveLocation]);
 
   React.useEffect(() => {
     if (weatherLocation) {
-      setCurrentLocation(weatherLocation);
+      setCurrentLocation(previous => {
+        const sameMeetingCoordinates = previous?.isMeetingPlace
+          && weatherLocation?.isMeetingPlace
+          && Number(previous.lat) === Number(weatherLocation.lat)
+          && Number(previous.lon) === Number(weatherLocation.lon);
+        // The parent reconstructs a meeting-location object on ordinary
+        // calendar renders. Keep an area we already resolved instead of
+        // needlessly discarding it and issuing another reverse lookup.
+        if (sameMeetingCoordinates && previous.areaName && !weatherLocation.areaName) return previous;
+        return weatherLocation;
+      });
     }
   }, [weatherLocation]);
 
@@ -971,7 +1029,8 @@ export function WeatherDetailModal({
               lon: resolved.lon,
               name: resolved.name || prev.name,
               areaName: resolved.areaName || prev.areaName,
-              needsGeocode: false
+              needsGeocode: false,
+              needsReverseGeocode: !resolved.areaName && !prev.areaName
             }));
           }
         })
@@ -980,10 +1039,54 @@ export function WeatherDetailModal({
     }
   }, [currentLocation?.needsGeocode, currentLocation?.name]);
 
+  // Imported pins and GPS selections can provide a precise coordinate without
+  // an administrative address.  Complete just that label in the background;
+  // it does not change the forecast coordinate or the meeting place itself.
+  React.useEffect(() => {
+    if (!currentLocation?.needsReverseGeocode || currentLocation?.areaName) return undefined;
+    let active = true;
+    reverseGeocodeWeatherArea(currentLocation.lat, currentLocation.lon)
+      .then(areaName => {
+        if (!active) return;
+        const resolvedAreaName = String(areaName || '').trim();
+        setCurrentLocation(prev => {
+          if (!prev?.needsReverseGeocode) return prev;
+          return {
+            ...prev,
+            areaName: resolvedAreaName || prev.areaName || '',
+            needsReverseGeocode: false
+          };
+        });
+        // Persist a successful region resolution with the user's selected
+        // weather region, but never write a meeting place back as a setting.
+        if (resolvedAreaName && !currentLocation.isMeetingPlace) {
+          onSaveLocationRef.current?.({
+            ...currentLocation,
+            areaName: resolvedAreaName,
+            needsReverseGeocode: false
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) {
+          setCurrentLocation(prev => prev?.needsReverseGeocode
+            ? { ...prev, needsReverseGeocode: false }
+            : prev);
+        }
+      });
+    return () => { active = false; };
+  }, [currentLocation?.needsReverseGeocode, currentLocation?.areaName, currentLocation?.lat, currentLocation?.lon]);
+
   const lat = currentLocation.lat || 37.566;
   const lon = currentLocation.lon || 126.9784;
   const locationName = currentLocation.name || '지역';
   const locationAreaLabel = formatWeatherLocationArea(currentLocation);
+  const isResolvingPlaceCoordinates = Boolean(currentLocation?.isMeetingPlace && currentLocation?.needsGeocode);
+  const isResolvingForecastArea = Boolean(currentLocation?.isMeetingPlace && currentLocation?.needsReverseGeocode && !currentLocation?.areaName);
+  const forecastAreaText = isResolvingPlaceCoordinates
+    ? '일정 장소 위치 확인 중'
+    : (isResolvingForecastArea ? '일정 장소 기준 날씨' : `${locationAreaLabel} 날씨`);
 
   React.useEffect(() => {
     let active = true;
@@ -1106,7 +1209,7 @@ export function WeatherDetailModal({
     className: "modal-container weather-detail-modal-container",
     role: "dialog",
     "aria-modal": "true",
-    "aria-label": `${locationAreaLabel} 날씨 상세`,
+    "aria-label": `${forecastAreaText} 상세`,
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '520px' }
   },
@@ -1138,8 +1241,8 @@ export function WeatherDetailModal({
           ),
           /*#__PURE__*/React.createElement("span", { className: "weather-detail-place-name", title: locationName }, locationName)
         ),
-        /*#__PURE__*/React.createElement("span", { className: "weather-detail-region", title: locationAreaLabel },
-          `${locationAreaLabel} 날씨`
+        /*#__PURE__*/React.createElement("span", { className: "weather-detail-region", title: forecastAreaText },
+          forecastAreaText
         )
       ),
       /*#__PURE__*/React.createElement("div", { className: "weather-detail-header-actions" },
@@ -1487,8 +1590,12 @@ export function WeatherDetailModal({
       onSelectLocation: (newLoc) => {
         setShowLocationPicker(false);
         if (newLoc && newLoc.lat != null && newLoc.lon != null) {
-          setCurrentLocation(newLoc);
-          onSaveLocation?.(newLoc);
+          const next = {
+            ...newLoc,
+            needsReverseGeocode: Boolean(newLoc.needsReverseGeocode || (!newLoc.areaName && newLoc.regionName === '현재 위치'))
+          };
+          setCurrentLocation(next);
+          onSaveLocation?.(next);
         }
       }
     })
