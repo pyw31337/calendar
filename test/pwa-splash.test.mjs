@@ -40,3 +40,22 @@ test('all PWA manifests have background_color matching splash theme', () => {
     assert.equal(content.background_color, '#09041F', `${file} background_color matches splash background`);
   }
 });
+
+test('splash screen is suppressed on PC / desktop environment to prevent jarring flicker', () => {
+  const html = fs.readFileSync('src/index.html', 'utf8');
+  const rootHtml = fs.readFileSync('index.html', 'utf8');
+  const mainJs = fs.readFileSync('src/main.jsx', 'utf8');
+
+  // Verify CSS suppresses splash on PC / desktop
+  assert.match(html, /html\.is-pc-device\s+\.app-splash[\s\S]*?display:\s*none\s*!important/, 'src/index.html hides splash for is-pc-device');
+  assert.match(html, /@media\s*\(min-width:\s*1024px\)\s*and\s*\(hover:\s*hover\)[\s\S]*?display:\s*none\s*!important/, 'src/index.html hides splash on desktop media query');
+  assert.match(rootHtml, /html\.is-pc-device\s+\.app-splash/, 'index.html hides splash for is-pc-device');
+
+  // Verify early head PC device class detection
+  assert.match(html, /document\.documentElement\.classList\.add\(['"]is-pc-device['"]\)/, 'src/index.html adds is-pc-device class early in head');
+  assert.match(rootHtml, /document\.documentElement\.classList\.add\(['"]is-pc-device['"]\)/, 'index.html adds is-pc-device class early in head');
+
+  // Verify main.jsx dismissSplashScreen immediate PC bypass
+  assert.match(mainJs, /isPC[\s\S]*?splash\.remove\(\)[\s\S]*?return;/, 'main.jsx removes splash immediately on PC');
+});
+

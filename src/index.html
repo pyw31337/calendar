@@ -34,6 +34,16 @@
       window.__GATHER_SPLASH_START__ = Date.now();
       (function () {
         try {
+          var ua = navigator.userAgent || '';
+          var isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          if (!isMobile) {
+            document.documentElement.classList.add('is-pc-device');
+          }
+        } catch (_) {}
+      })();
+      (function () {
+        try {
           // V2 is the default shell everywhere now (isRenewalShellEnabled: absent shell param
           // = V2, `?shell=v1` is the escape hatch) -- this script no longer needs to force
           // `shell=v2` itself, and MUST NOT touch the `shell` param at all, or it would silently
@@ -161,6 +171,15 @@
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
     <style id="app-splash-style">
+      /* PC / Desktop: Suppress splash screen to avoid intrusive flicker */
+      html.is-pc-device .app-splash {
+        display: none !important;
+      }
+      @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+        .app-splash {
+          display: none !important;
+        }
+      }
       .app-splash {
         position: fixed;
         inset: 0;
@@ -401,6 +420,16 @@
     <script>
       (function () {
         try {
+          var ua = navigator.userAgent || '';
+          var isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          var isPC = !isMobile || document.documentElement.classList.contains('is-pc-device') ||
+            (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches);
+          if (isPC) {
+            var splashEl = document.getElementById('app-splash');
+            if (splashEl) splashEl.remove();
+            return;
+          }
           var p = new URLSearchParams(window.location.search);
           var calId = p.get('id') || p.get('cal');
           if (!calId) {

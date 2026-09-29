@@ -36,7 +36,19 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="모여라 캘린더">
-  <script>window.__GATHER_SPLASH_START__ = Date.now();</script>
+  <script>
+    window.__GATHER_SPLASH_START__ = Date.now();
+    (function () {
+      try {
+        var ua = navigator.userAgent || '';
+        var isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (!isMobile) {
+          document.documentElement.classList.add('is-pc-device');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <script id="pwa-manifest-switch">
     // The <link rel="manifest"> tag is created here, in JS, instead of sitting in the HTML
     // source with a generic href that later gets mutated (the previous approach, mirrored from
@@ -154,6 +166,15 @@
 
   <link rel="stylesheet" href="assets/app.css?v=20260826-press-all">
   <style id="app-splash-style">
+    /* PC / Desktop: Suppress splash screen to avoid intrusive flicker */
+    html.is-pc-device .app-splash {
+      display: none !important;
+    }
+    @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+      .app-splash {
+        display: none !important;
+      }
+    }
     .app-splash {
       position: fixed;
       inset: 0;
@@ -394,6 +415,16 @@
   <script>
     (function () {
       try {
+        var ua = navigator.userAgent || '';
+        var isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var isPC = !isMobile || document.documentElement.classList.contains('is-pc-device') ||
+          (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches);
+        if (isPC) {
+          var splashEl = document.getElementById('app-splash');
+          if (splashEl) splashEl.remove();
+          return;
+        }
         var p = new URLSearchParams(window.location.search);
         var calId = p.get('id') || p.get('cal');
         if (!calId) {

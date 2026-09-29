@@ -38,6 +38,17 @@ function resolveFirebaseSdkUrl(src) {
 function dismissSplashScreen() {
   const splash = document.getElementById('app-splash');
   if (!splash) return;
+  // If PC / desktop, dismiss and remove immediately without 1s splash delay to avoid flickering
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+    (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isPC = !isMobile ||
+    (typeof document !== 'undefined' && document.documentElement.classList.contains('is-pc-device')) ||
+    (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches);
+  if (isPC) {
+    try { splash.remove(); } catch (_) {}
+    return;
+  }
   // Cinematic VFX splash timing (~1s for shockwave, glint flare, shimmer title, and warp dismiss)
   const MIN_SPLASH_MS = 1050;
   const startTime = (typeof window !== 'undefined' && window.__GATHER_SPLASH_START__) || Date.now();
