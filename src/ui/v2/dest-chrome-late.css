@@ -1107,8 +1107,7 @@ html:has(.renewal-shell.v2-design) :is(
 .v2-design :is(.gallery-page-tabs, .gallery-page-tabs-mobile, .v2-gallery, .v2-gallery-tabs-slot) .underline-tabs .underline-tabs-label {
   font-size: var(--v2-event-sheet-tab-label-fs);
 }
-.v2-design .bp-event-sheet .underline-tabs-label.has-status-dot::after,
-.v2-design :is(.gallery-page-tabs, .gallery-page-tabs-mobile, .v2-gallery, .v2-gallery-tabs-slot) .underline-tabs-label.has-status-dot::after {
+.v2-design .bp-event-sheet .underline-tabs-label.has-status-dot::after {
   content: '';
   position: absolute;
   top: var(--v2-tab-status-dot-offset-block-start);
@@ -1118,6 +1117,9 @@ html:has(.renewal-shell.v2-design) :is(
   border-radius: 50%;
   background: var(--brand, #7C2FE5);
   box-shadow: 0 0 0 var(--v2-tab-status-dot-ring-width) var(--bg-card);
+}
+.v2-design :is(.gallery-page-tabs, .gallery-page-tabs-mobile, .v2-gallery, .v2-gallery-tabs-slot) .underline-tabs-label.has-status-dot::after {
+  display: none !important;
 }
 
 /* Name pills: same geometry, white type on participant color. */

@@ -1279,8 +1279,6 @@ export function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, onLoadOlderChat, onLoadMoreMemos]);
 
-  const displayPhotoTabCount = usingPhotoIndex && Number.isFinite(Number(indexedPhotoTotal))
-    ? Number(indexedPhotoTotal) : visiblePhotos.length;
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
   const [isGalleryPickerOpen, setIsGalleryPickerOpen] = React.useState(false);
@@ -3821,10 +3819,10 @@ export function ChatGalleryModal({
         onChange: v => setGalleryTab(v),
         style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
         options: [
-          { value: 'photos', label: '사진', badge: displayPhotoTabCount, badgeMode: 'dot' },
-          { value: 'links', label: '링크', badge: filteredLinks.length, badgeMode: 'dot' },
-          { value: 'files', label: '파일', badge: filteredFiles.length, badgeMode: 'dot' },
-          { value: 'analysis', label: 'AI 분석', badge: mediaAnalysis.items.length || undefined, badgeMode: 'dot' }
+          { value: 'photos', label: '사진' },
+          { value: 'links', label: '링크' },
+          { value: 'files', label: '파일' },
+          { value: 'analysis', label: 'AI 분석' }
         ]
       })
     );

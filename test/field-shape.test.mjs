@@ -56,16 +56,18 @@ test('Memo titles use full capsule borders while actual edge-only fields keep st
   assert.match(screensJs, /className:\s*'modal-header',\s*style:\s*\{[^}]*borderBottom:\s*'none'/, 'screens.js layerPopup modal-header sets borderBottom to none');
 });
 
-test('Gallery tabs use dot badge mode and match event-sheet text style without numeric count pills', async () => {
+test('Gallery tabs render clean labels without status dots or numeric count pills', async () => {
   const [galleryJs, destLateCss] = await Promise.all([
     readFile(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8')
   ]);
-  assert.match(galleryJs, /\{ value: 'photos', label: '사진', badge: displayPhotoTabCount, badgeMode: 'dot' \}/, 'photos tab uses dot badge mode');
-  assert.match(galleryJs, /\{ value: 'links', label: '링크', badge: filteredLinks\.length, badgeMode: 'dot' \}/, 'links tab uses dot badge mode');
-  assert.match(galleryJs, /\{ value: 'files', label: '파일', badge: filteredFiles\.length, badgeMode: 'dot' \}/, 'files tab uses dot badge mode');
-  assert.match(galleryJs, /\{ value: 'analysis', label: 'AI 분석', badge: mediaAnalysis\.items\.length \|\| undefined, badgeMode: 'dot' \}/, 'analysis tab uses dot badge mode');
+  assert.match(galleryJs, /\{ value: 'photos', label: '사진' \}/, 'photos tab uses plain label');
+  assert.match(galleryJs, /\{ value: 'links', label: '링크' \}/, 'links tab uses plain label');
+  assert.match(galleryJs, /\{ value: 'files', label: '파일' \}/, 'files tab uses plain label');
+  assert.match(galleryJs, /\{ value: 'analysis', label: 'AI 분석' \}/, 'analysis tab uses plain label');
+  assert.doesNotMatch(galleryJs, /value: 'photos'[\s\S]*?badgeMode:\s*'dot'/, 'photos tab does not use badgeMode dot');
   assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs \.underline-tabs-label[\s\S]*?font-size:\s*var\(--v2-event-sheet-tab-label-fs\);/, 'gallery tabs use shared 0.9rem event-sheet font size');
-  assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs-label\.has-status-dot::after/, 'gallery tabs render shared purple status dot');
+  assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs-label\.has-status-dot::after[\s\S]*?display:\s*none !important;/, 'gallery tabs suppress status dots');
   assert.match(destLateCss, /:is\(\.v2-gallery, \.gallery-page-tabs, \.gallery-page-tabs-mobile, \.v2-gallery-tabs-slot\) \.underline-tabs \.underline-tabs-count[\s\S]*?display:\s*none !important;/, 'numeric count pills are hidden in gallery tabs');
 });
+
