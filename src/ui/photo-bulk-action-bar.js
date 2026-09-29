@@ -422,7 +422,7 @@ export function PhotoBulkActionBar({
           onChange: e => setCustomTagInput(e.target.value),
           onKeyDown: e => {
             if (e.key === 'Enter') {
-              if (e.nativeEvent && e.nativeEvent.isComposing) return;
+              if (e.isComposing || (e.nativeEvent && e.nativeEvent.isComposing) || e.keyCode === 229) return;
               e.preventDefault();
               handleAddCustomTag();
             }
