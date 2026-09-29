@@ -1359,17 +1359,18 @@ function HeroWeatherBox({ weatherLocation, onSelectDate }) {
   const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
   const lat = effectiveLocation.lat || 37.566;
   const lon = effectiveLocation.lon || 126.9784;
+  const [selectedWeatherDate, setSelectedWeatherDate] = React.useState(null);
 
   const days = React.useMemo(() => {
     const res = [];
     const labels = ['어제', '오늘', '내일', '모레'];
     const now = new Date();
-    for (let offset = -1; offset <= 3; offset += 1) {
+    // Mobile baseline caps at offset <= 3 (5 days), while extended layout generates up to offset <= 8 (10 days) for PC/tablet.
+    for (let offset = -1; offset <= 8; offset += 1) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       res.push({
         offset,
-        // The fifth slot remains clear across month boundaries, e.g. 09.30 → 10.01.
         label: labels[offset + 1] || `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
         dateStr,
         isToday: offset === 0,
@@ -1390,33 +1391,47 @@ function HeroWeatherBox({ weatherLocation, onSelectDate }) {
     return () => { active = false; };
   }, [lat, lon]);
 
-  return React.createElement('div', {
-    className: 'bp-hero-weather-row',
-    role: 'region',
-    'aria-label': `${effectiveLocation.name || '지역'} 날씨`
-  },
-    days.map(day => {
-      const forecast = weatherData ? weatherData[day.dateStr] : null;
-      const code = forecast?.code ?? 1;
-      const maxTemp = forecast?.max != null ? Math.round(forecast.max) : null;
-      const minTemp = forecast?.min != null ? Math.round(forecast.min) : null;
-      const tempText = maxTemp != null ? `${maxTemp}°` : (weatherData ? '-' : '...');
-      const fullTitle = `${day.label} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''}`;
+  const WeatherDetailModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal) || null;
 
-      return React.createElement('button', {
-        type: 'button',
-        key: day.dateStr,
-        className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}`,
-        title: fullTitle,
-        'aria-label': fullTitle,
-        onClick: () => onSelectDate?.(day.dateStr),
-      },
-        React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
-        React.createElement('span', { className: 'bp-hero-weather-icon', 'aria-hidden': 'true' },
-          getWeatherIcon(code, 22)
-        ),
-        React.createElement('span', { className: 'bp-hero-weather-temp' }, tempText)
-      );
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', {
+      className: 'bp-hero-weather-row',
+      role: 'region',
+      'aria-label': `${effectiveLocation.name || '지역'} 날씨`
+    },
+      days.map(day => {
+        const forecast = weatherData ? weatherData[day.dateStr] : null;
+        const code = forecast?.code ?? 1;
+        const maxTemp = forecast?.max != null ? Math.round(forecast.max) : null;
+        const minTemp = forecast?.min != null ? Math.round(forecast.min) : null;
+        const tempText = maxTemp != null ? `${maxTemp}°` : (weatherData ? '-' : '...');
+        const fullTitle = `${day.label} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''} - 일기예보 상세 보기`;
+
+        return React.createElement('button', {
+          type: 'button',
+          key: day.dateStr,
+          className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}`,
+          title: fullTitle,
+          'aria-label': fullTitle,
+          onClick: () => setSelectedWeatherDate(day.dateStr),
+        },
+          React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
+          React.createElement('span', { className: 'bp-hero-weather-icon', 'aria-hidden': 'true' },
+            getWeatherIcon(code, 22)
+          ),
+          React.createElement('span', { className: 'bp-hero-weather-temp' }, tempText)
+        );
+      })
+    ),
+    selectedWeatherDate && WeatherDetailModal && React.createElement(WeatherDetailModal, {
+      dateStr: selectedWeatherDate,
+      weatherLocation: effectiveLocation,
+      days,
+      onClose: () => setSelectedWeatherDate(null),
+      onSelectDate: (targetDate) => {
+        setSelectedWeatherDate(null);
+        onSelectDate?.(targetDate);
+      }
     })
   );
 }
@@ -1548,18 +1563,24 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
     React.createElement(HomeActivitySummary, {
       calendarContext: {
         ...calendarContext,
-        displayChatMessages: recordsContext?.mediaProps?.chatMessages,
-        memos: recordsContext?.memoProps?.memos,
-        places: recordsContext?.placesProps?.calendar?.places,
+        displayChatMessages: (Array.isArray(calendarContext?.displayChatMessages) && calendarContext.displayChatMessages.length > 0)
+          ? calendarContext.displayChatMessages
+          : (recordsContext?.mediaProps?.chatMessages || []),
+        memos: (Array.isArray(recordsContext?.memoProps?.memos) && recordsContext.memoProps.memos.length > 0)
+          ? recordsContext.memoProps.memos
+          : (calendarContext?.memos || []),
+        places: (Array.isArray(mergedCalendar?.places) && mergedCalendar.places.length > 0)
+          ? mergedCalendar.places
+          : (recordsContext?.placesProps?.calendar?.places || calendarContext?.places || []),
         galleryPhotoIndex: {
-          items: Array.isArray(recordsContext?.mediaProps?.indexedPhotos)
+          items: Array.isArray(recordsContext?.mediaProps?.indexedPhotos) && recordsContext.mediaProps.indexedPhotos.length > 0
             ? recordsContext.mediaProps.indexedPhotos
-            : [],
-          status: recordsContext?.mediaProps?.indexedPhotoStatus,
-          loading: !!recordsContext?.mediaProps?.indexedPhotoLoading,
+            : (Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items : []),
+          status: recordsContext?.mediaProps?.indexedPhotoStatus || calendarContext?.galleryPhotoIndex?.status,
+          loading: !!(recordsContext?.mediaProps?.indexedPhotoLoading ?? calendarContext?.galleryPhotoIndex?.loading),
         },
-        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
-        onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
+        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox || calendarContext?.setActiveLightbox,
+        onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange || calendarContext?.onMemoCommentsChange,
         // HomeActivitySummary always passes the complete memo record.  Keep
         // the legacy callback compatible by converting it back to an id only
         // when the V2 shell has not supplied its focused-navigation handler.
@@ -1782,7 +1803,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   );
   const messages = React.useMemo(() => {
     const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
-    return visibleMessages.slice(-3);
+    // latestRows returns newest-first; .slice(0, 3) keeps the three most recent.
+    // The pager shows index 0 first, so we reverse to surface the latest message
+    // on the first (leftmost) slide as the user expects.
+    return latestRows(visibleMessages).slice(0, 3).reverse();
   }, [allMessages, meetingPhotoMessageIds]);
   const memoItems = calendarContext?.memos;
   const memos = React.useMemo(() => {
@@ -1799,22 +1823,14 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         ? memo.comments.reduce((latest, comment) => Math.max(latest, timestampMs(comment?.updatedAt ?? comment?.createdAt)), 0)
         : 0;
     };
-    const recentFirst = (a, b) => memoUpdatedAt(b) - memoUpdatedAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
+    const memoActivityAt = memo => Math.max(memoUpdatedAt(memo), latestCommentAt(memo));
+    const recentFirst = (a, b) => memoActivityAt(b) - memoActivityAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
     const pinned = rows.filter(memo => memo.isPinned).sort(recentFirst);
     const selected = pinned.slice(0, 4);
     if (selected.length >= 4) return selected;
 
-    const remaining = rows.filter(memo => !selected.includes(memo));
-    const commented = remaining
-      .filter(memo => latestCommentAt(memo) > 0)
-      .sort((a, b) => latestCommentAt(b) - latestCommentAt(a) || recentFirst(a, b));
-    selected.push(...commented.slice(0, 4 - selected.length));
-
-    // Preserve a recent-memo fallback when there are fewer commented memos than slots.
-    if (selected.length < 4) {
-      const fallback = latestRows(remaining.filter(memo => !selected.includes(memo)));
-      selected.push(...fallback.slice(0, 4 - selected.length));
-    }
+    const remaining = rows.filter(memo => !selected.includes(memo)).sort(recentFirst);
+    selected.push(...remaining.slice(0, 4 - selected.length));
     return selected;
   }, [memoItems]);
   const photoItems = calendarContext?.galleryPhotoIndex?.items;
@@ -2465,7 +2481,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     activeCal, galleryChatMessages, galleryMemos, showToast, showConfirmDialog,
     handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles,
     handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos,
-    activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex,
+    activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex,
     hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages,
     hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE,
     isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
@@ -2551,7 +2567,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onAddPersonTag: handleAddPersonTag, onRenamePersonTag: handleRenamePersonTag, onDeletePersonTag: handleDeletePersonTag,
       anniversaries, chatMessages: galleryChatMessages, memos: historyMemosSnapshot, setActiveLightbox,
       showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags, onBulkSaveImageTags: bulkSaveImageTags, onSearchTag: handleSearchTag,
-      onDeletePhoto: handleDeletePhoto, onReplacePhoto: handleReplacePhoto,
+      onDeletePhoto: handleDeletePhoto, onDeletePhotos: handleBulkDeletePhotos, onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage, onJumpToMemo: handleJumpToMemo, onJumpToMeetingDate: handleJumpToMeetingDate,
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal, onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
       onRequestConfirm: showConfirmDialog,
@@ -3972,7 +3988,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
                     marginLeft: 'auto',
                     flexShrink: 0,
                     display: 'inline-block',
-                    boxShadow: '0 0 0 1px rgba(30,27,46,0.08)',
                   },
                   title: lastChatAuthor,
                   'aria-label': lastChatAuthor,

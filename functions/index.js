@@ -727,7 +727,7 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     
     const bodyText = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : '새 메시지가 도착했습니다'));
     const delivery = await broadcastCalendarPush(calendarDocId, {
-      title: `${calendarTitle} · ${senderName}`,
+      title: senderName || calendarTitle,
       body: bodyText,
       url: `./?id=${calendarDocId.replace('cal_', '')}&view=chat`,
       tag: `chat-${calendarDocId}`
@@ -805,13 +805,11 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
-    const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     const author = memo.authorName || memo.participantName || '참여자';
     const body = (memo.text || memo.title || '새 메모').toString().trim().slice(0, 120) || '새 메모가 등록되었습니다';
     await broadcastCalendarPush(calendarDocId, {
-      title: `${calendarTitle} · 메모`,
-      body: `${author}: ${body}`,
+      title: `${author}의 새 메모`,
+      body,
       url: `./?id=${calendarDocId.replace('cal_', '')}&view=memo`,
       tag: `memo-${calendarDocId}-${context.params.memoId}`
     }, { skipParticipantId: memo.participantId || memo.authorId || null, channel: 'memo' });
@@ -839,8 +837,6 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
-    const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     const dateLabel = context.params.dateId || after.date || '';
     const meetingDateKey = normalizeMeetingDateKey(dateLabel);
     // Historical confirmedMeeting documents can be rewritten during migration,
@@ -851,7 +847,7 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
       return;
     }
     await broadcastCalendarPush(calendarDocId, {
-      title: `${calendarTitle} · 모임 확정`,
+      title: '모임 확정',
       body: dateLabel ? `${dateLabel} 모임이 확정되었습니다` : '모임이 확정되었습니다',
       url: `./?id=${calendarDocId.replace('cal_', '')}`,
       tag: `schedule-${calendarDocId}-${dateLabel}`
@@ -870,11 +866,10 @@ exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] 
     const newPolls = afterPolls.filter(p => p && p.id && !beforeIds.has(p.id));
     if (newPolls.length === 0) return;
     const calendarDocId = context.params.calendarDocId;
-    const calendarTitle = afterCal.title || '모여라 캘린더';
     for (const poll of newPolls) {
       await broadcastCalendarPush(calendarDocId, {
-        title: `${calendarTitle} · 투표`,
-        body: poll.title ? `새 투표: ${poll.title}` : '새 투표가 등록되었습니다',
+        title: poll.title ? `새 투표: ${poll.title}` : '새 투표',
+        body: poll.title ? `${poll.title} 투표가 등록되었습니다` : '새 투표가 등록되었습니다',
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `poll-${calendarDocId}-${poll.id}`
       }, { channel: 'poll' });
@@ -912,15 +907,13 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   for (const [calendarDocId, entry] of byCalendar) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-    const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
 
     const subSnap = await entry.ref.collection('push_subscriptions').get();
     if (subSnap.empty) continue;
 
     entry.anniversaries.forEach(ann => {
       const payload = JSON.stringify({
-        title: `${calendarTitle} · 오늘의 기념일`,
+        title: '오늘의 기념일',
         body: `🎉 ${ann.title || '기념일'}`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `anniversary-${calendarDocId}-${ann.id}`
@@ -985,11 +978,9 @@ exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   for (const [calendarDocId, entry] of meetingsByCal.entries()) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-    const calendarData = (calendarSnap.data() || {}).calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     for (const dateLabel of entry.dates) {
       promises.push(broadcastCalendarPush(calendarDocId, {
-        title: `${calendarTitle} · 모임 알림`,
+        title: '모임 알림',
         body: `내일(${dateLabel}) 확정 모임이 있습니다`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `schedule-eve-${calendarDocId}-${dateLabel}`
@@ -1013,12 +1004,10 @@ exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   for (const [calendarDocId, entry] of repeatsByCal.entries()) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-    const calendarData = (calendarSnap.data() || {}).calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     for (const ann of entry.anns) {
       const title = ann.title || ann.patternLabel || '반복 일정';
       promises.push(broadcastCalendarPush(calendarDocId, {
-        title: `${calendarTitle} · 일정 알림`,
+        title: '일정 알림',
         body: `내일(${tomorrowKey}) ${title}`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `repeat-eve-${calendarDocId}-${ann.id}-${tomorrowKey}`

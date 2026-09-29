@@ -1755,6 +1755,32 @@ html:has(.renewal-shell.v2-design) textarea:not(.admin-scope *) {
 html:has(.renewal-shell.v2-design) textarea[data-field-lines="1"]:not(.admin-scope *) {
   border-radius: var(--field-radius-single-line) !important;
 }
+html:has(.renewal-shell.v2-design) textarea.content-desc-textarea.is-singleline,
+html:has(.renewal-shell.v2-design) textarea.content-desc-textarea[data-field-lines="1"] {
+  border-radius: var(--field-radius-single-line) !important;
+  min-height: var(--field-single-line-height, 44px) !important;
+  line-height: 20px !important;
+}
+html:has(.renewal-shell.v2-design) textarea.content-desc-textarea.is-multiline,
+html:has(.renewal-shell.v2-design) textarea.content-desc-textarea[data-field-lines="multi"] {
+  border-radius: var(--field-radius-multiline) !important;
+  min-height: 72px !important;
+  line-height: 20px !important;
+}
+html:has(.renewal-shell.v2-design) .content-thumb-delete-btn,
+html:has(.renewal-shell.v2-design) .modal-body button.content-thumb-delete-btn {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
 
 /* Every user-facing single-line control follows the same capsule geometry.  A number of
    controls are rendered through the reusable bottom-sheet picker, so they are buttons with
@@ -2279,6 +2305,43 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
   min-height: 48px !important;
   font-size: 0.78rem !important;
 }
+.renewal-shell.v2-design .global-search-page-card .global-search-category-wrap {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 16px var(--v2-dest-content-pad-x, 20px) 0 !important;
+}
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .global-search-page-card .global-search-category-wrap {
+    padding: 16px 16px 0 !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .global-search-count-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 20px !important;
+  height: 18px !important;
+  border-radius: var(--radius-full, 9999px) !important;
+  padding: 0 6px !important;
+  margin-left: 4px !important;
+  font-size: var(--font-size-sm, 0.78rem) !important;
+  font-weight: 700 !important;
+  background-color: var(--bg-secondary, #e2e8f0) !important;
+  color: var(--text-muted, #64748b) !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .global-search-count-badge.has-count {
+  background-color: var(--brand, #7c2fe5) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge.has-count {
+  background-color: var(--brand, #C9FD58) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge:not(.has-count) {
+  background-color: var(--bg-secondary, #2A2836) !important;
+  color: var(--text-muted, #94A3B8) !important;
+}
 .renewal-shell.v2-design .global-search-page-card .modal-body {
   flex: 1 1 auto !important;
   min-height: calc(100dvh - 64px - 48px) !important;
@@ -2323,6 +2386,13 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
   justify-content: center !important;
   padding: 0 8px !important;
   line-height: 1 !important;
+}
+.renewal-shell.v2-design .global-search-result-title,
+.renewal-shell.v2-design .global-search-result-meta {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.5 !important;
 }
 .renewal-shell.v2-design .global-search-result-title mark,
 .renewal-shell.v2-design .global-search-result-meta mark,
@@ -2412,7 +2482,9 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
   top: 0 !important;
   bottom: 0 !important;
   width: 100vw !important;
-  height: 100dvh !important;
+  height: var(--app-vv-height, 100dvh) !important;
+  min-height: var(--app-vv-height, 100dvh) !important;
+  max-height: var(--app-vv-height, 100dvh) !important;
   max-width: none !important;
   margin: 0 !important;
   display: flex !important;
@@ -3904,11 +3976,128 @@ html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-her
 
 html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-today-box,
 html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-row {
-  width: calc(100% - 32px) !important;
-  max-width: 520px !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
+  width: calc(100% - 28px) !important;
+  max-width: none !important;
+  margin: 0 14px 8px !important;
   box-sizing: border-box !important;
+  container-type: inline-size;
+  container-name: weather-row;
+}
+
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-today-box,
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-row {
+    width: calc(100% - 40px) !important;
+    margin: 0 20px 8px !important;
+  }
+}
+
+@media (max-width: 359px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-today-box,
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-row {
+    width: calc(100% - 16px) !important;
+    margin: 0 8px 8px !important;
+  }
+}
+
+/* Default / Mobile: show max 5 columns in hero weather row */
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(n+6) {
+  display: none !important;
+}
+
+/* Container queries (based on actual width of weather row) */
+@container weather-row (min-width: 520px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(6) {
+    display: flex !important;
+  }
+}
+@container weather-row (min-width: 610px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(7) {
+    display: flex !important;
+  }
+}
+@container weather-row (min-width: 700px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(8) {
+    display: flex !important;
+  }
+}
+@container weather-row (min-width: 790px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(9) {
+    display: flex !important;
+  }
+}
+@container weather-row (min-width: 880px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(10) {
+    display: flex !important;
+  }
+}
+
+/* Media query fallbacks for viewports */
+@media (min-width: 600px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(6) {
+    display: flex !important;
+  }
+}
+@media (min-width: 700px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(7) {
+    display: flex !important;
+  }
+}
+@media (min-width: 800px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(8) {
+    display: flex !important;
+  }
+}
+@media (min-width: 950px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(9) {
+    display: flex !important;
+  }
+}
+@media (min-width: 1080px) {
+  html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-weather-col:nth-child(10) {
+    display: flex !important;
+  }
+}
+
+/* Weather Detail Modal */
+html:has(.renewal-shell.v2-design) .weather-detail-modal-overlay {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+html:has(.renewal-shell.v2-design) .weather-detail-modal-container {
+  animation: bp-weather-modal-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes bp-weather-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-modal-container {
+  background-color: var(--bg-card, #1E1B2E) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.6) !important;
+}
+
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-highlight-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.18) 100%) !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-highlight-card > div:first-child > div:first-child {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  color: #60A5FA !important;
 }
 
 /* Expanded D-day cards keep the closed capsule's glass, and each one
@@ -4979,6 +5168,104 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-quick-nav-badge {
   box-shadow: 0 0 0 2px var(--brand) !important;
 }
+
+/* Mobile hero weather row & today box on the lime slab (Theme 2 dark mode). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-row,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-row {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-col,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-col {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-col:hover,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-col:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-col.is-today,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-col.is-today {
+  background: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-day,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-day {
+  color: var(--on-brand) !important;
+  opacity: 0.85 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-col.is-today .bp-hero-weather-day,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-col.is-today .bp-hero-weather-day {
+  color: var(--on-brand) !important;
+  opacity: 1 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-icon,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-icon {
+  color: var(--on-brand) !important;
+  filter: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-icon svg,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-icon svg {
+  color: var(--on-brand) !important;
+  stroke: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-weather-temp,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-weather-temp {
+  color: var(--on-brand) !important;
+  text-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-today-box,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-today-box {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-today-box:hover,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-today-box:hover {
+  background: rgba(0, 0, 0, 0.14) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-today-badge,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-today-badge {
+  background: var(--on-brand) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-today-title,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-today-title {
+  color: var(--on-brand) !important;
+  text-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-today-subtitle,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-today-subtitle {
+  color: var(--on-brand) !important;
+  opacity: 0.85 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-today-arrow,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .bp-hero-today-arrow {
+  color: var(--on-brand) !important;
+}
+
+/* Mobile bottom nav calendar button in dark mode: lime background with black icon */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-center-circle,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-center-circle {
+  background: var(--brand) !important;
+  box-shadow: 0 4px 18px rgba(201, 253, 88, 0.4), 0 2px 6px rgba(0, 0, 0, 0.45) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-center-circle::before,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-center-circle::before {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-center-circle svg,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-center-circle svg {
+  color: var(--on-brand) !important;
+  stroke: var(--on-brand) !important;
+  filter: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
+  box-shadow: 0 6px 24px rgba(201, 253, 88, 0.55), 0 2px 8px rgba(0, 0, 0, 0.55) !important;
+}
+
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-fab {
   box-shadow: none !important;
 }

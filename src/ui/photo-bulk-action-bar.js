@@ -50,6 +50,7 @@ export function PhotoBulkActionBar({
   onRequestConfirm = null,
   isSaving = false,
   isDeleting = false,
+  deleteProgress = null, // { current: number, total: number }
   mode = 'people', // 'people' | 'places' | 'memories' | 'gallery'
   style = {}
 }) {
@@ -305,7 +306,9 @@ export function PhotoBulkActionBar({
           }
         },
           /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }),
-          isDeleting ? '삭제 중…' : '삭제'
+          isDeleting
+            ? (deleteProgress && deleteProgress.total ? `삭제 중… (${deleteProgress.current}/${deleteProgress.total})` : '삭제 중…')
+            : '삭제'
         ),
         // Clear selection button
         onClearSelection && /*#__PURE__*/React.createElement('button', {
@@ -419,6 +422,7 @@ export function PhotoBulkActionBar({
           onChange: e => setCustomTagInput(e.target.value),
           onKeyDown: e => {
             if (e.key === 'Enter') {
+              if (e.nativeEvent && e.nativeEvent.isComposing) return;
               e.preventDefault();
               handleAddCustomTag();
             }

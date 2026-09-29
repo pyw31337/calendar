@@ -10,6 +10,7 @@ import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTime, recordMediaAnalysisFeedback } from '../core/media-analysis-feed.js';
 import { ClipboardPasteIcon } from './ui-icons.js';
 import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
+import { isExternalServiceUrl } from '../core/memo-share-link.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -342,7 +343,7 @@ function parseGatherLinksClipboardText(text) {
     if (!payload || payload.kind !== 'gather-links' || !Array.isArray(payload.links)) return null;
     const links = payload.links
       .map(item => ({ url: String(item?.url || '').trim(), title: String(item?.title || '').trim() }))
-      .filter(item => /^https?:\/\//i.test(item.url));
+      .filter(item => /^https?:\/\//i.test(item.url) && isExternalServiceUrl(item.url));
     return links.length ? links : null;
   } catch (_) {
     return null;
@@ -904,7 +905,8 @@ export function ChatGalleryModal({
     // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
     // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
     // preview live the same way a fresh link normally would. Recognized image links are excluded
-    // In the gallery, all shared URLs belong to the 링크 tab.
+    // In the gallery, only external service URLs belong to the 링크 tab.
+    // Internal service links (memos, calendar shares, app routes, self origin) are excluded.
     const list = [];
     const seen = new Set();
     (chatMessages || []).forEach(msg => {
@@ -912,6 +914,7 @@ export function ChatGalleryModal({
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(msg.text).forEach(info => {
         if (!info.url || seen.has(info.url)) return;
+        if (!isExternalServiceUrl(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
         firstUrlSeen = true;
@@ -924,6 +927,7 @@ export function ChatGalleryModal({
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(body).forEach(info => {
         if (!info.url || seen.has(info.url)) return;
+        if (!isExternalServiceUrl(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '', text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
         firstUrlSeen = true;
@@ -934,6 +938,7 @@ export function ChatGalleryModal({
       if (!body) return;
       extractAllUrlInfosLoose(body).forEach(info => {
         if (!info.url || seen.has(info.url)) return;
+        if (!isExternalServiceUrl(info.url)) return;
         seen.add(info.url);
         list.push({
           url: info.url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
@@ -1883,6 +1888,10 @@ export function ChatGalleryModal({
       if (showToast) showToast('올바른 링크(URL)를 입력해 주세요.', 'error');
       return;
     }
+    if (!isExternalServiceUrl(url)) {
+      if (showToast) showToast('외부 서비스의 링크(URL)만 추가할 수 있습니다.', 'error');
+      return;
+    }
     setIsSavingLink(true);
     try {
       const ok = await onAddLink(url);
@@ -1915,10 +1924,11 @@ export function ChatGalleryModal({
       try {
         let added = 0;
         for (const item of gatherLinks) {
+          if (!isExternalServiceUrl(item.url)) continue;
           const ok = await onAddLink(item.url);
           if (ok !== false) added += 1;
         }
-        if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '링크 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+        if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '붙여넣을 수 있는 외부 서비스 링크가 없습니다.', added ? 'success' : 'error');
         if (added) setActiveTab('links');
       } finally {
         setIsSavingLink(false);
@@ -1928,6 +1938,10 @@ export function ChatGalleryModal({
     const url = extractFirstUrl(text);
     if (!url) {
       if (showToast) showToast('클립보드에 붙여넣을 링크가 없습니다.', 'error');
+      return;
+    }
+    if (!isExternalServiceUrl(url)) {
+      if (showToast) showToast('외부 서비스의 링크(URL)만 추가할 수 있습니다.', 'error');
       return;
     }
     setIsSavingLink(true);

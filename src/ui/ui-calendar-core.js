@@ -2885,7 +2885,9 @@ export function GlobalSearchModal({
   }, item.meta ? highlightKeyword(item.meta, q) : null);
 
   const Frame = inline ? 'div' : ResizableModalContainer;
-  const tabBar = q && hasResults ? (isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+  const categoryPicker = isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement("div", {
+    className: "global-search-category-wrap"
+  }, /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
     title: "검색 카테고리 선택",
     value: activeTab,
     options: tabDefs.map(t => {
@@ -2893,18 +2895,21 @@ export function GlobalSearchModal({
       return {
         value: t.key,
         label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
+          className: `global-search-count-badge${hasCount ? ' has-count' : ''}`,
           style: {
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
             borderRadius: 'var(--radius-full)',
-            backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
-            color: hasCount ? '#FFFFFF' : '#475569',
+            backgroundColor: hasCount ? 'var(--brand, #7C2FE5)' : 'var(--bg-secondary, #E2E8F0)',
+            color: hasCount ? 'var(--on-brand, #FFFFFF)' : 'var(--text-muted, #475569)',
             fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
           }
         }, t.count))
       };
     }),
     onSelect: setActiveTab
-  }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
+  })) : null;
+
+  const tabBar = q && hasResults ? (categoryPicker || (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
     options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
     value: activeTab,
     onChange: setActiveTab,

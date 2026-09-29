@@ -52,4 +52,27 @@ test('Hero zone replaces redundant quick nav with TODAY schedule box and compact
   assert.match(designCss, /\.bp-hero-weather-col/, 'design.css styles .bp-hero-weather-col');
   assert.match(destLateCss, /\.bp-hero-zone \.bp-hero-today-box/, 'dest-chrome-late.css has responsive sizing for today box');
   assert.match(destLateCss, /\.bp-hero-zone \.bp-hero-weather-row/, 'dest-chrome-late.css has responsive sizing for weather row');
+
+  // Dark mode weather row on lime slab uses dark --on-brand for text and icons
+  assert.match(destLateCss, /html:has\(\.renewal-shell\.v2-design\)\[data-theme="dark"\][\s\S]*?\.bp-hero-zone \.bp-hero-weather-col\s*\{\s*color:\s*var\(--on-brand\)\s*!important;/);
+  assert.match(destLateCss, /html:has\(\.renewal-shell\.v2-design\)\[data-theme="dark"\][\s\S]*?\.bp-hero-zone \.bp-hero-weather-icon svg\s*\{[\s\S]*?color:\s*var\(--on-brand\)\s*!important;/);
+  assert.match(destLateCss, /html:has\(\.renewal-shell\.v2-design\)\[data-theme="dark"\][\s\S]*?\.bp-hero-zone \.bp-hero-weather-temp\s*\{\s*color:\s*var\(--on-brand\)\s*!important;/);
+
+  // Weather row fluid sizing removes rigid 520px constraint and matches D-day badge width
+  assert.equal(
+    destLateCss.includes('.bp-hero-zone .bp-hero-weather-row {\n  width: calc(100% - 32px) !important;\n  max-width: 520px !important;'),
+    false,
+    'dest-chrome-late.css removes fixed 520px max-width on weather row'
+  );
+  assert.match(destLateCss, /\.bp-hero-zone \.bp-hero-weather-row\s*\{[^}]*max-width:\s*none\s*!important;/, 'weather row max-width is none');
+
+  // Hero weather supports responsive count: 5 on mobile, progressive on tablet, up to 10 on PC
+  assert.match(appShellJs, /offset\s*<=\s*8/, 'HeroWeatherBox generates up to 10 items for desktop');
+  assert.match(destLateCss, /\.bp-hero-weather-col:nth-child\(n\+6\)\s*\{\s*display:\s*none\s*!important;/, 'mobile caps weather columns to 5');
+  assert.match(destLateCss, /container-name:\s*weather-row;/, 'weather row uses container queries for responsive layout');
+
+  // Detailed forecast API & WeatherDetailModal
+  assert.match(weatherJs, /export function fetchDetailedWeatherForecast/, 'app-weather exports fetchDetailedWeatherForecast');
+  assert.match(destLateCss, /\.weather-detail-modal-container/, 'dest-chrome-late styles WeatherDetailModal');
 });
+

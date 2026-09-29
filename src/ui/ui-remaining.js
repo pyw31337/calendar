@@ -551,7 +551,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   );
 }
 
-export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder, rangeMode = false, rangeStart, rangeEnd, onChangeRange }) {
+export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder, rangeMode = false, rangeStart, rangeEnd, onChangeRange, sheetZIndex = 15000 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -619,7 +619,13 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   };
 
   const handleApply = () => {
-    if (rangeMode) { setIsOpen(false); return; }
+    if (rangeMode) {
+      if (localRangeStart && !localRangeEnd && typeof onChangeRange === 'function') {
+        onChangeRange({ start: localRangeStart, end: localRangeStart });
+      }
+      setIsOpen(false);
+      return;
+    }
     const mm = String(pMonth + 1).padStart(2, '0');
     const dd = String(pDay).padStart(2, '0');
     onChange(dateOnly ? `${pYear}-${mm}-${dd}` : `${pYear}-${mm}-${dd}T${pTime}`);
@@ -661,7 +667,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet-overlay',
         onClick: () => setIsOpen(false),
-        style: { zIndex: 12000 }
+        style: { zIndex: sheetZIndex || 15000 }
       }, /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet',
         onClick: e => e.stopPropagation()

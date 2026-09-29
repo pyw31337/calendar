@@ -212,7 +212,15 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
 
   return /*#__PURE__*/React.createElement("div", { className: "lightbox-comment-thread", onClick: e => e.stopPropagation() },
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+        marginTop: '4px',
+        maxHeight: '140px',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }
     },
       hasMoreComments && /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -542,6 +550,9 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     style: {
       width: '92vw',
       maxWidth: '92vw',
+      maxHeight: isDesktop ? 'none' : '150px',
+      overflowY: isDesktop ? 'visible' : 'auto',
+      WebkitOverflowScrolling: 'touch',
       boxSizing: 'border-box',
       backgroundColor: 'rgba(15, 23, 42, 0.72)',
       border: '1px solid rgba(255,255,255,0.12)',
@@ -729,6 +740,28 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     return () => {
       if (mq.removeEventListener) mq.removeEventListener('change', onChange);
       else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  const [viewportSize, setViewportSize] = React.useState(() => ({
+    width: typeof window !== 'undefined' ? (window.visualViewport?.width || window.innerWidth) : 390,
+    height: typeof window !== 'undefined' ? (window.visualViewport?.height || window.innerHeight) : 800
+  }));
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateSize = () => {
+      setViewportSize({
+        width: Math.round(window.visualViewport?.width || window.innerWidth),
+        height: Math.round(window.visualViewport?.height || window.innerHeight)
+      });
+    };
+    window.addEventListener('resize', updateSize);
+    window.addEventListener('orientationchange', updateSize);
+    const vv = window.visualViewport;
+    if (vv) vv.addEventListener('resize', updateSize);
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('orientationchange', updateSize);
+      if (vv) vv.removeEventListener('resize', updateSize);
     };
   }, []);
   // ZOOM_DEFAULT (100%, fit-view) is the neutral/reset value -- ZOOM_MIN lets the user zoom
@@ -1031,8 +1064,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         // Ready threads size to their comment count + composer. A fixed minHeight here used to
         // keep a tall empty band under sparse threads; only loading/error keep a tap target floor.
         minHeight: commentStatus === 'ready' ? undefined : (isDesktop ? '64px' : '58px'),
-        maxHeight: isDesktop ? '55vh' : '36dvh',
-        overflowY: isDesktop ? 'auto' : 'visible', resize: isDesktop ? 'vertical' : 'none',
+        maxHeight: isDesktop ? '55vh' : (showTags ? '24dvh' : '32dvh'),
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        resize: isDesktop ? 'vertical' : 'none',
         marginTop: isDesktop ? '4px' : '0', padding: isDesktop ? '10px 14px' : '6px 10px',
         flexShrink: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
@@ -1844,19 +1879,76 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const isLandscape = currentDim?.width && currentDim?.height ? currentDim.width > currentDim.height : false;
   const isPortrait = currentDim?.width && currentDim?.height ? currentDim.height >= currentDim.width : false;
 
-  const reservedBottomPx = isDesktop ? (showTags ? 220 : 160) : (showTags ? 210 : 145);
+  const vpH = viewportSize.height;
+  const vpW = viewportSize.width;
+
+  const isTagPanelOpen = showTags && zoomLevel === ZOOM_DEFAULT;
+  const currentComments = photoCommentsByKey[photoCommentKey] || [];
+  const commentsCount = currentComments.length;
+
+  const desktopReservedPx = (() => {
+    let reserved = 80;
+    if (isTagPanelOpen) reserved += 130;
+    const commentsContentHeight = commentsCount === 0
+      ? 64
+      : (commentsCount === 1 ? 98 : (commentsCount === 2 ? 130 : 164));
+    reserved += Math.min(220, commentsContentHeight);
+    if (total > 1) reserved += 32;
+    return Math.max(160, reserved);
+  })();
+
+  // On mobile, dynamically account for all non-stage UI (safe areas, header buttons,
+  // tag panel card, comments card, indicator, and flex gaps) so content never overflows
+  // the viewport even when tags and comments are fully exposed.
+  const mobileReservedPx = (() => {
+    // Top & bottom safe-areas (iPhone dynamic island/notch ~47px + bottom home bar ~34px)
+    // plus close button clearance and container paddings
+    const chromeAndPadding = 96;
+
+    // Tag panel card height when open
+    const tagsHeight = isTagPanelOpen ? 124 : 0;
+
+    // Comments thread height based on current comment count + composer
+    const commentsContentHeight = commentsCount === 0
+      ? 64
+      : (commentsCount === 1 ? 98 : (commentsCount === 2 ? 130 : 164));
+    const commentsHeight = Math.min(190, commentsContentHeight);
+
+    // Multi-photo indicator text ("1 / 9")
+    const indicatorHeight = total > 1 ? 24 : 0;
+
+    // Flex gaps (8px between each visible block)
+    let visibleBlocks = 1; // stage
+    if (isTagPanelOpen) visibleBlocks++;
+    visibleBlocks++; // comments
+    if (total > 1) visibleBlocks++;
+    const gapsHeight = (visibleBlocks - 1) * 8;
+
+    return chromeAndPadding + tagsHeight + commentsHeight + indicatorHeight + gapsHeight;
+  })();
+
+  const reservedBottomPx = isDesktop ? desktopReservedPx : mobileReservedPx;
+
+  // Available vertical height for the image stage. Capped at 56dvh reference max.
   const availableHeightPx = typeof window !== 'undefined'
-    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) - reservedBottomPx))
+    ? Math.max(140, Math.round(vpH - reservedBottomPx))
     : 480;
+
+  const stageWidthPx = typeof window === 'undefined'
+    ? 640
+    : Math.max(240, Math.round(vpW * (isLandscape ? 1 : 0.92)));
 
   const mobileStageHeightPx = (() => {
     if (isDesktop) return null;
-    if (isPortrait) return availableHeightPx;
     if (currentDim?.width && currentDim?.height) {
-      const fitted = window.innerWidth * (currentDim.height / currentDim.width);
-      return Math.max(120, Math.min(availableHeightPx, Math.round(fitted)));
+      // Natural fitted height of this photo when spanning across stage width
+      const naturalAspectHeight = Math.round(stageWidthPx * (currentDim.height / currentDim.width));
+      // Cap at available vertical space so tags and comments never get pushed off-screen,
+      // while fitting the image tightly so no empty vertical gaps appear above/below it.
+      return Math.max(120, Math.min(availableHeightPx, naturalAspectHeight));
     }
-    return Math.max(120, Math.min(availableHeightPx, Math.round(window.innerWidth * 0.75)));
+    const fallbackAspect = isPortrait ? 1.25 : 0.75;
+    return Math.max(120, Math.min(availableHeightPx, Math.round(stageWidthPx * fallbackAspect)));
   })();
 
   const mobileImageStageStyle = isDesktop
@@ -1873,16 +1965,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         width: isLandscape ? '100vw' : '92vw',
         maxWidth: '100vw',
         height: `${mobileStageHeightPx}px`,
-        maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
+        maxHeight: `${mobileStageHeightPx}px`,
         overflow: 'hidden',
         position: 'relative',
         flexShrink: 0,
         transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
       };
-
-  const stageWidthPx = typeof window === 'undefined'
-    ? 640
-    : Math.max(240, Math.round((window.visualViewport?.width || window.innerWidth) * (isLandscape ? 1 : 0.92)));
 
   const renderSlide = (url, slot) => {
     const wrapperStyle = {
@@ -1951,6 +2039,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           alt: "썸네일",
           className: "lightbox-thumb-img",
           draggable: false,
+          onLoad: e => {
+            recordImageDimensions(url, e);
+          },
           style: {
             position: 'absolute',
             inset: 0,
@@ -2028,6 +2119,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           alt: "썸네일",
           className: "lightbox-thumb-img",
           draggable: false,
+          onLoad: e => {
+            recordImageDimensions(url, e);
+          },
           style: {
             position: 'absolute',
             inset: 0,
@@ -2078,7 +2172,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       // chunk and vertically center that unit via margin:auto on the chunk; flex-start on the
       // overlay keeps tall threads scrollable from the top instead of clipping both ends.
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: 'auto',
       paddingTop: isDesktop ? 0 : 'max(12px, calc(env(safe-area-inset-top, 0px) + 8px))',
       paddingBottom: isDesktop ? 0 : 'max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px))', boxSizing: 'border-box',
       userSelect: 'none'
@@ -2151,8 +2245,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'center',
       width: '100%',
       maxWidth: '100%',
+      maxHeight: isDesktop ? '100%' : 'calc(100dvh - max(28px, calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 20px)))',
       flexShrink: 1,
       minHeight: 0,
       gap: '8px',
@@ -2205,8 +2301,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       justifyContent: 'center',
       width: isLandscape ? '100vw' : 'auto',
       maxWidth: '100vw',
-      height: isPortrait ? (isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`) : 'auto',
-      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+      height: isDesktop ? (isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto') : `${mobileStageHeightPx}px`,
+      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`,
       touchAction: 'none',
       transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
     },
@@ -2221,14 +2317,17 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       alt: "썸네일",
       className: "lightbox-thumb-img",
       draggable: false,
+      onLoad: e => {
+        recordImageDimensions(currentUrl, e);
+      },
       style: {
         position: 'absolute',
         inset: 0,
         margin: 'auto',
         width: isLandscape ? '100%' : 'auto',
         maxWidth: '100vw',
-        height: isPortrait ? '100%' : 'auto',
-        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+        height: isDesktop ? (isPortrait ? '100%' : 'auto') : '100%',
+        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : '100%',
         borderRadius: isLandscape ? 0 : 'var(--radius-md)',
         objectFit: 'contain',
         display: 'block',
@@ -2255,8 +2354,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         position: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'relative' : 'static',
         width: isLandscape ? '100%' : 'auto',
         maxWidth: '100vw',
-        height: isPortrait ? '100%' : 'auto',
-        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+        height: isDesktop ? (isPortrait ? '100%' : 'auto') : '100%',
+        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : '100%',
         borderRadius: isLandscape ? 0 : 'var(--radius-md)',
         objectFit: 'contain',
         display: 'block',

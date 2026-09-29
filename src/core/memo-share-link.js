@@ -80,3 +80,91 @@ export function findMemoShareUrlInText(value, options = {}) {
   const remainingText = `${text.slice(0, match.index)}${text.slice((match.index || 0) + match[0].length)}`.trim();
   return { ...share, isOnlyUrl: remainingText.length === 0, rawUrl: candidate, remainingText };
 }
+
+/**
+ * Determines if a given URL or text candidate points to an internal service
+ * (such as a memo share, calendar share, app page, or local/hosted app origin).
+ * Used to ensure only external service URLs (YouTube, Naver, Kakao, blogs, etc.)
+ * appear in the gallery's 링크 (links) tab.
+ */
+export function isInternalServiceUrl(value, options = {}) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+
+  // Relative URLs, internal paths, or fragments
+  if (text.startsWith('/') || text.startsWith('#')) return true;
+
+  // Memo share URL (e.g. /share/{cal}/memo/{memoId} or ?memo=...)
+  if (parseMemoShareUrl(text, options)) return true;
+
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+  } catch (_) {
+    return false;
+  }
+
+  const hostname = (url.hostname || '').toLowerCase();
+  const host = (url.host || '').toLowerCase();
+  const locationLike = runtimeLocation(options.locationLike);
+  const currentHostname = (locationLike?.hostname || (typeof window !== 'undefined' ? window.location?.hostname : '') || '').toLowerCase();
+  const currentHost = (locationLike?.host || (typeof window !== 'undefined' ? window.location?.host : '') || '').toLowerCase();
+
+  const internalHosts = new Set([
+    'pyw31337.github.io',
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    currentHostname,
+    currentHost,
+    ...(Array.isArray(options.allowedHosts) ? options.allowedHosts.map(h => String(h).toLowerCase()) : []),
+  ].filter(Boolean));
+
+  if (internalHosts.has(hostname) || internalHosts.has(host)) {
+    return true;
+  }
+
+  // Firebase hosting domains for this project
+  if (hostname.endsWith('.web.app') || hostname.endsWith('.firebaseapp.com')) {
+    if (
+      hostname.includes('demo-moyeora') ||
+      hostname.includes('metro-live') ||
+      hostname.includes('moyeora') ||
+      (currentHostname && hostname === currentHostname)
+    ) {
+      return true;
+    }
+  }
+
+  // Internal app route patterns on any host
+  const pathname = url.pathname.toLowerCase();
+  if (
+    pathname.startsWith('/calendar/share/') ||
+    pathname.startsWith('/calendar/app/') ||
+    pathname.startsWith('/share/') ||
+    pathname.startsWith('/app/')
+  ) {
+    if (url.searchParams.has('cal') || url.searchParams.has('memo') || url.searchParams.has('id')) {
+      return true;
+    }
+  }
+
+  // Fragments representing internal app shares
+  if (url.hash && /#(?:gatherPhoto|gatherPhotos|gatherLinks|places|gallery|memo|links)=/i.test(url.hash)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isExternalServiceUrl(value, options = {}) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  try {
+    const url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+    if (!url.hostname || !url.hostname.includes('.')) return false;
+  } catch (_) {
+    return false;
+  }
+  return !isInternalServiceUrl(text, options);
+}

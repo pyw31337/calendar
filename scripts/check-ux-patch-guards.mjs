@@ -68,7 +68,7 @@ assert.match(gallery, /localeCompare\(bDay\)/);
 
 const chatRoom = fs.readFileSync(path.join(root, "src/ui/ui-chat-room.js"), "utf8");
 assert.doesNotMatch(chatRoom, /title: "사진 첨부"/);
-assert.match(chatRoom, /title: "파일 업로드"/);
+assert.match(chatRoom, /title: "(?:파일 업로드|사진 또는 파일 첨부)"/);
 assert.match(chatRoom, /lucide-paperclip/);
 assert.doesNotMatch(chatRoom, /fileInputRefChat/);
 

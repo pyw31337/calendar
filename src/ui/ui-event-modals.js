@@ -2240,7 +2240,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const EXPORT_SCALE = EXPORT_W / W;
     const PAD = 40;
     const HEADER_H = 190;
-    const ROW_H = 40;
+    // DATE_ROW_H: vertical space occupied by the date/amount line itself (date + gap below it).
+    // LABEL_ROW_H: vertical space occupied by each label (item name) line.
+    // Keeping them separate lets us tighten the date→item-name gap (was a single ROW_H=40 for both)
+    // without shrinking the space between items, giving a more compact readable card.
+    const DATE_ROW_H = 28;
+    const LABEL_ROW_H = 24;
+    const ROW_H = DATE_ROW_H + LABEL_ROW_H; // used only for summary-box height calculation
     const summaryBoxH = 74 + Math.max(1, participantRows.length) * ROW_H;
     const cleanAccountDigits = String(accountNumber || '').replace(/[^0-9]/g, '');
     const hasTransferAccount = cleanAccountDigits.length >= 8;
@@ -2318,10 +2324,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         labelLines: wrapText(item.label || '정산 항목', 420)
       };
     });
-    const itemRowUnits = imageItems.length === 0 ? 1 : imageItems.reduce((sum, entry) => sum + 1 + Math.max(1, entry.labelLines.length), 0);
-    const listBoxH = 74 + itemRowUnits * ROW_H;
+    // Each item occupies: 1 date row (DATE_ROW_H) + N label lines (LABEL_ROW_H each, min 1).
+    const listBoxH = 74 + imageItems.reduce((sum, entry) => sum + DATE_ROW_H + Math.max(1, entry.labelLines.length) * LABEL_ROW_H, imageItems.length === 0 ? DATE_ROW_H : 0);
     const bankSectionSpace = hasTransferAccount ? bankBoxH + 20 : 0;
-    const H = HEADER_H + 34 + summaryBoxH + 20 + bankSectionSpace + listBoxH + 50;
+    const H = HEADER_H + 34 + summaryBoxH + 20 + bankSectionSpace + listBoxH + 36;
 
     // The downloaded card follows the app theme: the dark V2 theme is black with the lime
     // accent (same as the settlement page's top card); light keeps the original palette.
@@ -2485,7 +2491,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
     } else {
       imageItems.forEach(({ item, parts, payerColor, payerBadge, labelLines }) => {
-        hLine(PAD + 20, W - PAD - 20, listRowY - 22);
+        hLine(PAD + 20, W - PAD - 20, listRowY - Math.round(DATE_ROW_H * 0.6));
         let textX = PAD + 20;
         ctx.fillStyle = P.text;
         ctx.font = '600 14px sans-serif';
@@ -2515,13 +2521,14 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         }
         ctx.fillStyle = P.text;
         ctx.font = '500 14px sans-serif';
-        labelLines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + (lineIndex + 1) * ROW_H));
+        // Label lines start DATE_ROW_H below the date line (not ROW_H=40) to reduce spacing.
+        labelLines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + DATE_ROW_H + lineIndex * LABEL_ROW_H));
         ctx.fillStyle = P.red;
         ctx.font = '800 15px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, listRowY);
         ctx.textAlign = 'left';
-        listRowY += ROW_H * (1 + Math.max(1, labelLines.length));
+        listRowY += DATE_ROW_H + Math.max(1, labelLines.length) * LABEL_ROW_H;
       });
     }
 
@@ -3043,7 +3050,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             );
           })
       ),
-      React.createElement('div', { style: { padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
+      cleanAccountDigits.length >= 8 && React.createElement('div', { style: { padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
         React.createElement('div', { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, '송금계좌 정보'),
         React.createElement('div', { style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)' } }, `${bankName === '기타' ? otherBankName || '기타' : bankName} ${(isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber) || '계좌번호 미입력'}`),
         depositorName && React.createElement('div', { style: { marginTop: '3px', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, `예금주: ${depositorName}`)

@@ -62,9 +62,17 @@ function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
   const React = window.React;
   const list = Array.isArray(photos) ? photos : [];
   const [currentPage, setCurrentPage] = React.useState(1);
+  const prevListKeyRef = React.useRef(listKey);
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [listKey, list.length]);
+    if (prevListKeyRef.current !== listKey) {
+      prevListKeyRef.current = listKey;
+      setCurrentPage(1);
+    }
+  }, [listKey]);
+  const pageCount = Math.max(1, Math.ceil(list.length / ARCHIVE_GRID_INITIAL_COUNT));
+  React.useEffect(() => {
+    setCurrentPage(prev => (prev > pageCount ? pageCount : prev));
+  }, [pageCount]);
   const page = paginateGalleryItems(list, currentPage, ARCHIVE_GRID_INITIAL_COUNT);
   const visible = page.items;
   return React.createElement(React.Fragment, null,
@@ -1278,7 +1286,7 @@ export function HistoryView({
   onAddPersonTag = null, onRenamePersonTag = null, onDeletePersonTag = null, showToast = null,
   anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null,
   onPromoteImageUrl = null, onSaveImageTags = null, onBulkSaveImageTags = null, onSearchTag = null,
-  onDeletePhoto = null, onReplacePhoto = null,
+  onDeletePhoto = null, onDeletePhotos = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
@@ -1784,14 +1792,25 @@ export function HistoryView({
     });
     return () => { cancelled = true; };
   }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, onIndexedPhotoLoadAll]);
+  const [deletedPhotoKeys, setDeletedPhotoKeys] = React.useState(() => new Set());
   const historyPhotoEntries = React.useMemo(() => {
     const list = indexedMeetingPhotoEntries.length
       ? [...baseHistoryPhotoEntries, ...indexedMeetingPhotoEntries]
       : baseHistoryPhotoEntries;
     return dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey)
-      .filter(photo => !isKnownBrokenHistoryPhoto(photo))
+      .filter((photo, idx) => {
+        if (isKnownBrokenHistoryPhoto(photo)) return false;
+        if (deletedPhotoKeys.size > 0) {
+          const selectKey = archivePhotoSelectKey(photo, idx);
+          if (deletedPhotoKeys.has(selectKey)) return false;
+          if (photo.assetKey && deletedPhotoKeys.has(String(photo.assetKey))) return false;
+          if (photo.mediaKey && deletedPhotoKeys.has(String(photo.mediaKey))) return false;
+          if (photo.refKey && deletedPhotoKeys.has(String(photo.refKey))) return false;
+        }
+        return true;
+      })
       .sort((a, b) => (Number(b.timestamp || 0) - Number(a.timestamp || 0)));
-  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision]);
+  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision, deletedPhotoKeys]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   // 장소 탭: a place group's key, PLACE_UNCLASSIFIED_KEY for "분류 필요", or null (the place grid).
   const [selectedPlaceKey, setSelectedPlaceKey] = React.useState(null);
@@ -1955,6 +1974,7 @@ export function HistoryView({
   const [peopleSelectedKeys, setPeopleSelectedKeys] = React.useState(() => new Set());
   const [isPeopleBulkSaving, setIsPeopleBulkSaving] = React.useState(false);
   const [isPeopleBulkDeleting, setIsPeopleBulkDeleting] = React.useState(false);
+  const [peopleDeleteProgress, setPeopleDeleteProgress] = React.useState(null);
   const peopleAnchorKeyRef = React.useRef('');
 
   React.useEffect(() => {
@@ -2022,18 +2042,47 @@ export function HistoryView({
 
   const handleDeleteSelectedPeoplePhotos = async () => {
     const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
-    if (!photos.length || typeof onDeletePhoto !== 'function') return;
+    if (!photos.length) return;
+    const deleteFn = onDeletePhotos || window.__gatherBulkDeletePhotos;
+    const keysToRemove = Array.from(peopleSelectedKeys);
+
+    // Optimistic local deletion: mark keys as deleted immediately so they vanish from the view instantly
+    setDeletedPhotoKeys(prev => {
+      const next = new Set(prev);
+      keysToRemove.forEach(k => next.add(k));
+      photos.forEach(p => {
+        if (p.assetKey) next.add(String(p.assetKey));
+        if (p.mediaKey) next.add(String(p.mediaKey));
+        if (p.refKey) next.add(String(p.refKey));
+      });
+      return next;
+    });
+    setPeopleSelectedKeys(new Set());
+    setPeopleSelectMode(false);
     setIsPeopleBulkDeleting(true);
+    setPeopleDeleteProgress({ current: 0, total: photos.length });
+
     try {
-      for (const photo of photos) {
-        await onDeletePhoto(photo);
+      if (typeof deleteFn === 'function') {
+        const res = await deleteFn(photos, {
+          onProgress: ({ current, total }) => setPeopleDeleteProgress({ current, total })
+        });
+        showToast?.(`사진 ${res?.deleted ?? photos.length}장을 삭제했습니다.`, 'success');
+      } else if (typeof onDeletePhoto === 'function') {
+        let done = 0;
+        for (const photo of photos) {
+          await onDeletePhoto({ ...photo, silent: true });
+          done += 1;
+          setPeopleDeleteProgress({ current: done, total: photos.length });
+        }
+        showToast?.(`사진 ${photos.length}장을 삭제했습니다.`, 'success');
       }
-      showToast?.(`사진 ${photos.length}장을 삭제했습니다.`, 'success');
-      setPeopleSelectedKeys(new Set());
     } catch (err) {
+      console.error('handleDeleteSelectedPeoplePhotos failed:', err);
       showToast?.('사진 삭제에 실패했습니다.', 'error');
     } finally {
       setIsPeopleBulkDeleting(false);
+      setPeopleDeleteProgress(null);
     }
   };
 
@@ -2175,8 +2224,9 @@ export function HistoryView({
   };
   // Same photo cell as the 인물 detail grid (comment badge + heartbeat), for the 장소 tab.
   const renderArchivePhotoGrid = (photos, keyPrefix, selection = null) => /*#__PURE__*/React.createElement(ProgressiveArchivePhotoGrid, {
+    key: keyPrefix,
+    listKey: keyPrefix,
     photos,
-    listKey: `${keyPrefix}:${photos.length}:${photos[0]?.assetKey || photos[0]?.mediaKey || ''}`,
     renderPhoto: (photo, idx) => {
     const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
     const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
@@ -2489,8 +2539,9 @@ export function HistoryView({
   };
   const renderPhotoThumbGrid = (photos, { checkable, selectedKeys, onToggle, onOpen, keyPrefix }) => (
     /*#__PURE__*/React.createElement(ProgressiveArchivePhotoGrid, {
+      key: keyPrefix,
+      listKey: keyPrefix,
       photos,
-      listKey: `${keyPrefix}:${photos.length}:${photos[0]?.assetKey || photos[0]?.mediaKey || ''}`,
       renderPhoto: (photo, idx) => {
       const ids = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
       const photoKey = ids[0] || photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
@@ -3090,6 +3141,7 @@ export function HistoryView({
         onRequestConfirm,
         isSaving: isPeopleBulkSaving,
         isDeleting: isPeopleBulkDeleting,
+        deleteProgress: peopleDeleteProgress,
         mode: 'people'
       })
     )),
@@ -4586,6 +4638,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+  const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker;
   const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
 
   // 'performance' | 'festival' | 'sports' -- defaults to whichever 컨텐츠 탭 the user opened this
@@ -4947,15 +5000,30 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
           placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : (kind === 'movie' ? "영화 제목" : "공연 제목")), maxLength: 120
         })),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
-          field("시작일 *", /*#__PURE__*/React.createElement("input", {
-            className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
-            style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
-          }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' }),
-          field(kind === 'movie' ? "상영종료일 (선택)" : "종료일", /*#__PURE__*/React.createElement("input", {
-            className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
-            style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
-          }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
+        field(kind === 'movie' ? "상영 기간 *" : (kind === 'festival' ? "축제 기간 *" : (kind === 'sports' ? "경기/대회 기간 *" : "공연/행사 기간 *")),
+          DeadlineDateTimePicker
+            ? /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                dateOnly: true,
+                rangeMode: true,
+                rangeStart: startDate,
+                rangeEnd: endDate,
+                placeholder: "시작일 ~ 종료일 선택",
+                sheetZIndex: 16000,
+                onChangeRange: ({ start, end }) => {
+                  setStartDate(start || '');
+                  setEndDate(end || '');
+                }
+              })
+            : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
+                /*#__PURE__*/React.createElement("input", {
+                  className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
+                  style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
+                }),
+                /*#__PURE__*/React.createElement("input", {
+                  className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
+                  style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
+                })
+              )
         ),
         kind !== 'movie' && field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : "공연장"), /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
@@ -5017,24 +5085,32 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
               onClick: e => { e.stopPropagation(); setImage(''); },
               title: "이미지 삭제",
               "aria-label": "이미지 삭제",
+              className: "content-thumb-delete-btn",
               style: {
                 position: 'absolute',
                 top: '-6px',
                 right: '-6px',
-                width: '18px',
-                height: '18px',
+                width: '20px',
+                height: '20px',
+                minWidth: '20px',
+                minHeight: '20px',
+                maxWidth: '20px',
+                maxHeight: '20px',
+                aspectRatio: '1 / 1',
                 borderRadius: '50%',
                 border: 'none',
                 backgroundColor: 'rgba(0, 0, 0, 0.65)',
                 color: '#FFFFFF',
                 fontSize: '11px',
-                lineHeight: '18px',
+                lineHeight: 1,
                 textAlign: 'center',
                 cursor: 'pointer',
                 padding: 0,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                flexShrink: 0
               }
             }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 10 }) : "✕")
           ) : null,
@@ -5109,28 +5185,47 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
             field("관객수", /*#__PURE__*/React.createElement("input", { className: "form-input", value: audience, onChange: e => setAudience(e.target.value), placeholder: "명" }))
           )
         ),
-        field("설명", AutoGrowTextarea
-          ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
-              className: "form-input",
-              value: description,
-              onChange: e => setDescription(e.target.value),
-              placeholder: "간단한 설명",
-              rows: 3,
-              maxLength: 2000,
-              minHeight: 72,
-              maxHeight: 240,
-              style: { width: '100%' }
-            })
-          : /*#__PURE__*/React.createElement("textarea", {
-              className: "form-input", value: description,
-              onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
-              onInput: e => autoGrowTextarea(e.target, 240),
-              placeholder: "간단한 설명", rows: 3, maxLength: 2000,
-              style: { resize: 'none', minHeight: '72px', overflow: 'hidden', width: '100%' }
-            }))),
+        (() => {
+          const isDescMultiline = Boolean(description && (description.includes('\n') || description.length > 28));
+          return field("설명", AutoGrowTextarea
+            ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
+                className: `form-input content-desc-textarea ${isDescMultiline ? 'is-multiline' : 'is-singleline'}`,
+                value: description,
+                onChange: e => setDescription(e.target.value),
+                placeholder: "간단한 설명",
+                rows: isDescMultiline ? 3 : 1,
+                maxLength: 2000,
+                minHeight: isDescMultiline ? 72 : 44,
+                maxHeight: 240,
+                "data-field-lines": isDescMultiline ? "multi" : "1",
+                style: {
+                  width: '100%',
+                  borderRadius: isDescMultiline ? 'var(--field-radius-multiline, 14px)' : 'var(--field-radius-single-line, 22px)',
+                  transition: 'border-radius 0.15s ease'
+                }
+              })
+            : /*#__PURE__*/React.createElement("textarea", {
+                className: `form-input content-desc-textarea ${isDescMultiline ? 'is-multiline' : 'is-singleline'}`,
+                value: description,
+                onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
+                onInput: e => autoGrowTextarea(e.target, 240),
+                placeholder: "간단한 설명",
+                rows: isDescMultiline ? 3 : 1,
+                maxLength: 2000,
+                "data-field-lines": isDescMultiline ? "multi" : "1",
+                style: {
+                  resize: 'none',
+                  minHeight: isDescMultiline ? '72px' : '44px',
+                  overflow: 'hidden',
+                  width: '100%',
+                  borderRadius: isDescMultiline ? 'var(--field-radius-multiline, 14px)' : 'var(--field-radius-single-line, 22px)',
+                  transition: 'border-radius 0.15s ease'
+                }
+              }));
+        })()),
         /*#__PURE__*/React.createElement("div", {
           className: "modal-footer",
-          style: { flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end' }
+          style: { flexShrink: 0, padding: '12px 18px max(16px, calc(10px + env(safe-area-inset-bottom, 0px)))', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end', boxSizing: 'border-box' }
         },
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-primary btn-action", disabled: saving || uploadingImage, onClick: handleSave,
@@ -5901,11 +5996,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 13000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
       },
         /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
-          className: "modal-container",
+          className: "modal-container culture-detail-modal-container",
           onClick: e => e.stopPropagation(),
           style: {
-            position: 'relative', width: '100%', maxWidth: '520px', maxHeight: '85vh',
-            backgroundColor: 'var(--bg-card)', borderRadius: '20px', padding: '20px',
+            position: 'relative', width: '100%', maxWidth: '520px', maxHeight: 'min(88dvh, var(--gather-vv-modal-max, 860px))',
+            backgroundColor: 'var(--bg-card)', borderRadius: '20px', padding: '20px 20px 0',
             display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
           }
         },
@@ -6124,18 +6219,25 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // 자세히보기 URL이 없으면 공유만 남는데, 44px 아이콘만 두면 로드 깨진 것처럼 보인다.
             // 그때는 자세히보기 폭까지 써서 아이콘+「공유하기」풀폭 버튼으로 바꾼다.
             const detailUrl = resolveCultureDetailUrl(selected);
-            return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+            return /*#__PURE__*/React.createElement("div", {
+              className: "modal-footer culture-detail-footer",
+              style: {
+                display: 'flex', gap: '8px', flexShrink: 0,
+                padding: '0 0 max(16px, calc(10px + env(safe-area-inset-bottom, 0px)))',
+                marginTop: '4px', borderTop: 'none', background: 'transparent', boxSizing: 'border-box'
+              }
+            },
               /*#__PURE__*/React.createElement("button", {
                 type: "button", onClick: () => handleShareContent(selected), "aria-label": "공유",
                 style: detailUrl ? {
-                  width: '44px', height: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '44px', height: '44px', minHeight: '44px', maxHeight: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
+                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer', boxSizing: 'border-box'
                 } : {
-                  flex: 1, minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  flex: 1, minHeight: '44px', height: '44px', maxHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer',
-                  fontWeight: 800, fontSize: 'var(--font-size-md)'
+                  fontWeight: 800, fontSize: 'var(--font-size-md)', boxSizing: 'border-box'
                 }
               },
                 ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗",
@@ -6144,8 +6246,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               detailUrl ? /*#__PURE__*/React.createElement("a", {
                 href: detailUrl, target: "_blank", rel: "noopener noreferrer",
                 style: {
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '44px', minHeight: '44px', maxHeight: '44px', textAlign: 'center', padding: '0 16px', borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none', boxSizing: 'border-box'
                 }
               }, "자세히보기") : null
             );

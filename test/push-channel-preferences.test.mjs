@@ -34,3 +34,9 @@ test('chat push trigger logs recipient-selection results for delivery diagnosis'
   assert.match(functionSrc, /Chat push dispatch/);
   assert.match(functionSrc, /skippedChannel/);
 });
+
+test('chat push notification title uses senderName directly to avoid redundancy with iOS from-label', () => {
+  const functionSrc = readFileSync(join(root, 'functions/index.js'), 'utf8');
+  assert.match(functionSrc, /title:\s*senderName\s*\|\|\s*calendarTitle/);
+});
+

@@ -956,6 +956,124 @@ export function createCalendarPhotoActions({
     return false;
   };
 
+  const handleBulkDeletePhotos = async (photos, options = {}) => {
+    const list = Array.isArray(photos) ? photos.filter(Boolean) : [];
+    if (!list.length) return { ok: true, deleted: 0, failed: 0 };
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+    let deletedCount = 0;
+    let failedCount = 0;
+    onProgress?.({ current: 0, total: list.length });
+
+    const meetingItems = [];
+    const chatGroups = new Map();
+    const memoItems = [];
+    const fallbacks = [];
+
+    list.forEach(item => {
+      const msgId = String(item.sourceMessageId || item.messageId || '').trim();
+      const isMemo = item.source === 'memo' || item.uploadSource === 'memo';
+      const isMeeting = item.source === 'meeting' || item.uploadSource === 'meeting' || Boolean(item.meetingDate && item.photoId);
+      if (isMemo && msgId) memoItems.push(item);
+      else if (msgId && !isMeeting) {
+        if (!chatGroups.has(msgId)) chatGroups.set(msgId, []);
+        chatGroups.get(msgId).push(item);
+      } else if (isMeeting || item.meetingDate || item.photoId) meetingItems.push(item);
+      else fallbacks.push(item);
+    });
+
+    if (meetingItems.length && activeCal) {
+      try {
+        const nextConfirmedMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
+        const now = Date.now();
+        const photoLogs = [];
+        let changed = false;
+
+        meetingItems.forEach(item => {
+          const { meetingDate: dateStr, photoId, mediaKey = '', refKey = '' } = item;
+          const imageUrl = item.imageUrl || item.full || item.thumb;
+          const matchFn = p => (photoId && photoMatchesIdentity(p, photoId)) || photoMatchesIdentity(p, refKey) || photoMatchesIdentity(p, mediaKey) || photoMatchesUrl(p, imageUrl);
+
+          let mIdx = isValidDateString(dateStr) ? nextConfirmedMeetings.findIndex(m => m.date === dateStr) : -1;
+          if (mIdx < 0) mIdx = nextConfirmedMeetings.findIndex(m => (m.photos || []).some(matchFn));
+          if (mIdx >= 0) {
+            const meeting = nextConfirmedMeetings[mIdx];
+            const pPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
+            const tIdx = pPhotos.findIndex(matchFn);
+            if (tIdx >= 0) {
+              pPhotos[tIdx] = { ...pPhotos[tIdx], deletedAt: now, updatedAt: now };
+              meeting.photos = pPhotos;
+              meeting.updatedAt = now;
+              changed = true;
+              deletedCount += 1;
+              const log = createActivityLog(activeCal.id, 'photo_delete', meeting.date || dateStr, '', now, '일정 사진 삭제');
+              if (log) photoLogs.push(log);
+              dropPhotoFromGalleryIndex(item);
+            } else fallbacks.push(item);
+          } else fallbacks.push(item);
+          onProgress?.({ current: deletedCount, total: list.length });
+        });
+        if (changed) await commitConfirmedMeetings(nextConfirmedMeetings, null, photoLogs, 'write', 'delete');
+      } catch (err) {
+        console.error('handleBulkDeletePhotos meeting error:', err);
+      }
+    }
+
+    for (const [msgId, items] of chatGroups) {
+      try {
+        const srcMsg = await readFreshChatMessage(msgId);
+        if (!srcMsg) { fallbacks.push(...items); continue; }
+        const rawUrls = Array.isArray(srcMsg.imageUrls) && srcMsg.imageUrls.length ? srcMsg.imageUrls.slice() : (srcMsg.imageUrl ? [srcMsg.imageUrl] : []);
+        const rawThumbs = Array.isArray(srcMsg.thumbUrls) && srcMsg.thumbUrls.length ? srcMsg.thumbUrls.slice() : (srcMsg.thumbUrl ? [srcMsg.thumbUrl] : []);
+        const rawTags = Array.isArray(srcMsg.imageTags) ? srcMsg.imageTags.slice() : [];
+
+        const delSlots = new Set();
+        items.forEach(it => {
+          const exp = { imageUrl: it.imageUrl || it.full || it.thumb || '', thumbUrl: it.thumbUrl || it.thumb || it.full || '' };
+          const pIdx = Number.isInteger(it.imageIndex) ? it.imageIndex : it.sourceImageIndex;
+          let slot = findImageSlotByAsset(srcMsg, exp, pIdx);
+          if (slot < 0 && Number.isInteger(pIdx) && pIdx >= 0 && pIdx < rawUrls.length) slot = pIdx;
+          if (slot >= 0) delSlots.add(slot);
+        });
+
+        if (!delSlots.size) { fallbacks.push(...items); continue; }
+
+        const nextUrls = rawUrls.filter((_, i) => !delSlots.has(i));
+        const nextThumbs = rawThumbs.filter((_, i) => !delSlots.has(i));
+        const nextTags = rawTags.filter((_, i) => !delSlots.has(i));
+        const nextTagMap = reconcileMessageImageTagMap({ ...srcMsg, imageUrls: nextUrls, thumbUrls: nextThumbs, imageTags: nextTags, imageUrl: nextUrls[0] || nextThumbs[0] || null, thumbUrl: nextThumbs[0] || nextUrls[0] || null }, srcMsg.imageTagMap);
+        const shouldDel = !nextUrls.length && !nextThumbs.length && (!String(srcMsg.text || '').trim() || srcMsg.uploadSource === 'gallery') && !(srcMsg.fileAttachments || []).length;
+
+        if (shouldDel) {
+          await writeCollectionDocumentWithFallback('messages', activeCalId, msgId, null, 'delete', '채팅 사진 일괄 삭제');
+          removeLocalChatMessage(msgId);
+        } else {
+          const data = sanitizeMessageForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || nextThumbs[0] || null, thumbUrl: nextThumbs[0] || nextUrls[0] || null, imageTags: nextTags, imageTagMap: nextTagMap });
+          await writeCollectionDocumentWithFallback('messages', activeCalId, msgId, data, 'update', '채팅 사진 일괄 삭제', { deletePaths: (!nextUrls.length && !nextThumbs.length) ? ['imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags'] : [] });
+          patchLocalChatMessage(msgId, data);
+        }
+        items.forEach(it => { deletedCount += 1; dropPhotoFromGalleryIndex(it); onProgress?.({ current: deletedCount, total: list.length }); });
+      } catch (err) {
+        console.error('handleBulkDeletePhotos chat error:', msgId, err);
+        fallbacks.push(...items);
+      }
+    }
+
+    for (const item of memoItems) {
+      const ok = await handleDeleteMemoPhoto(item.memoId || item.messageId, item.imageIndex || 0, { silent: true });
+      if (ok) { deletedCount += 1; dropPhotoFromGalleryIndex(item); } else fallbacks.push(item);
+      onProgress?.({ current: deletedCount, total: list.length });
+    }
+
+    for (const item of fallbacks) {
+      try {
+        const ok = await handleDeletePhoto({ ...item, silent: true });
+        if (ok) deletedCount += 1; else failedCount += 1;
+      } catch { failedCount += 1; }
+      onProgress?.({ current: deletedCount, total: list.length });
+    }
+    return { ok: true, deleted: deletedCount, failed: failedCount, total: list.length };
+  };
+
   const handleReplacePhoto = async (meta, file) => {
     if (!meta || meta.directMediaUrl || !file) return false;
     const imageUrl = meta.imageUrl || meta.full || meta.thumb;
@@ -1097,7 +1215,7 @@ export function createCalendarPhotoActions({
   return {
     handleDeleteMeetingPhoto, unlinkMeetingPhotoReferences, handleDeleteChatMessagePhoto,
     handleReplaceChatMessagePhoto, handleSavePhotoComments, findMemoById, handleDeletePhoto,
-    handleReplacePhoto, handleJumpToChatMessage, handleGetChatMessageOrdinal,
+    handleBulkDeletePhotos, handleReplacePhoto, handleJumpToChatMessage, handleGetChatMessageOrdinal,
     handleGetGalleryPhotoOrdinal, handleJumpToMemo, handleJumpToMemoTag, handleJumpToPlace,
     handleJumpToGallery, handleJumpToMeetingDate
   };

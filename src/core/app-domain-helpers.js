@@ -1379,7 +1379,7 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
-    new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
+    new Notification(participantName || calendar?.title || '모여라 캘린더', {
       body,
       tag: `chat-${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
@@ -1401,7 +1401,7 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
   const body = `${whenLabel} 모임입니다. ${label}`;
   if (isNotificationSupported() && Notification.permission === 'granted') {
     try {
-      new Notification(`${calendar?.title || '모여라 캘린더'} 모임 알림`, {
+      new Notification('모임 알림', {
         body,
         tag: `meeting-reminder-${calendar?.id}-${meeting.date}`
       });
@@ -1422,7 +1422,7 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
     : `${whenLabel} 반복 일정입니다. ${title}`;
   if (isNotificationSupported() && Notification.permission === 'granted') {
     try {
-      new Notification(`${calendar?.title || '모여라 캘린더'} 일정 알림`, {
+      new Notification('일정 알림', {
         body,
         tag: `repeat-reminder-${calendar?.id}-${ann?.id || 'x'}-${dateStr || ''}`
       });

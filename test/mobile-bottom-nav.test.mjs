@@ -66,6 +66,11 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
 
   // 10. v2-chat-root is pinned to top: 0 and bottom: 0 so it never lifts upward on keyboard open
   assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\s*\.v2-chat\s*\.v2-chat-root\s*\{[\s\S]*top:\s*0\s*!important;[\s\S]*bottom:\s*0\s*!important;/);
+
+  // 11. Dark mode calendar center button has lime background and black icon
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-theme="dark"\][\s\S]*?\.bp-mobile-bottom-nav-center-circle\s*\{\s*background:\s*var\(--brand\)\s*!important;/);
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-theme="dark"\][\s\S]*?\.bp-mobile-bottom-nav-center-circle::before\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-theme="dark"\][\s\S]*?\.bp-mobile-bottom-nav-center-circle svg\s*\{[\s\S]*?color:\s*var\(--on-brand\)\s*!important;[\s\S]*?stroke:\s*var\(--on-brand\)\s*!important;/);
 });
 
 test('ChatScreen in screens.js does not shift v2-chat-root by viewportBottom', () => {
