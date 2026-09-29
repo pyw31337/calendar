@@ -53,7 +53,7 @@ function withTimeout(promise, ms, message) {
   });
 }
 
-function resizeImageToBlob(img, maxDim, quality, isPng) {
+function resizeImageToBlob(img, maxDim, quality = 0.85, isPng = false) {
   let w = img.width, h = img.height;
   if (w > maxDim || h > maxDim) {
     if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
@@ -64,16 +64,22 @@ function resizeImageToBlob(img, maxDim, quality, isPng) {
   canvas.height = h;
   canvas.getContext('2d').drawImage(img, 0, 0, w, h);
   return new Promise((resolve, reject) => {
-    const type = isPng ? 'image/png' : 'image/jpeg';
-    const done = blob => {
-      if (!blob) {
-        reject(new Error('이미지를 변환하지 못했습니다'));
+    // Modern browsers support canvas WebP encoding with superior compression
+    canvas.toBlob(blob => {
+      if (blob) {
+        resolve({ blob, width: w, height: h, isWebp: true });
         return;
       }
-      resolve({ blob, width: w, height: h });
-    };
-    if (isPng) canvas.toBlob(done, type);
-    else canvas.toBlob(done, type, quality);
+      // Fallback if browser canvas lacks WebP support
+      const fallbackType = isPng ? 'image/png' : 'image/jpeg';
+      canvas.toBlob(fbBlob => {
+        if (!fbBlob) {
+          reject(new Error('이미지를 변환하지 못했습니다'));
+          return;
+        }
+        resolve({ blob: fbBlob, width: w, height: h, isWebp: false });
+      }, fallbackType, isPng ? undefined : quality);
+    }, 'image/webp', quality);
   });
 }
 
@@ -381,11 +387,13 @@ async function uploadMemePoolAssets(id, file) {
       resizeImageToBlob(img, MEME_FULL_MAX_DIM, 0.85, isPng),
       resizeImageToBlob(img, MEME_THUMB_MAX_DIM, 0.8, isPng)
     ]);
-    const ext = isPng ? 'png' : 'jpg';
-    const contentType = isPng ? 'image/png' : 'image/jpeg';
+    const fullExt = full.isWebp ? 'webp' : (isPng ? 'png' : 'jpg');
+    const fullContentType = full.isWebp ? 'image/webp' : (isPng ? 'image/png' : 'image/jpeg');
+    const thumbExt = thumb.isWebp ? 'webp' : (isPng ? 'png' : 'jpg');
+    const thumbContentType = thumb.isWebp ? 'image/webp' : (isPng ? 'image/png' : 'image/jpeg');
     const [fullUrl, thumbUrl] = await Promise.all([
-      uploadBlobToMemePool(storage, `memePool/${id}_full.${ext}`, full.blob, contentType),
-      uploadBlobToMemePool(storage, `memePool/${id}_thumb.${ext}`, thumb.blob, contentType)
+      uploadBlobToMemePool(storage, `memePool/${id}_full.${fullExt}`, full.blob, fullContentType),
+      uploadBlobToMemePool(storage, `memePool/${id}_thumb.${thumbExt}`, thumb.blob, thumbContentType)
     ]);
     return { fullUrl, thumbUrl, width: full.width, height: full.height };
   } catch (err) {
