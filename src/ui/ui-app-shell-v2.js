@@ -240,6 +240,48 @@ function TabIcon({ id, active, size = 16 }) {
   );
 }
 
+export const MOBILE_BOTTOM_NAV_ITEMS = [
+  { id: 'settlement', label: '정산', icon: 'settlement' },
+  { id: 'memo', label: '메모', icon: 'memo' },
+  { id: 'calendar', label: '캘린더', icon: 'calendar' },
+  { id: 'chat', label: '채팅', icon: 'chat' },
+  { id: 'more', label: '더보기', icon: 'more' },
+];
+
+export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
+  const React = window.React;
+  return React.createElement(
+    'nav',
+    {
+      className: bentoClass('mobile-bottom-nav'),
+      'aria-label': '하단 메뉴',
+    },
+    MOBILE_BOTTOM_NAV_ITEMS.map((item) => {
+      const isActive = isSideNavOpen ? item.id === 'more' : activeTab === item.id;
+      return React.createElement(
+        'button',
+        {
+          key: item.id,
+          type: 'button',
+          className: bentoClass(`mobile-bottom-nav-item ${isActive ? 'is-active' : ''}`.trim()),
+          'aria-label': item.label,
+          'aria-current': isActive ? 'page' : undefined,
+          onClick: () => {
+            if (typeof onSelectTab === 'function') onSelectTab(item.id);
+          },
+        },
+        React.createElement('span', { className: bentoClass('mobile-bottom-nav-indicator'), 'aria-hidden': 'true' }),
+        React.createElement(
+          'span',
+          { className: bentoClass('mobile-bottom-nav-icon'), 'aria-hidden': 'true' },
+          React.createElement(TabIcon, { id: item.icon, active: isActive, size: 22 })
+        ),
+        React.createElement('span', { className: bentoClass('mobile-bottom-nav-label') }, item.label)
+      );
+    })
+  );
+}
+
 /**
  * Top header bar -- brand/캘린더명 + 검색 + 더보기, matching the Claude Design 목업 (Mobile320
  * artboard)'s hero-zone brand row. Unlike that mockup, there is no separate 메뉴/hamburger icon
@@ -3895,7 +3937,19 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           onSelectDate: (d) => { setDateModalTab(null); setDateModalSearchFocus(null); setDateModalDate(d); },
           onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
         })
-      )
+      ),
+      React.createElement(MobileBottomNav, {
+        activeTab,
+        isSideNavOpen,
+        onSelectTab: (tabId) => {
+          if (tabId === 'more') {
+            setIsSideNavOpen(prev => !prev);
+          } else {
+            setIsSideNavOpen(false);
+            selectSideItem(tabId);
+          }
+        },
+      })
     ),
     React.createElement(MoreModalsHost, {
       openModal: openMoreModal, onClose: () => setOpenMoreModal(null),

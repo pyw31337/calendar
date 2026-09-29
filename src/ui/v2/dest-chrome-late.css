@@ -2740,12 +2740,132 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   .v2-design .bp-menu-fab { display: none !important; }
 }
 
+/* Mobile bottom navigation bar ---------------------------------------------
+ * 5 primary tabs: 정산, 메모, 캘린더, 채팅, 더보기
+ * Visible on mobile (<1200px) and hidden on desktop (>=1200px).
+ */
+html:has(.renewal-shell.v2-design) {
+  --mobile-bottom-nav-height: 58px;
+  --mobile-bottom-nav-total: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+}
+
+.v2-design .bp-mobile-bottom-nav {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: var(--mobile-bottom-nav-total, calc(58px + env(safe-area-inset-bottom, 0px))) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  background: var(--bg-card) !important;
+  border-top: 1px solid var(--border-subtle) !important;
+  box-shadow: 0 -2px 10px rgba(30, 27, 46, 0.05) !important;
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: space-around !important;
+  z-index: 520 !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 1200px) {
+  .v2-design .bp-mobile-bottom-nav {
+    display: none !important;
+  }
+}
+
+.v2-design .bp-mobile-bottom-nav-item {
+  position: relative !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  height: var(--mobile-bottom-nav-height, 58px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px 4px 5px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: var(--text-muted) !important;
+  cursor: pointer !important;
+  outline: none !important;
+  text-decoration: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: color 0.15s ease !important;
+  box-sizing: border-box !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-indicator {
+  position: absolute !important;
+  top: 0 !important;
+  left: 20% !important;
+  right: 20% !important;
+  height: 3px !important;
+  background: var(--brand) !important;
+  border-radius: 0 0 3px 3px !important;
+  opacity: 0 !important;
+  transform: scaleX(0.5) !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+  pointer-events: none !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-is-active .bp-mobile-bottom-nav-indicator {
+  opacity: 1 !important;
+  transform: scaleX(1) !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  margin-bottom: 3px !important;
+  color: currentColor !important;
+  flex-shrink: 0 !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-icon svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-label {
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.2px !important;
+  color: currentColor !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-is-active {
+  color: var(--brand) !important;
+}
+
+.v2-design .bp-mobile-bottom-nav-item.bp-is-active .bp-mobile-bottom-nav-label {
+  font-weight: 600 !important;
+}
+
 /* Mobile/tablet drawer uses the same expanded PC rail (brand, search, groups,
  * 공유/설정/접기). No separate close control — 접기 dismisses the overlay. */
 @media (max-width: 1199px) {
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
     padding-left: 0 !important;
   }
+  /* Hide FAB menu buttons on phone/tablet; replaced by MobileBottomNav */
+  html:has(.renewal-shell.v2-design) .bp-home-menu-fab,
+  html:has(.renewal-shell.v2-design) .bp-menu-fab,
+  html:has(.renewal-shell.v2-design) .bp-fab,
+  .v2-design .bp-home-menu-fab,
+  .v2-design .bp-menu-fab,
+  .v2-design .bp-fab {
+    display: none !important;
+  }
+  /* Drawer sits ABOVE the bottom menu bar */
   html:has(.renewal-shell.v2-design) .bp-side-nav,
   html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed {
     --v2-side-head-h: 64px;
@@ -2758,7 +2878,8 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     flex-direction: column !important;
     position: fixed !important;
     top: 0 !important;
-    bottom: 0 !important;
+    bottom: var(--mobile-bottom-nav-total, calc(58px + env(safe-area-inset-bottom, 0px))) !important;
+    height: auto !important;
     left: auto !important;
     right: 0 !important;
     width: 280px !important;
@@ -2784,11 +2905,37 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop {
     z-index: 490 !important;
+    bottom: var(--mobile-bottom-nav-total, calc(58px + env(safe-area-inset-bottom, 0px))) !important;
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop.bp-is-open {
     display: block !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+  }
+  /* Page clearance above mobile bottom nav */
+  .v2-design .bp-app-shell.is-bento-home,
+  .v2-design .renewal-shell-main.v2-destination:not(.v2-chat) {
+    padding-bottom: calc(var(--mobile-bottom-nav-total, 58px) + 24px) !important;
+  }
+  /* Chat composer sits directly above mobile bottom nav */
+  html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
+    bottom: var(--mobile-bottom-nav-total, calc(58px + env(safe-area-inset-bottom, 0px))) !important;
+  }
+  html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
+  html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+    bottom: calc(var(--v2-chat-composer-space, 168px) + var(--mobile-bottom-nav-total, 58px) + 8px) !important;
+  }
+  html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
+  html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+    bottom: calc(var(--mobile-bottom-nav-total, 58px) + 8px) !important;
+  }
+  html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
+  html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
+    padding-bottom: calc(var(--v2-chat-composer-space, 168px) + var(--mobile-bottom-nav-total, 58px) + 16px) !important;
+  }
+  html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-scroll,
+  html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .chat-messages-scroll {
+    padding-bottom: calc(var(--mobile-bottom-nav-total, 58px) + 24px) !important;
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-close-btn {
     display: none !important;
