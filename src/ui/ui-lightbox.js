@@ -1065,7 +1065,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         // keep a tall empty band under sparse threads; only loading/error keep a tap target floor.
         minHeight: commentStatus === 'ready' ? undefined : (isDesktop ? '64px' : '58px'),
         maxHeight: isDesktop ? '55vh' : (showTags ? '24dvh' : '32dvh'),
-        overflowY: 'auto',
+        overflowY: isDesktop ? 'auto' : 'visible',
         WebkitOverflowScrolling: 'touch',
         resize: isDesktop ? 'vertical' : 'none',
         marginTop: isDesktop ? '4px' : '0', padding: isDesktop ? '10px 14px' : '6px 10px',

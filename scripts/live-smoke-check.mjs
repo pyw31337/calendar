@@ -57,8 +57,8 @@ function resolveAssetUrl(path, fallbackBase = baseUrl) {
   return new URL(normalized.startsWith('assets/') ? normalized : path, normalized.startsWith('assets/') ? baseUrl : fallbackBase).toString();
 }
 
-function fetchWithTimeout(url, options = {}) {
-  return fetch(url, { ...options, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 async function checkUrl(url, validate) {
@@ -222,10 +222,26 @@ const functionProbes = [
   // structured empty result, so the smoke contract must not require the retired 400 response.
   ['kakaoLocalSearchProxy', [200], '"ok":true']
 ];
+const FUNCTION_PROBE_TIMEOUT_MS = 25_000;
 for (const [name, okCodes, needle] of functionProbes) {
   const url = `${FUNCTIONS_BASE}/${name}`;
-  const response = await fetchWithTimeout(url, { redirect: 'follow' });
-  const text = await response.text();
+  let response;
+  let text = '';
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      response = await fetchWithTimeout(url, { redirect: 'follow' }, FUNCTION_PROBE_TIMEOUT_MS);
+      text = await response.text();
+      break;
+    } catch (err) {
+      lastError = err;
+      if (attempt < 2) {
+        console.warn(`[live-smoke] function probe retry ${name} after ${err.message}`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  }
+  if (!response) throw lastError;
   if (response.status === 404) throw new Error(`Cloud Function missing (not deployed): ${name}`);
   if (!okCodes.includes(response.status)) {
     throw new Error(`Cloud Function ${name} unexpected ${response.status}`);
@@ -233,7 +249,7 @@ for (const [name, okCodes, needle] of functionProbes) {
   if (needle && !text.includes(needle)) throw new Error(`Cloud Function ${name} body mismatch`);
   console.log(`[live-smoke] function ok ${name} ${response.status}`);
 }
-const photoIndexTrigger = await fetchWithTimeout(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' });
+const photoIndexTrigger = await fetchWithTimeout(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' }, FUNCTION_PROBE_TIMEOUT_MS);
 if (photoIndexTrigger.status === 404) {
   throw new Error('Cloud Function missing (not deployed): onMessagePhotoIndexWrite');
 }
