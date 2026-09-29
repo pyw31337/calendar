@@ -1443,11 +1443,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     setIsDragging(false);
   }, [index]);
 
-  const goTo = i => {
-    if (i < 0 || i >= total || i === index) return;
-    setShowInfo(false);
-    onNavigate(i);
-  };
   // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
   // motion as a completed drag -- used by the arrow buttons and arrow keys so every way of
   // moving between photos feels like the same carousel, not just the drag gesture.
@@ -1766,8 +1761,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     style: {
       position: 'absolute',
       top: '8px',
-      left: '8px',
-      right: '8px',
+      left: 'max(8px, calc((100% - 92vw) / 2))',
+      right: 'max(8px, calc((100% - 92vw) / 2))',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -1886,15 +1881,17 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const currentComments = photoCommentsByKey[photoCommentKey] || [];
   const commentsCount = currentComments.length;
 
+  const showPhotoCounter = total > 1 && !showTags && !showInfo && zoomLevel === ZOOM_DEFAULT;
+
   const desktopReservedPx = (() => {
-    let reserved = 80;
+    let reserved = 48;
     if (isTagPanelOpen) reserved += 130;
     const commentsContentHeight = commentsCount === 0
       ? 64
       : (commentsCount === 1 ? 98 : (commentsCount === 2 ? 130 : 164));
     reserved += Math.min(220, commentsContentHeight);
-    if (total > 1) reserved += 32;
-    return Math.max(160, reserved);
+    if (showPhotoCounter) reserved += 24;
+    return Math.max(110, reserved);
   })();
 
   // On mobile, dynamically account for all non-stage UI (safe areas, header buttons,
@@ -1903,7 +1900,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const mobileReservedPx = (() => {
     // Top & bottom safe-areas (iPhone dynamic island/notch ~47px + bottom home bar ~34px)
     // plus close button clearance and container paddings
-    const chromeAndPadding = 96;
+    const chromeAndPadding = 84;
 
     // Tag panel card height when open
     const tagsHeight = isTagPanelOpen ? 124 : 0;
@@ -1914,14 +1911,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       : (commentsCount === 1 ? 98 : (commentsCount === 2 ? 130 : 164));
     const commentsHeight = Math.min(190, commentsContentHeight);
 
-    // Multi-photo indicator text ("1 / 9")
-    const indicatorHeight = total > 1 ? 24 : 0;
+    // Multi-photo indicator text ("1 / 9") above comment input when tags/info are closed
+    const indicatorHeight = showPhotoCounter ? 20 : 0;
 
     // Flex gaps (8px between each visible block)
     let visibleBlocks = 1; // stage
     if (isTagPanelOpen) visibleBlocks++;
+    if (showPhotoCounter) visibleBlocks++;
     visibleBlocks++; // comments
-    if (total > 1) visibleBlocks++;
     const gapsHeight = (visibleBlocks - 1) * 8;
 
     return chromeAndPadding + tagsHeight + commentsHeight + indicatorHeight + gapsHeight;
@@ -2383,55 +2380,30 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
     onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
   }),
-  renderCommentThread(),
-  total > 1 && (() => {
-    const maxVisibleDots = 10;
-    const startIdx = total <= maxVisibleDots
-      ? 0
-      : Math.max(0, Math.min(index - Math.floor(maxVisibleDots / 2), total - maxVisibleDots));
-    const endIdx = startIdx + Math.min(total, maxVisibleDots);
-    const visibleIndices = Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i);
-
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: isDesktop ? '6px' : '2px',
-        marginTop: isDesktop ? '16px' : '4px',
-        zIndex: 9001
-      }
-    },
-      /* Text indicator */
-      /*#__PURE__*/React.createElement("span", {
-        style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 'var(--font-size-md)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
-      }, `${index + 1} / ${total}`),
-      /* Dots container -- 모바일에서는 숫자 표시("1 / 9")만으로 충분해 점은 생략한다 */
-      isDesktop && /*#__PURE__*/React.createElement("div", {
-        onClick: e => e.stopPropagation(),
-        style: { display: 'flex', alignItems: 'center', gap: '7px' }
-      },
-        startIdx > 0 && /*#__PURE__*/React.createElement("span", {
-          style: { width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-        }),
-        visibleIndices.map(i => /*#__PURE__*/React.createElement("span", {
-          key: i,
-          onClick: () => goTo(i),
-          style: {
-            width: i === index ? '8px' : '6px',
-            height: i === index ? '8px' : '6px',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            backgroundColor: i === index ? '#FFFFFF' : 'rgba(255, 255, 255, 0.35)',
-            transition: 'all 0.15s'
-          }
-        })),
-        endIdx < total && /*#__PURE__*/React.createElement("span", {
-          style: { width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-        })
-      )
-    );
-  })()), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+  showPhotoCounter && /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-counter-bar",
+    style: {
+      width: '92vw',
+      maxWidth: '92vw',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      marginBottom: isDesktop ? '-4px' : '-2px',
+      flexShrink: 0,
+      zIndex: 10,
+      pointerEvents: 'none'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255, 255, 255, 0.75)',
+      fontSize: isDesktop ? 'var(--font-size-md)' : 'var(--font-size-sm)',
+      fontWeight: 700,
+      fontVariantNumeric: 'tabular-nums',
+      userSelect: 'none'
+    }
+  }, `${index + 1} / ${total}`)),
+  renderCommentThread()
+  ), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
     tags: currentTagsWithUploadDate,
     onClose: () => setImageUrlModalOpen(false),
