@@ -559,8 +559,9 @@ assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(asset
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
 assert(photoIndexSource.includes("activeView !== 'gallery' && activeView !== 'history'")
   && photoIndexSource.includes("void loadPage(1, { includeTotal: !shouldLoadPreview })")
-  && summaryGallerySource.includes('전체 과거 사진 분석은 필요할 때 실행하세요.'),
-  'archive entry must stay paged and expose an explicit complete-analysis control');
+  && !summaryGallerySource.includes('전체 분석')
+  && !summaryGallerySource.includes('loadEntireArchive'),
+  'archive entry must stay paged without a manual complete-analysis control');
 assert(chatGallerySource.includes("activeTab === 'files' ? filteredFiles"), 'gallery date-mode file tab must group files rather than photo rows');
 assert(chatGallerySource.includes('renderFileListHeader') && chatGallerySource.includes('renderVisitFilterToggleMobile()'), 'file tab must retain the all/date switch');
 const imagePipelineSource = fs.readFileSync(new URL('../src/core/app-image-pipeline.js', import.meta.url), 'utf8');
