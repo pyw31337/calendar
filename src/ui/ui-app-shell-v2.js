@@ -1563,8 +1563,8 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
 
   const todaySchedule = todayMeeting || todayAnniversary;
 
-  const participants = calendar?.participants || [];
   const todayMemos = React.useMemo(() => {
+    const participants = calendar?.participants || [];
     return getActiveAvailabilities(calendar || {})
       .filter(e => e.date === todayStr && e.note && String(e.note).trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
       .map(e => {
@@ -1583,7 +1583,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
         };
       })
       .filter(Boolean);
-  }, [calendar, todayStr, participants]);
+  }, [calendar, todayStr]);
 
   const hasTodayContent = todaySchedule || (todayMemos && todayMemos.length > 0);
 

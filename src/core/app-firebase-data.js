@@ -1783,7 +1783,7 @@ async function fetchMemePoolRest(options = {}) {
     } while (pageToken);
 
     if (list.length > 0) {
-      saveMemePoolCache(list, maxUpdatedAt);
+      saveMemePoolCache(list, maxUpdatedAt || Date.now());
     } else if (cache?.items?.length) {
       return cache.items;
     }

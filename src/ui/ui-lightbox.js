@@ -1144,6 +1144,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // denormalization trigger runs. Keep the durable source untouched, but avoid
   // showing an empty tag panel for a newly uploaded chat/gallery photo.
   const currentTagsWithUploadDate = (() => {
+    if (tagOverrideKey && Object.prototype.hasOwnProperty.call(tagOverrides, tagOverrideKey)) return currentTags;
     if (String(currentTags || '').trim()) return currentTags;
     const source = String(currentMeta?.source || currentMeta?.uploadSource || '').toLowerCase();
     if (source === 'meme' || source === 'anniversary' || source === 'meeting') return currentTags;
