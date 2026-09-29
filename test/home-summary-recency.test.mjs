@@ -51,10 +51,14 @@ test('ui-app-shell-v2 uses latestRows for chat messages and passes live calendar
   const fs = await import('node:fs/promises');
   const shellSource = await fs.readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
 
-  // Verify chat messages slice uses latestRows
+  // Verify chat messages slice uses latestRows without reverse so newest message is 1st
   assert.ok(
     shellSource.includes('latestRows(visibleMessages).slice(0, 3)'),
     'HomeActivitySummary must order chat messages newest-first with latestRows'
+  );
+  assert.ok(
+    !shellSource.includes('latestRows(visibleMessages).slice(0, 3).reverse()'),
+    'HomeActivitySummary must not reverse chat slice, ensuring latest message is 1st'
   );
 
   // Verify CalendarPane prefers calendarContext.displayChatMessages

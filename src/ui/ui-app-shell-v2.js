@@ -1984,9 +1984,8 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const messages = React.useMemo(() => {
     const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
     // latestRows returns newest-first; .slice(0, 3) keeps the three most recent.
-    // The pager shows index 0 first, so we reverse to surface the latest message
-    // on the first (leftmost) slide as the user expects.
-    return latestRows(visibleMessages).slice(0, 3).reverse();
+    // Index 0 is the newest message so it appears on the first slide (1번째) in the home chat section.
+    return latestRows(visibleMessages).slice(0, 3);
   }, [allMessages, meetingPhotoMessageIds]);
   const memoItems = calendarContext?.memos;
   const memos = React.useMemo(() => {
