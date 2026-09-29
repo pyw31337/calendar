@@ -1224,6 +1224,27 @@ export function ChatScreen(p) {
     : keyboardPin === 'off'
       ? true
       : (headerHidden && !inputActive);
+
+  // The legacy reopen control was nested in the message scroll wrapper.  Once
+  // the composer was hidden, that wrapper can be clipped by its scrollport on
+  // mobile (most visibly in an iOS home-screen app), leaving no way to bring
+  // the input back.  Keep the action stateful here and render its hidden-state
+  // affordance as a sibling of that wrapper instead.
+  const revealComposer = () => {
+    suppressUntilRef.current = Date.now() + 640;
+    setHeaderHidden(false);
+    setKeyboardPin('on');
+    requestAnimationFrame(() => {
+      const field = document.querySelector('.v2-chat .bp-composer-input');
+      if (field && typeof field.focus === 'function') field.focus();
+    });
+  };
+  const hideComposer = () => {
+    suppressUntilRef.current = Date.now() + 360;
+    setKeyboardPin('off');
+    const input = document.querySelector('.v2-chat .bp-composer-input');
+    if (input && typeof input.blur === 'function') input.blur();
+  };
   const chatHeader = {
     title: '채팅',
     subtitle,
@@ -1472,26 +1493,15 @@ export function ChatScreen(p) {
           h(
             'div',
             { className: 'v2-chat-jump-row' },
-            h('button', {
+            !composerHidden ? h('button', {
               type: 'button',
               className: 'v2-chat-keyboard-btn',
-              'aria-pressed': keyboardPin === 'on' ? 'true' : keyboardPin === 'off' ? 'false' : undefined,
-              'aria-label': composerHidden ? '키보드 열기' : '키보드 닫기',
-              title: composerHidden ? '키보드 열기' : '키보드 닫기',
-              onClick: () => {
-                const willHide = !composerHidden;
-                setKeyboardPin(willHide ? 'off' : 'on');
-                const input = document.querySelector('.v2-chat .bp-composer-input');
-                if (willHide) {
-                  if (input && typeof input.blur === 'function') input.blur();
-                } else {
-                  requestAnimationFrame(() => {
-                    const field = document.querySelector('.v2-chat .bp-composer-input');
-                    if (field && typeof field.focus === 'function') field.focus();
-                  });
-                }
-              },
-            }, h(DesignIcon, { name: composerHidden ? 'keyboard' : 'keyboardOff', size: 18 })),
+              'aria-pressed': keyboardPin === 'on' ? 'true' : undefined,
+              'aria-label': '키보드 닫기',
+              title: '키보드 닫기',
+              onPointerDown: event => event.stopPropagation(),
+              onClick: hideComposer,
+            }, h(DesignIcon, { name: 'keyboardOff', size: 18 })) : null,
             showScrollBottom ? h('button', {
               type: 'button',
               className: 'v2-chat-scroll-bottom-btn',
@@ -1507,6 +1517,15 @@ export function ChatScreen(p) {
         composer,
         ...keptRootKids
       ),
+      composerHidden ? h('button', {
+        type: 'button',
+        className: 'v2-chat-composer-reopen-btn',
+        'data-chat-composer-reopen': 'true',
+        'aria-label': '키보드 열기',
+        title: '키보드 열기',
+        onPointerDown: event => event.stopPropagation(),
+        onClick: revealComposer,
+      }, h(DesignIcon, { name: 'keyboard', size: 18 })) : null,
       h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu }),
       ...passthrough,
       overlays(slots, [

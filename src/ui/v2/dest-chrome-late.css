@@ -3485,6 +3485,101 @@ html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row
   bottom: calc(var(--mobile-bottom-nav-total, 0px) + 12px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
+/* --------------------------------------------------------------------------
+ * Phone PWA layer ownership
+ * --------------------------------------------------------------------------
+ * The bottom navigation is application chrome, not part of a dialog.  Leaving
+ * it on top of a backdrop made the last action in sheets unreachable and let a
+ * tap switch pages through an open dialog.  A layer now owns the whole visual
+ * viewport while it is open; sheets already reserve only the physical safe
+ * inset, so the nav must not be counted as a second footer.
+ *
+ * The chat composer reopen button intentionally does not live in the message
+ * scrollport.  That scrollport clips overflowing descendants while the
+ * composer is collapsed; putting the lone recovery control beside it makes it
+ * persist above the nav in iOS standalone, Safari, and Chromium mobile.
+ */
+html:has(.renewal-shell.v2-design) .v2-chat {
+  position: relative !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-composer-reopen-btn {
+  position: absolute !important;
+  left: 16px !important;
+  right: auto !important;
+  bottom: 12px !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  border-radius: 50% !important;
+  background: var(--bg-card) !important;
+  color: var(--v2-ink-2, #6b6580) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16) !important;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto !important;
+  z-index: 1100 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-composer-reopen-btn:focus-visible {
+  outline: 2px solid var(--brand, #7C2FE5) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .v2-chat-composer-reopen-btn {
+    bottom: calc(var(--mobile-bottom-nav-total, 0px) + 12px) !important;
+  }
+
+  /* Every viewport-covering layer outranks the mobile navigation.  Keep the
+     emoji picker above this common band with its existing 40000 z-index. */
+  html:has(.renewal-shell.v2-design) :is(
+    .renewal-shell .modal-overlay,
+    .renewal-shell .bottom-sheet-overlay:not(.emoji-sheet-overlay),
+    .renewal-shell .admin-side-menu-overlay,
+    .renewal-shell .manual-overlay,
+    body > .modal-overlay,
+    body > .bottom-sheet-overlay:not(.emoji-sheet-overlay),
+    body > .admin-side-menu-overlay,
+    body > .manual-overlay,
+    body > .lightbox-overlay
+  ) {
+    z-index: 12000 !important;
+  }
+
+  /* A modal, sheet, lightbox or administration drawer has modal ownership:
+     hide and disable the app nav so it cannot cover or receive clicks through
+     its backdrop. `:has()` is supported by current iOS Safari and all target
+     Chromium browsers; legacy webviews retain the existing body scroll lock. */
+  html:has(.renewal-shell.v2-design) body:has(:is(
+    .modal-overlay,
+    .bottom-sheet-overlay,
+    .admin-side-menu-overlay,
+    .manual-overlay,
+    .lightbox-overlay
+  )) .renewal-shell.v2-design .bp-mobile-bottom-nav,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design:has(.bp-side-nav.bp-is-open) .bp-mobile-bottom-nav {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  /* The side menu is another backdrop surface.  Once opened it fills the
+     physical viewport (with the existing safe-area padding) rather than
+     stopping at a nav that has just been hidden. */
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-open,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed.bp-is-open,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop.bp-is-open {
+    bottom: 0 !important;
+  }
+}
+
 /* Header action icons sit close together on every page (mobile used to force 12px). */
 html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions,
 html:has(.renewal-shell.v2-design) .bp-header.v2-page-header .bp-header-actions {
