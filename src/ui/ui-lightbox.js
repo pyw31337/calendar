@@ -1957,7 +1957,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
 
   const stageWidthPx = typeof window === 'undefined'
     ? 640
-    : Math.max(240, Math.round(vpW * (isLandscape ? 1 : 0.92)));
+    : Math.max(240, Math.round(vpW));
 
   const mobileStageHeightPx = (() => {
     if (isDesktop) return null;
@@ -1974,7 +1974,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
 
   const mobileImageStageStyle = isDesktop
     ? {
-        width: isLandscape ? '100vw' : '92vw',
+        width: '100vw',
         maxWidth: '100vw',
         height: `calc(100vh - ${reservedBottomPx}px)`,
         maxHeight: `calc(100vh - ${reservedBottomPx}px)`,
@@ -1983,7 +1983,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
       }
     : {
-        width: isLandscape ? '100vw' : '92vw',
+        width: '100vw',
         maxWidth: '100vw',
         height: `${mobileStageHeightPx}px`,
         maxHeight: `${mobileStageHeightPx}px`,
@@ -2067,9 +2067,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
             position: 'absolute',
             inset: 0,
             margin: 'auto',
-            width: isLandscape ? '100%' : 'auto',
+            width: '100%',
             maxWidth: '100%',
-            height: isPortrait ? '100%' : 'auto',
+            height: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
             borderRadius: isLandscape ? 0 : 'var(--radius-md)',
@@ -2095,10 +2095,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           onError: handleCurrentImageError,
           onMouseDown: handleZoomedImageMouseDown,
           style: {
-            position: hasThumb ? 'relative' : 'static',
-            width: isLandscape ? '100%' : 'auto',
+            position: hasThumb ? 'absolute' : 'relative',
+            inset: hasThumb ? 0 : undefined,
+            margin: hasThumb ? 'auto' : undefined,
+            width: '100%',
             maxWidth: '100%',
-            height: isPortrait ? '100%' : 'auto',
+            height: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
             borderRadius: isLandscape ? 0 : 'var(--radius-md)',
@@ -2147,7 +2149,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
             position: 'absolute',
             inset: 0,
             margin: 'auto',
+            width: '100%',
             maxWidth: '100%',
+            height: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
             borderRadius: 'var(--radius-md)',
@@ -2169,11 +2173,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           },
           onClick: e => e.stopPropagation(),
           style: {
-            position: hasThumb ? 'relative' : 'static',
+            position: hasThumb ? 'absolute' : 'relative',
+            inset: hasThumb ? 0 : undefined,
+            margin: hasThumb ? 'auto' : undefined,
+            width: '100%',
             maxWidth: '100%',
+            height: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
             borderRadius: 'var(--radius-md)',
+            display: 'block',
             opacity: showOriginal ? 1 : (hasThumb ? 0 : 1),
             transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)'
           }
@@ -2317,10 +2326,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     className: "lightbox-single-stage",
     style: {
       position: 'relative',
-      display: 'inline-flex',
+      display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      width: isLandscape ? '100vw' : 'auto',
+      width: '100%',
       maxWidth: '100vw',
       height: isDesktop ? (isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto') : `${mobileStageHeightPx}px`,
       maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`,
@@ -2345,9 +2354,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         position: 'absolute',
         inset: 0,
         margin: 'auto',
-        width: isLandscape ? '100%' : 'auto',
-        maxWidth: '100vw',
-        height: isDesktop ? (isPortrait ? '100%' : 'auto') : '100%',
+        width: '100%',
+        maxWidth: '100%',
+        height: '100%',
         maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : '100%',
         borderRadius: isLandscape ? 0 : 'var(--radius-md)',
         objectFit: 'contain',
@@ -2372,10 +2381,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       onError: handleCurrentImageError,
       onMouseDown: handleZoomedImageMouseDown,
       style: {
-        position: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'relative' : 'static',
-        width: isLandscape ? '100%' : 'auto',
-        maxWidth: '100vw',
-        height: isDesktop ? (isPortrait ? '100%' : 'auto') : '100%',
+        position: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'absolute' : 'relative',
+        inset: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 0 : undefined,
+        margin: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'auto' : undefined,
+        width: '100%',
+        maxWidth: '100%',
+        height: '100%',
         maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : '100%',
         borderRadius: isLandscape ? 0 : 'var(--radius-md)',
         objectFit: 'contain',

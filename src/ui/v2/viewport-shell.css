@@ -196,6 +196,7 @@ html:has(.v2-design)::view-transition-new(root) {
 
 /* Lightbox is portaled to body — scope via :has(.v2-design). */
 body:has(.v2-design) .lightbox-overlay .lightbox-stage,
+body:has(.v2-design) .lightbox-overlay .lightbox-single-stage,
 body:has(.v2-design) .lightbox-overlay .lightbox-image-stage {
   width: 100% !important;
   max-width: 100% !important;
