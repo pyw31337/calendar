@@ -73,4 +73,17 @@ test('Gallery tabs render clean labels without status dots or numeric count pill
   assert.doesNotMatch(galleryJs, /renderGalleryLoadMoreButton/, 'gallery does not render redundant load more buttons');
 });
 
+test('Gallery links and files render in 2-column grid with wrapping text and persistent pagination', async () => {
+  const [galleryJs, filesJs] = await Promise.all([
+    readFile(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/ui-chat-files.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(galleryJs, /className:\s*"gallery-link-grid"[\s\S]*?gridTemplateColumns:\s*'repeat\(2, minmax\(0, 1fr\)\)'/, 'links render in 2-column grid');
+  assert.match(galleryJs, /className:\s*"gallery-file-grid"[\s\S]*?gridTemplateColumns:\s*'repeat\(2, minmax\(0, 1fr\)\)'/, 'files render in 2-column grid');
+  assert.match(galleryJs, /fallbackTitle[\s\S]*?whiteSpace:\s*'normal'[\s\S]*?wordBreak:\s*'break-word'[\s\S]*?overflowWrap:\s*'anywhere'/, 'link fallbackTitle wraps without ellipsis');
+  assert.doesNotMatch(galleryJs, /fallbackTitle && [\s\S]{0,150}textOverflow:\s*'ellipsis'/, 'link fallbackTitle has no ellipsis');
+  assert.match(filesJs, /attachment\.name[\s\S]*?whiteSpace:\s*"normal"[\s\S]*?overflowWrap:\s*"anywhere"[\s\S]*?wordBreak:\s*"break-word"/, 'file name wraps without clipping');
+  assert.match(galleryJs, /const alwaysShow = !!options\?\.alwaysShow;[\s\S]*?if \(pageCount <= 1 && !alwaysShow\) return null;/, 'renderGalleryPagination honors alwaysShow');
+});
+
 

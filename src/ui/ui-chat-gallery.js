@@ -16,6 +16,7 @@ import { isExternalServiceUrl } from '../core/memo-share-link.js';
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const AI_REVIEW_MAX_TAGS = 20;
 const GALLERY_PAGE_SIZE = 100;
+const GALLERY_CARD_PAGE_SIZE = 20;
 const ANALYSIS_BATCH_FETCH_CONCURRENCY = 6;
 function normalizeAnalysisTagList(values) {
   const input = (Array.isArray(values) ? values : [values])
@@ -196,6 +197,7 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
       flexDirection: 'column',
       gap: '8px',
       width: '100%',
+      minWidth: 0,
       backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
@@ -208,9 +210,10 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
         fontSize: '0.9rem',
         fontWeight: 700,
         color: 'var(--text-main)',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
+        lineHeight: 1.45
       }
     }, highlightKeyword(fallbackTitle, searchQuery)),
 
@@ -219,7 +222,8 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
       url: item.url,
       fallbackTitle: fallbackTitle,
       cachedData: item.linkPreview,
-      stretch: true
+      stretch: true,
+      wrapTitle: true
     }),
 
     /* Video Toggle Button for video media */
@@ -1331,8 +1335,8 @@ export function ChatGalleryModal({
     });
   }, [activeTab, filteredLinks, filteredFiles, visiblePhotos, galleryMonthKey]);
   const pagedDateModeItems = React.useMemo(
-    () => paginateGalleryItems(dateModeSourceItems, galleryListPage, GALLERY_PAGE_SIZE),
-    [dateModeSourceItems, galleryListPage]
+    () => paginateGalleryItems(dateModeSourceItems, galleryListPage, (activeTab === 'links' || activeTab === 'files') ? GALLERY_CARD_PAGE_SIZE : GALLERY_PAGE_SIZE),
+    [activeTab, dateModeSourceItems, galleryListPage]
   );
   const groupedGallerySections = React.useMemo(() => {
     if (galleryViewMode !== 'date') return [];
@@ -2356,7 +2360,16 @@ export function ChatGalleryModal({
       commentBadge
     );
   }));
-  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
+  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement("div", {
+    className: "gallery-link-grid",
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gap: isMobile ? '8px' : '12px',
+      width: '100%',
+      boxSizing: 'border-box'
+    }
+  },
     (items || []).map(item => {
       const itemKey = item.messageId || item.url;
       const isChecked = selectedBulkShareKeys.has(itemKey);
@@ -2369,7 +2382,7 @@ export function ChatGalleryModal({
       return /*#__PURE__*/React.createElement("div", {
         key: itemKey,
         onClick: ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); },
-        style: { position: 'relative', width: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+        style: { position: 'relative', width: '100%', minWidth: 0, height: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
       },
         card,
         EditSelectCheckbox
@@ -2391,7 +2404,14 @@ export function ChatGalleryModal({
     })
   );
   const renderGalleryFileList = items => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+    className: "gallery-file-grid",
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gap: isMobile ? '8px' : '12px',
+      width: '100%',
+      boxSizing: 'border-box'
+    }
   }, (items || []).map((item, idx) => {
     const itemKey = String(item.id || item.url || idx);
     const isChecked = selectedBulkShareKeys.has(itemKey);
@@ -2408,7 +2428,7 @@ export function ChatGalleryModal({
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
       onClick: isBulkShareMode ? ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); } : undefined,
-      style: { position: 'relative', width: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+      style: { position: 'relative', width: '100%', minWidth: 0, height: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
     },
       card,
       isBulkShareMode && (EditSelectCheckbox
@@ -2458,7 +2478,8 @@ export function ChatGalleryModal({
     const pageCount = Math.max(1, Number(options?.pageCount || Math.ceil(Number(indexedPhotoTotal || 0) / GALLERY_PAGE_SIZE)) || 1);
     const onPageChange = options?.onChange || onIndexedPhotoPageChange;
     const pageLoading = options?.loading ?? indexedPhotoLoading;
-    if (pageCount <= 1) return null;
+    const alwaysShow = !!options?.alwaysShow;
+    if (pageCount <= 1 && !alwaysShow) return null;
     const windowSize = isMobile ? 5 : 10;
     const focusPage = paginationDragPage != null ? paginationDragPage : currentPage;
     const pages = getPaginationWindow(focusPage, pageCount, windowSize);
@@ -3440,13 +3461,14 @@ export function ChatGalleryModal({
           currentPage: pagedDateModeItems.currentPage,
           pageCount: pagedDateModeItems.pageCount,
           onChange: setGalleryListPage,
-          label: '일자별 갤러리 페이지'
+          label: '일자별 갤러리 페이지',
+          alwaysShow: ((activeTab === 'links' || activeTab === 'files') && dateModeSourceItems.length > 0)
         })
       );
     }
     if (activeTab === 'files') {
       const sortedFiles = sortGalleryFlatItems(filteredFiles);
-      const pagedFiles = paginateGalleryItems(sortedFiles, galleryListPage, GALLERY_PAGE_SIZE);
+      const pagedFiles = paginateGalleryItems(sortedFiles, galleryListPage, GALLERY_CARD_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderFileListHeader(),
         sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -3456,13 +3478,14 @@ export function ChatGalleryModal({
           currentPage: pagedFiles.currentPage,
           pageCount: pagedFiles.pageCount,
           onChange: setGalleryListPage,
-          label: '파일 갤러리 페이지'
+          label: '파일 갤러리 페이지',
+          alwaysShow: sortedFiles.length > 0
         })
       );
     }
     if (activeTab === 'links') {
       const sortedLinks = sortGalleryFlatItems(filteredLinks);
-      const pagedLinks = paginateGalleryItems(sortedLinks, galleryListPage, GALLERY_PAGE_SIZE);
+      const pagedLinks = paginateGalleryItems(sortedLinks, galleryListPage, GALLERY_CARD_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderLinkListHeader(),
         sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -3472,7 +3495,8 @@ export function ChatGalleryModal({
           currentPage: pagedLinks.currentPage,
           pageCount: pagedLinks.pageCount,
           onChange: setGalleryListPage,
-          label: '링크 갤러리 페이지'
+          label: '링크 갤러리 페이지',
+          alwaysShow: sortedLinks.length > 0
         })
       );
     }

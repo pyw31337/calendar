@@ -1015,7 +1015,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null, wrapTitle = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1139,11 +1139,13 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         style: {
           fontSize: 'var(--font-size-md)',
           fontWeight: 700,
-          lineHeight: 1.25,
+          lineHeight: 1.3,
           color: 'var(--text-main)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
+          overflow: wrapTitle ? 'visible' : 'hidden',
+          textOverflow: wrapTitle ? 'clip' : 'ellipsis',
+          whiteSpace: wrapTitle ? 'normal' : 'nowrap',
+          wordBreak: wrapTitle ? 'break-word' : undefined,
+          overflowWrap: wrapTitle ? 'anywhere' : undefined
         }
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
