@@ -3,6 +3,18 @@ const baseUrl = process.env.CALENDAR_LIVE_BASE_URL || DEFAULT_BASE_URL;
 const cacheBust = process.env.CALENDAR_LIVE_CACHE_BUST || Date.now().toString(36);
 const expectedBuildSha = String(process.env.EXPECTED_BUILD_SHA || '').trim();
 const REQUEST_TIMEOUT_MS = 6_000;
+// Pages' CDN normally updates within a minute, but a freshly published artifact
+// can remain behind an edge cache for more than two minutes.  Keep the live
+// smoke strict about the exact build while allowing enough time for that
+// documented propagation race instead of recording a false failed deployment.
+const DEPLOY_PROPAGATION_RETRY_MS = 10_000;
+const DEFAULT_DEPLOY_PROPAGATION_ATTEMPTS = 25;
+const configuredDeployAttempts = Number.parseInt(process.env.PAGES_DEPLOY_MAX_ATTEMPTS || '', 10);
+const maxDeployAttempts = expectedBuildSha
+  ? (Number.isFinite(configuredDeployAttempts) && configuredDeployAttempts > 0
+      ? configuredDeployAttempts
+      : DEFAULT_DEPLOY_PROPAGATION_ATTEMPTS)
+  : 1;
 
 const pages = [
   '?id=kkot',
@@ -83,7 +95,6 @@ function isClassicHtml(html) {
 
 const indexBaseUrl = new URL('.', baseUrl).toString();
 let indexText = '';
-const maxDeployAttempts = expectedBuildSha ? 13 : 1;
 for (let attempt = 1; attempt <= maxDeployAttempts; attempt += 1) {
   const indexUrl = `${indexBaseUrl}?_v=${cacheBust}-${attempt}`;
   try {
@@ -104,8 +115,8 @@ for (let attempt = 1; attempt <= maxDeployAttempts; attempt += 1) {
   } catch (error) {
     const isDeployRace = expectedBuildSha && String(error?.message || '').includes('Deployed build SHA mismatch');
     if (!isDeployRace || attempt === maxDeployAttempts) throw error;
-    console.log(`[live-smoke] Pages propagation pending (${attempt}/${maxDeployAttempts}); retrying in 10s`);
-    await new Promise(resolve => setTimeout(resolve, 10_000));
+    console.log(`[live-smoke] Pages propagation pending (${attempt}/${maxDeployAttempts}); retrying in ${DEPLOY_PROPAGATION_RETRY_MS / 1_000}s`);
+    await new Promise(resolve => setTimeout(resolve, DEPLOY_PROPAGATION_RETRY_MS));
   }
 }
 
