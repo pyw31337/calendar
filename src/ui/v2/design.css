@@ -154,12 +154,11 @@
 /* Hero TODAY schedule box */
 .v2-design .bp-hero-today-box {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: calc(100% - 32px);
-  max-width: 480px;
-  margin: 0 auto 12px;
+  flex-direction: column;
+  gap: 8px;
+  width: calc(100% - 28px);
+  max-width: none;
+  margin: 0 14px 8px;
   padding: 10px 14px;
   background: rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(16px);
@@ -173,6 +172,18 @@
   transition: background 0.16s ease, transform 0.14s ease, box-shadow 0.16s ease;
   user-select: none;
 }
+@media (min-width: 768px) {
+  .v2-design .bp-hero-today-box {
+    width: calc(100% - 40px);
+    margin: 0 20px 8px;
+  }
+}
+@media (max-width: 359px) {
+  .v2-design .bp-hero-today-box {
+    width: calc(100% - 16px);
+    margin: 0 8px 8px;
+  }
+}
 .v2-design .bp-hero-today-box:hover {
   background: rgba(255, 255, 255, 0.24);
   transform: translateY(-1px);
@@ -180,6 +191,20 @@
 }
 .v2-design .bp-hero-today-box:active {
   transform: scale(0.99);
+}
+.v2-design .bp-hero-today-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.v2-design .bp-hero-today-memos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  width: 100%;
 }
 .v2-design .bp-hero-today-left {
   display: flex;

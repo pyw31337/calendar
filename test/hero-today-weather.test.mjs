@@ -74,5 +74,11 @@ test('Hero zone replaces redundant quick nav with TODAY schedule box and compact
   // Detailed forecast API & WeatherDetailModal
   assert.match(weatherJs, /export function fetchDetailedWeatherForecast/, 'app-weather exports fetchDetailedWeatherForecast');
   assert.match(destLateCss, /\.weather-detail-modal-container/, 'dest-chrome-late styles WeatherDetailModal');
+
+  // Weather is always visible under today box; today box exposes participant memos
+  assert.match(appShellJs, /todayBox,\s*weatherElement/, 'HeroTodayOrWeather renders weatherElement under todayBox when todayBox exists');
+  assert.match(appShellJs, /bp-hero-today-memos/, 'HeroTodayOrWeather renders participant memos within today box');
+  assert.match(designCss, /\.bp-hero-today-main-row/, 'design.css styles .bp-hero-today-main-row');
+  assert.match(designCss, /\.bp-hero-today-memos/, 'design.css styles .bp-hero-today-memos');
 });
 

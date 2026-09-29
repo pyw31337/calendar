@@ -1563,25 +1563,56 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
 
   const todaySchedule = todayMeeting || todayAnniversary;
 
-  if (todaySchedule) {
-    const isMeeting = !!todayMeeting;
-    const title = todayMeeting?.title
-      || todayMeeting?.place
-      || todayPlace?.name
-      || todayMeeting?.note
-      || todayAnniversary?.title
-      || (isMeeting ? '오늘 확정된 모임' : '오늘의 일정');
-    const subtitle = (todayPlace?.name && todayPlace.name !== title)
-      ? todayPlace.name
-      : (todayMeeting?.note && todayMeeting.note !== title
-        ? todayMeeting.note
-        : (todayMeeting?.time || (todayAnniversary ? '기념일' : '')));
+  const participants = calendar?.participants || [];
+  const todayMemos = React.useMemo(() => {
+    return getActiveAvailabilities(calendar || {})
+      .filter(e => e.date === todayStr && e.note && String(e.note).trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
+      .map(e => {
+        const p = participants.find(part => part.id === e.participantId);
+        const rawNote = String(e.note).trim().replace(/\s+/g, ' ');
+        const cleanNote = rawNote.replace(/https?:\/\/[^\s]+/gi, '').trim().replace(/\s{2,}/g, ' ');
+        if (!cleanNote) return null;
+        const fullName = p?.name || '참여자';
+        const shortName = shortParticipantName(fullName);
+        return {
+          id: e.participantId || e.id,
+          name: shortName,
+          color: p?.color || '#A78BFA',
+          note: cleanNote,
+          fullNote: rawNote,
+        };
+      })
+      .filter(Boolean);
+  }, [calendar, todayStr, participants]);
 
-    return React.createElement('div', {
+  const hasTodayContent = todaySchedule || (todayMemos && todayMemos.length > 0);
+
+  let todayBox = null;
+  if (hasTodayContent) {
+    const isMeeting = !!todayMeeting;
+    const placeName = todayPlace?.name || (typeof todayMeeting?.place === 'string' ? todayMeeting.place.trim() : '');
+    const meetingTitle = (todayMeeting?.title && todayMeeting.title !== '모임확정') ? todayMeeting.title.trim() : '';
+    const meetingNote = (todayMeeting?.note && todayMeeting.note !== meetingTitle) ? todayMeeting.note.trim() : '';
+    const timeStr = todayMeeting?.time ? String(todayMeeting.time).trim() : '';
+
+    const title = meetingTitle
+      || placeName
+      || todayAnniversary?.title
+      || (todayMemos.length > 0 ? '오늘의 일정' : (isMeeting ? '오늘 확정된 모임' : '오늘의 일정'));
+
+    const subtitleParts = [];
+    if (placeName && placeName !== title) subtitleParts.push(`📍 ${placeName}`);
+    if (timeStr) subtitleParts.push(timeStr);
+    if (meetingNote && meetingNote !== title && meetingNote !== placeName) subtitleParts.push(meetingNote);
+    if (todayAnniversary && !isMeeting && todayAnniversary.title !== title) subtitleParts.push('기념일');
+
+    const subtitle = subtitleParts.join(' · ');
+
+    todayBox = React.createElement('div', {
       className: 'bp-hero-today-box',
       role: 'button',
       tabIndex: 0,
-      'aria-label': `오늘 일정: ${title}`,
+      'aria-label': `오늘 일정: ${title}${todayMemos.length ? `, 참여자 메모 ${todayMemos.length}건` : ''}`,
       onClick: () => onSelectDate?.(todayStr),
       onKeyDown: (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -1590,29 +1621,59 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
         }
       }
     },
-      React.createElement('div', { className: 'bp-hero-today-left' },
-        React.createElement('span', { className: 'bp-hero-today-badge' }, 'TODAY'),
-        React.createElement('div', { className: 'bp-hero-today-text' },
-          React.createElement('span', { className: 'bp-hero-today-title' }, title),
-          subtitle ? React.createElement('span', { className: 'bp-hero-today-subtitle' }, subtitle) : null
+      React.createElement('div', { className: 'bp-hero-today-main-row' },
+        React.createElement('div', { className: 'bp-hero-today-left' },
+          React.createElement('span', { className: 'bp-hero-today-badge' }, 'TODAY'),
+          React.createElement('div', { className: 'bp-hero-today-text' },
+            React.createElement('span', { className: 'bp-hero-today-title' }, title),
+            subtitle ? React.createElement('span', { className: 'bp-hero-today-subtitle' }, subtitle) : null
+          )
+        ),
+        React.createElement('span', { className: 'bp-hero-today-arrow', 'aria-hidden': 'true' },
+          React.createElement('svg', {
+            width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+            strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round'
+          }, React.createElement('path', { d: 'M9 18l6-6-6-6' }))
         )
       ),
-      React.createElement('span', { className: 'bp-hero-today-arrow', 'aria-hidden': 'true' },
-        React.createElement('svg', {
-          width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-          strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round'
-        }, React.createElement('path', { d: 'M9 18l6-6-6-6' }))
-      )
+      todayMemos.length > 0 ? React.createElement('div', {
+        className: 'bp-dday-participant-memos bp-hero-today-memos',
+        'aria-label': '오늘 참여자 메모'
+      },
+        todayMemos.map(m => React.createElement('span', {
+          key: m.id,
+          className: 'bp-dday-participant-memo',
+          title: `${m.name}: ${m.fullNote || m.note}`,
+          style: { borderColor: m.color }
+        },
+          React.createElement('span', {
+            className: 'bp-dday-participant-memo-name',
+            style: { backgroundColor: m.color }
+          }, m.name),
+          React.createElement('span', {
+            className: 'bp-dday-participant-memo-text'
+          }, m.note)
+        ))
+      ) : null
     );
   }
 
-  // 오늘 일정이 없을 때는 5일 날씨 ('어제 오늘 내일 모레 M.DD')
-  return React.createElement(HeroWeatherBox, {
+  // 날씨 정보는 항상 상시 노출되며, 오늘 일정이 있을 경우 투데이 박스 아래에 함께 배치됩니다.
+  const weatherElement = React.createElement(HeroWeatherBox, {
     weatherLocation: calendar?.weatherLocation,
     onSelectDate,
     calendar,
     upcomingMeetings
   });
+
+  if (!todayBox) {
+    return weatherElement;
+  }
+
+  return React.createElement(React.Fragment, null,
+    todayBox,
+    weatherElement
+  );
 }
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
