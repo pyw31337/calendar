@@ -4,10 +4,17 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
 
-test('archive tab badges do not depend on the currently open tab', () => {
-  // These two collections back the 보관함 header counts.  They are memoized by source data,
-  // not by historyTab, so navigating from 장소 to 추억 cannot briefly show 0 or hide a badge.
-  assert.doesNotMatch(source, /if \(historyTab !== 'places'\) return \{ groups: \[\], unclassified: \[\], unclassifiedCount: 0 \};/);
-  assert.doesNotMatch(source, /if \(historyTab !== 'memories'\) return \[\];/);
-  assert.match(source, /\{ value: 'places', label: '장소', badge: placePhotoGroups\.groups\.length \}/);
+test('archive defers inactive facet analysis without presenting a false zero badge', () => {
+  // 장소/추억 분류 are O(photo × facet) work. They must not run merely to render a hidden tab;
+  // the place tab keeps the already cheap registered-place count until its real group count is ready.
+  assert.match(source, /if \(historyTab !== 'places'\) return \{ groups: \[\], unclassified: \[\], unclassifiedCount: 0 \};/);
+  assert.match(source, /if \(historyTab !== 'memories'\) return \[\];/);
+  assert.match(source, /\{ value: 'places', label: '장소', badge: historyTab === 'places' \? placePhotoGroups\.groups\.length : \(placeCount \|\| null\) \}/);
+});
+
+test('archive trusts a ready paged photo index and never falls back to a full legacy merge while it loads', () => {
+  assert.match(source, /indexedPhotoStatus === 'ready'/);
+  assert.match(source, /usesLegacyPhotoFallback \? buildCombinedPhotoEntries\(chatMessages, memos, calendar, anniversaries\) : \[\]/);
+  assert.match(source, /archivePhotoIndexIsPending/);
+  assert.match(source, /onIndexedPhotoPageChange\(1, \{ force: true \}\)/);
 });

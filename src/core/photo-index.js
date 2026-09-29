@@ -508,30 +508,43 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     if (!calendarId) return false;
     const requestedPage = Math.max(1, Number(page) || 1);
     const includeTotal = options.includeTotal !== false;
-    setState(previous => ({ ...previous, loading: true }));
+    setState(previous => ({
+      ...previous,
+      status: previous.status === 'ready' ? 'ready' : 'loading',
+      loading: true
+    }));
     try {
       if (options.force) invalidatePhotoIndexCache(calendarId);
       const summary = await fetchPhotoIndexSummary({ calendarId, projectId, force: Boolean(options.force) });
-      const [items, total] = await Promise.all([
-        fetchPhotoIndexPage({
-          calendarId, projectId, page: requestedPage, decodeDocument,
-          force: Boolean(options.force), cacheRevision: summary.version
-        }),
-        includeTotal ? fetchPhotoIndexCount({ calendarId, projectId, cacheRevision: summary.version }) : Promise.resolve(null)
-      ]);
+      // A first page is useful immediately; aggregate counts are metadata and used to hold the
+      // first visual result behind two extra Firestore queries. Commit the page first, then let
+      // the total settle in the background so side-menu navigation can paint without waiting.
+      const items = await fetchPhotoIndexPage({
+        calendarId, projectId, page: requestedPage, decodeDocument,
+        force: Boolean(options.force), cacheRevision: summary.version
+      });
       setState(previous => {
         const merged = reconcilePhotoIndexTagItems(calendarId, previous.items, items);
-        const resolvedTotal = includeTotal ? Math.max(0, Number(total) || 0) : Math.max(previous.total || 0, merged.length);
         return {
-          status: (includeTotal ? total > 0 : merged.length > 0) ? 'ready' : 'fallback',
+          // Do not call an empty first filtered page a fallback yet. The count resolves whether
+          // the index really has no gallery rows; page one may contain only content posters.
+          status: merged.length > 0 ? 'ready' : (includeTotal ? 'loading' : 'ready'),
           items: merged,
-          total: resolvedTotal,
+          total: Math.max(previous.total || 0, merged.length),
           page: requestedPage,
-          loading: false,
+          loading: includeTotal,
           complete: false
         };
       });
-      return includeTotal ? total > 0 : items.length > 0;
+      if (!includeTotal) return items.length > 0;
+      const total = await fetchPhotoIndexCount({ calendarId, projectId, cacheRevision: summary.version });
+      setState(previous => ({
+        ...previous,
+        status: total > 0 ? 'ready' : 'fallback',
+        total: Math.max(0, Number(total) || 0),
+        loading: false
+      }));
+      return total > 0;
     } catch (error) {
       console.warn('photo index page load failed:', error);
       // A network/read failure is not evidence that this calendar has no canonical index.

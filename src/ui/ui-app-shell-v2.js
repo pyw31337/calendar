@@ -2691,6 +2691,11 @@ export function buildRenewalRecordsContext(calendar, deps) {
     preloadedPhotoComments, preloadedPhotoCommentsReady,
   } = deps || {};
   const bulkSaveImageTags = handleBulkSaveImageTags || window.__gatherBulkSaveImageTags || null;
+  // This is a cheap calendar-record count used only until the 장소 tab finishes its own
+  // photo grouping. Do not mount the O(photo × place) classifier just to draw a header badge.
+  const historyPlaceCount = Array.isArray(activeCal?.places)
+    ? activeCal.places.filter(place => place && !place.deletedAt).length
+    : 0;
   const requireLoadedCalendar = (message) => {
     if (activeCal) return true;
     if (typeof showToast === 'function') showToast(message, 'error');
@@ -2760,8 +2765,13 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
       onFetchPhotoComments: handleFetchPhotoComments, onSavePhotoComments: handleSavePhotoComments,
       onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
-      indexedPhotos: galleryPhotoIndex ? galleryPhotoIndex.items : [],
+      placeCount: historyPlaceCount,
+      indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
+        ? galleryPhotoIndex.items
+        : (galleryPhotoIndex && galleryPhotoIndex.status === 'fallback' ? null : []),
+      indexedPhotoStatus: galleryPhotoIndex ? galleryPhotoIndex.status : undefined,
       indexedPhotoComplete: galleryPhotoIndex ? galleryPhotoIndex.complete : false,
+      onIndexedPhotoPageChange: galleryPhotoIndex ? galleryPhotoIndex.loadPage : undefined,
       onIndexedPhotoLoadAll: galleryPhotoIndex ? galleryPhotoIndex.loadAll : undefined,
       photoCommentCounts,
     },

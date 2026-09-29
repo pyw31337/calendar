@@ -1347,7 +1347,7 @@ export function HistoryView({
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
-  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoComplete = false, onIndexedPhotoLoadAll = null,
+  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null, onIndexedPhotoLoadAll = null,
   photoCommentCounts = {}, onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -1719,16 +1719,32 @@ export function HistoryView({
     ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, participantId: null, label: t, color: '#64748B' }))
   ], [activeParticipants, customPersonTags]);
 
+  // 보관함의 첫 화면은 서버 photoIndex의 한 페이지만 사용한다. 이전에는 `complete`가 true일
+  // 때만 index를 신뢰해서, 첫 100장을 정상 수신한 뒤에도 채팅·메모·일정 전체를 다시 합성했다.
+  // 그 중복 전체 순회가 사이드 메뉴에서 보관함을 누른 순간의 Long Task의 직접 원인이었다.
+  // 인덱스가 준비 중이면 빈 목록으로 먼저 화면을 그리고, 레거시 캘린더에 index가 없다고
+  // 확정된 경우에만 제한된 라이브 데이터 소스를 폴백으로 쓴다.
+  const hasExplicitIndexedPhotoStatus = typeof indexedPhotoStatus === 'string' && indexedPhotoStatus.length > 0;
+  const usesCanonicalPhotoIndex = Array.isArray(indexedPhotos)
+    && (indexedPhotoStatus === 'ready' || (!hasExplicitIndexedPhotoStatus && indexedPhotoComplete));
+  const usesLegacyPhotoFallback = indexedPhotoStatus === 'fallback'
+    || (!hasExplicitIndexedPhotoStatus && !Array.isArray(indexedPhotos));
+  const archivePhotoIndexIsPending = hasExplicitIndexedPhotoStatus
+    && !usesCanonicalPhotoIndex
+    && !usesLegacyPhotoFallback
+    && indexedPhotoStatus !== 'error';
+  const archivePhotoIndexHasError = indexedPhotoStatus === 'error';
+
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
   const baseHistoryPhotoEntries = React.useMemo(() => {
     const calendarId = calendar && calendar.id ? calendar.id : '';
-    const canonical = indexedPhotoComplete && Array.isArray(indexedPhotos)
+    const canonical = usesCanonicalPhotoIndex
       // photoIndex rows are server-maintained and never learned about meme keyboard stickers
       // (see isMemeKeyboardPhotoEntry's comment) -- buildCombinedPhotoEntries's composeGalleryPhotos
       // path already excludes them, this branch needs its own filter to match.
       ? indexedPhotos.filter(photo => !isMemeKeyboardPhotoEntry(photo))
-      : buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries);
+      : (usesLegacyPhotoFallback ? buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries) : []);
     return canonical.map(entry => ({
       ...entry,
       tags: resolveGalleryLightboxTags(calendarId, entry, {
@@ -1736,7 +1752,7 @@ export function HistoryView({
         indexTags: String(entry.tags || '')
       })
     }));
-  }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, indexedPhotoComplete]);
+  }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, usesCanonicalPhotoIndex, usesLegacyPhotoFallback]);
   // Do not turn opening 보관함 into a full-index network request. Large archives can opt into
   // the complete historical scan through the visible control below.
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
@@ -1751,7 +1767,24 @@ export function HistoryView({
       setIsLoadingEntireArchive(false);
     }
   }, [indexedPhotoComplete, onIndexedPhotoLoadAll, isLoadingEntireArchive]);
-  const incompleteArchiveNotice = !indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function'
+  const incompleteArchiveNotice = archivePhotoIndexHasError
+    ? /*#__PURE__*/React.createElement('p', { role: 'alert' },
+      '보관함 사진을 불러오지 못했습니다. ',
+      typeof onIndexedPhotoPageChange === 'function' && /*#__PURE__*/React.createElement('button', {
+        type: 'button', onClick: () => { void onIndexedPhotoPageChange(1, { force: true }); }
+      }, '다시 시도')
+    )
+    : archivePhotoIndexIsPending
+    ? /*#__PURE__*/React.createElement('div', {
+      role: 'status',
+      style: {
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '9px 10px', marginBottom: '8px', border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', color: 'var(--text-muted)',
+        fontSize: 'var(--font-size-xs)'
+      }
+    }, /*#__PURE__*/React.createElement('span', { "aria-hidden": true }, '⏳'), /*#__PURE__*/React.createElement('span', null, '보관함 사진을 준비하는 중입니다.'))
+    : !indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function'
     ? /*#__PURE__*/React.createElement('div', {
       role: 'status',
       style: {
@@ -1887,6 +1920,15 @@ export function HistoryView({
       })
       .sort((a, b) => (Number(b.timestamp || 0) - Number(a.timestamp || 0)));
   }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision, deletedPhotoKeys]);
+  // Match memory date ranges from a prepared token list. This is purposely limited to the active
+  // 추억 tab: person/place navigation does not pay for date parsing it cannot display.
+  const historyMemoryPhotoEntries = React.useMemo(() => {
+    if (historyTab !== 'memories') return [];
+    return historyPhotoEntries.map(entry => ({
+      ...entry,
+      __gatherMemoryDateTokens: parseHistoryDateTokens(entry?.tags || '')
+    }));
+  }, [historyTab, historyPhotoEntries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   // 장소 탭: a place group's key, PLACE_UNCLASSIFIED_KEY for "분류 필요", or null (the place grid).
   const [selectedPlaceKey, setSelectedPlaceKey] = React.useState(null);
@@ -2003,11 +2045,13 @@ export function HistoryView({
   // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
   // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
   // 완전일치만 인정한다.
-  // Build person buckets once per dataset change in a single pass rather than scanning every photo
-  // repeatedly across tab switches. Retains cache across tabs for instant 0ms tab switching.
+  // 인물 분류는 인물 탭을 실제로 열었을 때만 수행한다. 보관함 첫 진입(기본: 추억)에서
+  // 보이지 않는 인물/장소 분류까지 동시에 실행하면 사진 수에 비례해 메인 스레드를 막는다.
+  // 탭을 다시 열어도 그 탭의 데이터가 바뀌지 않는 한 useMemo 캐시가 유지된다.
   const { personPhotosByLabel, unclassifiedPeoplePhotos } = React.useMemo(() => {
     const buckets = new Map(personTagChips.map(tag => [tag.label, []]));
     const unclassified = [];
+    if (historyTab !== 'people') return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
     const matchers = personTagChips.map(tag => ({
       label: tag.label,
       variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
@@ -2028,7 +2072,7 @@ export function HistoryView({
       if (!hasPerson) unclassified.push(entry);
     });
     return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
-  }, [historyPhotoEntries, personTagChips]);
+  }, [historyTab, historyPhotoEntries, personTagChips]);
   const getPhotosForTagLabel = React.useCallback(label => personPhotosByLabel.get(label) || [], [personPhotosByLabel]);
 
   const photosForPersonTag = React.useMemo(
@@ -2160,6 +2204,7 @@ export function HistoryView({
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
   const placePhotoGroups = React.useMemo(() => {
+    if (historyTab !== 'places') return { groups: [], unclassified: [], unclassifiedCount: 0 };
     return buildPlacePhotoGroups({
       places: getCalendarPlaces(calendar),
       photos: historyPhotoEntries,
@@ -2170,7 +2215,7 @@ export function HistoryView({
       },
       doesPlaceMatchDate
     });
-  }, [calendar, historyPhotoEntries]);
+  }, [historyTab, calendar, historyPhotoEntries]);
   const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
     ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
     : null;
@@ -2354,6 +2399,7 @@ export function HistoryView({
     return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
   const travelMemoryGroups = React.useMemo(() => {
+    if (historyTab !== 'memories') return [];
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
@@ -2368,7 +2414,7 @@ export function HistoryView({
         // 제외 목록은 기념일 문서 set()에도 살아남아야 한다 -- 같은 날 다른 일정의 사진이
         // 다시 들어오는 건 한 번 고친 작업을 반복하게 만든다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
-        const photosInRange = historyPhotoEntries.filter(entry => {
+        const photosInRange = historyMemoryPhotoEntries.filter(entry => {
           return entryMatchesDateRange(entry, start, end, a.id);
         });
         const photos = photosInRange.filter(entry => !isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
@@ -2380,7 +2426,7 @@ export function HistoryView({
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
-  }, [anniversaries, historyPhotoEntries]);
+  }, [historyTab, anniversaries, historyMemoryPhotoEntries]);
 
     const handleExcludeMemoryGroups = async () => {
     const ids = Array.from(selectedMemoryGroupIds);
@@ -2400,14 +2446,17 @@ export function HistoryView({
   // 이미 추억 목록에 있는 기념일을 제외하고, 사진이 있거나 이전에 숨긴 기록이 있는
   // 기념일만 추가 후보로 보여준다. 실제 추가/복원은 기존 기념일 문서 모듈을 재사용한다.
   const memoryGroupIds = new Set(travelMemoryGroups.map(group => group.id));
-  const availableMemoryGroups = React.useMemo(() => (anniversaries || []).filter(a => {
+  const availableMemoryGroups = React.useMemo(() => {
+    if (historyTab !== 'memories') return [];
+    return (anniversaries || []).filter(a => {
     if (!a || !a.id || memoryGroupIds.has(a.id)) return false;
     const start = a.startDate || a.date;
     const end = a.endDate || a.startDate || a.date;
     if (!start || !end) return false;
-    return historyPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end, a.id));
-  }).map(a => ({ id: a.id, title: a.title || '기록', startDate: a.startDate || a.date, endDate: a.endDate || a.startDate || a.date, hidden: !!a.hiddenFromMemories }))
-    .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '')), [anniversaries, historyPhotoEntries, travelMemoryGroups]);
+    return historyMemoryPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end, a.id));
+    }).map(a => ({ id: a.id, title: a.title || '기록', startDate: a.startDate || a.date, endDate: a.endDate || a.startDate || a.date, hidden: !!a.hiddenFromMemories }))
+      .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+  }, [historyTab, anniversaries, historyMemoryPhotoEntries, travelMemoryGroups]);
   const handleRestoreMemoryGroup = async id => {
     if (typeof onRestoreMemoryGroup !== 'function') return;
     setIsChangingMemoryGroups(true);
@@ -2558,6 +2607,18 @@ export function HistoryView({
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }
   }, groups.map(renderMemoryGroupCard));
   const renderMemoryGroups = () => {
+    if (archivePhotoIndexIsPending) {
+      return /*#__PURE__*/React.createElement('div', {
+        role: 'status',
+        style: {
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '8px', padding: '24px', textAlign: 'center', color: 'var(--text-muted)'
+        }
+      },
+        /*#__PURE__*/React.createElement('span', { style: { fontSize: '2rem' }, "aria-hidden": true }, '🗂️'),
+        /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, '최근 사진을 불러오는 중입니다')
+      );
+    }
     if (travelMemoryGroups.length === 0) {
       return /*#__PURE__*/React.createElement("div", {
         style: {
@@ -2694,9 +2755,9 @@ export function HistoryView({
     onChange: changeHistoryTab,
     activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
     options: [
-      { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
+      { value: 'memories', label: '추억', badge: historyTab === 'memories' ? travelMemoryGroups.length : null },
       { value: 'people', label: '인물', badge: personTagChips.length },
-      { value: 'places', label: '장소', badge: placePhotoGroups.groups.length },
+      { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : (placeCount || null) },
       { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
     ]
   })

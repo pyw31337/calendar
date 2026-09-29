@@ -34,8 +34,7 @@ export function useGalleryArchiveState({
   galleryPreviewMessages,
   memos,
   fetchAllChatMessagesRest,
-  fetchCalendarSearchIndex,
-  canonicalPhotoIndexStatus = 'idle'
+  fetchCalendarSearchIndex
 }) {
   const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
   const [fullGalleryMemosByCalendar, setFullGalleryMemosByCalendar] = React.useState({});
@@ -94,13 +93,13 @@ export function useGalleryArchiveState({
 
   React.useEffect(() => {
     if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history' && activeView !== 'gallery')) return;
-    // History is backed by the server-maintained photoIndex.  Hydrating the whole chat archive
-    // here as well made a large archive perform two complete reads and two large React state
-    // writes before its first frame.  Keep the legacy chat path only when photoIndex explicitly
-    // reports that this calendar has no index (or failed), and retain it for global search.
-    const historyUsesCanonicalIndex = activeView === 'history' && !isGlobalSearchOpen
-      && canonicalPhotoIndexStatus !== 'fallback' && canonicalPhotoIndexStatus !== 'error';
-    if (historyUsesCanonicalIndex) return;
+    // Gallery and History are backed by the paged server photoIndex. Hydrating every chat and
+    // memo record in parallel caused two complete reads and two large React state writes before
+    // their first frame. That is especially harmful for legacy/no-index calendars: a missing
+    // index must degrade to the already-hydrated live window, never silently start a full client
+    // archive scan. Global search is the only surface that explicitly asks for that full corpus.
+    const isMediaBrowse = !isGlobalSearchOpen && (activeView === 'history' || activeView === 'gallery');
+    if (isMediaBrowse) return;
     const hasFullChat = Object.prototype.hasOwnProperty.call(fullChatHistoryByCalendar, activeCalId);
     const hasFullGalleryMemos = Object.prototype.hasOwnProperty.call(fullGalleryMemosByCalendar, activeCalId);
     if (activeView === 'gallery' ? (hasFullChat && hasFullGalleryMemos) : hasFullChat) return;
@@ -140,7 +139,7 @@ export function useGalleryArchiveState({
       }).catch(error => console.warn('full paged chat history load failed:', error));
     }
     return () => { cancelled = true; };
-  }, [activeCalId, isGlobalSearchOpen, activeView, canonicalPhotoIndexStatus, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar, fullGalleryMemosByCalendar, fetchAllChatMessagesRest, fetchCalendarSearchIndex]);
+  }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar, fullGalleryMemosByCalendar, fetchAllChatMessagesRest, fetchCalendarSearchIndex]);
 
   const patchGalleryArchiveMessage = React.useCallback((messageId, patch) => {
     if (!activeCalId || !messageId || !patch || typeof patch !== 'object') return;

@@ -369,8 +369,12 @@ export function renderCalendarViews({
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
-        indexedPhotos: galleryPhotoIndex.items,
+        indexedPhotos: galleryPhotoIndex.status === 'ready'
+          ? galleryPhotoIndex.items
+          : (galleryPhotoIndex.status === 'fallback' ? null : []),
+        indexedPhotoStatus: galleryPhotoIndex.status,
         indexedPhotoComplete: galleryPhotoIndex.complete,
+        onIndexedPhotoPageChange: galleryPhotoIndex.loadPage,
         onIndexedPhotoLoadAll: galleryPhotoIndex.loadAll,
         photoCommentCounts: photoCommentCounts,
         ...navMenuProps

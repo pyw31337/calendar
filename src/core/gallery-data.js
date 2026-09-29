@@ -227,7 +227,11 @@ export function photoBelongsToMemory(entry, memory, options = {}) {
   if (anniversaryId && memoryId && anniversaryId !== memoryId) return false;
 
   const parseDateTokens = typeof options.parseDateTokens === 'function' ? options.parseDateTokens : parseMemoryDateTokens;
-  const taggedDates = (parseDateTokens(entry.tags || '') || []).map(date => String(date).slice(0, 10)).filter(isIsoDate);
+  // HistoryView prepares this tiny per-photo projection once for the active 추억 tab. A full
+  // archive used to re-run the same hashtag regexp for every photo × every anniversary range.
+  // Keep the public shape backwards-compatible and only trust a caller-provided array.
+  const preparedDates = Array.isArray(entry.__gatherMemoryDateTokens) ? entry.__gatherMemoryDateTokens : null;
+  const taggedDates = (preparedDates || parseDateTokens(entry.tags || '') || []).map(date => String(date).slice(0, 10)).filter(isIsoDate);
   if (taggedDates.length) return taggedDates.some(date => date >= start && date <= end);
 
   const meetingDate = String(entry.meetingDate || '').slice(0, 10);

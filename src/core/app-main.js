@@ -979,8 +979,7 @@ function CalendarApp() {
   }, [activeCalId, allChatMessages, memos, calendars]);
   const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
-    allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex,
-    canonicalPhotoIndexStatus: galleryPhotoIndex.status
+    allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
   });
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
@@ -2201,20 +2200,24 @@ function CalendarApp() {
   // Photo comment counts / preloaded comments subscription: useGalleryIndexBindings.
 
   // Memo pagination, the needsMemoCollection gate and the memo listeners: useMemoCollections.
-  // 보관함 인물/추억 탭의 사진 목록용 memo 스냅샷 -- 위 needsMemoCollection에 'history'를 넣어 실시간
-  // 구독을 타게 하면 캘린더<->보관함을 오갈 때마다 리스너가 추가로 붙었다 떨어지는 처치(churn)가
-  // 늘어나는데, 이 리스너 처치가 실사용자 콘솔에서 반복 관찰된 "FIRESTORE INTERNAL ASSERTION
-  // FAILED: Unexpected state" 크래시의 유력한 방아쇠라 이미 위 주석에서 경고하고 있다. 사진 모아보기는
-  // 실시간일 필요가 없으므로, 보관함에 들어갈 때 한 번만 REST로 읽어와 별도 상태에 담는다(구독 없음).
+  // 보관함의 레거시 사진 폴백용 memo 스냅샷. 정상적인 photoIndex 캘린더에서는 사진 메타가 이미
+  // 인덱스 한 페이지에 있으므로 여기서 별도로 memo 200건을 읽을 이유가 없다. 그 읽기와 상태 반영이
+  // 보관함 첫 프레임의 네트워크/GC 부담을 키웠다. 인덱스가 실제로 없는 캘린더만 제한적으로 폴백한다.
+  // (실시간 listener는 쓰지 않는다. listener churn은 FIRESTORE INTERNAL ASSERTION의 방아쇠가 된다.)
   const [historyMemosSnapshot, setHistoryMemosSnapshot] = React.useState([]);
   React.useEffect(() => {
-    if (!activeCalId || activeView !== 'history') return;
+    const needsLegacyMemoFallback = activeCalId && activeView === 'history'
+      && galleryPhotoIndex.status === 'fallback';
+    if (!needsLegacyMemoFallback) {
+      setHistoryMemosSnapshot(previous => (previous.length ? [] : previous));
+      return undefined;
+    }
     let cancelled = false;
-    fetchMemosRest(activeCalId, 200).then(list => {
+    fetchMemosRest(activeCalId, 100).then(list => {
       if (!cancelled) setHistoryMemosSnapshot(Array.isArray(list) ? list : []);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [activeCalId, activeView]);
+  }, [activeCalId, activeView, galleryPhotoIndex.status]);
 
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo, places,
