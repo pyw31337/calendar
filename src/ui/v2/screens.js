@@ -18,16 +18,13 @@ import {
 
 const h = (...args) => window.React.createElement(...args);
 
-// Destination-only CSS is loaded when its tab is first rendered, instead of competing with the
-// calendar home for the initial CSS download. Vite caches each dynamic CSS import after loading.
+// Reference CSS is loaded when its matching destination is first rendered. Shared destination
+// chrome is statically imported above, so it is never requested a second time dynamically.
 const destinationStyleLoaders = {
-  memo: () => import('./reference-memo.css').then(() => import('./dest-chrome-late.css')),
-  places: () => import('./reference-places.css').then(() => import('./dest-chrome-late.css')),
-  settlement: () => import('./reference-settlement.css').then(() => import('./dest-chrome-late.css')),
-  chat: () => import('./reference-chat.css').then(() => import('./dest-chrome-late.css')),
-  gallery: () => import('./dest-chrome-late.css'),
-  content: () => import('./dest-chrome-late.css'),
-  archive: () => import('./dest-chrome-late.css'),
+  memo: () => import('./reference-memo.css'),
+  places: () => import('./reference-places.css'),
+  settlement: () => import('./reference-settlement.css'),
+  chat: () => import('./reference-chat.css'),
 };
 const destinationStylePromises = new Map();
 function ensureDestinationStyles(kind) {

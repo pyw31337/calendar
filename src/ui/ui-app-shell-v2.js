@@ -8,7 +8,6 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader, prefetchDestinationStyles } from './v2/screens.js';
-import './v2/dest-chrome-late.css';
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {

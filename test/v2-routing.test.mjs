@@ -102,6 +102,9 @@ test('V2 destination panes prefetch lazy UI and never stall on 불러오는 중 
   assert.doesNotMatch(shell, /title: '메모 불러오는 중'/);
   assert.doesNotMatch(shell, /title: '장소 불러오는 중'/);
   assert.match(screens, /export function prefetchDestinationStyles/);
+  assert.match(screens, /import '\.\/dest-chrome-late\.css';/, 'shared destination chrome has one static source of truth');
+  assert.doesNotMatch(screens, /import\('\.\/dest-chrome-late\.css'\)/, 'the shared chrome is not requested again by every destination prefetch');
+  assert.doesNotMatch(shell, /import '\.\/v2\/dest-chrome-late\.css';/, 'the shell does not duplicate the screens chrome import');
 });
 
 test('places map reuses the shared chat composer resize handle', async () => {
