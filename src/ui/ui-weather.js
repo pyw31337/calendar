@@ -932,6 +932,28 @@ function formatWeatherLocationArea(location) {
     .trim();
 }
 
+function shortWeatherPlaceLabel(full) {
+  const text = String(full || '').replace(/\s+/g, ' ').trim();
+  if (!text || text === '지역') return '서울시';
+  const parts = text.split(' ');
+  if (parts.length >= 2 && /(?:특별시|광역시|도)$/.test(parts[0])) return parts[1];
+  return parts[0];
+}
+
+function formatWeatherSettingLocation(location) {
+  const name = String(location?.name || '').trim();
+  const area = formatWeatherLocationArea(location);
+  const explicitAddress = String(location?.address || '').trim();
+  const areaName = String(location?.areaName || '').trim();
+  if (location?.isMeetingPlace && name && name !== '지역') {
+    const address = explicitAddress || areaName || (area && area !== name ? area : '');
+    return address ? `설정위치 : [${name}] ${address}` : `설정위치 : [${name}]`;
+  }
+  const full = area && area !== '지역' ? area : '서울시';
+  const short = shortWeatherPlaceLabel(full);
+  return `설정위치 : [${short}] ${full}`;
+}
+
 function WeatherPlaceMarkerIcon({ size = 16 }) {
   const React = window.React;
   return /*#__PURE__*/React.createElement('svg', {
@@ -1447,21 +1469,6 @@ export function WeatherDetailModal({
     /*#__PURE__*/React.createElement("div", {
       className: "weather-detail-header"
     },
-      /*#__PURE__*/React.createElement("div", {
-        className: "weather-detail-location-copy"
-      },
-        /*#__PURE__*/React.createElement("div", {
-          className: "weather-detail-place"
-        },
-          /*#__PURE__*/React.createElement("span", { className: "weather-detail-place-icon" },
-            /*#__PURE__*/React.createElement(WeatherPlaceMarkerIcon, { size: 16 })
-          ),
-          /*#__PURE__*/React.createElement("span", { className: "weather-detail-place-name", title: locationName }, locationName)
-        ),
-        /*#__PURE__*/React.createElement("span", { className: "weather-detail-region", title: forecastAreaText },
-          forecastAreaText
-        )
-      ),
       /*#__PURE__*/React.createElement("div", { className: "weather-detail-header-actions" },
         /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -1569,6 +1576,12 @@ export function WeatherDetailModal({
                 apparentMax != null ? `체감 ${apparentMax}°` : "",
                 maxTemp != null && minTemp != null ? `최고 ${maxTemp}° / 최저 ${minTemp}°` : ""
               ].filter(Boolean).join("  ·  ")
+            ),
+            /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting" },
+              /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting-pin", "aria-hidden": "true" },
+                /*#__PURE__*/React.createElement(WeatherPlaceMarkerIcon, { size: 14 })
+              ),
+              /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting-text" }, formatWeatherSettingLocation(currentLocation))
             )
           ),
           /*#__PURE__*/React.createElement(WeatherScene, { kind: cardKind })

@@ -60,6 +60,15 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
   assert.match(weatherJs, /function weatherSceneKind/, 'weather highlight card uses dynamic weather gradient themes');
   assert.match(weatherJs, /weather-highlight-temp-big/, 'weather highlight card features prominent large temperature typography');
   assert.match(weatherJs, /WeatherScene/, 'weather highlight card renders an animated scene on the right');
+  assert.match(weatherJs, /formatWeatherSettingLocation/, 'the highlight card states the saved or meeting place');
+  assert.match(weatherJs, /설정위치 : \[\$\{name\}\] \$\{address\}/, 'a meeting place is bracketed, then the address');
+  assert.match(weatherJs, /설정위치 : \[\$\{short\}\] \$\{full\}/, 'a saved region brackets the short place name');
+  assert.match(weatherJs, /className: "weather-highlight-setting"/, 'the setting line sits in the highlight card');
+  assert.doesNotMatch(weatherJs, /weather-detail-location-copy/, 'the header no longer carries the location copy');
+  assert.match(css, /\.weather-scene\s*\{[\s\S]*?overflow:\s*visible;/, 'scene objects are not clipped by the scene box');
+  assert.match(css, /\.weather-highlight-card\s*\{[\s\S]*?overflow:\s*visible;/, 'the highlight card does not crop the scene');
+  assert.match(css, /\.bp-dot-row \+ \.bp-day-bar-stack\s*\{[\s\S]*?margin-top:\s*10px/, 'participant dots sit clear of the anniversary badge');
+  assert.match(css, /\.v2-header-search\.is-open\s*\{[\s\S]*?grid-template-rows:\s*1fr;/, 'header search opens with a height transition');
   assert.match(css, /\.weather-scene\b/, 'CSS includes the animated weather scene');
   assert.match(css, /\.weather-highlight-card\s*\{[\s\S]*?border-radius:\s*(?:20|28)px;/, 'weather highlight card stays a rounded card');
 

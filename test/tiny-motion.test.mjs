@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { itemIdentity, isMotionItem, isNegativeControl, planListExits } from '../src/ui/v2/tiny-motion.js';
+import { collectMotionLists, itemIdentity, isMotionItem, isNegativeControl, planListExits } from '../src/ui/v2/tiny-motion.js';
 
 function el(attrs = {}, text = '') {
   const attributes = new Map(Object.entries(attrs));
@@ -57,4 +57,36 @@ test('short delete labels are negative, long copy and plain buttons are not', ()
   assert.equal(isNegativeControl(labeled), true);
   assert.equal(isNegativeControl(paragraph), false);
   assert.equal(isNegativeControl(save), false);
+});
+
+function motionNode(className, children = []) {
+  const node = {
+    nodeType: 1,
+    className,
+    children,
+    matches(selector) {
+      return String(selector).split(',').some(part => part.trim() === `.${className}`);
+    },
+    querySelectorAll(selector) {
+      const found = [];
+      const walk = (current) => {
+        for (const child of current.children || []) {
+          if (child.matches?.(selector)) found.push(child);
+          walk(child);
+        }
+      };
+      walk(this);
+      return found;
+    }
+  };
+  return node;
+}
+
+test('a list nested in an inserted page is still a motion list', () => {
+  const card = motionNode('archive-photo-cell');
+  const grid = motionNode('history-bento-grid', [card]);
+  const page = motionNode('history-page-scroll', [grid]);
+  const lists = collectMotionLists(page);
+  assert.deepEqual(lists, [grid]);
+  assert.equal(collectMotionLists(card).length, 0);
 });
