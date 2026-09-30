@@ -32,6 +32,7 @@ function runShell({ userAgent, innerHeight, screenHeight, width, innerWidth = wi
   return {
     height: props.get('--app-vv-height'),
     standaloneTopInset: props.get('--app-vv-standalone-top-inset'),
+    keyboard: attrs.has('data-v2-keyboard'),
   };
 }
 
@@ -64,10 +65,43 @@ test('compact iOS standalone keeps its full height while a focused control has c
   assert.equal(result.standaloneTopInset, '59px');
 });
 
+test('mobile Safari fits the shell to browser chrome without calling it a keyboard', () => {
+  const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  const result = runShell({
+    userAgent: ua,
+    innerHeight: 800,
+    screenHeight: 852,
+    width: 390,
+    visualViewport: { height: 720, offsetTop: 0, scale: 1 },
+  });
+  assert.equal(result.height, '720px');
+  assert.equal(result.keyboard, false);
+  assert.equal(result.standaloneTopInset, '0px');
+});
+
+test('a keyboard-sized shrink still pins the shell and marks the keyboard', () => {
+  const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  const result = runShell({
+    userAgent: ua,
+    innerHeight: 800,
+    screenHeight: 852,
+    width: 390,
+    visualViewport: { height: 420, offsetTop: 0, scale: 1 },
+  });
+  assert.equal(result.height, '420px');
+  assert.equal(result.keyboard, true);
+});
+
 test('iOS input controls use a 16px-equivalent mobile token so Safari does not auto-zoom', () => {
   const css = fs.readFileSync('src/ui/v2/viewport-shell.css', 'utf8');
   assert.match(css, /--v2-mobile-control-font-size:\s*1rem/);
   assert.match(css, /textarea,\s*html:has\(\.renewal-shell\.v2-design\) \.renewal-shell\.v2-design select[\s\S]*font-size:\s*var\(--v2-mobile-control-font-size\)\s*!important/);
+});
+
+test('the home scrollport uses overflow-x clip so the sticky hero survives in WebKit', () => {
+  const css = fs.readFileSync('src/ui/v2/viewport-shell.css', 'utf8');
+  const rule = css.slice(css.indexOf('.renewal-shell.v2-design > main.bp-app-shell.is-bento-home'));
+  assert.match(rule.slice(0, 500), /overflow-x: hidden !important;\s*\/\*[\s\S]*?\*\/\s*overflow-x: clip !important;/);
 });
 
 test('the menu FAB clears the measured bottom-toolbar gap', () => {

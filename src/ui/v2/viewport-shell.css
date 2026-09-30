@@ -103,9 +103,11 @@ html:has(.v2-design)::view-transition-new(root) {
   max-height: 100% !important;
   min-height: 0 !important;
   overflow-x: hidden !important;
+  /* clip keeps horizontal bleed in without the WebKit bug that drops
+     position:sticky when the scrollport is overflow-x:hidden. */
+  overflow-x: clip !important;
   overflow-y: auto !important;
   overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
   box-sizing: border-box !important;
 }
 

@@ -80,8 +80,15 @@
     // Do not mistake Safari's automatic input zoom for the keyboard.  A real
     // keyboard keeps visualViewport.scale at 1; an auto/manual zoom does not.
     const viewportScale = Number(vv?.scale || 1);
-    const keyboard = viewportScale <= 1.01 && layoutH - vvH - rawTop > 120;
-    const height = keyboard ? vvH : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH));
+    const chromeShrink = layoutH - vvH - rawTop;
+    const keyboard = viewportScale <= 1.01 && chromeShrink > 120;
+    // Address and tool bars cover less than a keyboard. Size the shell to the
+    // visible viewport so the last cards are not stuck under the bar. Leave
+    // offsetTop at 0: copying it back is what makes the chat header jump.
+    const browserChrome = !keyboard && viewportScale <= 1.01 && chromeShrink > 24;
+    const height = keyboard || browserChrome
+      ? vvH
+      : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH));
     const offsetTop = keyboard ? rawTop : 0;
     // How far the real screen extends past what WebKit reports (iOS standalone only, see
     // standaloneScreenHeight). viewport-shell.css uses the class to stretch fixed layers too.
