@@ -16,6 +16,7 @@ import {
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { useTabStripGesture } from './tab-strip-gesture.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
@@ -354,12 +355,20 @@ function handleSectionHeaderKeyDown(event, onToggle) {
 
 export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle, activeColor = '#2563EB' }) {
   const React = window.React;
+  const list = Array.isArray(tabs) ? tabs : [];
+  const { rootRef, gestureProps } = useTabStripGesture({
+    values: list.map(tab => tab.key),
+    value: activeKey,
+    onChange: onSelect,
+  });
 
   return /*#__PURE__*/React.createElement("div", {
+    ...gestureProps,
+    ref: rootRef,
     className: "underline-tabs",
     role: "tablist",
-    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', ...containerStyle }
-  }, tabs.map(tab => {
+    style: { display: 'grid', gridTemplateColumns: `repeat(${list.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', touchAction: 'pan-y', ...containerStyle }
+  }, list.map(tab => {
     const count = Number(tab.count || 0);
     const isActive = activeKey === tab.key;
     return /*#__PURE__*/React.createElement("button", {
@@ -2982,12 +2991,12 @@ export function HistoryView({
       { value: 'memories', label: '추억', badge: visibleMemoryGroups.length, faded: visibleMemoryGroups.length === 0 },
       { value: 'people', label: '인물', badge: visiblePersonChips.length + (visibleUnclassifiedPeople.length > 0 ? 1 : 0), faded: visiblePersonChips.length === 0 && visibleUnclassifiedPeople.length === 0 },
       { value: 'places', label: '장소', badge: visiblePlacePhotoGroups.groups.length + (visiblePlacePhotoGroups.unclassifiedCount > 0 ? 1 : 0), faded: visiblePlacePhotoGroups.groups.length === 0 && !visiblePlacePhotoGroups.unclassifiedCount },
-      { value: 'meetings', label: '지난모임', badge: confirmedDates.length, faded: confirmedDates.length === 0 }
+      { value: 'meetings', label: '모임', badge: confirmedDates.length, faded: confirmedDates.length === 0 }
     ] : [
       { value: 'memories', label: '추억', badge: historyTab === 'memories' ? travelMemoryGroups.length : null },
       { value: 'people', label: '인물', badge: personTagChips.length },
       { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : (placeCount || null) },
-      { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
+      { value: 'meetings', label: '모임', badge: confirmedDates.length }
     ]
   })
   );
@@ -3766,7 +3775,7 @@ export function HistoryView({
         },
         icon: SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍",
         title: "보관함 검색",
-        desc: "추억·인물·장소·지난모임 전체 검색"
+        desc: "추억·인물·장소·모임 전체 검색"
       }],
       navBlockProps: {
         onClose: () => setIsMenuOpen(false),

@@ -1,6 +1,7 @@
 /**
  * Shared UI primitives (P4-22)
  */
+import { useTabStripGesture } from './tab-strip-gesture.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -600,11 +601,18 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
 export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = 'var(--v2-primary, #7C3AED)', variant = null }) {
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
+  const { rootRef, gestureProps } = useTabStripGesture({
+    values: list.map(opt => opt.value),
+    value,
+    onChange,
+  });
   // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
   // horizontal padding. The active 2px underline stays inside the tab (margin 0) so it rests
   // on top of the container hairline instead of hanging below it.
   const isFlush = variant === 'flush';
   return /*#__PURE__*/React.createElement('div', {
+    ...gestureProps,
+    ref: rootRef,
     className: `underline-tabs${isFlush ? ' underline-tabs--flush' : ''}${className ? ' ' + className : ''}`,
     role: 'tablist',
     'aria-label': ariaLabel || undefined,
@@ -617,6 +625,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
       boxSizing: 'border-box',
       paddingLeft: isFlush ? 0 : undefined,
       paddingRight: isFlush ? 0 : undefined,
+      touchAction: 'pan-y',
       ...(style || {})
     }
   }, list.map(opt => {
@@ -937,13 +946,22 @@ export function SegmentedToggle({ options, value, onChange, disabled, style, ari
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const safeOptions = Array.isArray(options) ? options : [];
+  const { rootRef, gestureProps } = useTabStripGesture({
+    values: safeOptions.map(opt => opt.value),
+    value,
+    onChange,
+    disabled,
+  });
   return /*#__PURE__*/React.createElement("div", {
+    ...gestureProps,
+    ref: rootRef,
     role: "tablist",
     className: "segmented-toggle",
     "aria-label": ariaLabel,
     style: {
       display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
       border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', flexShrink: 0,
+      touchAction: 'pan-y',
       ...style
     }
   }, safeOptions.flatMap((opt, i) => [

@@ -76,7 +76,7 @@ requireText(icons, /function ThreeLinesIcon\(\{ size = 22 \}/, 'ThreeLinesIcon d
 // 막되, 지연 집계 계약도 허용한다.
 requireText(picker, /value: 'memories', label: '추억', badge: historyTab === 'memories' \? travelMemoryGroups\.length : null/, 'history 추억 tab must show its count after the active facet is prepared');
 requireText(picker, /value: 'people', label: '인물', badge: personTagChips\.length/, 'history 인물 tab must show a count badge');
-requireText(picker, /value: 'meetings', label: '지난모임', badge: confirmedDates\.length/, 'history 지난모임 tab must show a count badge');
+requireText(picker, /value: 'meetings', label: '모임', badge: confirmedDates\.length/, 'history 모임 tab must show a count badge');
 requireText(picker, /historyScrollPadTop/, 'memories scroll must use measured header height like gallery');
 requireText(placesView, /padding: '20px 16px 14px'/, 'places toolbar padding must match the V2 reference spacing (20/16/14)');
 requireText(placesView, /padding: '20px'/, 'places list body must use flat 20px padding (V2 reference), not a stacked card-box inset');
