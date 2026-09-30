@@ -11,6 +11,15 @@
 
 const MEASURE_FONT_FALLBACK = '16px sans-serif';
 
+/** One drawn line is a capsule; two or more is a rounded rectangle. */
+export function fieldLineModeFromBox(contentHeight, lineHeight) {
+  const height = Number(contentHeight);
+  const line = Number(lineHeight);
+  if (!(height > 0) || !(line > 0)) return '1';
+  const lines = Math.max(1, Math.round(height / line));
+  return lines <= 1 ? '1' : 'multi';
+}
+
 export function countPlaceholderLines(text, contentWidth, measureWidth) {
   if (!text || !(contentWidth > 0)) return 1;
   return String(text).split(/\r?\n/).reduce((total, line) => {

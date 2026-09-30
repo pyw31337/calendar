@@ -2102,7 +2102,6 @@ export function HistoryView({
 
   const [peopleSelectMode, setPeopleSelectMode] = React.useState(false);
   const [peopleSelectedKeys, setPeopleSelectedKeys] = React.useState(() => new Set());
-  const [isPeopleBulkSaving, setIsPeopleBulkSaving] = React.useState(false);
   const [isPeopleBulkDeleting, setIsPeopleBulkDeleting] = React.useState(false);
   const [peopleDeleteProgress, setPeopleDeleteProgress] = React.useState(null);
   const peopleAnchorKeyRef = React.useRef('');
@@ -2188,7 +2187,6 @@ export function HistoryView({
     }
     publishArchiveTags(changes);
     setPeopleSelectedKeys(new Set());
-    setIsPeopleBulkSaving(true);
     try {
       const result = await save(changes);
       if (!result?.ok) throw new Error('태그 저장 실패');
@@ -2196,8 +2194,6 @@ export function HistoryView({
     } catch (err) {
       rollbackArchiveTags(changes);
       showToast?.(String(err?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
-    } finally {
-      setIsPeopleBulkSaving(false);
     }
   };
 
@@ -2364,7 +2360,6 @@ export function HistoryView({
       publishArchiveTags(bulkChanges);
       setPlaceSelectedKeys(new Set());
       setPlaceSelectMode(false);
-      setPlaceAssignProgress({ current: 0, total: bulkChanges.length, label: placeTag });
       try {
         const result = await bulkSaveImageTagsRef.current(bulkChanges);
         if (!result?.ok) throw new Error('일괄 장소 태그 저장 실패');
@@ -2390,20 +2385,18 @@ export function HistoryView({
       return;
     }
     const counts = { done: 0, full: 0, failed: 0 };
-    // Let React re-render between saves so the next call uses a handler built from the state the
-    // previous save just patched (memo/meeting paths read local state; chat reads the stored doc).
-    const nextFrame = () => new Promise(resolve => setTimeout(resolve, 60));
+    // The tag handler keeps an optimistic snapshot per document, so a fresh
+    // server read here would drop tags that have not landed yet.
     for (let i = 0; i < photos.length; i += 1) {
       setPlaceAssignProgress({ current: i + 1, total: photos.length, label: placeTag });
       const photo = photos[i];
       const next = withPlaceTag(photo.tags, place);
       if (next.status === 'already') { counts.done += 1; continue; }
       if (next.status !== 'add') { counts.full += 1; continue; }
-      await nextFrame();
       let ok = false;
       try {
         ok = await saveImageTagsRef.current(photo.messageId, photo.imageIndex, next.tags, {
-          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', readFresh: true, silent: true
+          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', silent: true
         });
       } catch (err) {
         console.warn('Place bulk tag save failed:', err);
@@ -2441,7 +2434,6 @@ export function HistoryView({
       publishArchiveTags(bulkChanges);
       setPlaceSelectedKeys(new Set());
       setPlaceSelectMode(false);
-      setPlaceAssignProgress({ current: 0, total: bulkChanges.length, label: '제거' });
       try {
         const result = await bulkSaveImageTagsRef.current(bulkChanges);
         if (!result?.ok) throw new Error('분류 제거 저장 실패');
@@ -2467,17 +2459,15 @@ export function HistoryView({
       return;
     }
     const counts = { done: 0, failed: 0 };
-    const nextFrame = () => new Promise(resolve => setTimeout(resolve, 60));
     for (let i = 0; i < photos.length; i += 1) {
       setPlaceAssignProgress({ current: i + 1, total: photos.length, label: '제거' });
       const photo = photos[i];
       const next = withNotAPlaceTag(photo.tags);
       if (next.status !== 'add') { counts.done += 1; continue; }
-      await nextFrame();
       let ok = false;
       try {
         ok = await saveImageTagsRef.current(photo.messageId, photo.imageIndex, next.tags, {
-          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', readFresh: true, silent: true
+          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', silent: true
         });
       } catch (err) {
         console.warn('Place dismiss tag save failed:', err);
@@ -3529,7 +3519,7 @@ export function HistoryView({
         onDeletePhotos: handleDeleteSelectedPeoplePhotos,
         showToast,
         onRequestConfirm,
-        isSaving: isPeopleBulkSaving,
+        isSaving: false,
         isDeleting: isPeopleBulkDeleting,
         deleteProgress: peopleDeleteProgress,
         mode: 'people'
