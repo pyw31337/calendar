@@ -300,15 +300,27 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.96) !important;
   color: var(--v2-accent, #5B4BEB) !important;
-  font-size: 0.68rem !important;
+  font-size: .6rem !important;
   font-weight: 900 !important;
   line-height: 1 !important;
-  padding: 2px 7px !important;
+  padding: 2px 5px !important;
   border-radius: 9999px !important;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
   animation: bp-hero-dday-heartbeat 0.75s ease-in-out infinite !important;
   transform-origin: center !important;
   letter-spacing: -0.02em;
+  white-space: nowrap !important;
+}
+.v2-design .bp-hero-weather-past-dday {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+  letter-spacing: -0.01em;
+  padding: 0 !important;
+  white-space: nowrap !important;
 }
 @keyframes bp-hero-dday-heartbeat {
   0%, 100% { transform: scale(1); }

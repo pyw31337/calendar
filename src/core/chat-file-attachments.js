@@ -427,7 +427,7 @@ export async function uploadChatFileAttachments(calendarId, pendingList, onProgr
   return uploaded;
 }
 
-export function collectChatFileAttachmentsFromMessages(messages) {
+export function collectChatFileAttachmentsFromMessages(messages, memos = []) {
   const list = [];
   (Array.isArray(messages) ? messages : []).forEach(msg => {
     const attachments = Array.isArray(msg?.fileAttachments) ? msg.fileAttachments : [];
@@ -441,6 +441,22 @@ export function collectChatFileAttachmentsFromMessages(messages) {
         timestamp: Number(msg.timestamp) || clean.uploadedAt || 0,
         source: 'chat',
         uploadSource: msg.uploadSource || 'chat',
+        attachmentIndex: index
+      });
+    });
+  });
+  (Array.isArray(memos) ? memos : []).forEach(memo => {
+    const attachments = Array.isArray(memo?.fileAttachments) ? memo.fileAttachments : [];
+    attachments.forEach((attachment, index) => {
+      const clean = sanitizeFileAttachment(attachment);
+      if (!clean) return;
+      list.push({
+        ...clean,
+        memoId: memo.id || '',
+        participantId: memo.author || memo.participantId || '',
+        timestamp: Number(memo.updatedAt || memo.createdAt) || clean.uploadedAt || 0,
+        source: 'memo',
+        uploadSource: memo.uploadSource || 'memo',
         attachmentIndex: index
       });
     });

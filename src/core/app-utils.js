@@ -68,12 +68,15 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   }
 
   function formatDDayLabel(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return '';
     const [y, m, d] = dateStr.split('-').map(Number);
     const target = new Date(y, m - 1, d);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const diffDays = Math.round((target - today) / 86400000);
-    return diffDays <= 0 ? 'D-DAY' : `D-${diffDays}`;
+    if (diffDays === 0) return 'D-Day';
+    if (diffDays < 0) return `D+${Math.abs(diffDays)}`;
+    return `D-${diffDays}`;
   }
 
   function formatRegisteredAt(timestamp) {

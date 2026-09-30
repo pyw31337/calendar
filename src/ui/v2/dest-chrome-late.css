@@ -3209,9 +3209,20 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
     opacity: 1 !important;
     pointer-events: auto !important;
   }
-  /* Page clearance above mobile bottom nav */
+  /* Page clearance above mobile bottom nav — floating overlay style:
+     Outer main shell extends to bottom: 0 so scrolling content passes underneath the floating nav
+     and shows through the space around the center sticking-up button. Inner scroll containers
+     keep padding-bottom so the final card can be scrolled comfortably above the nav. */
   .v2-design .bp-app-shell.is-bento-home,
   .v2-design .renewal-shell-main.v2-destination:not(.v2-chat) {
+    padding-bottom: 0 !important;
+  }
+  .v2-design .bp-app-shell.is-bento-home .bp-bento-grid,
+  .v2-design .gallery-page-scroll,
+  .v2-design .history-page-scroll,
+  .v2-design .v2-records-frame,
+  .v2-design .v2-dest-body,
+  .v2-design .places-list-body {
     padding-bottom: calc(var(--mobile-bottom-nav-total, 58px) + 24px) !important;
   }
   /* Chat composer sits directly above mobile bottom nav */

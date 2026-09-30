@@ -11,6 +11,7 @@ import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTim
 import { ClipboardPasteIcon } from './ui-icons.js';
 import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
 import { isExternalServiceUrl } from '../core/memo-share-link.js';
+import { collectChatFileAttachmentsFromMessages } from '../core/chat-file-attachments.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -624,8 +625,8 @@ export function ChatGalleryModal({
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const FileAttachmentCard = __comp.FileAttachmentCard || __deps.FileAttachmentCard;
   const DocumentLightbox = __comp.DocumentLightbox || __deps.DocumentLightbox;
-  const collectChatFileAttachmentsFromMessages = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages);
-        const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
+  const collectChatFileAttachments = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages) || collectChatFileAttachmentsFromMessages;
+  const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
     const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -896,10 +897,23 @@ export function ChatGalleryModal({
   // isMobile) so the PC header filter vs. mobile select+tab row swap reacts live to resize/rotate
   // instead of only whatever this component happened to read on its first render.
   const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 720px)').matches);
+  const [isTabletOrMobile, setIsTabletOrMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 1024px)').matches);
   React.useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined;
     const mq = window.matchMedia('(max-width: 720px)');
     const handleChange = () => setIsMobile(mq.matches);
+    handleChange();
+    if (mq.addEventListener) mq.addEventListener('change', handleChange);
+    else if (mq.addListener) mq.addListener(handleChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handleChange);
+      else if (mq.removeListener) mq.removeListener(handleChange);
+    };
+  }, []);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => setIsTabletOrMobile(mq.matches);
     handleChange();
     if (mq.addEventListener) mq.addEventListener('change', handleChange);
     else if (mq.addListener) mq.addListener(handleChange);
@@ -1090,7 +1104,7 @@ export function ChatGalleryModal({
         // Meme keyboard stickers
         .filter(photo => !isMemeKeyboardPhotoEntry(photo))
         // Photos tab must only contain real photos, not link URLs
-        .filter(photo => !photo.directMediaUrl)
+        .filter(photo => !photo.directMediaUrl && photo.source !== 'link' && !isExternalServiceUrl(photo.full || photo.url || photo.thumb))
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)
@@ -1266,10 +1280,10 @@ export function ChatGalleryModal({
   }, [sharedLinks, searchQuery]);
 
   const sharedFiles = React.useMemo(() => {
-    const collect = collectChatFileAttachmentsFromMessages;
+    const collect = collectChatFileAttachments;
     if (typeof collect !== 'function') return [];
-    return collect(chatMessages || []);
-  }, [chatMessages]);
+    return collect(chatMessages || [], memos || []);
+  }, [chatMessages, memos]);
 
   const filteredFiles = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedFiles;
@@ -1298,7 +1312,8 @@ export function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
   const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
-    if (photo.directMediaUrl) return false;
+    if (photo.directMediaUrl || photo.source === 'link') return false;
+    if (isExternalServiceUrl(photo.full || photo.url || photo.thumb)) return false;
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
@@ -2474,7 +2489,7 @@ export function ChatGalleryModal({
     className: "gallery-link-grid",
     style: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gridTemplateColumns: isTabletOrMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
       gap: isMobile ? '8px' : '12px',
       width: '100%',
       boxSizing: 'border-box'
@@ -2517,7 +2532,7 @@ export function ChatGalleryModal({
     className: "gallery-file-grid",
     style: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gridTemplateColumns: isTabletOrMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
       gap: isMobile ? '8px' : '12px',
       width: '100%',
       boxSizing: 'border-box'

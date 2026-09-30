@@ -488,6 +488,8 @@ export function composeGalleryPhotos({
   });
   memos.forEach(memo => {
     if (!memo || (typeof isTombstone === 'function' && isTombstone(memo))) return;
+    const hasPhotos = Boolean(memo.imageUrl || (Array.isArray(memo.imageUrls) && memo.imageUrls.length > 0) || memo.thumbUrl || (Array.isArray(memo.thumbUrls) && memo.thumbUrls.length > 0));
+    if (!hasPhotos) return;
     const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
     const asMessage = {
       id: memo.id,
@@ -506,7 +508,7 @@ export function composeGalleryPhotos({
       getAllDirectMediaImageEntries,
       getPhotoAssetCommentKey,
       isBrokenPhotoValue: broken
-    }).forEach(entry => {
+    }).filter(entry => entry && !entry.directMediaUrl && entry.source !== 'link').forEach(entry => {
       list.push({
         ...entry,
         tags: String(entry.tags || memoImageTags[entry.imageIndex] || ''),

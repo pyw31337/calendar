@@ -45,7 +45,8 @@ function dismissSplashScreen() {
   const isPC = !isMobile ||
     (typeof document !== 'undefined' && document.documentElement.classList.contains('is-pc-device')) ||
     (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches);
-  if (isPC) {
+  const isSplashDemo = typeof window !== 'undefined' && (window.location.search.includes('splash') || window.location.search.includes('demo'));
+  if (isPC && !isSplashDemo) {
     try { splash.remove(); } catch (_) {}
     return;
   }

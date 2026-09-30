@@ -1513,16 +1513,20 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
         const ddayText = isConfirmed ? formatDDayLabel(day.dateStr) : null;
         const fullTitle = `${day.label}${ddayText ? ` (${ddayText} 모임확정)` : ''} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''} - 일기예보 상세 보기`;
 
+        const isPast = day.offset < 0;
+
         return React.createElement('button', {
           type: 'button',
           key: day.dateStr,
-          className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}${isConfirmed ? ' has-dday' : ''}`,
+          className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}${isConfirmed ? (isPast ? ' has-past-dday' : ' has-dday') : ''}`,
           title: fullTitle,
           'aria-label': fullTitle,
           onClick: () => setSelectedWeatherDate(day.dateStr),
         },
           isConfirmed && ddayText
-            ? React.createElement('span', { className: 'bp-hero-weather-day bp-hero-weather-dday-badge' }, ddayText)
+            ? (isPast
+                ? React.createElement('span', { className: 'bp-hero-weather-day bp-hero-weather-past-dday' }, ddayText)
+                : React.createElement('span', { className: 'bp-hero-weather-day bp-hero-weather-dday-badge' }, ddayText))
             : React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
           React.createElement('span', { className: 'bp-hero-weather-icon', 'aria-hidden': 'true' },
             getWeatherIcon(code, 22)

@@ -40,6 +40,9 @@
           if (!isMobile) {
             document.documentElement.classList.add('is-pc-device');
           }
+          if (location.search.indexOf('splash') !== -1 || location.search.indexOf('demo') !== -1) {
+            document.documentElement.classList.add('force-splash-preview');
+          }
         } catch (_) {}
       })();
       (function () {
@@ -178,6 +181,15 @@
       @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
         .app-splash {
           display: none !important;
+        }
+      }
+      html.force-splash-preview .app-splash,
+      html.force-splash-preview.is-pc-device .app-splash {
+        display: flex !important;
+      }
+      @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+        html.force-splash-preview .app-splash {
+          display: flex !important;
         }
       }
       .app-splash {

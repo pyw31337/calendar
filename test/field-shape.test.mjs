@@ -78,12 +78,61 @@ test('Gallery links and files render in 2-column grid with wrapping text and per
     readFile(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/ui-chat-files.js', import.meta.url), 'utf8')
   ]);
-  assert.match(galleryJs, /className:\s*"gallery-link-grid"[\s\S]*?gridTemplateColumns:\s*'repeat\(2, minmax\(0, 1fr\)\)'/, 'links render in 2-column grid');
-  assert.match(galleryJs, /className:\s*"gallery-file-grid"[\s\S]*?gridTemplateColumns:\s*'repeat\(2, minmax\(0, 1fr\)\)'/, 'files render in 2-column grid');
+  assert.match(galleryJs, /className:\s*"gallery-link-grid"[\s\S]*?gridTemplateColumns:\s*(?:isTabletOrMobile \? '1fr' : )?'repeat\(2, minmax\(0, 1fr\)\)'/, 'links render in responsive grid');
+  assert.match(galleryJs, /className:\s*"gallery-file-grid"[\s\S]*?gridTemplateColumns:\s*(?:isTabletOrMobile \? '1fr' : )?'repeat\(2, minmax\(0, 1fr\)\)'/, 'files render in responsive grid');
   assert.match(galleryJs, /fallbackTitle[\s\S]*?whiteSpace:\s*'normal'[\s\S]*?wordBreak:\s*'break-word'[\s\S]*?overflowWrap:\s*'anywhere'/, 'link fallbackTitle wraps without ellipsis');
   assert.doesNotMatch(galleryJs, /fallbackTitle && [\s\S]{0,150}textOverflow:\s*'ellipsis'/, 'link fallbackTitle has no ellipsis');
   assert.match(filesJs, /attachment\.name[\s\S]*?whiteSpace:\s*"normal"[\s\S]*?overflowWrap:\s*"anywhere"[\s\S]*?wordBreak:\s*"break-word"/, 'file name wraps without clipping');
   assert.match(galleryJs, /const alwaysShow = !!options\?\.alwaysShow;[\s\S]*?if \(pageCount <= 1 && !alwaysShow\) return null;/, 'renderGalleryPagination honors alwaysShow');
+});
+
+test('Hero weather D-day calculation and badge styling', async () => {
+  const [appUtilsJs, appShellJs, designCss] = await Promise.all([
+    readFile(new URL('../src/core/app-utils.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8')
+  ]);
+
+  // Verify formatDDayLabel logic
+  assert.match(appUtilsJs, /if \(diffDays === 0\) return 'D-Day';/, 'formatDDayLabel returns D-Day for today');
+  assert.match(appUtilsJs, /if \(diffDays < 0\) return `D\+\$\{Math\.abs\(diffDays\)\}`;/, 'formatDDayLabel returns D+N for past dates');
+  assert.match(appUtilsJs, /return `D-\$\{diffDays\}`;/, 'formatDDayLabel returns D-N for future dates');
+
+  // Verify weather row badge font size and white-space
+  assert.match(designCss, /\.v2-design \.bp-hero-weather-dday-badge\s*\{[\s\S]*?font-size:\s*\.6rem !important;/, 'dday badge uses .6rem font size');
+  assert.match(designCss, /\.v2-design \.bp-hero-weather-dday-badge\s*\{[\s\S]*?white-space:\s*nowrap !important;/, 'dday badge prevents wrapping');
+  assert.match(designCss, /\.v2-design \.bp-hero-weather-past-dday\s*\{[\s\S]*?animation:\s*none !important;/, 'past dday badge disables animation');
+
+  // Verify app shell differentiates past meetings
+  assert.match(appShellJs, /const isPast = day\.offset < 0;/, 'checks whether date is in the past');
+  assert.match(appShellJs, /isPast\s*\?\s*React\.createElement\('span', \{ className: 'bp-hero-weather-day bp-hero-weather-past-dday' \}, ddayText\)/, 'renders bp-hero-weather-past-dday for past meetings');
+});
+
+test('Mobile bottom nav floats over main content and allows content to scroll underneath', async () => {
+  const destLateCss = await readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8');
+
+  // Verify shell main has padding-bottom: 0 so it reaches the bottom
+  assert.match(destLateCss, /\.v2-design \.renewal-shell-main\.v2-destination:not\(\.v2-chat\)\s*\{[\s\S]*?padding-bottom:\s*0 !important;/, 'main shell padding-bottom is 0 for floating overlay nav');
+
+  // Verify inner scroll containers keep clearance
+  assert.match(destLateCss, /\.v2-design \.gallery-page-scroll,[\s\S]*?padding-bottom:\s*calc\(var\(--mobile-bottom-nav-total, 58px\) \+ 24px\) !important;/, 'inner containers maintain bottom nav clearance');
+});
+
+test('Chat and memo file attachments collection and gallery photo filtering', async () => {
+  const [chatFilesJs, galleryJs, galleryDataJs] = await Promise.all([
+    readFile(new URL('../src/core/chat-file-attachments.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/core/gallery-data.js', import.meta.url), 'utf8')
+  ]);
+
+  // File collection from memos
+  assert.match(chatFilesJs, /export function collectChatFileAttachmentsFromMessages\(messages,\s*memos = \[\]\)/, 'collects from both messages and memos');
+  assert.match(chatFilesJs, /\(Array\.isArray\(memos\) \? memos : \[\]\)\.forEach\(memo => \{/, 'scans memos for file attachments');
+  assert.match(galleryJs, /import \{ collectChatFileAttachmentsFromMessages \} from '\.\.\/core\/chat-file-attachments\.js';/, 'ui-chat-gallery imports collectChatFileAttachmentsFromMessages');
+
+  // Photo filtering excludes links and external service urls
+  assert.match(galleryJs, /photo\.source !== 'link' && !isExternalServiceUrl\(photo\.full \|\| photo\.url \|\| photo\.thumb\)/, 'sharedPhotos filters out link sources and external urls');
+  assert.match(galleryDataJs, /const hasPhotos = Boolean\(memo\.imageUrl \|\| \(Array\.isArray\(memo\.imageUrls\) && memo\.imageUrls\.length > 0\)/, 'composeGalleryPhotos skips memos without uploaded photos');
 });
 
 

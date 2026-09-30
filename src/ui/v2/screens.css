@@ -564,6 +564,23 @@
   visibility: visible !important;
 }
 
+/* Responsive links and files layout: 1-col on mobile & tablet (<=1024px), 2-col on PC (>1024px) */
+.v2-design .gallery-link-grid,
+.v2-design .gallery-file-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+@media (min-width: 1025px) {
+  .v2-design .gallery-link-grid,
+  .v2-design .gallery-file-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+}
+
 
 /* --------------------------------------------------------------------------
  * Structural rebuild: contain legacy fixed page shells inside the V2 main pane
