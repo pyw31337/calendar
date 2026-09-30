@@ -300,7 +300,9 @@ self.addEventListener('push', event => {
     icon: iconUrl,
     badge: iconUrl,
     tag: payload.tag || 'gather-push',
-    renotify: true,
+    // Same tag replaces the previous card. A caller must opt in to buzz again;
+    // memo/chat retries send renotify:false so a duplicate delivery stays one card.
+    renotify: payload.renotify !== false,
     data: payload.url || './',
     vibrate: [80, 40, 80]
   };
