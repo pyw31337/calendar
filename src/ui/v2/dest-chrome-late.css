@@ -1530,7 +1530,13 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child svg {
 /* Admin settings modal inner styling - remove double borders, purple V2 tabs, clean layout */
 html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container.admin-settings-modal {
   height: auto !important;
-  max-height: calc(100dvh - 8px) !important;
+  /* Same measured cap as other V2 sheets. A raw 100dvh - 8px beat the later
+     safety rule on specificity (:not(.bp-sheet-backdrop)) and let the header
+     sit under the iPhone status bar / ignore the keyboard visual viewport. */
+  max-height: min(
+    var(--gather-vv-modal-max, 860px),
+    calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap, 12px) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)))
+  ) !important;
 }
 html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) {
   background: var(--bg-card) !important;
@@ -1544,16 +1550,18 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-
   padding: 10px 8px !important;
   transition: color 0.15s ease, border-color 0.15s ease !important;
 }
-html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[style*="2563EB"],
-html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[style*="rgb(37, 99, 235)"] {
-  color: var(--v2-primary, #7C3AED) !important;
-  border-bottom: 2px solid var(--v2-primary, #7C3AED) !important;
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[aria-selected="true"] {
+  color: var(--brand, #7C2FE5) !important;
+  border-bottom: 2px solid var(--brand, #7C2FE5) !important;
 }
 html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body {
-  /* Cap the scroller at the viewport minus header/tabs/drag-handle so the sheet
-     grows with the form and only scrolls once it would overflow the browser. */
-  max-height: calc(100dvh - 120px) !important;
-  padding: 16px 16px 24px !important;
+  /* Cap the scroller at the visual viewport minus header/tabs so the sheet
+     grows with the form and only scrolls once it would overflow. Bottom padding
+     clears the iPhone home indicator; the sheet itself still paints to the edge. */
+  max-height: calc(
+    var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap, 12px) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)) - 120px
+  ) !important;
+  padding: 16px 16px max(24px, env(safe-area-inset-bottom, 0px)) !important;
 }
 html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div {
   padding: 0 !important;
@@ -3754,12 +3762,7 @@ html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
 }
 
 /* Calendar settings: no second inset and no card chrome on tab panels.
-   Sheet height follows the content up to the viewport (see admin max-height above). */
-@media (max-width: 767px) {
-  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container.admin-settings-modal {
-    max-height: calc(100dvh - 8px) !important;
-  }
-}
+   Sheet height follows the shared visual-viewport cap above, not 100dvh. */
 html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div > div {
   border: none !important;
   border-radius: 0 !important;

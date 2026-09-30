@@ -187,6 +187,7 @@ export function AdminModal({
     const PollModal = __comp.PollModal || __deps.PollModal;
   const PollSectionIcon = __comp.PollSectionIcon || __deps.PollSectionIcon;
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SettingsIcon = AdminSettingsIcon;
   const SmallXIcon = AdminSmallXIcon;
   const TrashIcon = AdminTrashIcon;
@@ -536,7 +537,7 @@ export function AdminModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container admin-settings-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'auto', maxHeight: 'calc(100dvh - 8px)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'auto', borderRadius: 'var(--radius-md)', overflow: 'hidden' }
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
@@ -553,59 +554,19 @@ export function AdminModal({
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
 
-    /* Tab Menu Bar */
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
-    },
-      /* Tab 1: General settings */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('settings'),
-        style: {
-          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'settings' ? '#2563EB' : 'var(--text-muted)',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'settings' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-        }
-      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
-      /* Tab 2: Poll management */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('polls'),
-        style: {
-          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'polls' ? '#2563EB' : 'var(--text-muted)',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'polls' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-        }
-      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(PollSectionIcon, null)), "투표"),
-      /* Tab 3: Log-based recovery */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('recovery'),
-        style: {
-          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'recovery' ? '#2563EB' : 'var(--text-muted)',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-        }
-      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구"),
-      /* Tab 3: Logs view list */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('logs'),
-        style: {
-          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'logs' ? '#2563EB' : 'var(--text-muted)',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'logs' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-        }
-      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(LogIcon, null)), "로그")
-    ),
+    /* Tab Menu Bar — shared underline tabs (purple label + underline), not the old V1 blue bar. */
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "캘린더 설정 탭",
+      variant: "flush",
+      value: activeTab,
+      onChange: setActiveTab,
+      options: [
+        { value: 'settings', label: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon", style: { marginRight: '6px' } }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반") },
+        { value: 'polls', label: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon", style: { marginRight: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null)), "투표") },
+        { value: 'recovery', label: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon", style: { marginRight: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구") },
+        { value: 'logs', label: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon", style: { marginRight: '6px' } }, /*#__PURE__*/React.createElement(LogIcon, null)), "로그") }
+      ]
+    }),
 
     /* Modal Scrollable Body -- one scroll container. Tab wrappers stay flush (no extra
        padding/card chrome) so the sheet can grow with the content up to the viewport. */
@@ -935,29 +896,22 @@ export function AdminModal({
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '12px' }
       },
-        /* Module Filter Chips Bar */
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }
-        },
-          [
-            { id: 'all', label: '전체' },
-            { id: 'schedule', label: '일정' },
-            { id: 'place', label: '장소' },
-            { id: 'expense', label: '정산' },
-            { id: 'poll', label: '투표' },
-            { id: 'memo', label: '메모' }
-          ].map(chip => /*#__PURE__*/React.createElement("button", {
-            key: chip.id,
-            type: "button",
-            onClick: () => setLogCategoryFilter(chip.id),
-            style: {
-              padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
-              border: logCategoryFilter === chip.id ? '1px solid var(--text-main)' : '1px solid var(--border-subtle)',
-              backgroundColor: logCategoryFilter === chip.id ? 'var(--text-main)' : 'var(--bg-card)',
-              color: logCategoryFilter === chip.id ? '#FFFFFF' : 'var(--text-muted)'
-            }
-          }, chip.label))
-        ),
+        /* Log category row: same underline-tab module as content subnav (purple label + underline). */
+        UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+          ariaLabel: "활동 로그 분류",
+          variant: "flush",
+          value: logCategoryFilter,
+          onChange: setLogCategoryFilter,
+          style: { margin: '0 -16px' },
+          options: [
+            { value: 'all', label: '전체' },
+            { value: 'schedule', label: '일정' },
+            { value: 'place', label: '장소' },
+            { value: 'expense', label: '정산' },
+            { value: 'poll', label: '투표' },
+            { value: 'memo', label: '메모' }
+          ]
+        }),
 
         /* Search Input Box */
         /*#__PURE__*/React.createElement("input", {

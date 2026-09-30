@@ -27,3 +27,13 @@ test('admin settings cannot bypass the shared mobile sheet safety cap', () => {
   assert.match(rule, /var\(--v2-pwa-safe-top/);
   assert.match(rule, /var\(--v2-pwa-safe-bottom/);
 });
+
+test('calendar settings sheet no longer bypasses the cap with a raw 100dvh height', () => {
+  assert.doesNotMatch(chromeCss, /calc\(100dvh - 8px\)/);
+  assert.match(chromeCss, /modal-container\.admin-settings-modal[\s\S]{0,500}var\(--gather-vv-modal-max/);
+  const admin = fs.readFileSync('src/ui/ui-admin-modals.js', 'utf8');
+  assert.match(admin, /ariaLabel: "활동 로그 분류"/);
+  assert.match(admin, /ariaLabel: "캘린더 설정 탭"/);
+  assert.doesNotMatch(admin, /backgroundColor: logCategoryFilter/);
+  assert.doesNotMatch(admin, /calc\(100dvh - 8px\)/);
+});
