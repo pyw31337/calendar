@@ -94,8 +94,21 @@ test('a keyboard-sized shrink still pins the shell and marks the keyboard', () =
 
 test('iOS input controls use a 16px-equivalent mobile token so Safari does not auto-zoom', () => {
   const css = fs.readFileSync('src/ui/v2/viewport-shell.css', 'utf8');
-  assert.match(css, /--v2-mobile-control-font-size:\s*1rem/);
+  assert.match(css, /--v2-mobile-control-font-size:\s*max\(16px, 1rem\)/);
   assert.match(css, /textarea,\s*html:has\(\.renewal-shell\.v2-design\) \.renewal-shell\.v2-design select[\s\S]*font-size:\s*var\(--v2-mobile-control-font-size\)\s*!important/);
+});
+
+test('touch devices floor every text control at 16px, including landscape and portaled sheets', () => {
+  const css = fs.readFileSync('src/ui/v2/viewport-shell.css', 'utf8');
+  assert.match(css, /@media \(hover: none\) and \(pointer: coarse\)/);
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\) :is\([\s\S]*\[contenteditable='true'\][\s\S]*font-size:\s*max\(16px, 1rem\)\s*!important/);
+  assert.match(css, /touch-action:\s*manipulation/);
+});
+
+test('a focused field is revealed by its scroll ancestor, not by scrolling the window', () => {
+  assert.match(source, /const revealFocusedControl = \(\) =>/);
+  assert.match(source, /node\.scrollTop \+= delta/);
+  assert.doesNotMatch(source, /scrollIntoView/);
 });
 
 test('the home scrollport uses overflow-x clip so the sticky hero survives in WebKit', () => {

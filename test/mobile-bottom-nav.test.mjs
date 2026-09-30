@@ -65,6 +65,7 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
   //    the chat composer is positioned with --mobile-bottom-nav-total and
   //    would slide under a still-visible bar.
   assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*flex\s*!important;\s*bottom:\s*var\(--app-vv-keyboard-inset,\s*0px\)\s*!important;\s*\}/);
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\] \.renewal-shell\.v2-design \{\s*--mobile-bottom-nav-total:\s*var\(--mobile-bottom-nav-height,\s*58px\);\s*\}/);
   assert.doesNotMatch(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\{\s*--mobile-bottom-nav-total:\s*0px\s*!important;\s*\}/);
   assert.doesNotMatch(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*none\s*!important;\s*\}/);
 

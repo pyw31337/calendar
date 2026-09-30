@@ -153,10 +153,50 @@
     raf = requestAnimationFrame(apply);
   };
 
+  const isTextControl = (el) => {
+    if (!el || el === document.body || el === document.documentElement) return false;
+    if (el.isContentEditable) return true;
+    const tag = String(el.tagName || '');
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag !== 'INPUT') return false;
+    const type = String(el.type || 'text').toLowerCase();
+    return !['checkbox', 'radio', 'range', 'color', 'file', 'hidden', 'button', 'submit', 'reset'].includes(type);
+  };
+
+  // iOS scrolls the layout viewport to reveal a focused field, which fights the
+  // pinned shell. Nudge only the nearest overflow ancestor, and skip fixed
+  // chrome (the field would not move, but the page behind it would).
+  const revealFocusedControl = () => {
+    const el = document.activeElement;
+    if (!isTextControl(el) || typeof el.getBoundingClientRect !== 'function' || typeof window.getComputedStyle !== 'function') return;
+    const vv = window.visualViewport;
+    const topLimit = Math.round(vv?.offsetTop || 0) + 8;
+    const bottomLimit = Math.round((vv?.offsetTop || 0) + (vv?.height || window.innerHeight || 0)) - 12;
+    const rect = el.getBoundingClientRect();
+    let delta = 0;
+    if (rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
+    else if (rect.top < topLimit) delta = rect.top - topLimit;
+    if (!delta) return;
+    let node = el.parentElement;
+    while (node && node !== document.body && node !== document.documentElement) {
+      const style = window.getComputedStyle(node);
+      if (style.position === 'fixed') return;
+      const canScroll = /(auto|scroll|overlay)/.test(`${style.overflowY} ${style.overflow}`)
+        && node.scrollHeight > node.clientHeight + 1;
+      if (canScroll) {
+        node.scrollTop += delta;
+        return;
+      }
+      node = node.parentElement;
+    }
+  };
+
   const onFocusIn = () => {
     onVp();
     setTimeout(onVp, 50);
+    setTimeout(revealFocusedControl, 50);
     setTimeout(onVp, 300);
+    setTimeout(revealFocusedControl, 320);
   };
 
   const onFocusOut = () => {

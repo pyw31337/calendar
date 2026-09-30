@@ -26,7 +26,7 @@ const adminSources = [adminDashboard, adminModals, adminRestore].join('\n');
 const failures = [];
 const requireText = (text, pattern, message) => { if (!pattern.test(text)) failures.push(message); };
 
-requireText(css, /@media \(max-width: 720px\)[\s\S]*font-size: 1rem !important/, 'mobile form controls must be at least 16px');
+requireText(css, /@media \(max-width: 720px\)[\s\S]*font-size: max\(16px, 1rem\) !important/, 'mobile form controls must be at least 16px');
 requireText(shared, /export function FormAddEditActionButtons/, 'shared add/edit action module missing');
 requireText(shared, /height: '44px'[\s\S]*minHeight: '44px'/, 'shared add/edit actions must use 44px targets');
 requireText(css, /\.btn-action[\s\S]{0,280}min-width:\s*44px/, 'action buttons must keep width >= height (min 1:1)');

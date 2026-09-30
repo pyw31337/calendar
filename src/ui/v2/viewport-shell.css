@@ -426,7 +426,7 @@ html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="di
  */
 @media (max-width: 1199px) {
   .renewal-shell.v2-design {
-    --v2-mobile-control-font-size: 1rem;
+    --v2-mobile-control-font-size: max(16px, 1rem);
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -435,5 +435,32 @@ html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="di
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design textarea,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design select {
     font-size: var(--v2-mobile-control-font-size) !important;
+  }
+}
+
+/* Touch devices keep zooming a focused control under 16px no matter how wide
+   the layout viewport is (iPhone landscape, iPad). A width query misses them,
+   and portaled sheets/lightbox fields sit outside .renewal-shell. The user's
+   type scale can also shrink 1rem below 16px, which Safari still zooms.
+   max(16px, 1rem) is the floor; larger type settings still grow the field.
+   Double-tap zoom is disabled so a stray tap cannot rescale the fixed shell.
+   Pinch zoom stays available. */
+@media (hover: none) and (pointer: coarse) {
+  html:has(.renewal-shell.v2-design) {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  html:has(.renewal-shell.v2-design) :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']),
+    textarea,
+    select,
+    [contenteditable='true']
+  ) {
+    font-size: max(16px, 1rem) !important;
+    scroll-margin-top: 12px;
+    scroll-margin-bottom: calc(12px + var(--mobile-bottom-nav-height, 0px));
   }
 }

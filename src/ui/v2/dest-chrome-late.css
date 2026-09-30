@@ -2982,6 +2982,15 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
   display: flex !important;
   bottom: var(--app-vv-keyboard-inset, 0px) !important;
 }
+/* The home indicator is covered by the keyboard, but env(safe-area-inset-bottom)
+   does not drop to 0. Leaving it in the bar painted a blank band between the
+   tabs and the keyboard and pushed the composer up by the same amount. */
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .renewal-shell.v2-design {
+  --mobile-bottom-nav-total: var(--mobile-bottom-nav-height, 58px);
+}
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
+  padding-bottom: 0 !important;
+}
 
 .v2-design .bp-mobile-bottom-nav-item {
   position: relative !important;

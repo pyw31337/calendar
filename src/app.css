@@ -1806,7 +1806,28 @@ button, input, textarea, select {
   textarea,
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
   select {
-    font-size: 1rem !important;
+    font-size: max(16px, 1rem) !important;
+  }
+}
+/* iPhone landscape and iPad are wider than 720px. Safari still zooms any
+   focused control whose computed size is under 16px, and an 80% type scale
+   makes 1rem itself smaller than that. */
+@media (hover: none) and (pointer: coarse) {
+  input.form-input,
+  textarea.form-input,
+  select.form-select,
+  button.form-select,
+  .form-input,
+  .form-select,
+  .inline-search-input,
+  .places-list-search-input,
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+  select {
+    font-size: max(16px, 1rem) !important;
   }
 }
 html {
