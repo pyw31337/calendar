@@ -4433,7 +4433,10 @@ html:has(.renewal-shell.v2-design) .weather-detail-days-strip {
   overflow-x: auto;
   overflow-y: hidden;
   border: 0;
-  border-radius: 0;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-radius: 0 !important;
   border-bottom: 1px solid var(--v2-line, #f0eef5);
   background: transparent;
   box-shadow: none;
@@ -4480,7 +4483,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-day-choice:focus-visible {
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice.is-selected {
-  color: #fff;
+  color: var(--on-brand);
   border: 0;
   background: var(--v2-primary, #7c2fe5);
   box-shadow: 0 6px 14px rgba(124, 47, 229, 0.28);
@@ -4651,7 +4654,7 @@ html:has(.renewal-shell.v2-design) .weather-sun {
   border-radius: 50%;
   background: radial-gradient(circle at 34% 32%, #fff7c2 0%, #ffe14a 38%, #ff9f1c 78%);
   box-shadow: 0 0 0 14px rgba(255, 226, 92, 0.28), 0 0 36px 8px rgba(255, 186, 40, 0.7);
-  animation: weather-sun-glow 3.2s ease-in-out infinite;
+  animation: bp-weather-sun-glow 3.2s ease-in-out infinite;
 }
 @media (max-width: 420px) {
   html:has(.renewal-shell.v2-design) .weather-scene { flex-basis: 132px; width: 132px; height: 124px; }
@@ -4664,7 +4667,7 @@ html:has(.renewal-shell.v2-design) .weather-sun-rays {
   background: repeating-conic-gradient(from 0deg, transparent 0 12deg, rgba(255, 236, 150, 0.55) 12deg 18deg);
   -webkit-mask: radial-gradient(circle, transparent 54%, #000 58%, #000 70%, transparent 74%);
   mask: radial-gradient(circle, transparent 54%, #000 58%, #000 70%, transparent 74%);
-  animation: weather-spin 16s linear infinite;
+  animation: bp-weather-spin 16s linear infinite;
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="cloudy"] .weather-sun {
   top: 10px;
@@ -4681,7 +4684,7 @@ html:has(.renewal-shell.v2-design) .weather-moon {
   border-radius: 50%;
   background: #ffe38a;
   box-shadow: 14px -8px 0 -6px #5b46c9, 0 0 24px rgba(255, 227, 138, 0.7);
-  animation: weather-moon-glow 3.8s ease-in-out infinite;
+  animation: bp-weather-moon-glow 3.8s ease-in-out infinite;
 }
 html:has(.renewal-shell.v2-design) .weather-cloud {
   position: absolute;
@@ -4690,9 +4693,9 @@ html:has(.renewal-shell.v2-design) .weather-cloud {
   width: 96px;
   height: 34px;
   border-radius: 40px;
-  background: #fff;
+  background: rgb(255, 255, 255);
   filter: drop-shadow(0 10px 10px rgba(15, 23, 42, 0.18));
-  animation: weather-cloud-drift 5.6s ease-in-out infinite;
+  animation: bp-weather-cloud-drift 5.6s ease-in-out infinite;
 }
 html:has(.renewal-shell.v2-design) .weather-cloud::before,
 html:has(.renewal-shell.v2-design) .weather-cloud::after {
@@ -4725,7 +4728,7 @@ html:has(.renewal-shell.v2-design) .weather-mist {
   border-radius: 40px;
   background: rgba(255, 255, 255, 0.45);
   filter: blur(8px);
-  animation: weather-cloud-drift 8s ease-in-out infinite;
+  animation: bp-weather-cloud-drift 8s ease-in-out infinite;
 }
 html:has(.renewal-shell.v2-design) .weather-rain,
 html:has(.renewal-shell.v2-design) .weather-snow,
@@ -4747,7 +4750,7 @@ html:has(.renewal-shell.v2-design) .weather-drop {
   border-radius: 4px;
   background: linear-gradient(#fff, rgba(255, 255, 255, 0.15));
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.65);
-  animation: weather-rain-fall 0.85s linear infinite;
+  animation: bp-weather-rain-fall 0.85s linear infinite;
   animation-delay: calc(var(--i) * -0.12s);
 }
 html:has(.renewal-shell.v2-design) .weather-flake {
@@ -4756,16 +4759,16 @@ html:has(.renewal-shell.v2-design) .weather-flake {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #fff;
-  animation: weather-snow-fall 2.8s linear infinite;
+  background: rgb(255, 255, 255);
+  animation: bp-weather-snow-fall 2.8s linear infinite;
   animation-delay: calc(var(--i) * -0.35s);
 }
 html:has(.renewal-shell.v2-design) .weather-star {
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: #fff;
-  animation: weather-twinkle 2.4s ease-in-out infinite;
+  background: rgb(255, 255, 255);
+  animation: bp-weather-twinkle 2.4s ease-in-out infinite;
   animation-delay: calc(var(--i) * -0.3s);
 }
 html:has(.renewal-shell.v2-design) .weather-star:nth-child(1) { top: 14px; left: 18px; }
@@ -4785,36 +4788,36 @@ html:has(.renewal-shell.v2-design) .weather-bolt {
   background: #ffe14a;
   clip-path: polygon(58% 0, 0 58%, 40% 58%, 16% 100%, 100% 36%, 54% 36%);
   filter: drop-shadow(0 0 10px rgba(255, 225, 74, 0.9));
-  animation: weather-flash 2.7s ease-in-out infinite;
+  animation: bp-weather-flash 2.7s ease-in-out infinite;
 }
-@keyframes weather-sun-glow {
+@keyframes bp-weather-sun-glow {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.06); }
 }
-@keyframes weather-spin { to { transform: rotate(360deg); } }
-@keyframes weather-cloud-drift {
+@keyframes bp-weather-spin { to { transform: rotate(360deg); } }
+@keyframes bp-weather-cloud-drift {
   0%, 100% { translate: 0 0; }
   50% { translate: -8px 2px; }
 }
-@keyframes weather-rain-fall {
+@keyframes bp-weather-rain-fall {
   0% { transform: translateY(-8px); opacity: 0; }
   18% { opacity: 1; }
   100% { transform: translateY(96px); opacity: 0; }
 }
-@keyframes weather-snow-fall {
+@keyframes bp-weather-snow-fall {
   0% { transform: translate3d(0, -8px, 0); opacity: 0; }
   20% { opacity: 1; }
   100% { transform: translate3d(10px, 70px, 0); opacity: 0; }
 }
-@keyframes weather-twinkle {
+@keyframes bp-weather-twinkle {
   0%, 100% { opacity: 0.25; transform: scale(0.7); }
   50% { opacity: 1; transform: scale(1.3); }
 }
-@keyframes weather-moon-glow {
+@keyframes bp-weather-moon-glow {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.15); }
 }
-@keyframes weather-flash {
+@keyframes bp-weather-flash {
   0%, 70%, 100% { opacity: 1; }
   74% { opacity: 0.15; }
   78% { opacity: 1; }
@@ -5027,7 +5030,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice
   color: var(--v2-ink-2, #c4bdd4);
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice.is-selected {
-  color: #fff;
+  color: var(--on-brand, #111);
   background: var(--v2-primary, #7c2fe5);
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-metric,
@@ -6712,7 +6715,7 @@ html:has(.renewal-shell.v2-design) .v2-memo .bp-search-row {
 }
 /* Memo used to portal a viewport-fixed search bar. It covered the side nav and
    shoved the page down as soon as a query was typed. Keep search inside the header. */
-body > .inline-search-bar {
+body:has(.renewal-shell.v2-design) > .inline-search-bar {
   display: none !important;
 }
 html:has(.renewal-shell.v2-design) .v2-memo .inline-search-bar,
@@ -6890,7 +6893,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-input {
 html:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):not(:disabled) {
   transition: scale 130ms var(--motion-ease-out), translate 180ms var(--motion-ease-soft), background-color 160ms var(--motion-ease-soft), border-color 160ms var(--motion-ease-soft), color 160ms var(--motion-ease-soft), opacity 160ms var(--motion-ease-soft), box-shadow 160ms var(--motion-ease-soft);
 }
-html:not([data-bp-spring="1"]):has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):not(.bp-btn-gamified-confirm):not(:disabled):active {
+html:has(.renewal-shell.v2-design):not([data-bp-spring="1"]) :is(button, [role="button"], [role="tab"]):not(.bp-btn-gamified-confirm):not(:disabled):active {
   scale: 0.94 !important;
   transition-duration: 70ms;
   transition-timing-function: var(--motion-ease-in);
@@ -6965,10 +6968,10 @@ html:has(.renewal-shell.v2-design) .bp-motion-leave-host {
   pointer-events: none;
 }
 
-html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]) {
+html:has(.renewal-shell.v2-design)[data-bp-spring="1"] :is(button, [role="button"], [role="tab"]) {
   transition-property: translate, background-color, border-color, color, opacity, box-shadow;
 }
-html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(
+html:has(.renewal-shell.v2-design)[data-bp-spring="1"] :is(
   .bp-memo-grid,
   .bp-place-grid,
   .places-list-body,
@@ -6986,11 +6989,11 @@ html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(
   .admin-side-menu-list,
   .bp-motion-list
 ) > :not([data-bp-sprung]):not([data-bp-leave]):not(.bp-skel-list):not(.bp-skel-row):not(.bp-motion-leave-host),
-html[data-bp-spring="1"]:has(.renewal-shell.v2-design) .chat-messages-scroll > [data-msg-row-id]:not([data-bp-sprung]):not([data-bp-leave]) {
+html:has(.renewal-shell.v2-design)[data-bp-spring="1"] .chat-messages-scroll > [data-msg-row-id]:not([data-bp-sprung]):not([data-bp-leave]) {
   opacity: 0;
   scale: 0.9;
 }
-html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(
+html:has(.renewal-shell.v2-design)[data-bp-spring="1"] :is(
   .bp-memo-grid,
   .bp-place-grid,
   .places-list-body,
@@ -7000,7 +7003,7 @@ html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(
   .memo-list-scroll,
   .bp-motion-list
 ) > *,
-html[data-bp-spring="1"]:has(.renewal-shell.v2-design) .bp-motion-leave {
+html:has(.renewal-shell.v2-design)[data-bp-spring="1"] .bp-motion-leave {
   animation: none !important;
 }
 
@@ -7051,7 +7054,7 @@ html:has(.renewal-shell.v2-design) .calendar-loading-overlay.bp-cal-skel {
   height: 100%;
   box-sizing: border-box;
   padding: 14px 12px 16px;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
