@@ -200,6 +200,7 @@ export function extractSettlementSlots(legacyTree) {
   return extractSlotsByClass(legacyTree, {
     body: 'settlement-page-body',
     tabs: 'settlement-page-tabs',
+    search: 'inline-search-bar',
     menu: 'admin-side-menu-overlay',
   });
 }

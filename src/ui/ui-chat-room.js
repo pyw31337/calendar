@@ -2565,7 +2565,10 @@ export function ChatRoomView({
       calendar,
       onBack,
       onMenu: () => setIsChatSideMenuOpen(true),
-      onSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
+      onSearch: () => {
+        setIsSearchOpen(open => !open);
+        setSearchQuery('');
+      },
       onOpenGallery,
       onOpenNotice: () => {
         if (pinnedNotices.length > 0) setNoticePanelMode('list');

@@ -1007,8 +1007,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       searchMatch = titleMatch || textMatch || tagsMatch;
     }
 
-    // Filter by Tag Clicked Matcher
-    const filterTagMatch = selectedTag ? (memo.tags || []).includes(selectedTag) : true;
+    // Filter by Tag Clicked Matcher. Stored tags keep a leading '#'; a tap may pass either form.
+    const normalizeMemoTag = (tag) => String(tag || '').replace(/^#+/, '').trim().toLowerCase();
+    const filterTagMatch = selectedTag
+      ? (memo.tags || []).some(tag => normalizeMemoTag(tag) === normalizeMemoTag(selectedTag))
+      : true;
 
     return searchMatch && filterTagMatch;
   });

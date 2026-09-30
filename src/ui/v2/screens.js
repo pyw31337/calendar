@@ -514,6 +514,8 @@ export function MemoScreen(p) {
   // into view instead of it sitting open by default on every page load.
   const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
   const toggleSearch = () => setIsSearchOpen(v => !v);
+  // A tag tap filters the list; keep the field open so the active tag is visible.
+  const searchShown = isSearchOpen || Boolean(p.selectedTag);
   // `memoFocus` or `memo` is written by deep links, share URLs, or V2 home card
   // before local tab handoff.
   const focusIdFromLocation = typeof window !== 'undefined'
@@ -599,7 +601,7 @@ export function MemoScreen(p) {
               onMenu: p.onMenu,
               extra: memoHeaderExtra,
             },
-            isSearchOpen && h(Search, {
+            searchShown && h(Search, {
               value: p.searchQuery || '',
               onChange: p.onSearch || (() => {}),
               placeholder: '메모 검색',
@@ -630,7 +632,7 @@ export function MemoScreen(p) {
             onMenu: p.onMenu,
             extra: memoHeaderExtra,
           },
-          isSearchOpen && h(Search, {
+          searchShown && h(Search, {
             value: p.searchQuery || '',
             onChange: p.onSearch || (() => {}),
             placeholder: '메모 검색',
@@ -661,7 +663,7 @@ export function MemoScreen(p) {
           onMenu: p.onMenu,
           extra: memoHeaderExtra,
         },
-        isSearchOpen && h(Search, {
+        searchShown && h(Search, {
           value: p.searchQuery,
           onChange: p.onSearch,
           placeholder: '메모 검색',
@@ -683,7 +685,7 @@ export function MemoScreen(p) {
             className: 'v2-memo-active-tag',
             onClick: () => p.onSelectTag && p.onSelectTag(''),
           },
-          `#${p.selectedTag} 해제`
+          `#${String(p.selectedTag).replace(/^#+/, '')} 해제`
         ),
         h(
           'div',
@@ -985,7 +987,7 @@ export function SettlementScreen(p) {
             onShare: p.onShare,
             onMenu: p.onMenu,
             extra: settlementHeaderExtra,
-          }, flushTabs),
+          }, slots.search || null, flushTabs),
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
         ),
@@ -1321,6 +1323,10 @@ export function ChatScreen(p) {
           if (React.isValidElement(node) && String(node.props?.className || '').includes('chat-composer')) return false;
           return true;
         });
+    const headerSearch = passthrough.filter(node =>
+      React.isValidElement(node) && String(node.props?.className || '').includes('inline-search-bar')
+    );
+    const restPassthrough = passthrough.filter(node => !headerSearch.includes(node));
     const rootKids = React.isValidElement(originalRoot)
       ? React.Children.toArray(originalRoot.props.children)
       : [];
@@ -1456,7 +1462,7 @@ export function ChatScreen(p) {
             overflow: 'hidden',
           },
         },
-        h(PageHeader, chatHeader),
+        h(PageHeader, chatHeader, ...headerSearch),
         slots.notice,
         h(
           'div',
@@ -1538,7 +1544,7 @@ export function ChatScreen(p) {
         onClick: revealComposer,
       }, h(DesignIcon, { name: 'keyboard', size: 18 })) : null,
       h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu }),
-      ...passthrough,
+      ...restPassthrough,
       overlays(slots, [
         'notice', 'body', 'composer', 'lightbox', 'resize', 'memes', 'reply', 'textarea',
         'photos', 'files', 'fileInput', 'participant', 'emoji', 'keyboard', 'attach', 'paste', 'send',
