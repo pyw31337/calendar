@@ -424,7 +424,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.68rem !important;
+    font-size:0.75rem !important;
     font-weight: 800 !important;
   }
 
@@ -1148,7 +1148,7 @@
   }
   .v2-design .bp-bento-card:first-of-type.bp-wide { grid-column: 1 / -1; }
   .v2-design .bp-day-cell { min-height: 60px !important; padding: 3px 2px !important; }
-  .v2-design .bp-day-num { font-size: 0.74rem !important; }
+  .v2-design .bp-day-num { font-size:0.75rem !important; }
   .v2-design .bp-dot-row { gap: 3px !important; }
   .v2-design .bp-p-dot {
     width: 8px !important; height: 8px !important; border-radius: 50% !important;

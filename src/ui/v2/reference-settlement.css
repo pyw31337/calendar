@@ -29,8 +29,8 @@
     .v2-settlement .bp-settlement-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(30,27,46,0.05); }
     .v2-settlement .bp-settlement-card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
     .v2-settlement .bp-settlement-card-title { font-weight: 800; font-size: 0.88rem; color: var(--text-main); }
-    .v2-settlement .bp-settlement-card-badge { font-size: 0.62rem; font-weight: 800; color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: var(--radius-full); }
-    .v2-settlement .bp-settlement-total-row { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 10px; }
+    .v2-settlement .bp-settlement-card-badge { font-size:0.75rem; font-weight: 800; color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: var(--radius-full); }
+    .v2-settlement .bp-settlement-total-row { font-size:0.75rem; color: var(--text-muted); margin-bottom: 10px; }
     .v2-settlement .bp-settlement-total-row b { color: var(--text-main); font-variant-numeric: tabular-nums; }
     .v2-settlement .bp-settlement-card-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--border-subtle); }
     .v2-settlement .bp-settlement-card-row:first-of-type { border-top: none; }
@@ -42,11 +42,11 @@
     .v2-settlement .bp-settlement-card-row .bp-amt.bp-is-owe { color: #DC2626; }
     .v2-settlement .bp-settlement-share-btn { width: 100%; margin-top: 12px; background: var(--brand-soft); color: var(--brand); font-weight: 800; font-size: 0.76rem; border: none; border-radius: var(--radius-full); padding: 10px; cursor: pointer; }
 
-    .v2-settlement .bp-expense-section-label { font-size: 0.66rem; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.04em; margin: 18px 0 8px; padding: 0 2px; }
+    .v2-settlement .bp-expense-section-label { font-size:0.75rem; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.04em; margin: 18px 0 8px; padding: 0 2px; }
     .v2-settlement .bp-expense-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 6px; }
     .v2-settlement .bp-expense-row .bp-cat-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
     .v2-settlement .bp-expense-row-label { font-weight: 700; font-size: 0.78rem; color: var(--text-main); flex: 1; min-width: 0; }
-    .v2-settlement .bp-expense-row-payer { font-size: 0.64rem; color: var(--text-light); }
+    .v2-settlement .bp-expense-row-payer { font-size:0.75rem; color: var(--text-light); }
     .v2-settlement .bp-expense-row-amount { font-weight: 800; font-size: 0.8rem; flex-shrink: 0; font-variant-numeric: tabular-nums; }
     .v2-settlement .bp-expense-row-amount.bp-is-expense { color: #DC2626; }
     .v2-settlement .bp-expense-row-amount.bp-is-income { color: var(--status-green); }

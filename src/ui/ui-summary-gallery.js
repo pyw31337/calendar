@@ -5225,7 +5225,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
                 border: 'none',
                 backgroundColor: 'rgba(0, 0, 0, 0.65)',
                 color: '#FFFFFF',
-                fontSize: '11px',
+                fontSize: '12px',
                 lineHeight: 1,
                 textAlign: 'center',
                 cursor: 'pointer',

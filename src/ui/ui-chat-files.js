@@ -109,7 +109,7 @@ function FileTypeBadge(props) {
       width: "48px", height: "48px", borderRadius: "10px",
       backgroundColor: "color-mix(in srgb, var(--primary) 12%, var(--bg-secondary))",
       color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.02em", flexShrink: 0,
+      fontSize: "0.75rem", fontWeight: 900, letterSpacing: "0.02em", flexShrink: 0,
       overflow: "hidden"
     },
     "aria-hidden": true

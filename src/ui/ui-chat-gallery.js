@@ -3002,7 +3002,7 @@ export function ChatGalleryModal({
                       borderRadius: '9999px',
                       background: analysisViewMode === 'unreviewed' ? 'var(--accent-primary)' : 'var(--border-subtle)',
                       color: analysisViewMode === 'unreviewed' ? '#fff' : 'var(--text-secondary)',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 800
                     }
                   }, unreviewed.length)
@@ -3033,7 +3033,7 @@ export function ChatGalleryModal({
                       borderRadius: '9999px',
                       background: analysisViewMode === 'reviewed' ? 'var(--accent-primary)' : 'var(--border-subtle)',
                       color: analysisViewMode === 'reviewed' ? '#fff' : 'var(--text-secondary)',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 800
                     }
                   }, reviewed.length)
@@ -3290,7 +3290,7 @@ export function ChatGalleryModal({
                       /*#__PURE__*/React.createElement('circle', { cx: '8.5', cy: '8.5', r: '1.5' }),
                       /*#__PURE__*/React.createElement('path', { d: 'm21 15-5-5L5 21' })
                     ),
-                    /*#__PURE__*/React.createElement('span', { style: { fontSize: '11px', fontWeight: 600 } }, '사진 로딩 중')
+                    /*#__PURE__*/React.createElement('span', { style: { fontSize: '12px', fontWeight: 600 } }, '사진 로딩 중')
                   ),
               fullUrl && /*#__PURE__*/React.createElement('div', {
                 style: {
@@ -3382,7 +3382,7 @@ export function ChatGalleryModal({
                       background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
                       color: 'var(--status-danger, #e11d48)',
                       border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 800
                     }
                   }, '날짜 누락'),
@@ -3395,7 +3395,7 @@ export function ChatGalleryModal({
                       background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
                       color: 'var(--status-danger, #e11d48)',
                       border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 800
                     }
                   }, '장소 누락'),
@@ -3408,7 +3408,7 @@ export function ChatGalleryModal({
                       background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
                       color: 'var(--status-danger, #e11d48)',
                       border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 800
                     }
                   }, '인물 누락'),
@@ -3421,7 +3421,7 @@ export function ChatGalleryModal({
                       background: 'color-mix(in srgb, var(--status-green, #10b981) 12%, transparent)',
                       color: 'var(--status-green, #10b981)',
                       border: '1px solid color-mix(in srgb, var(--status-green, #10b981) 25%, transparent)',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 800
                     }
                   }, '✓ 날짜·장소·인물 완비')
@@ -3586,7 +3586,7 @@ export function ChatGalleryModal({
                                 border: '1px dashed var(--accent-primary)',
                                 background: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
                                 color: 'var(--accent-primary)',
-                                fontSize: '11px',
+                                fontSize: '12px',
                                 fontWeight: 800,
                                 cursor: 'pointer'
                               }
@@ -3605,7 +3605,7 @@ export function ChatGalleryModal({
                                   border: '1px solid color-mix(in srgb, var(--status-green, #10b981) 30%, transparent)',
                                   background: 'color-mix(in srgb, var(--status-green, #10b981) 10%, transparent)',
                                   color: 'var(--status-green, #10b981)',
-                                  fontSize: '11px',
+                                  fontSize: '12px',
                                   fontWeight: 800,
                                   cursor: 'pointer'
                                 }
@@ -3625,7 +3625,7 @@ export function ChatGalleryModal({
                                   border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 30%, transparent)',
                                   background: 'color-mix(in srgb, var(--status-danger, #e11d48) 10%, transparent)',
                                   color: 'var(--status-danger, #e11d48)',
-                                  fontSize: '11px',
+                                  fontSize: '12px',
                                   fontWeight: 800,
                                   cursor: 'pointer'
                                 }
@@ -3642,7 +3642,7 @@ export function ChatGalleryModal({
                                 border: '1px solid var(--border-subtle)',
                                 background: 'var(--bg-card)',
                                 color: 'var(--text-secondary)',
-                                fontSize: '11px',
+                                fontSize: '12px',
                                 fontWeight: 700,
                                 cursor: 'pointer'
                               }

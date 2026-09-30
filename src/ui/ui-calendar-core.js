@@ -2078,7 +2078,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           borderRadius: 0,
           backgroundColor: 'transparent',
           color: 'var(--brand, #7C2FE5)',
-          fontSize: '0.62rem',
+          fontSize: '0.75rem',
           fontWeight: 700,
           lineHeight: 1.2,
           cursor: 'pointer',
@@ -2175,7 +2175,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         marginTop: '8px',
         paddingTop: 0,
         color: 'var(--v2-ink-3, #9793a3)',
-        fontSize: '0.62rem',
+        fontSize: '0.75rem',
         fontWeight: 500,
         width: '100%',
         boxSizing: 'border-box'
@@ -2187,7 +2187,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           marginRight: 'auto',
           color: 'var(--v2-ink-3, #9793a3)',
           fontWeight: 500,
-          fontSize: '0.62rem',
+          fontSize: '0.75rem',
           lineHeight: 1.2
         }
       }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
@@ -2211,7 +2211,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           alignItems: 'center',
           gap: '3px',
           color: 'var(--brand, #7C2FE5)',
-          fontSize: '0.68rem',
+          fontSize: '0.75rem',
           fontWeight: 700,
           cursor: 'pointer'
         }

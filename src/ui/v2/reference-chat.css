@@ -21,28 +21,28 @@
     }
     .v2-chat .bp-back-btn { background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
     .v2-chat .bp-header-title { font-weight: 800; font-size: 0.96rem; color: var(--text-main); }
-    .v2-chat .bp-header-sub { font-size: 0.64rem; color: var(--text-light); font-weight: 700; }
+    .v2-chat .bp-header-sub { font-size:0.75rem; color: var(--text-light); font-weight: 700; }
     .v2-chat .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
     .v2-chat .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
     .v2-chat .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
     .v2-chat .bp-date-divider { text-align: center; padding: 14px 0 10px; }
-    .v2-chat .bp-date-divider span { display: inline-block; background: var(--bg-primary); color: var(--text-light); font-size: 0.66rem; font-weight: 700; padding: 4px 12px; border-radius: var(--radius-full); }
+    .v2-chat .bp-date-divider span { display: inline-block; background: var(--bg-primary); color: var(--text-light); font-size:0.75rem; font-weight: 700; padding: 4px 12px; border-radius: var(--radius-full); }
 
     .v2-chat .bp-chat-list { padding: 4px 14px 90px; }
     .v2-chat .bp-chat-row { display: flex; gap: 6px; margin-bottom: 14px; align-items: flex-start; }
-    .v2-chat .bp-chat-name-pill { flex-shrink: 0; font-size: 0.62rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); height: fit-content; margin-top: 1px; }
+    .v2-chat .bp-chat-name-pill { flex-shrink: 0; font-size:0.75rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); height: fit-content; margin-top: 1px; }
     .v2-chat .bp-chat-body { min-width: 0; }
     .v2-chat .bp-chat-text { font-size: 0.8rem; color: var(--text-main); line-height: 1.45; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md); padding: 8px 11px; display: inline-block; max-width: 260px; }
     .v2-chat .bp-chat-meta-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
-    .v2-chat .bp-chat-meta { font-size: 0.62rem; color: var(--text-light); }
+    .v2-chat .bp-chat-meta { font-size:0.75rem; color: var(--text-light); }
     .v2-chat .bp-chat-img { margin-top: 4px; width: 130px; height: 174px; border-radius: var(--radius-md); background-size: cover; background-position: center; cursor: pointer; border: none; padding: 0; position: relative; }
-    .v2-chat .bp-comment-badge { position: absolute; top: 4px; right: 4px; background: rgba(20,15,35,0.62); color: #fff; font-size: 0.56rem; font-weight: 800; padding: 1px 6px; border-radius: var(--radius-full); }
+    .v2-chat .bp-comment-badge { position: absolute; top: 4px; right: 4px; background: rgba(20,15,35,0.62); color: #fff; font-size:0.75rem; font-weight: 800; padding: 1px 6px; border-radius: var(--radius-full); }
     .v2-chat .bp-chat-reply-quote {
       display: flex; flex-direction: column; gap: 1px; border-left: 2.5px solid var(--brand); background: var(--brand-soft);
       border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 4px 8px; margin-bottom: 4px; max-width: 240px;
     }
-    .v2-chat .bp-chat-reply-quote-author { font-size: 0.6rem; font-weight: 800; color: var(--brand); }
-    .v2-chat .bp-chat-reply-quote-text { font-size: 0.66rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .v2-chat .bp-chat-reply-quote-author { font-size:0.75rem; font-weight: 800; color: var(--brand); }
+    .v2-chat .bp-chat-reply-quote-text { font-size:0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .v2-chat .bp-gallery-comment-heartbeat { animation: bp-gallery-comment-heartbeat 2.8s ease-in-out infinite; }
     .v2-chat .bp-gallery-comment-heartbeat::before, .v2-chat .bp-gallery-comment-heartbeat::after {
       content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
@@ -64,7 +64,7 @@
     .v2-chat .bp-composer-input[data-field-lines="multi"] { border-radius: var(--field-radius-multiline, 14px); }
     .v2-chat .bp-composer-send { background: var(--brand); color: var(--on-brand, white); border: none; border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 
-    .v2-chat .bp-side-nav-caption { padding: 10px 14px; font-size: 0.62rem; color: var(--text-light); text-align: center; }
+    .v2-chat .bp-side-nav-caption { padding: 10px 14px; font-size:0.75rem; color: var(--text-light); text-align: center; }
 
     @media (min-width: 768px) {
       .v2-chat .bp-app-shell { max-width: 640px; }
@@ -122,7 +122,7 @@
       border-radius: 0 !important;
       background: transparent !important;
       color: var(--brand, #7c2fe5) !important;
-      font-size: .62rem !important;
+      font-size:0.75rem !important;
       font-weight: 700 !important;
       line-height: 1.2 !important;
     }
@@ -150,7 +150,7 @@
       margin-top: 8px !important;
       padding-top: 0 !important;
       color: var(--v2-ink-3, #9793a3) !important;
-      font-size: .62rem !important;
+      font-size:0.75rem !important;
       font-weight: 500 !important;
       width: 100% !important;
       box-sizing: border-box !important;
@@ -159,7 +159,7 @@
       margin-right: auto !important;
       color: var(--v2-ink-3, #9793a3) !important;
       font-weight: 500 !important;
-      font-size: .62rem !important;
+      font-size:0.75rem !important;
       line-height: 1.2 !important;
     }
     .v2-chat .chat-memo-share-card .memo-card-comment-footer > .memo-card-comment-toggle {
@@ -171,7 +171,7 @@
       align-items: center !important;
       gap: 3px !important;
       color: var(--brand, #7c2fe5) !important;
-      font-size: .68rem !important;
+      font-size:0.75rem !important;
       font-weight: 700 !important;
       cursor: pointer !important;
     }
@@ -181,10 +181,10 @@
     .v2-chat .chat-memo-share-card .comment-composer .participant-picker-button {
       height: auto !important;
       padding: 6px 10px !important;
-      font-size: .7rem !important;
+      font-size:0.75rem !important;
     }
     .v2-chat .chat-memo-share-card .comment-composer-buttons button {
-      font-size: .7rem !important;
+      font-size:0.75rem !important;
     }
     .v2-chat .chat-memo-share-loading,
     .v2-chat .chat-memo-share-fallback {

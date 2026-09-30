@@ -1071,7 +1071,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         ),
         React.createElement('button', {
           className: bentoClass('ghost-btn cal-today-btn'),
-          style: { fontWeight: 700, fontSize: '0.72rem', padding: '6px 8px' },
+          style: { fontWeight: 700, fontSize: '0.75rem', padding: '6px 8px' },
           type: 'button',
           onClick: () => setMonthDate(new Date()),
         }, '오늘'),

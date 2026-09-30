@@ -336,7 +336,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   min-height: 28px !important;
   padding: 4px !important;
   box-sizing: border-box !important;
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   line-height: 1 !important;
 }
 @media (min-width: 768px) {
@@ -346,7 +346,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
     min-width: 32px !important;
     min-height: 32px !important;
     padding: 5px !important;
-    font-size: 0.74rem !important;
+    font-size:0.75rem !important;
   }
 }
 @media (min-width: 1200px) {
@@ -522,7 +522,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   border-radius: 999px;
   background: #2563EB;
   color: #fff;
-  font-size: 0.7rem;
+  font-size:0.75rem;
   font-weight: 800;
   line-height: 18px;
   box-sizing: border-box;
@@ -1149,7 +1149,7 @@ html:has(.renewal-shell.v2-design) :is(
   border-radius: 6px !important;
   background: #0F172A !important;
   color: #FFFFFF !important;
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   font-weight: 700 !important;
   line-height: 1.2 !important;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22) !important;
@@ -1319,7 +1319,7 @@ html:has(.renewal-shell.v2-design) :is(
   margin-left: 2px !important;
   background: transparent !important;
   color: inherit !important;
-  font-size: 0.72rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   line-height: 1 !important;
   opacity: 0.88;
@@ -3138,7 +3138,7 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
 }
 
 .v2-design .bp-mobile-bottom-nav-label {
-  font-size: 11px !important;
+  font-size:12px !important;
   line-height: 1.2 !important;
   font-weight: 500 !important;
   letter-spacing: -0.2px !important;
@@ -5063,7 +5063,7 @@ html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-lab
   html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
     display: block !important;
     color: inherit !important;
-    font-size: 0.62rem !important;
+    font-size:0.75rem !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     white-space: nowrap !important;
@@ -5200,7 +5200,7 @@ html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
   html:has(.renewal-shell.v2-design) .bp-ann-range.bp-has-label .bp-day-anniversary-label {
     display: block !important;
     color: inherit !important;
-    font-size: 0.62rem !important;
+    font-size:0.75rem !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     white-space: nowrap !important;
@@ -5251,7 +5251,7 @@ html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
     max-width: 100% !important;
     padding: 0 !important;
     color: inherit !important;
-    font-size: 0.62rem !important;
+    font-size:0.75rem !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     text-align: center !important;
@@ -6294,6 +6294,9 @@ html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-share-btn {
 html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .v2-memo-card-title {
   padding-right: 58px !important;
   margin-bottom: 18px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-renewal-home-place-note {
+  font-size: 0.8rem !important;
 }
 
 /* In-page search sits in the header (or directly under it) and must stay visible.

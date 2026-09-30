@@ -1068,7 +1068,7 @@ export function AnniversaryModal({
                   "aria-label": "사진 삭제",
                   style: {
                     position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%',
-                    border: 'none', backgroundColor: 'rgba(0,0,0,0.65)', color: '#FFFFFF', fontSize: '11px',
+                    border: 'none', backgroundColor: 'rgba(0,0,0,0.65)', color: '#FFFFFF', fontSize: '12px',
                     lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }
@@ -3067,7 +3067,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 payerBadge && React.createElement('span', {
                   title: `${payerBadge.name} 결제`,
                   'aria-label': `${payerBadge.name} 결제`,
-                  style: { width: '18px', height: '18px', minWidth: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: payerBadge.color, color: '#FFFFFF', fontSize: '10px', fontWeight: 800, lineHeight: 1 }
+                  style: { width: '18px', height: '18px', minWidth: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: payerBadge.color, color: '#FFFFFF', fontSize: '12px', fontWeight: 800, lineHeight: 1 }
                 }, payerBadge.initial),
                 React.createElement('span', null, item.label || '정산 항목')
               ),

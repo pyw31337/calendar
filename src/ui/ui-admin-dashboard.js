@@ -3277,7 +3277,7 @@ export function AdminDashboard({ initialCalendars }) {
           style: {
             margin: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)',
             background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)',
-            fontSize: '11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+            fontSize: '12px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
           }
         }, JSON.stringify(photoIndexReport, null, 2))
       ),
@@ -3300,7 +3300,7 @@ export function AdminDashboard({ initialCalendars }) {
           "깨진 Storage 참조, stale owner, 태그 차이, 레거시 댓글을 원본 스냅샷과 함께 검토 큐에 기록합니다. 적용은 삭제가 아니라 assets/assetEdges 이중 기록과 확인 가능한 댓글 복사만 수행합니다. 원본이 사라진 사진은 복원·재업로드·숨김으로만 처리합니다."
         ),
         integrityReport && /*#__PURE__*/React.createElement("pre", {
-          style: { margin: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
+          style: { margin: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '12px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
         }, JSON.stringify(integrityReport, null, 2))
       ),
 

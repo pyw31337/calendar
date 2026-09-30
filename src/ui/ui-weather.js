@@ -1691,7 +1691,7 @@ export function WeatherDetailModal({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
-                fontSize: '0.74rem',
+                fontSize: '0.75rem',
                 fontWeight: 600,
                 color: 'rgba(255, 255, 255, 0.85)',
                 textShadow: '0 1px 3px rgba(0,0,0,0.15)'
@@ -1759,7 +1759,7 @@ export function WeatherDetailModal({
                     backgroundColor: `${airQuality.grade10.color}15`,
                     padding: '1px 6px',
                     borderRadius: '4px',
-                    fontSize: '0.72rem'
+                    fontSize: '0.75rem'
                   }
                 }, airQuality.grade10.text)
               ),
@@ -1774,7 +1774,7 @@ export function WeatherDetailModal({
                     backgroundColor: `${airQuality.grade25.color}15`,
                     padding: '1px 6px',
                     borderRadius: '4px',
-                    fontSize: '0.72rem'
+                    fontSize: '0.75rem'
                   }
                 }, airQuality.grade25.text)
               )
@@ -1848,7 +1848,7 @@ export function WeatherDetailModal({
                 onClick: () => setHourlyTab(tab.key),
                 style: {
                   padding: '4px 10px',
-                  fontSize: '0.72rem',
+                  fontSize: '0.75rem',
                   fontWeight: hourlyTab === tab.key ? 800 : 600,
                   color: hourlyTab === tab.key ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)',
                   borderRadius: '999px',
@@ -1974,7 +1974,7 @@ export function WeatherDetailModal({
                         /* Hour label */
                         /*#__PURE__*/React.createElement("span", {
                           style: {
-                            fontSize: '0.72rem',
+                            fontSize: '0.75rem',
                             fontWeight: isNow ? 800 : 500,
                             color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
                           }
@@ -2011,7 +2011,7 @@ export function WeatherDetailModal({
                     },
                       /* Percentage */
                       /*#__PURE__*/React.createElement("span", {
-                        style: { fontSize: '0.74rem', fontWeight: 750, color: prob > 0 ? '#3B82F6' : 'var(--text-muted)' }
+                        style: { fontSize: '0.75rem', fontWeight: 750, color: prob > 0 ? '#3B82F6' : 'var(--text-muted)' }
                       }, `${prob}%`),
                       /* Bar area */
                       /*#__PURE__*/React.createElement("div", {
@@ -2033,7 +2033,7 @@ export function WeatherDetailModal({
                       /* Hour label */
                       /*#__PURE__*/React.createElement("span", {
                         style: {
-                          fontSize: '0.72rem',
+                          fontSize: '0.75rem',
                           fontWeight: isNow ? 800 : 500,
                           color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
                         }
@@ -2069,7 +2069,7 @@ export function WeatherDetailModal({
                     },
                       /* Speed text */
                       /*#__PURE__*/React.createElement("span", {
-                        style: { fontSize: '0.72rem', fontWeight: 750, color: 'var(--v2-primary, #7C2FE5)' }
+                        style: { fontSize: '0.75rem', fontWeight: 750, color: 'var(--v2-primary, #7C2FE5)' }
                       }, `${speed}m/s`),
                       /* Bar area */
                       /*#__PURE__*/React.createElement("div", {
@@ -2092,7 +2092,7 @@ export function WeatherDetailModal({
                       /* Hour label */
                       /*#__PURE__*/React.createElement("span", {
                         style: {
-                          fontSize: '0.72rem',
+                          fontSize: '0.75rem',
                           fontWeight: isNow ? 800 : 500,
                           color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
                         }
@@ -2128,7 +2128,7 @@ export function WeatherDetailModal({
                   },
                     /* Humidity text */
                     /*#__PURE__*/React.createElement("span", {
-                      style: { fontSize: '0.74rem', fontWeight: 750, color: '#06B6D4' }
+                      style: { fontSize: '0.75rem', fontWeight: 750, color: '#06B6D4' }
                     }, `${hum}%`),
                     /* Bar area */
                     /*#__PURE__*/React.createElement("div", {
@@ -2151,7 +2151,7 @@ export function WeatherDetailModal({
                     /* Hour label */
                     /*#__PURE__*/React.createElement("span", {
                       style: {
-                        fontSize: '0.72rem',
+                        fontSize: '0.75rem',
                         fontWeight: isNow ? 800 : 500,
                         color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
                       }
