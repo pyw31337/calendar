@@ -2,7 +2,7 @@
  * Chat / gallery modal (P4-13)
  */
 
-import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
+import { composeGalleryPhotos, getPaginationWindow, isGalleryWebLinkPhoto, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
@@ -12,6 +12,7 @@ import { ClipboardPasteIcon } from './ui-icons.js';
 import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
 import { isExternalServiceUrl } from '../core/memo-share-link.js';
 import { collectChatFileAttachmentsFromMessages } from '../core/chat-file-attachments.js';
+import { requestGalleryChatCorpus } from '../core/gallery-archive-state.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1104,7 +1105,7 @@ export function ChatGalleryModal({
         // Meme keyboard stickers
         .filter(photo => !isMemeKeyboardPhotoEntry(photo))
         // Photos tab must only contain real photos, not link URLs
-        .filter(photo => !photo.directMediaUrl && photo.source !== 'link' && !isExternalServiceUrl(photo.full || photo.url || photo.thumb))
+        .filter(photo => !isGalleryWebLinkPhoto(photo))
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)
@@ -1312,8 +1313,7 @@ export function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
   const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
-    if (photo.directMediaUrl || photo.source === 'link') return false;
-    if (isExternalServiceUrl(photo.full || photo.url || photo.thumb)) return false;
+    if (isGalleryWebLinkPhoto(photo)) return false;
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
@@ -1404,6 +1404,13 @@ export function ChatGalleryModal({
       onLoadMoreMemos();
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, onLoadOlderChat, onLoadMoreMemos]);
+
+  // Files and links are not photoIndex rows. Gallery uploads use uploadSource=gallery, so they
+  // never enter the live chat window. Ask for the search-index corpus only on these tabs.
+  React.useEffect(() => {
+    if (activeTab !== 'files' && activeTab !== 'links') return;
+    requestGalleryChatCorpus();
+  }, [activeTab]);
 
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());

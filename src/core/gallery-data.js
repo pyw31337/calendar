@@ -6,6 +6,35 @@
 // time. photo-asset.js is pure and is the shared asset:v1 identity.
 
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { isExternalServiceUrl } from './memo-share-link.js';
+
+// Firebase Storage (and inline image bytes) are gallery photos. isExternalServiceUrl is true
+// for every non-app host, so it must not be used alone to drop photoIndex rows.
+export function isStoredGalleryMediaUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  if (/^data:image\//i.test(text) || /^blob:/i.test(text)) return true;
+  try {
+    const url = new URL(text);
+    const host = url.hostname.toLowerCase();
+    if (host === 'firebasestorage.googleapis.com' || host.endsWith('.firebasestorage.app')) return true;
+    if (host === 'storage.googleapis.com') return true;
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+// True when this row is a shared webpage, not a stored photo. Storage URLs stay in 사진.
+export function isGalleryWebLinkPhoto(photo) {
+  if (!photo) return true;
+  if (photo.directMediaUrl || photo.source === 'link') return true;
+  const mediaUrl = String(photo.full || photo.url || photo.thumb || '').trim();
+  if (!mediaUrl) return false;
+  if (isStoredGalleryMediaUrl(mediaUrl)) return false;
+  return isExternalServiceUrl(mediaUrl);
+}
+
 
 export function coerceGalleryImageIndex(value) {
   if (Number.isInteger(value)) return value;
