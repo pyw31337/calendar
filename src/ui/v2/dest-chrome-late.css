@@ -4972,7 +4972,9 @@ html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack {
   flex-direction: column !important;
   align-items: stretch !important;
   gap: var(--ann-bar-gap) !important;
-  margin-top: auto !important;
+  /* Sit under the day number. auto pinned the band to the bottom of the
+     84px cell floor and left a large hole under the date. */
+  margin-top: 2px !important;
   margin-bottom: 0 !important;
 }
 html:has(.renewal-shell.v2-design) .bp-day-bar-stack .festival-bar-spacer {
@@ -5090,7 +5092,7 @@ html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-lab
   html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
     display: block !important;
     color: inherit !important;
-    font-size:0.75rem !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     white-space: nowrap !important;
@@ -5227,7 +5229,7 @@ html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
   html:has(.renewal-shell.v2-design) .bp-ann-range.bp-has-label .bp-day-anniversary-label {
     display: block !important;
     color: inherit !important;
-    font-size:0.75rem !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     white-space: nowrap !important;
@@ -5278,7 +5280,7 @@ html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
     max-width: 100% !important;
     padding: 0 !important;
     color: inherit !important;
-    font-size:0.75rem !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     line-height: 1 !important;
     text-align: center !important;
@@ -5328,6 +5330,27 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary.bp-cat-other {
   --ann-ink: #D1D5DB;
+}
+
+/* Calendar cell pills are the 11px exception to the 12px badge floor
+   (--v2-badge-fs / --v2-fs-2xs stay 12px for every other control).
+   Anniversary titles and the purple 모임확정 pill share that size.
+   The 84px day-cell floor is cleared here so those pills sit just under
+   the date instead of floating at the bottom of an empty cell. Multi-day
+   bars keep their lane padding and the left/right span. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-meeting-pill,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-bar-label,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary > .bp-day-anniversary-label,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-has-label > .bp-day-anniversary-label {
+  font-size: 11px !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell {
+  min-height: 0 !important;
+  gap: 2px !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-bar-stack {
+  margin-top: 2px !important;
+  gap: 2px !important;
 }
 
 html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child {
