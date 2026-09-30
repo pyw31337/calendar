@@ -2330,7 +2330,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       alignItems: 'center',
       justifyContent: 'center',
       width: '100%',
-      maxWidth: '100vw',
+      maxWidth: '100%',
       height: isDesktop ? (isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto') : `${mobileStageHeightPx}px`,
       maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`,
       touchAction: 'none',

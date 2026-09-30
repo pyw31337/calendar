@@ -11,8 +11,9 @@ test('lightbox single stage is full-width flex container and does not collapse t
   assert.doesNotMatch(lightboxJs, /className:\s*"lightbox-single-stage"[\s\S]{0,150}display:\s*'inline-flex'/);
   assert.doesNotMatch(lightboxJs, /width:\s*isLandscape\s*\?\s*'100vw'\s*:\s*'auto'/);
 
-  // Verify single-stage uses 100% width
-  assert.match(lightboxJs, /width:\s*'100%',\s*maxWidth:\s*'100vw'/);
+  // Single stage matches the CSS contract (100% of the measured overlay), not 100vw.
+  assert.match(lightboxJs, /className:\s*"lightbox-single-stage"[\s\S]*?width:\s*'100%',\s*maxWidth:\s*'100%'/);
+  assert.doesNotMatch(lightboxJs, /maxWidth:\s*'100vw'/);
 });
 
 test('stageWidthPx and mobileImageStageStyle use full viewport width to prevent initial right-shift', () => {
@@ -22,8 +23,9 @@ test('stageWidthPx and mobileImageStageStyle use full viewport width to prevent 
   assert.match(lightboxJs, /const stageWidthPx = typeof window === 'undefined'\s*\?\s*640\s*:\s*Math\.max\(240,\s*Math\.round\(vpW\)\);/);
   assert.doesNotMatch(lightboxJs, /Math\.round\(vpW\s*\*\s*\(isLandscape\s*\?\s*1\s*:\s*0\.92\)\)/);
 
-  // mobileImageStageStyle should use 100vw across orientations
-  assert.match(lightboxJs, /width:\s*'100vw',\s*maxWidth:\s*'100vw'/);
+  // Stage width follows the overlay (100%), not the layout viewport (100vw).
+  assert.match(lightboxJs, /width:\s*'100%',\s*maxWidth:\s*'100%'/);
+  assert.doesNotMatch(lightboxJs, /width:\s*'100vw',\s*maxWidth:\s*'100vw'/);
   assert.doesNotMatch(lightboxJs, /width:\s*isLandscape\s*\?\s*'100vw'\s*:\s*'92vw'/);
 });
 
