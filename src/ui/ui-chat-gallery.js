@@ -54,6 +54,53 @@ function createAnalysisTagChange(item, photo, finalTags) {
     },
   };
 }
+
+function getPhotoTagCompleteness(tagsText, calendar) {
+  const rawTags = String(tagsText || '')
+    .split(/[\s,#]+/)
+    .map(t => t.trim().toLowerCase())
+    .filter(Boolean);
+
+  // 1. 날짜: 6자리 숫자 (예: 250615, 250330) 또는 8자리 숫자 (20250615) 또는 YYYY-MM-DD
+  const hasDate = rawTags.some(tag => /^\d{6}$/.test(tag) || /^\d{8}$/.test(tag) || /^\d{4}[.\-_]?\d{2}[.\-_]?\d{2}$/.test(tag));
+
+  // 2. 장소: calendar.places 매칭
+  const placeNames = (Array.isArray(calendar?.places) ? calendar.places : [])
+    .map(p => String(p?.name || p?.title || '').trim().toLowerCase())
+    .filter(Boolean);
+  const hasPlace = rawTags.some(tag => placeNames.some(name => tag.includes(name) || name.includes(tag)));
+
+  // 3. 인물: calendar.participants 매칭
+  const participantNames = (Array.isArray(calendar?.participants) ? calendar.participants : [])
+    .map(p => String(p?.name || '').trim().toLowerCase())
+    .filter(Boolean);
+  const hasPerson = rawTags.some(tag => participantNames.some(name => tag.includes(name) || name.includes(tag)));
+
+  const missing = [];
+  if (!hasDate) missing.push('날짜');
+  if (!hasPlace) missing.push('장소');
+  if (!hasPerson) missing.push('인물');
+
+  return {
+    hasDate,
+    hasPlace,
+    hasPerson,
+    isComplete: missing.length === 0,
+    missing
+  };
+}
+
+function getSuggestedDateTag(photo, item) {
+  const ts = photo?.timestamp || photo?.capturedAt || item?.lastReceivedAt || item?.analyzedAt;
+  if (!ts) return '';
+  const date = new Date(Number(ts));
+  if (Number.isNaN(date.getTime()) || date.getTime() <= 0) return '';
+  const yy = String(date.getFullYear()).slice(2);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yy}${mm}${dd}`;
+}
+
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getPhotoCommentIdentity(...args) {
   const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
@@ -592,6 +639,7 @@ export function ChatGalleryModal({
     setGalleryListPage(1);
     setSelectedBulkShareKeys(new Set());
   }; // 'photos' | 'links' | 'files' | 'analysis'
+  const [analysisViewMode, setAnalysisViewMode] = React.useState('unreviewed'); // 'unreviewed' | 'reviewed'
   const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
   const [analysisPhotoCache, setAnalysisPhotoCache] = React.useState({});
   const [isBatchApplying, setIsBatchApplying] = React.useState(false);
@@ -603,7 +651,7 @@ export function ChatGalleryModal({
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!calendarId || !projectId) return Promise.resolve();
     setMediaAnalysis(previous => ({ ...previous, loading: true, error: '' }));
-    return fetchMediaAnalysisFeed({ calendarId, projectId, force })
+    return fetchMediaAnalysisFeed({ calendarId, projectId, force, limit: 100 })
       .then(items => setMediaAnalysis({ loading: false, error: '', items }))
       .catch(error => setMediaAnalysis(previous => ({ ...previous, loading: false, error: String(error?.message || error) })));
   }, [calendar?.id]);
@@ -620,7 +668,19 @@ export function ChatGalleryModal({
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
-    const review = await recordMediaAnalysisFeedback({
+    const optimisticReview = {
+      decision,
+      proposedTags: getAnalysisSuggestedTags(item),
+      acceptedTags,
+      finalTags,
+      reviewedAt: Date.now(),
+      reviewCount: (Number(item?.review?.reviewCount) || 0) + 1
+    };
+    updateAnalysisReview(item.assetKey, optimisticReview);
+    if (decision === 'rejected') {
+      showToast('추천에서 제외했습니다.', 'info');
+    }
+    void recordMediaAnalysisFeedback({
       calendarId,
       projectId,
       assetKey: item.assetKey,
@@ -628,36 +688,64 @@ export function ChatGalleryModal({
       proposedTags: getAnalysisSuggestedTags(item),
       acceptedTags,
       finalTags
-    });
-    updateAnalysisReview(item.assetKey, review);
-    return review;
-  }, [calendar?.id, updateAnalysisReview]);
+    }).catch(err => console.warn('Background feedback save warning:', err));
+    return optimisticReview;
+  }, [calendar?.id, updateAnalysisReview, showToast]);
   const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied', { silent = false } = {}) => {
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     const saveBulk = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
     if (!onSaveImageTags && typeof saveBulk !== 'function') throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
     if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
-    setAnalysisSavingAssetKey(item.assetKey);
+
+    // 1. Resolve photo from memory cache immediately if available (avoids 1~2s REST delay)
+    const cachedPhoto = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey] || null;
+    let photo = cachedPhoto;
+    if (!photo) {
+      setAnalysisSavingAssetKey(item.assetKey);
+      try {
+        photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
+      } catch (err) {
+        setAnalysisSavingAssetKey('');
+        throw err;
+      }
+    }
+
+    const finalTags = normalizeAnalysisTagList([photo?.tags || '', ...requestedTags]);
+    const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo?.tags || '').join(' ');
+
+    // 2. Optimistic UI update: Immediately mark review in state so user experiences instant response (0.05s)
+    const optimisticReview = {
+      decision,
+      proposedTags: getAnalysisSuggestedTags(item),
+      acceptedTags: requestedTags,
+      finalTags,
+      reviewedAt: Date.now(),
+      reviewCount: (Number(item?.review?.reviewCount) || 0) + 1
+    };
+    updateAnalysisReview(item.assetKey, optimisticReview);
+    setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+    setAnalysisSavingAssetKey('');
+
+    if (!silent) {
+      showToast(changed ? '태그를 적용했습니다.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했습니다.', 'success');
+    }
+
+    // 3. Save to server in background without blocking user UI
     try {
-      const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
-      const finalTags = normalizeAnalysisTagList([photo.tags || '', ...requestedTags]);
-      const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo.tags || '').join(' ');
-      if (changed) {
-        // The gallery's server command is the canonical write-through path. It updates every
-        // source and meeting copy in one transaction and works even when this page was mounted
-        // without the legacy single-photo callback.
+      const tagSavePromise = (async () => {
+        if (!changed) return true;
         if (typeof saveBulk === 'function') {
           const result = await saveBulk([createAnalysisTagChange(item, photo, finalTags)]);
-          if (!result?.ok) throw new Error('태그 저장에 실패했습니다.');
-        } else {
+          return result?.ok;
+        } else if (typeof onSaveImageTags === 'function') {
           const sourceOwner = String(photo.tagSourceOwner || photo.sourceOwner || photo.owners?.[0]?.sourceOwner || '');
           const ownerMatch = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
-          if (!ownerMatch) throw new Error('사진의 저장 위치를 찾지 못했습니다.');
+          if (!ownerMatch) return false;
           const [, sourceType, sourceId, sourceIndex] = ownerMatch;
           const imageIndex = Number(sourceIndex);
           const source = sourceType === 'message' ? 'chat' : sourceType;
-          const ok = await onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
+          return onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
             source,
             sourceOwner,
             imageIndex,
@@ -673,20 +761,37 @@ export function ChatGalleryModal({
             readFresh: true,
             silent: true
           });
-          if (!ok) throw new Error('태그 저장에 실패했습니다.');
         }
+        return true;
+      })();
+
+      const feedbackPromise = recordMediaAnalysisFeedback({
+        calendarId,
+        projectId,
+        assetKey: item.assetKey,
+        decision,
+        proposedTags: getAnalysisSuggestedTags(item),
+        acceptedTags: requestedTags,
+        finalTags
+      }).catch(err => console.warn('Background feedback save error:', err));
+
+      const [tagSaveOk] = await Promise.all([tagSavePromise, feedbackPromise]);
+      if (changed && !tagSaveOk) {
+        showToast('태그 서버 저장에 실패했습니다. 다시 시도해 주세요.', 'error');
       }
-      await saveAnalysisReview(item, decision, finalTags, requestedTags);
-      setAnalysisAction({ assetKey: '', mode: '', draft: '' });
-      if (!silent) {
-        showToast(changed ? 'AI 제안 태그를 적용했어요.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했어요.', 'success');
-      }
-    } finally {
-      setAnalysisSavingAssetKey('');
+    } catch (err) {
+      console.error('Server save error in applyAnalysisTags:', err);
+      showToast('태그 서버 동기화 중 오류가 발생했습니다.', 'error');
     }
-  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, saveAnalysisReview, showToast]);
+  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, photoByAssetKey, analysisPhotoCache, showToast, updateAnalysisReview]);
   const handleBatchApplyAnalysis = React.useCallback(async () => {
-    const unreviewed = (mediaAnalysis.items || []).filter(item => !item.review && item.assetKey);
+    const unreviewed = (mediaAnalysis.items || []).filter(item => {
+      if (!item?.assetKey || item.review) return false;
+      const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+      const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
+      const completeness = getPhotoTagCompleteness(currentTagsText, calendar);
+      return !completeness.isComplete;
+    });
     if (!unreviewed.length) {
       showToast('처리할 미검토 항목이 없습니다.', 'info');
       return;
@@ -713,11 +818,14 @@ export function ChatGalleryModal({
           const index = cursor++;
           const item = unreviewed[index];
           try {
-            const photo = await fetchMediaAnalysisPhoto({
-              calendarId,
-              projectId,
-              assetKey: item.assetKey,
-            });
+            const cachedPhoto = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+            const photo = (cachedPhoto && (cachedPhoto.tags != null || cachedPhoto.sourceOwner))
+              ? cachedPhoto
+              : await fetchMediaAnalysisPhoto({
+                  calendarId,
+                  projectId,
+                  assetKey: item.assetKey,
+                });
             resolved.push({
               item,
               finalTags: normalizeAnalysisTagList([photo.tags || '', ...getAnalysisSuggestedTags(item)]),
@@ -767,18 +875,17 @@ export function ChatGalleryModal({
       setIsBatchApplying(false);
       setBatchProgress({ current: 0, total: 0 });
     }
-  }, [calendar?.id, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast]);
+  }, [calendar, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast, photoByAssetKey, analysisPhotoCache]);
   const rejectAnalysisTags = React.useCallback(async item => {
     if (!item?.assetKey) return;
     setAnalysisSavingAssetKey(item.assetKey);
     try {
       await saveAnalysisReview(item, 'rejected', []);
       setAnalysisAction({ assetKey: '', mode: '', draft: '' });
-      showToast('이 추천을 제외했어요. 이후 개인화 보정에 반영됩니다.', 'success');
     } finally {
       setAnalysisSavingAssetKey('');
     }
-  }, [saveAnalysisReview, showToast]);
+  }, [saveAnalysisReview]);
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -2745,10 +2852,27 @@ export function ChatGalleryModal({
   );
   const renderGalleryContent = () => {
     if (activeTab === 'analysis') {
-      const unreviewedCount = (mediaAnalysis.items || []).filter(item => !item.review).length;
+      const allItems = mediaAnalysis.items || [];
+      const unreviewed = [];
+      const reviewed = [];
+      for (const item of allItems) {
+        const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+        const isReviewed = Boolean(item.review);
+        const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
+        const completeness = getPhotoTagCompleteness(currentTagsText, calendar);
+        const isHandled = isReviewed || completeness.isComplete;
+        const meta = { item, photo, completeness, isReviewed, isHandled };
+        if (isHandled) {
+          reviewed.push(meta);
+        } else {
+          unreviewed.push(meta);
+        }
+      }
+      const displayList = analysisViewMode === 'unreviewed' ? unreviewed : reviewed;
       const canSaveAnalysisTags = typeof onSaveImageTags === 'function'
         || typeof onBulkSaveImageTags === 'function'
         || typeof window.__gatherBulkSaveImageTags === 'function';
+
       const renderChips = (values, colorType = 'accent') => {
         const bgMap = {
           people: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
@@ -2786,6 +2910,18 @@ export function ChatGalleryModal({
         }, `#${value}`));
       };
 
+      const appendTagToDraft = tagToAdd => {
+        const clean = String(tagToAdd || '').replace(/^#+/, '').trim();
+        if (!clean) return;
+        setAnalysisAction(prev => {
+          const rawTokens = (prev.draft || '').trim().split(/\s+/).filter(Boolean);
+          const existingClean = rawTokens.map(t => t.replace(/^#+/, ''));
+          if (existingClean.includes(clean)) return prev;
+          const newTokens = [...rawTokens, `#${clean}`];
+          return { ...prev, draft: newTokens.join(' ') };
+        });
+      };
+
       return /*#__PURE__*/React.createElement('section', {
         className: 'media-analysis-feed',
         style: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '12px 0 24px' },
@@ -2807,30 +2943,94 @@ export function ChatGalleryModal({
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
           }
         },
-          /* Left summary info */
-          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-            /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+          /* Left summary info & view toggle */
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+            /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
               /*#__PURE__*/React.createElement('span', { style: { fontWeight: 900, color: 'var(--text-main)', fontSize: 'var(--font-size-md, 15px)' } }, 'AI 사진 분석 추천'),
-              /*#__PURE__*/React.createElement('span', {
+              /* Segmented view switcher */
+              /*#__PURE__*/React.createElement('div', {
                 style: {
                   display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '2px 9px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'var(--accent-tint, rgba(124, 47, 229, 0.1))',
-                  color: 'var(--accent-primary)',
-                  fontSize: 'var(--font-size-xs, 12px)',
-                  fontWeight: 800
+                  padding: '2px',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  border: '1px solid var(--border-subtle)',
+                  gap: '2px'
                 }
-              }, `미처리 ${unreviewedCount}건 / 전체 ${mediaAnalysis.items.length}건`)
+              },
+                /* Unreviewed tab */
+                /*#__PURE__*/React.createElement('button', {
+                  type: 'button',
+                  onClick: () => setAnalysisViewMode('unreviewed'),
+                  style: {
+                    padding: '4px 12px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    border: 'none',
+                    background: analysisViewMode === 'unreviewed' ? 'var(--bg-card)' : 'transparent',
+                    color: analysisViewMode === 'unreviewed' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    fontWeight: analysisViewMode === 'unreviewed' ? 900 : 600,
+                    fontSize: 'var(--font-size-xs, 12px)',
+                    boxShadow: analysisViewMode === 'unreviewed' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }
+                },
+                  '미처리',
+                  /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      background: analysisViewMode === 'unreviewed' ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                      color: analysisViewMode === 'unreviewed' ? '#fff' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }
+                  }, unreviewed.length)
+                ),
+                /* Reviewed tab */
+                /*#__PURE__*/React.createElement('button', {
+                  type: 'button',
+                  onClick: () => setAnalysisViewMode('reviewed'),
+                  style: {
+                    padding: '4px 12px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    border: 'none',
+                    background: analysisViewMode === 'reviewed' ? 'var(--bg-card)' : 'transparent',
+                    color: analysisViewMode === 'reviewed' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    fontWeight: analysisViewMode === 'reviewed' ? 900 : 600,
+                    fontSize: 'var(--font-size-xs, 12px)',
+                    boxShadow: analysisViewMode === 'reviewed' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }
+                },
+                  '검토 완료',
+                  /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      background: analysisViewMode === 'reviewed' ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                      color: analysisViewMode === 'reviewed' ? '#fff' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }
+                  }, reviewed.length)
+                )
+              )
             ),
             /*#__PURE__*/React.createElement('p', {
               style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', lineHeight: 1.4 }
-            }, '로컬 Mac 분석기가 인식한 태그 추천입니다. 적용 시 사진에 태그가 즉시 저장됩니다.')
+            }, analysisViewMode === 'unreviewed'
+              ? '날짜(YYMMDD)·장소·인물 태그 중 누락되었거나 추천된 항목입니다. 수정/적용 시 검토 완료로 이동합니다.'
+              : '검토를 마쳤거나 필수 태그(날짜·장소·인물)가 모두 입력된 사진 목록입니다.')
           ),
           /* Right action buttons */
           /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-            unreviewedCount > 0 && /*#__PURE__*/React.createElement('button', {
+            analysisViewMode === 'unreviewed' && unreviewed.length > 0 && /*#__PURE__*/React.createElement('button', {
               type: 'button',
               className: 'btn btn-action',
               disabled: isBatchApplying || mediaAnalysis.loading,
@@ -2857,7 +3057,7 @@ export function ChatGalleryModal({
               ),
               isBatchApplying
                 ? `적용 중 (${batchProgress.current}/${batchProgress.total})…`
-                : `미처리 전체 태그 적용 (${unreviewedCount})`
+                : `미처리 전체 태그 적용 (${unreviewed.length})`
             ),
             /*#__PURE__*/React.createElement('button', {
               type: 'button',
@@ -2900,36 +3100,90 @@ export function ChatGalleryModal({
           role: 'alert',
           style: { margin: 0, padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'color-mix(in srgb, var(--status-danger) 10%, var(--bg-card))', color: 'var(--status-danger)', fontSize: 'var(--font-size-sm)' }
         }, mediaAnalysis.error),
-        !mediaAnalysis.loading && !mediaAnalysis.error && mediaAnalysis.items.length === 0 && /*#__PURE__*/React.createElement('div', {
-          style: {
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '48px 16px',
-            textAlign: 'center',
-            color: 'var(--text-muted)'
-          }
-        },
-          /* Check circle icon */
-          /*#__PURE__*/React.createElement('svg', { width: '36', height: '36', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8' },
-            /*#__PURE__*/React.createElement('path', { d: 'M22 11.08V12a10 10 0 1 1-5.93-9.14' }),
-            /*#__PURE__*/React.createElement('polyline', { points: '22 4 12 14.01 9 11.01' })
-          ),
-          /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 14px)', fontWeight: 700 } }, '새로운 AI 분석 추천이 없습니다.'),
-          /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)' } }, '로컬 Mac 분석기가 사진을 감지하면 여기에 추천 태그가 표시됩니다.')
+        !mediaAnalysis.loading && !mediaAnalysis.error && displayList.length === 0 && (
+          analysisViewMode === 'unreviewed'
+            ? /*#__PURE__*/React.createElement('div', {
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: '48px 16px',
+                  textAlign: 'center',
+                  background: 'var(--bg-card)',
+                  borderRadius: 'var(--radius-lg, 16px)',
+                  border: '1px dashed var(--border-subtle)',
+                  color: 'var(--text-muted)'
+                }
+              },
+                /* Big check circle */
+                /*#__PURE__*/React.createElement('div', {
+                  style: {
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: 'color-mix(in srgb, var(--status-green, #10b981) 15%, transparent)',
+                    color: 'var(--status-green, #10b981)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }
+                },
+                  /*#__PURE__*/React.createElement('svg', { width: '28', height: '28', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+                    /*#__PURE__*/React.createElement('polyline', { points: '20 6 9 17 4 12' })
+                  )
+                ),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 15px)', fontWeight: 800, color: 'var(--text-main)' } }, '모든 사진의 검토 및 태그 작성이 완료되었습니다!'),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)', maxWidth: '380px', lineHeight: 1.5 } }, '미처리 항목이 없습니다. 날짜(YYMMDD)·장소·인물 필수 정보가 모두 등록되었거나 추천 태그가 적용되었습니다.'),
+                reviewed.length > 0 && /*#__PURE__*/React.createElement('button', {
+                  type: 'button',
+                  onClick: () => setAnalysisViewMode('reviewed'),
+                  style: {
+                    marginTop: '6px',
+                    padding: '8px 18px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid var(--accent-primary)',
+                    background: 'transparent',
+                    color: 'var(--accent-primary)',
+                    fontWeight: 800,
+                    fontSize: 'var(--font-size-xs, 12px)',
+                    cursor: 'pointer'
+                  }
+                }, `검토 완료된 사진 보기 (${reviewed.length}건)`)
+              )
+            : /*#__PURE__*/React.createElement('div', {
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '48px 16px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)'
+                }
+              },
+                /* Info circle */
+                /*#__PURE__*/React.createElement('svg', { width: '36', height: '36', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8' },
+                  /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '10' }),
+                  /*#__PURE__*/React.createElement('line', { x1: '12', y1: '16', x2: '12', y2: '12' }),
+                  /*#__PURE__*/React.createElement('line', { x1: '12', y1: '8', x2: '12.01', y2: '8' })
+                ),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 14px)', fontWeight: 700 } }, '검토 완료된 사진이 아직 없습니다.'),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)' } }, '미처리 탭에서 태그를 적용하거나 수정한 사진이 이곳에 보관됩니다.')
+              )
         ),
-        mediaAnalysis.items.map(item => {
-          const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+        displayList.map(({ item, photo, completeness, isReviewed }) => {
           const thumbUrl = photo?.thumb || photo?.full || photo?.imageUrl || '';
           const fullUrl = photo?.full || photo?.imageUrl || photo?.thumb || '';
           const isSaving = analysisSavingAssetKey === item.assetKey;
           const isEditing = analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit';
           const suggestedTags = getAnalysisSuggestedTags(item);
+          const suggestedDate = getSuggestedDateTag(photo, item);
 
           return /*#__PURE__*/React.createElement('article', {
-            key: item.id,
+            key: item.id || item.assetKey,
             className: 'v2-analysis-card',
             style: {
               display: 'flex',
@@ -3065,11 +3319,13 @@ export function ChatGalleryModal({
                 width: '100%'
               }
             },
-              /* Card header: Badge + existing tags + time */
+              /* Card header: Badge + existing tags + completeness badges + time */
               /*#__PURE__*/React.createElement('div', {
                 style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
               },
-                /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+                /* Left badges */
+                /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+                  /* Sparkle type badge */
                   /*#__PURE__*/React.createElement('span', {
                     style: {
                       display: 'inline-flex',
@@ -3089,16 +3345,75 @@ export function ChatGalleryModal({
                     ),
                     item.assetKey ? '사진 분석' : '로컬 사진 분석'
                   ),
-                  photo?.tags && /*#__PURE__*/React.createElement('span', {
-                    style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' },
-                    title: `기존 등록 태그: ${photo.tags}`
-                  }, `기존: ${photo.tags.slice(0, 32)}${photo.tags.length > 32 ? '…' : ''}`)
+                  /* Existing tags badge */
+                  photo?.tags
+                    ? /*#__PURE__*/React.createElement('span', {
+                        style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' },
+                        title: `기존 등록 태그: ${photo.tags}`
+                      }, `기존: ${photo.tags.slice(0, 32)}${photo.tags.length > 32 ? '…' : ''}`)
+                    : /*#__PURE__*/React.createElement('span', {
+                        style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' }
+                      }, '기존 태그 없음'),
+                  /* Completeness indicators */
+                  !completeness.hasDate && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+                      color: 'var(--status-danger, #e11d48)',
+                      border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }
+                  }, '날짜 누락'),
+                  !completeness.hasPlace && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+                      color: 'var(--status-danger, #e11d48)',
+                      border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }
+                  }, '장소 누락'),
+                  !completeness.hasPerson && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+                      color: 'var(--status-danger, #e11d48)',
+                      border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }
+                  }, '인물 누락'),
+                  completeness.isComplete && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-green, #10b981) 12%, transparent)',
+                      color: 'var(--status-green, #10b981)',
+                      border: '1px solid color-mix(in srgb, var(--status-green, #10b981) 25%, transparent)',
+                      fontSize: '11px',
+                      fontWeight: 800
+                    }
+                  }, '✓ 날짜·장소·인물 완비')
                 ),
+                /* Right time */
                 /*#__PURE__*/React.createElement('time', {
                   style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', whiteSpace: 'nowrap' }
                 }, formatMediaAnalysisTime(item.lastReceivedAt || item.analyzedAt))
               ),
-              /* Tags chips */
+              /* Suggested tag chips */
               /*#__PURE__*/React.createElement('div', {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }
               },
@@ -3131,6 +3446,7 @@ export function ChatGalleryModal({
                 ? /*#__PURE__*/React.createElement('div', {
                     style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '4px' }
                   },
+                    /* Decision badge */
                     /*#__PURE__*/React.createElement('span', {
                       style: {
                         display: 'inline-flex',
@@ -3171,11 +3487,16 @@ export function ChatGalleryModal({
                     /* Re-edit option */
                     /*#__PURE__*/React.createElement('button', {
                       type: 'button',
-                      onClick: () => setAnalysisAction({
-                        assetKey: item.assetKey,
-                        mode: 'edit',
-                        draft: (item.review.finalTags?.length ? item.review.finalTags : suggestedTags).join(' ')
-                      }),
+                      onClick: () => {
+                        const existingList = normalizeAnalysisTagList(photo?.tags || '');
+                        const finalTags = item.review.finalTags?.length ? item.review.finalTags : suggestedTags;
+                        const combined = normalizeAnalysisTagList([...existingList, ...finalTags]).map(t => `#${t}`).join(' ');
+                        setAnalysisAction({
+                          assetKey: item.assetKey,
+                          mode: 'edit',
+                          draft: combined
+                        });
+                      },
                       style: {
                         border: 'none',
                         background: 'transparent',
@@ -3194,11 +3515,12 @@ export function ChatGalleryModal({
                       ? /*#__PURE__*/React.createElement('div', {
                           style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
                         },
+                          /* Tag input */
                           /*#__PURE__*/React.createElement('input', {
                             type: 'text',
                             value: analysisAction.draft,
                             onChange: event => setAnalysisAction(previous => ({ ...previous, draft: event.target.value })),
-                            placeholder: '적용할 태그를 공백 또는 쉼표로 구분',
+                            placeholder: '적용할 태그를 공백 또는 쉼표로 구분 (#서준 #콘소넌스 #250615)',
                             maxLength: 640,
                             autoFocus: true,
                             style: {
@@ -3222,6 +3544,93 @@ export function ChatGalleryModal({
                               }
                             }
                           }),
+                          /* Quick chip suggestions */
+                          /*#__PURE__*/React.createElement('div', {
+                            style: {
+                              display: 'flex',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '6px',
+                              padding: '6px 10px',
+                              background: 'var(--bg-secondary)',
+                              borderRadius: 'var(--radius-md, 8px)',
+                              fontSize: 'var(--font-size-xs, 12px)'
+                            }
+                          },
+                            /*#__PURE__*/React.createElement('span', { style: { fontWeight: 700, color: 'var(--text-muted)' } }, '빠른 추가:'),
+                            /* Date suggestion */
+                            !completeness.hasDate && suggestedDate && /*#__PURE__*/React.createElement('button', {
+                              type: 'button',
+                              onClick: () => appendTagToDraft(suggestedDate),
+                              style: {
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px dashed var(--accent-primary)',
+                                background: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
+                                color: 'var(--accent-primary)',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                cursor: 'pointer'
+                              }
+                            }, `+ #${suggestedDate} (촬영일)`),
+                            /* Place suggestions from calendar */
+                            (Array.isArray(calendar?.places) ? calendar.places : []).map(p => {
+                              const name = String(p?.name || p?.title || '').trim();
+                              if (!name) return null;
+                              return /*#__PURE__*/React.createElement('button', {
+                                key: `place-${name}`,
+                                type: 'button',
+                                onClick: () => appendTagToDraft(name),
+                                style: {
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-full)',
+                                  border: '1px solid color-mix(in srgb, var(--status-green, #10b981) 30%, transparent)',
+                                  background: 'color-mix(in srgb, var(--status-green, #10b981) 10%, transparent)',
+                                  color: 'var(--status-green, #10b981)',
+                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }
+                              }, `+ #${name}`);
+                            }),
+                            /* Participant suggestions from calendar */
+                            (Array.isArray(calendar?.participants) ? calendar.participants : []).map(part => {
+                              const name = String(part?.name || '').trim();
+                              if (!name) return null;
+                              return /*#__PURE__*/React.createElement('button', {
+                                key: `person-${name}`,
+                                type: 'button',
+                                onClick: () => appendTagToDraft(name),
+                                style: {
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-full)',
+                                  border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 30%, transparent)',
+                                  background: 'color-mix(in srgb, var(--status-danger, #e11d48) 10%, transparent)',
+                                  color: 'var(--status-danger, #e11d48)',
+                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }
+                              }, `+ #${name}`);
+                            }),
+                            /* AI suggestions */
+                            suggestedTags.map(tag => /*#__PURE__*/React.createElement('button', {
+                              key: `ai-${tag}`,
+                              type: 'button',
+                              onClick: () => appendTagToDraft(tag),
+                              style: {
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px solid var(--border-subtle)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-secondary)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }
+                            }, `+ #${tag}`))
+                          ),
+                          /* Action buttons */
                           /*#__PURE__*/React.createElement('div', { style: { display: 'flex', gap: '8px' } },
                             /*#__PURE__*/React.createElement('button', {
                               type: 'button',
@@ -3308,11 +3717,16 @@ export function ChatGalleryModal({
                             type: 'button',
                             className: 'btn btn-action',
                             disabled: isSaving || isBatchApplying || !canSaveAnalysisTags,
-                            onClick: () => setAnalysisAction({
-                              assetKey: item.assetKey,
-                              mode: 'edit',
-                              draft: suggestedTags.join(' ')
-                            }),
+                            onClick: () => {
+                              const existingList = normalizeAnalysisTagList(photo?.tags || '');
+                              const aiTags = getAnalysisSuggestedTags(item);
+                              const combined = normalizeAnalysisTagList([...existingList, ...aiTags]).map(t => `#${t}`).join(' ');
+                              setAnalysisAction({
+                                assetKey: item.assetKey,
+                                mode: 'edit',
+                                draft: combined
+                              });
+                            },
                             style: {
                               minHeight: '36px',
                               padding: '0 14px',

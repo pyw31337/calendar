@@ -35,6 +35,12 @@ test('KST schedule grants nights, weekends and holiday daytime only', () => {
   assert.equal(isAnalysisWindow({ date: new Date('2026-09-27T01:00:00Z'), holidayKeys }).weekend, true);
 });
 
+test('allowAllHours overrides weekday daytime restrictions for background analysis', () => {
+  const holidayKeys = new Set();
+  assert.equal(isAnalysisWindow({ date: new Date('2026-09-29T01:00:00Z'), holidayKeys, allowAllHours: true }).allowed, true);
+  assert.equal(isAnalysisWindow({ date: new Date('2026-09-29T01:00:00Z'), holidayKeys, allowAllHours: false }).allowed, false);
+});
+
 test('missing photos are recorded but do not pin the local analysis cursor', () => {
   assert.equal(isRetryableAssetFailure('Image download failed: 404'), false);
   assert.equal(isRetryableAssetFailure('Missing Firebase Storage URL'), false);
@@ -61,6 +67,24 @@ test('live feed reads server-written analysis rows without exposing write creden
   try {
     const items = await fetchMediaAnalysisFeed({ calendarId: 'cw', projectId: 'metro-live-2918e', force: true });
     assert.deepEqual(items[0], { suggestedTags: ['하니랜드'], faceCount: 1, lastReceivedAt: 1000, id: 'item1' });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fetchMediaAnalysisFeed applies customizable bounded limit', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedLimit = 0;
+  globalThis.fetch = async (url, init) => {
+    const query = JSON.parse(init.body).structuredQuery;
+    requestedLimit = query.limit;
+    return new Response(JSON.stringify([]), { status: 200 });
+  };
+  try {
+    await fetchMediaAnalysisFeed({ calendarId: 'cw', projectId: 'metro-live-2918e', limit: 120, force: true });
+    assert.equal(requestedLimit, 120);
+    await fetchMediaAnalysisFeed({ calendarId: 'cw', projectId: 'metro-live-2918e', limit: 500, force: true });
+    assert.equal(requestedLimit, 200);
   } finally {
     globalThis.fetch = originalFetch;
   }

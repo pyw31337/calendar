@@ -21,9 +21,10 @@ function firestoreDocumentUrl(projectId, calendarId, collectionId, documentId) {
   return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/${collectionId}/${encodeURIComponent(documentId)}`;
 }
 
-export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = false } = {}) {
+export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = false, limit = 80 } = {}) {
   if (!calendarId || !projectId) return [];
-  const key = `${projectId}:${calendarId}`;
+  const queryLimit = Math.max(10, Math.min(200, Number(limit) || 80));
+  const key = `${projectId}:${calendarId}:${queryLimit}`;
   const cached = cache.get(key);
   if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/calendars/cal_${calendarId}:runQuery`, {
@@ -32,7 +33,7 @@ export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = fa
     body: JSON.stringify({ structuredQuery: {
       from: [{ collectionId: 'mediaAnalysis' }],
       orderBy: [{ field: { fieldPath: 'lastReceivedAt' }, direction: 'DESCENDING' }],
-      limit: 40
+      limit: queryLimit
     } })
   });
   if (!response.ok) throw new Error(`AI 분석 목록 요청 실패 (${response.status})`);
@@ -64,13 +65,14 @@ export async function recordMediaAnalysisFeedback({ calendarId, projectId, asset
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.ok === false) throw new Error(payload?.message || `AI 피드백 저장 실패 (${response.status})`);
-  const key = `${projectId}:${calendarId}`;
-  const cached = cache.get(key);
-  if (cached) {
-    cache.set(key, {
-      ...cached,
-      items: cached.items.map(item => item.assetKey === assetKey ? { ...item, review: payload.review || item.review } : item)
-    });
+  const prefix = `${projectId}:${calendarId}`;
+  for (const [k, cached] of cache.entries()) {
+    if (k === prefix || k.startsWith(`${prefix}:`)) {
+      cache.set(k, {
+        ...cached,
+        items: cached.items.map(item => item.assetKey === assetKey ? { ...item, review: payload.review || item.review } : item)
+      });
+    }
   }
   return payload.review || null;
 }

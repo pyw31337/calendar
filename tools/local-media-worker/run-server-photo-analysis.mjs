@@ -267,6 +267,21 @@ function classify(photo, insight, calendar, calibration = new Map()) {
 
   // Date resolution from photo.meetingDate or timestamp / capturedAt
   const dateStr = String(photo.meetingDate || '').trim() || toKstDateString(photo.timestamp || photo.capturedAt);
+  const dateMatch = dateStr.match(/^20(\d{2})-(\d{2})-(\d{2})$/);
+  const suggestedDateTag = dateMatch ? `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}` : '';
+  const hasDateTag = rawTags.some(t => /^\d{6}$/.test(t) || /^\d{8}$/.test(t));
+  const dateCandidates = (suggestedDateTag && !hasDateTag) ? [suggestedDateTag] : [];
+
+  // Match participants from OCR text if not already tagged
+  const ocrText = Array.isArray(insight.ocrText) ? insight.ocrText.join(' ') : '';
+  const allParticipants = (Array.isArray(calendar.participants) ? calendar.participants : [])
+    .map(person => String(person?.name || '').trim()).filter(Boolean);
+  for (const person of allParticipants) {
+    if (ocrText.includes(person) && !people.includes(person)) {
+      people.push(person);
+    }
+  }
+
   const matchedMeetings = [];
   if (dateStr) {
     const rawMeetings = Array.isArray(calendar.confirmedMeeting) ? calendar.confirmedMeeting : (calendar.confirmedMeeting ? [calendar.confirmedMeeting] : []);
@@ -297,7 +312,7 @@ function classify(photo, insight, calendar, calibration = new Map()) {
   const meetings = matchedMeetings.map(m => String(m.title || m.name || m.date || '')).filter(Boolean);
   const learned = calibratedTags(insight, calibration).filter(tag => !includes(tag));
   return {
-    suggestedTags: Array.from(new Set([...(insight.suggestedTags || []), ...places, ...scheduleSmartTags, ...meetings, ...learned])).slice(0, 20),
+    suggestedTags: Array.from(new Set([...dateCandidates, ...(insight.suggestedTags || []), ...people, ...places, ...scheduleSmartTags, ...meetings, ...learned])).slice(0, 20),
     people, places, meetings,
     scenes: Array.from(new Set((insight.labels || []).filter(label => Number(label?.confidence) >= 0.65).map(label => label.name))).slice(0, 12),
     confidence: Math.max(0, ...((insight.labels || []).map(label => Number(label?.confidence) || 0)))

@@ -20,11 +20,11 @@ function kstParts(date = new Date()) {
   return { key: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')), weekday: get('weekday') };
 }
 
-export function isAnalysisWindow({ date = new Date(), holidayKeys = new Set() } = {}) {
+export function isAnalysisWindow({ date = new Date(), holidayKeys = new Set(), allowAllHours = false } = {}) {
   const current = kstParts(date);
   const weekend = current.weekday === 'Sat' || current.weekday === 'Sun';
   const holiday = holidayKeys.has(current.key);
-  return { ...current, weekend, holiday, allowed: weekend || holiday || current.hour >= 18 || current.hour < 8 };
+  return { ...current, weekend, holiday, allowAllHours, allowed: Boolean(allowAllHours) || weekend || holiday || current.hour >= 18 || current.hour < 8 };
 }
 
 export function parseHolidayIcs(ics = '') {
@@ -74,7 +74,8 @@ async function main() {
   if (!config || !Array.isArray(config.calendarIds) || !config.calendarIds.length) throw new Error(`Missing calendarIds in ${configPath}`);
   const appDir = dirname(configPath);
   const holidays = await readHolidayKeys(resolve(config.holidayCachePath || join(appDir, 'korean-holidays.json')), config.holidayFeedUrl || DEFAULT_HOLIDAY_FEED);
-  const window = isAnalysisWindow({ holidayKeys: holidays });
+  const allowAllHours = Boolean(config.allowAllHours || process.env.MOYEORA_MEDIA_ALL_HOURS === '1' || process.argv.includes('--all-hours'));
+  const window = isAnalysisWindow({ holidayKeys: holidays, allowAllHours });
   const reportPath = resolve(config.schedulerReportPath || join(appDir, 'media-analysis-scheduler-latest.json'));
   if (!window.allowed) {
     await writeJson(reportPath, { status: 'idle', reason: 'weekday-daytime', generatedAt: Date.now(), ...window });
