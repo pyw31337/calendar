@@ -102,11 +102,13 @@
       if (extended) root.setAttribute('data-v2-standalone-extended', '');
       else root.removeAttribute('data-v2-standalone-extended');
     }
+    const keyboardInset = keyboard ? Math.max(0, Math.round(layoutH) - vvH - rawTop) : 0;
     const offsetLeft = keyboard ? rawLeft : 0;
     const heightPx = `${height}px`;
     const topPx = `${offsetTop}px`;
     const leftPx = `${offsetLeft}px`;
     const standaloneTopInsetPx = `${standaloneTopInset}px`;
+    const keyboardInsetPx = `${keyboardInset}px`;
     if (root.style.getPropertyValue('--app-vv-height') !== heightPx) {
       root.style.setProperty('--app-vv-height', heightPx);
     }
@@ -118,6 +120,9 @@
     }
     if (root.style.getPropertyValue('--app-vv-standalone-top-inset') !== standaloneTopInsetPx) {
       root.style.setProperty('--app-vv-standalone-top-inset', standaloneTopInsetPx);
+    }
+    if (root.style.getPropertyValue('--app-vv-keyboard-inset') !== keyboardInsetPx) {
+      root.style.setProperty('--app-vv-keyboard-inset', keyboardInsetPx);
     }
 
     if (typeof window.scrollTo === 'function' && window.scrollY !== 0) {
@@ -184,6 +189,7 @@
     root.style.removeProperty('--app-vv-offset-top');
     root.style.removeProperty('--app-vv-offset-left');
     root.style.removeProperty('--app-vv-standalone-top-inset');
+    root.style.removeProperty('--app-vv-keyboard-inset');
     root.removeAttribute('data-v2-standalone-extended');
     root.removeAttribute('data-v2-keyboard');
   };
