@@ -13,6 +13,13 @@ const { buildKakaoLocationTags, appendLocationTags } = require('./photo-location
 const { MAX_BATCH_ITEMS, MAX_TAGS, sanitizeAnalysisItem, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
 const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
+const {
+  decideMemoNotification,
+  decideChatNotification,
+  decidePollNotifications,
+  decideScheduleNotification,
+  selectDeliverableSubscriptions
+} = require('./push-notify-policy');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -613,6 +620,28 @@ function ensureVapidConfigured() {
 }
 
 
+
+// One successful claim per visible revision. A second trigger delivery (Functions
+// are at-least-once) or a maintenance rewrite of the same content must not send
+// again. Fail closed: a claim outage skips the push instead of repeating a storm.
+async function claimPushDelivery(calendarDocId, claimKey) {
+  if (!calendarDocId || !claimKey) return false;
+  const ref = admin.firestore()
+    .collection('calendars').doc(calendarDocId)
+    .collection('push_delivery_claims').doc(String(claimKey));
+  try {
+    return await admin.firestore().runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (snap.exists) return false;
+      tx.set(ref, { createdAt: Date.now(), claimKey: String(claimKey) });
+      return true;
+    });
+  } catch (err) {
+    console.error('claimPushDelivery failed; skipping push to avoid a duplicate storm', claimKey, err);
+    return false;
+  }
+}
+
 /** Shared push broadcast for a calendar's push_subscriptions */
 async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   ensureVapidConfigured();
@@ -634,8 +663,10 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
     skippedSender: 0,
     skippedChannel: 0,
     skippedInvalid: 0,
+    skippedDuplicate: 0,
     failed: 0
   };
+  const candidates = [];
   subSnap.forEach(doc => {
     const data = doc.data() || {};
     if (skipParticipantId && data.participantId === skipParticipantId) {
@@ -655,9 +686,23 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
       console.warn('Push subscription missing endpoint or keys', doc.id, channel);
       return;
     }
-    const pushSubscription = {
+    candidates.push({
+      doc,
       endpoint: data.endpoint,
-      keys: { auth: data.keys && data.keys.auth, p256dh: data.keys && data.keys.p256dh }
+      deviceId: data.deviceId,
+      lastSeenAt: data.lastSeenAt,
+      updatedAt: data.updatedAt,
+      createdAt: data.createdAt,
+      keys: data.keys
+    });
+  });
+  const selected = selectDeliverableSubscriptions(candidates);
+  result.skippedDuplicate = candidates.length - selected.length;
+  selected.forEach(entry => {
+    const doc = entry.doc;
+    const pushSubscription = {
+      endpoint: entry.endpoint,
+      keys: { auth: entry.keys && entry.keys.auth, p256dh: entry.keys && entry.keys.p256dh }
     };
     const sentAt = Date.now();
     const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
@@ -704,8 +749,14 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     // 일정 레이어팝업 사진탭('meeting')/갤러리 페이지('gallery')에서 올린 사진은 메시지
     // 문서에 저장되더라도 채팅 활동으로 취급하지 않는다. 채팅방 노출과 채팅 푸시는
     // 모두 uploadSource 기준으로 제외한다.
-    if (message.uploadSource === 'meeting' || message.uploadSource === 'gallery') {
-      console.log('Skipping push for non-chat photo upload:', message.uploadSource);
+    const decision = decideChatNotification(message, { messageId: context.params.messageId });
+    if (!decision) {
+      console.log('Skipping push for non-chat or empty message:', message && message.uploadSource);
+      return;
+    }
+    const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+    if (!claimed) {
+      console.log('Skipping duplicate chat push', decision.claimKey);
       return;
     }
 
@@ -731,8 +782,9 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
       title: senderName || calendarTitle,
       body: bodyText,
       url: `./?id=${calendarDocId.replace('cal_', '')}&view=chat`,
-      tag: `chat-${calendarDocId}`
-    }, { skipParticipantId: senderId, channel: 'chat' });
+      tag: `chat-${calendarDocId}-${context.params.messageId}`,
+      renotify: false
+    }, { skipParticipantId: decision.skipParticipantId || senderId, channel: 'chat' });
     console.log('Chat push dispatch', JSON.stringify({
       calendarDocId,
       messageId: context.params.messageId,
@@ -801,19 +853,37 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const memo = change.after.data() || {};
-    if (before && JSON.stringify(before) === JSON.stringify(memo)) return;
+    // Notify only when title/text/photos/comments actually change. Tag, GPS, link
+    // preview, asset-graph and updatedAt maintenance must not page anyone, and the
+    // same revision is claimed once so a retried trigger cannot send it again.
+    const decision = decideMemoNotification(before, memo, { memoId: context.params.memoId });
+    if (!decision) return;
     const calendarDocId = context.params.calendarDocId;
+    const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+    if (!claimed) {
+      console.log('Skipping duplicate memo push', decision.claimKey);
+      return;
+    }
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
-    const author = memo.authorName || memo.participantName || '참여자';
-    const body = (memo.text || memo.title || '새 메모').toString().trim().slice(0, 120) || '새 메모가 등록되었습니다';
+    const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
+    const named = participants.find(person => person && person.id === decision.skipParticipantId);
+    const author = decision.authorName || (named && named.name) || '참여자';
+    const title = decision.kind === 'comment'
+      ? `${author}의 메모 댓글`
+      : decision.kind === 'images'
+        ? `${author}의 메모 사진`
+        : decision.kind === 'edit'
+          ? `${author}의 메모 수정`
+          : `${author}의 새 메모`;
     await broadcastCalendarPush(calendarDocId, {
-      title: `${author}의 새 메모`,
-      body,
+      title,
+      body: decision.body,
       url: `./?id=${calendarDocId.replace('cal_', '')}&view=memo`,
-      tag: `memo-${calendarDocId}-${context.params.memoId}`
-    }, { skipParticipantId: memo.participantId || memo.authorId || null, channel: 'memo' });
+      tag: `memo-${calendarDocId}-${decision.tag}`,
+      renotify: false
+    }, { skipParticipantId: decision.skipParticipantId, channel: 'memo' });
   });
 
 // Meeting confirmed (the 확정 button, not a settlement/participant edit) → schedule channel.
@@ -830,29 +900,36 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const after = change.after.data() || {};
-    if (before && JSON.stringify(before) === JSON.stringify(after)) return;
-    const wasConfirmed = !!before && before.confirmed !== false;
-    const isConfirmed = after.confirmed !== false;
-    if (!isConfirmed || wasConfirmed) return;
     const calendarDocId = context.params.calendarDocId;
-    const db = admin.firestore();
-    const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
-    if (!calendarSnap.exists) return;
     const dateLabel = context.params.dateId || after.date || '';
     const meetingDateKey = normalizeMeetingDateKey(dateLabel);
     // Historical confirmedMeeting documents can be rewritten during migration,
     // reconciliation, or a late-arriving offline save. Never turn that maintenance
     // write into a fresh notification for a meeting that has already passed.
-    if (meetingDateKey && meetingDateKey < getKstDateKey()) {
-      console.log('Skipping stale confirmed meeting notification:', meetingDateKey);
+    const stale = Boolean(meetingDateKey && meetingDateKey < getKstDateKey());
+    const decision = decideScheduleNotification(before, after, {
+      dateId: dateLabel,
+      stale
+    });
+    if (!decision) {
+      if (stale) console.log('Skipping stale confirmed meeting notification:', meetingDateKey);
       return;
     }
+    const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+    if (!claimed) {
+      console.log('Skipping duplicate schedule push', decision.claimKey);
+      return;
+    }
+    const db = admin.firestore();
+    const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+    if (!calendarSnap.exists) return;
     await broadcastCalendarPush(calendarDocId, {
       title: '모임 확정',
       body: dateLabel ? `${dateLabel} 모임이 확정되었습니다` : '모임이 확정되었습니다',
       url: `./?id=${calendarDocId.replace('cal_', '')}`,
-      tag: `schedule-${calendarDocId}-${dateLabel}`
-    }, { channel: 'schedule' });
+      tag: `schedule-${calendarDocId}-${decision.tag}`,
+      renotify: false
+    }, { skipParticipantId: decision.skipParticipantId, channel: 'schedule' });
   });
 
 // Calendar document write → detect new polls
@@ -863,17 +940,23 @@ exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] 
     const afterCal = (change.after.data() || {}).calendar || {};
     const beforePolls = Array.isArray(beforeCal.polls) ? beforeCal.polls : [];
     const afterPolls = Array.isArray(afterCal.polls) ? afterCal.polls : [];
-    const beforeIds = new Set(beforePolls.map(p => p && p.id).filter(Boolean));
-    const newPolls = afterPolls.filter(p => p && p.id && !beforeIds.has(p.id));
-    if (newPolls.length === 0) return;
+    const decisions = decidePollNotifications(beforePolls, afterPolls);
+    if (decisions.length === 0) return;
     const calendarDocId = context.params.calendarDocId;
-    for (const poll of newPolls) {
+    for (const decision of decisions) {
+      const poll = decision.poll;
+      const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+      if (!claimed) {
+        console.log('Skipping duplicate poll push', decision.claimKey);
+        continue;
+      }
       await broadcastCalendarPush(calendarDocId, {
         title: poll.title ? `새 투표: ${poll.title}` : '새 투표',
         body: poll.title ? `${poll.title} 투표가 등록되었습니다` : '새 투표가 등록되었습니다',
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
-        tag: `poll-${calendarDocId}-${poll.id}`
-      }, { channel: 'poll' });
+        tag: `poll-${calendarDocId}-${decision.tag}`,
+        renotify: false
+      }, { skipParticipantId: decision.skipParticipantId, channel: 'poll' });
     }
   });
 

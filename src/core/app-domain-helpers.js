@@ -1382,7 +1382,7 @@ function notifyNewChatMessage(calendar, message, participantName) {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
     new Notification(participantName || calendar?.title || '모여라 캘린더', {
       body,
-      tag: `chat-${calendar?.id}`,
+      tag: message?.id ? `chat-cal_${calendar?.id}-${message.id}` : `chat-cal_${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
     });
   } catch (e) {
