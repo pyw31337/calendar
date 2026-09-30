@@ -27,9 +27,16 @@ test('useTapRevealedMsgId in app-ui-hooks and ui-chat-room handles touch toggle 
   assert.match(hooksJs, /export function useTapRevealedMsgId\(\)/);
   assert.match(hooksJs, /setRevealedId\(prev => \(prev === id \? null : id\)\)/);
   assert.match(hooksJs, /setTimeout\(\(\) => setRevealedId\(null\), 4000\)/);
+  assert.match(hooksJs, /let ignoreMouseUntil = 0/);
+  assert.match(hooksJs, /if \(e\.type === 'mousedown' && Date\.now\(\) < ignoreMouseUntil\) return/);
+  assert.match(hooksJs, /document\.addEventListener\('touchend', noteTouch, passive\)/);
+  assert.doesNotMatch(hooksJs, /addEventListener\('pointerup', handler/);
+  assert.doesNotMatch(hooksJs, /addEventListener\('touchend', handler/);
 
   const chatRoomJs = fs.readFileSync('src/ui/ui-chat-room.js', 'utf8');
   assert.match(chatRoomJs, /function useTapRevealedMsgId\(\.\.\.args\)/);
   assert.match(chatRoomJs, /__gatherUiDeps\(\)\.useTapRevealedMsgId/);
   assert.match(chatRoomJs, /setRevealedId\(prev => \(prev === id \? null : id\)\)/);
+  assert.match(chatRoomJs, /if \(e\.type === 'mousedown' && Date\.now\(\) < ignoreMouseUntil\) return/);
+  assert.match(chatRoomJs, /document\.addEventListener\('touchend', noteTouch, passive\)/);
 });

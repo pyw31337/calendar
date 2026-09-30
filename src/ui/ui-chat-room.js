@@ -69,7 +69,15 @@ function useTapRevealedMsgId(...args) {
   const [revealedId, setRevealedId] = React.useState(null);
   React.useEffect(() => {
     let timer = null;
+    // See useTapRevealedMsgId in app-ui-hooks.js: ignore the compatibility mousedown that
+    // follows touchend/pointerup so one tap leaves edit/reply visible until the next tap.
+    let ignoreMouseUntil = 0;
+    const noteTouch = () => {
+      ignoreMouseUntil = Date.now() + 800;
+    };
     const handler = e => {
+      if (e.type === 'touchstart') noteTouch();
+      if (e.type === 'mousedown' && Date.now() < ignoreMouseUntil) return;
       if (e.target && e.target.closest && e.target.closest('.msg-actions-group, .msg-actions-group-inline')) {
         return;
       }
@@ -81,11 +89,16 @@ function useTapRevealedMsgId(...args) {
         timer = setTimeout(() => setRevealedId(null), 4000);
       }
     };
-    document.addEventListener('touchstart', handler, { passive: true });
+    const passive = { passive: true };
+    document.addEventListener('touchstart', handler, passive);
+    document.addEventListener('touchend', noteTouch, passive);
+    document.addEventListener('touchcancel', noteTouch, passive);
     document.addEventListener('mousedown', handler);
     return () => {
       if (timer) clearTimeout(timer);
-      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('touchstart', handler, passive);
+      document.removeEventListener('touchend', noteTouch, passive);
+      document.removeEventListener('touchcancel', noteTouch, passive);
       document.removeEventListener('mousedown', handler);
     };
   }, []);
