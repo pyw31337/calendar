@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>모여라 캘린더</title>
+  <script>
+    (function () {
+      var loc = window.location;
+      var path = loc.pathname || '';
+      var search = loc.search || '';
+      var hash = loc.hash || '';
+
+      // Match /share/{calendarId}/{view}/{memoId} or /share/{calendarId}/{view} or /share/{calendarId}
+      var shareMatch = path.match(/\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
+      if (shareMatch) {
+        var calendarId = shareMatch[1];
+        var view = shareMatch[2] || '';
+        var extraId = shareMatch[3] || '';
+
+        var target = '/calendar/?id=' + encodeURIComponent(calendarId);
+        if (view === 'memo') {
+          target += '&view=memo';
+          if (extraId) target += '&memo=' + encodeURIComponent(extraId);
+        } else if (view && ['chat', 'places', 'gallery', 'settlement'].indexOf(view) !== -1) {
+          target += '&view=' + encodeURIComponent(view);
+          if (extraId) target += '&detail=' + encodeURIComponent(extraId);
+        } else if (view) {
+          target += '&view=' + encodeURIComponent(view);
+        }
+
+        if (search) {
+          var params = new URLSearchParams(search);
+          params.delete('id');
+          params.delete('cal');
+          params.delete('view');
+          if (view === 'memo') params.delete('memo');
+          var remainder = params.toString();
+          if (remainder) target += '&' + remainder;
+        }
+
+        loc.replace(target + hash);
+        return;
+      }
+
+      // Fallback for any other 404 on GitHub Pages
+      var base = path.indexOf('/calendar/') !== -1 ? '/calendar/' : '/';
+      loc.replace(base + search + hash);
+    })();
+  </script>
+</head>
+<body style="font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #64748B;">
+  <p>모여라 캘린더로 이동 중…</p>
+</body>
+</html>
