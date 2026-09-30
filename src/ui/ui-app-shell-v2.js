@@ -11,7 +11,7 @@ import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderCha
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
-  V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination,
+  V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination, resolveShellTab,
 } from './v2/shell-nav.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { syncThemeColor } from './v2/theme-color-sync.js';
@@ -92,17 +92,10 @@ function readTabFromLocation() {
   try {
     const params = new URLSearchParams(window.location.search);
     const view = getInitialAppView(window.location);
-    // Prefer explicit ?tab=; otherwise map data-view → first-class destination.
-    const fromView = ({ memo: 'memo', places: 'places', gallery: 'records', history: 'records', content: 'records', chat: 'chat', settlement: 'settlement' })[view];
-    let raw = params.get('tab') || fromView || view;
-    // Old bookmarks: ?tab=records&sub=memo|places → promote to first-class tabs.
     // Bare records hub (?tab=records / sub=all) is not a V2 destination — treat as calendar
     // so browser Back never resurfaces the mystery "모아엘가 기록" overview.
-    if (raw === 'records') {
-      const sub = params.get('sub');
-      if (sub === 'memo' || sub === 'places') raw = sub;
-      else if (!sub || sub === 'all') raw = DEFAULT_TAB;
-    }
+    // ?view=gallery|history|content still resolves to records (resolveShellTab).
+    const raw = resolveShellTab(params, view);
     return raw === 'search' || TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
   } catch (_) {
     return DEFAULT_TAB;

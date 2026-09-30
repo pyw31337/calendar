@@ -22,6 +22,34 @@ export const V2_SECONDARY = [
 /** Tab ids that own a full destination page (not nested under records). */
 export const V2_DESTINATION_TABS = ['calendar', 'chat', 'memo', 'places', 'settlement', 'records', 'more'];
 
+const VIEW_TO_SHELL_TAB = {
+  memo: 'memo',
+  places: 'places',
+  gallery: 'records',
+  history: 'records',
+  content: 'records',
+  chat: 'chat',
+  settlement: 'settlement',
+};
+const VIEW_TO_RECORDS_SUB = { gallery: 'media', history: 'archive', content: 'content' };
+
+/**
+ * Cold-load tab for a V2 URL. `?view=gallery|history|content` has no `sub`,
+ * but it is still that records destination — not the calendar.
+ * A bare `?tab=records` (no sub, no view) stays the calendar.
+ */
+export function resolveShellTab(search, view) {
+  const params = search instanceof URLSearchParams ? search : new URLSearchParams(search || '');
+  const fromView = VIEW_TO_SHELL_TAB[view];
+  let raw = params.get('tab') || fromView || view || 'calendar';
+  if (raw === 'records') {
+    const sub = params.get('sub') || VIEW_TO_RECORDS_SUB[params.get('view')] || VIEW_TO_RECORDS_SUB[view];
+    if (sub === 'memo' || sub === 'places') raw = sub;
+    else if (!sub || sub === 'all') raw = 'calendar';
+  }
+  return raw;
+}
+
 /** Maps legacy view ids / side-nav ids → shell tab (+ optional records sub). */
 export function resolveV2Destination(id) {
   if (!id) return { tab: 'calendar', sub: null };

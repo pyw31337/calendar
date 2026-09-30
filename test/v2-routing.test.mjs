@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { photoLightbox, timestampMs } from '../src/ui/v2/view-data.js';
-import { resolveV2Destination, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
+import { resolveV2Destination, resolveShellTab, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
 
 const location = search => ({ pathname: '/calendar/', search });
 test('default (no shell param) behaves like V2 -- cutover, shell=v1 is the escape hatch', () => {
@@ -67,6 +67,16 @@ test('shell-nav resolves Bento IA to first-class destinations', () => {
   assert.equal(V2_PRIMARY.some(i => i.id === 'memo'), true);
   assert.equal(V2_PRIMARY.some(i => i.id === 'places'), true);
 });
+test('shared view links open the records destination instead of the calendar', () => {
+  assert.equal(getInitialAppView(location('?id=example&view=gallery')), 'gallery');
+  assert.equal(resolveShellTab('?id=example&view=gallery', 'gallery'), 'records');
+  assert.equal(resolveShellTab('?id=example&view=history', 'history'), 'records');
+  assert.equal(resolveShellTab('?id=example&view=content', 'content'), 'records');
+  assert.equal(resolveShellTab('?tab=records&sub=media', 'gallery'), 'records');
+  assert.equal(resolveShellTab('?tab=records&sub=memo', 'memo'), 'memo');
+  assert.equal(resolveShellTab('?tab=records', 'calendar'), 'calendar');
+  assert.equal(resolveShellTab('?view=chat', 'chat'), 'chat');
+});
 test('gallery preview uses the shared lightbox URL and identity contract', () => {
   const photos = [{ full: 'https://example.test/a.jpg', messageId: 'm1', imageIndex: 0, assetKey: 'asset-1', thumb: 'thumb-1' }, { url: 'https://example.test/b.jpg', memoId: 'memo2', refKey: 'ref-2' }];
   const lightbox = photoLightbox(photos[1], photos);
@@ -126,6 +136,7 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   const { readFileSync } = await import('node:fs');
   const modal = readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const shellNav = readFileSync(new URL('../src/ui/v2/shell-nav.js', import.meta.url), 'utf8');
   assert.match(modal, /shellChrome\s*=\s*null/);
   assert.match(modal, /shellChrome === 'bento'/);
   assert.match(modal, /bp-event-sheet bp-is-open/);
@@ -137,7 +148,7 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   assert.match(shell, /activeTab === 'places'/);
   assert.match(shell, /resolveV2Destination/);
   // Legacy ?tab=records&sub=memo|places bookmarks promote to first-class tabs; sub is stripped.
-  assert.match(shell, /sub === 'memo' \|\| sub === 'places'/);
+  assert.match(shellNav, /sub === 'memo' \|\| sub === 'places'/);
   assert.match(shell, /Only gallery\/content\/archive \(records\) keep \?sub=/);
 });
 
