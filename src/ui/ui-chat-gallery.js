@@ -642,6 +642,7 @@ export function ChatGalleryModal({
   const [analysisViewMode, setAnalysisViewMode] = React.useState('unreviewed'); // 'unreviewed' | 'reviewed'
   const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
   const [analysisPhotoCache, setAnalysisPhotoCache] = React.useState({});
+  const photoByAssetKeyRef = React.useRef(new Map());
   const [isBatchApplying, setIsBatchApplying] = React.useState(false);
   const [batchProgress, setBatchProgress] = React.useState({ current: 0, total: 0 });
   const [analysisAction, setAnalysisAction] = React.useState({ assetKey: '', mode: '', draft: '' });
@@ -699,7 +700,7 @@ export function ChatGalleryModal({
     if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
 
     // 1. Resolve photo from memory cache immediately if available (avoids 1~2s REST delay)
-    const cachedPhoto = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey] || null;
+    const cachedPhoto = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey] || null;
     let photo = cachedPhoto;
     if (!photo) {
       setAnalysisSavingAssetKey(item.assetKey);
@@ -783,11 +784,11 @@ export function ChatGalleryModal({
       console.error('Server save error in applyAnalysisTags:', err);
       showToast('태그 서버 동기화 중 오류가 발생했습니다.', 'error');
     }
-  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, photoByAssetKey, analysisPhotoCache, showToast, updateAnalysisReview]);
+  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, analysisPhotoCache, showToast, updateAnalysisReview]);
   const handleBatchApplyAnalysis = React.useCallback(async () => {
     const unreviewed = (mediaAnalysis.items || []).filter(item => {
       if (!item?.assetKey || item.review) return false;
-      const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+      const photo = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
       const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
       const completeness = getPhotoTagCompleteness(currentTagsText, calendar);
       return !completeness.isComplete;
@@ -818,7 +819,7 @@ export function ChatGalleryModal({
           const index = cursor++;
           const item = unreviewed[index];
           try {
-            const cachedPhoto = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+            const cachedPhoto = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
             const photo = (cachedPhoto && (cachedPhoto.tags != null || cachedPhoto.sourceOwner))
               ? cachedPhoto
               : await fetchMediaAnalysisPhoto({
@@ -875,7 +876,7 @@ export function ChatGalleryModal({
       setIsBatchApplying(false);
       setBatchProgress({ current: 0, total: 0 });
     }
-  }, [calendar, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast, photoByAssetKey, analysisPhotoCache]);
+  }, [calendar, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast, analysisPhotoCache]);
   const rejectAnalysisTags = React.useCallback(async item => {
     if (!item?.assetKey) return;
     setAnalysisSavingAssetKey(item.assetKey);
@@ -1214,6 +1215,7 @@ export function ChatGalleryModal({
     });
     return map;
   }, [sharedPhotos]);
+  photoByAssetKeyRef.current = photoByAssetKey;
 
   React.useEffect(() => {
     if (activeTab !== 'analysis' || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
