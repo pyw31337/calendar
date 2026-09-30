@@ -439,7 +439,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   align-self: flex-start;
   margin-top: 2px;
   /* Same name badge as the V2 chat room (screens.css, .msg-row-hover > span:first-child). */
-  font-size: var(--font-size-2xs, 0.62rem);
+  font-size: var(--font-size-2xs, 0.75rem);
   font-weight: 800;
   padding: 2px 6px;
   margin-top: 1px;
@@ -497,7 +497,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 }
 .v2-design .v2-home-chat-time {
   /* Same timestamp as the V2 chat room. */
-  font-size: var(--font-size-2xs, 0.62rem);
+  font-size: var(--font-size-2xs, 0.75rem);
   color: #9ca3af;
   line-height: 1.25;
   white-space: nowrap;
@@ -874,7 +874,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design {
   --v2-badge-h: 22px;
   --v2-badge-pad-x: 8px;
-  --v2-badge-fs: 0.68rem;
+  --v2-badge-fs: max(12px, 0.75rem);
   --v2-chip-h: 32px;
   /* Event-sheet tabs use body-size labels; their populated state is a compact, shared dot. */
   --v2-event-sheet-tab-label-fs: 0.9rem;
@@ -952,7 +952,7 @@ html:has(.renewal-shell.v2-design) :is(
   min-height: var(--v2-badge-h, 20px) !important;
   border-radius: 9999px !important;
   line-height: 1 !important;
-  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-size: var(--v2-badge-fs, 0.75rem) !important;
   font-weight: 800 !important;
   text-align: center !important;
   vertical-align: middle !important;
@@ -1731,7 +1731,7 @@ html:has(.renewal-shell.v2-design) .bp-month-picker-apply {
   min-height: var(--v2-badge-h, 22px) !important;
   padding: 0 var(--v2-badge-pad-x, 8px) !important;
   line-height: 1 !important;
-  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-size: var(--v2-badge-fs, 0.75rem) !important;
   font-weight: 800 !important;
   border-radius: 999px !important;
   text-align: center;
@@ -1745,7 +1745,7 @@ html:has(.renewal-shell.v2-design) .bp-month-picker-apply {
   padding: 6px 14px !important;
   line-height: 130% !important;
   border-radius: 10px !important;
-  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-size: var(--v2-badge-fs, 0.75rem) !important;
   font-weight: 800 !important;
   text-align: left !important;
   word-break: break-word;
@@ -4314,7 +4314,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-location-copy > span {
   padding-left: 33px;
   margin-top: -4px !important;
   color: var(--v2-ink-3, var(--text-muted, #756d84));
-  font-size: var(--v2-fs-xs, 0.66rem);
+  font-size: var(--v2-fs-xs, 0.75rem);
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4371,7 +4371,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-date-eyebrow {
   color: var(--v2-primary, #7c2fe5);
   border-radius: var(--radius-full, 999px);
   background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.1));
-  font-size: var(--v2-fs-2xs, 0.6rem);
+  font-size: var(--v2-fs-2xs, 0.75rem);
   font-weight: 800;
 }
 
@@ -4417,7 +4417,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-day-choice {
   border-radius: var(--radius-full, 999px);
   background: var(--bg-card);
   font: inherit;
-  font-size: var(--v2-fs-xs, 0.66rem);
+  font-size: var(--v2-fs-xs, 0.75rem);
   font-weight: 750;
   white-space: nowrap;
   cursor: pointer;
@@ -4501,7 +4501,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-condition {
 
 html:has(.renewal-shell.v2-design) .weather-highlight-feels-like {
   color: var(--v2-ink-3, var(--text-muted, #756d84));
-  font-size: var(--v2-fs-xs, 0.66rem);
+  font-size: var(--v2-fs-xs, 0.75rem);
   font-weight: 650;
 }
 
@@ -4520,7 +4520,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-temperature {
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-temperature-label {
-  font-size: var(--v2-fs-2xs, 0.6rem);
+  font-size: var(--v2-fs-2xs, 0.75rem);
   font-weight: 800;
 }
 
@@ -4555,7 +4555,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-label {
   align-items: center;
   gap: 6px;
   color: var(--v2-ink-3, var(--text-muted, #756d84));
-  font-size: var(--v2-fs-xs, 0.66rem);
+  font-size: var(--v2-fs-xs, 0.75rem);
   font-weight: 750;
 }
 
@@ -4590,7 +4590,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-value {
 html:has(.renewal-shell.v2-design) .weather-detail-metric-note {
   overflow: hidden;
   color: var(--v2-ink-3, var(--text-muted, #756d84));
-  font-size: var(--v2-fs-2xs, 0.6rem);
+  font-size: var(--v2-fs-2xs, 0.75rem);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4626,7 +4626,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-primary-action {
   padding: 0 12px;
   border-radius: 10px;
   font: inherit;
-  font-size: var(--v2-fs-xs, 0.66rem);
+  font-size: var(--v2-fs-xs, 0.75rem);
   font-weight: 800;
   cursor: pointer;
 }
@@ -6295,8 +6295,8 @@ html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .v2-memo-card-title {
   padding-right: 58px !important;
   margin-bottom: 18px !important;
 }
-html:has(.renewal-shell.v2-design) .bp-renewal-home-place-note {
-  font-size: 0.8rem !important;
+html:has(.renewal-shell.v2-design) .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
+  font-size: max(12px, 0.8rem) !important;
 }
 
 /* In-page search sits in the header (or directly under it) and must stay visible.

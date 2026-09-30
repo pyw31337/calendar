@@ -161,7 +161,7 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /grid-template-columns:\s*repeat\(3, 1fr\)/);
   assert.match(design, /bp-day-cell\.bp-today \.bp-day-num/);
   assert.match(design, /bp-day-bar-stack/);
-  assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*0\.6rem/);
+  assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*(?:max\(12px,\s*)?0\.75rem/);
   assert.match(design, /\.festival-bar-desktop \.bp-day-anniversary-label/);
   assert.match(design, /--v2-fs-base:\s*0\.94rem/);
   assert.match(design, /--v2-fs-md:\s*0\.90rem/);

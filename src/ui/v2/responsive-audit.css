@@ -388,7 +388,7 @@
   min-height: var(--v2-badge-min-height, 20px) !important;
   padding: var(--v2-badge-pad, 3px 8px) !important;
   border-radius: var(--v2-badge-radius, 9999px) !important;
-  font-size: var(--v2-badge-font-size, 0.7rem) !important;
+  font-size: var(--v2-badge-font-size, 0.75rem) !important;
   font-weight: 800 !important;
   line-height: 1 !important;
   white-space: nowrap;

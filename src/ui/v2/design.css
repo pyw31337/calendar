@@ -1244,9 +1244,9 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* Type scale: BentoPinkFinal mock denseness + ~5–10% only (NOT bloated #634/#635).
  * Source: reference-home.css / pc-mock-scale-baseline.png. Remap --font-size-* for screens. */
 .v2-design {
-  --v2-fs-2xs:0.75rem;   /* mock meta/pill ~0.56–0.60 */
-  --v2-fs-xs:0.75rem;    /* mock weekday/corner ~0.60–0.66 */
-  --v2-fs-sm:0.75rem;    /* mock memo summary 0.72 + ~3% */
+  --v2-fs-2xs: max(12px, 0.75rem);   /* never under 12px, even at 80% root scale */
+  --v2-fs-xs: max(12px, 0.75rem);
+  --v2-fs-sm: max(12px, 0.75rem);
   --v2-fs-md: 0.90rem;    /* tested V2 chat body scale */
   --v2-fs-base: 0.94rem;  /* mock nav item 0.82 + ~15%; keep the tested V2 type scale */
   --v2-fs-lg: 0.94rem;    /* mock memo title 0.86 + ~9% */
@@ -1307,8 +1307,11 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 .v2-design .bp-place-name { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
 .v2-design .bp-place-addr { font-size: var(--v2-fs-xs) !important; }
-.v2-design .bp-place-note,
+.v2-design .bp-place-note:not(.bp-renewal-home-place-note),
 .v2-design .bp-place-tag { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
+  font-size: max(12px, 0.8rem) !important;
+}
 
 /* Side-nav type: see mock-parity block (explicit px under .v2-design) --
  * both .bp-side-nav-collapse-btn and .bp-header-title font-size are
@@ -1663,7 +1666,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   background: var(--brand, #7C2FE5);
   color: var(--on-brand, white);
   font: inherit;
-  font-size: var(--font-size-sm, 0.74rem);
+  font-size: var(--font-size-sm, 0.75rem);
   font-weight: 800;
   text-align: left;
   cursor: pointer;

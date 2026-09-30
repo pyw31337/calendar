@@ -81,11 +81,11 @@
      imperceptible) into whichever value in that cluster was already used most often. Rarer,
      more widely-spread sizes (headings, one-off badges) are left alone since collapsing them
      would be a real, unverified visual change rather than a no-op cleanup. */
-  --font-size-2xs:0.75rem;
-  --font-size-xs:0.75rem;
-  --font-size-sm:0.75rem;
-  --font-size-md: 0.8rem;
-  --font-size-base: 0.85rem;
+  --font-size-2xs: max(12px, 0.75rem);
+  --font-size-xs: max(12px, 0.75rem);
+  --font-size-sm: max(12px, 0.75rem);
+  --font-size-md: max(12px, 0.8rem);
+  --font-size-base: max(12px, 0.85rem);
 }
 
 /* Dark theme: an explicit choice via the header toggle stamps data-theme="dark"/"light" on
@@ -7872,7 +7872,7 @@ body:has(.v2-design) {
 .renewal-shell-main.is-calendar .renewal-home-place-card .renewal-home-place-note {
   overflow: hidden;
   color: var(--text-light);
-  font-size:0.75rem;
+  font-size: max(12px, 0.8rem);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

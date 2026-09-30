@@ -572,7 +572,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         historyWrap.style.gap = '4px';
         displayVisitEntries.forEach((entry, idx) => {
           const rowEl = document.createElement('div');
-          rowEl.style.fontSize = '0.72rem';
+          rowEl.style.fontSize = 'max(12px, 0.75rem)';
           rowEl.style.color = '#334155';
           rowEl.style.padding = '4px 0';
           rowEl.style.cursor = 'pointer';
@@ -652,7 +652,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           urlEl.style.display = 'inline-block';
           urlEl.style.padding = '2px 8px';
           urlEl.style.borderRadius = 'var(--radius-full)';
-          urlEl.style.fontSize = '0.68rem';
+          urlEl.style.fontSize = 'max(12px, 0.75rem)';
           urlEl.style.fontWeight = '600';
           urlEl.style.backgroundColor = '#E2E8F0';
           urlEl.style.color = '#475569';
