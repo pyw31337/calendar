@@ -30,7 +30,34 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
   assert.match(appShellJs, /areaName: String\(parsed\.areaName \|\| ''\)/, 'saved user weather regions retain their resolved area after a refresh');
 
   assert.match(css, /\.weather-detail-days-strip\s*\{[\s\S]*?touch-action:\s*pan-x;/, 'the horizontal date selector permits native horizontal panning');
+  assert.match(css, /\.weather-detail-days-strip\s*\{[\s\S]*?border-radius:\s*0\s*!important;/, 'days strip removes rounded pill borders');
+  assert.match(css, /\.weather-detail-days-strip\s*\{[\s\S]*?border-top:\s*0\s*!important;/, 'days strip removes top border');
+  assert.match(css, /\.weather-detail-region[\s\S]*?margin-top:\s*-4px\s*!important;/, 'the forecast area copy has narrowed margin');
   assert.match(css, /\.weather-detail-region/, 'the forecast area receives a dedicated V2 text treatment');
   assert.match(css, /\.weather-detail-icon-button/, 'header controls use the shared compact icon-button treatment');
   assert.match(css, /\.weather-detail-footer\s*\{[\s\S]*?safe-area-inset-bottom/, 'the weather modal footer remains above the iPhone home indicator');
+
+  // Location setting header subtitle
+  assert.match(weatherJs, /설정위치\s*:\s*\$\{displayLocationName\}/, 'region setting modal header displays current location subtitle');
+
+  // Metric cards custom SVG icons
+  assert.match(weatherJs, /lucide-cloud-rain-wind/, 'precipitation metric card renders cloud-rain-wind SVG');
+  assert.match(weatherJs, /lucide-factory/, 'air quality metric card renders factory SVG');
+  assert.match(weatherJs, /lucide-wind/, 'wind speed metric card renders wind SVG');
+  assert.match(weatherJs, /icon-tabler-uv-index/, 'UV index metric card renders uv-index SVG');
+
+  // Naver weather style hourly forecast tabs and chart
+  assert.match(weatherJs, /weather-hourly-tabs/, 'hourly forecast section renders category sub-tabs');
+  assert.match(weatherJs, /key:\s*'weather',\s*label:\s*'날씨'/, 'hourly forecast has weather/temp tab');
+  assert.match(weatherJs, /key:\s*'precip',\s*label:\s*'강수'/, 'hourly forecast has precip tab');
+  assert.match(weatherJs, /key:\s*'wind',\s*label:\s*'바람'/, 'hourly forecast has wind tab');
+  assert.match(weatherJs, /key:\s*'humidity',\s*label:\s*'습도'/, 'hourly forecast has humidity tab');
+  assert.match(weatherJs, /weather-hourly-col/, 'hourly columns render with individual borderless styling');
+  assert.match(css, /\.weather-hourly-col\s*\{[\s\S]*?border:\s*none\s*!important;/, 'hourly forecast boxes have borders removed');
+
+  // Weather highlight card redesign
+  assert.match(weatherJs, /getWeatherCardTheme/, 'weather highlight card uses dynamic weather gradient themes');
+  assert.match(weatherJs, /weather-highlight-temp-big/, 'weather highlight card features prominent large temperature typography');
+  assert.match(css, /\.weather-highlight-card\s*\{[\s\S]*?border-radius:\s*20px;/, 'weather highlight card uses 20px rounded card');
 });
+

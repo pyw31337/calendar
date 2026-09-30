@@ -4308,9 +4308,11 @@ html:has(.renewal-shell.v2-design) .weather-detail-place-name {
   white-space: nowrap;
 }
 
-html:has(.renewal-shell.v2-design) .weather-detail-region {
+html:has(.renewal-shell.v2-design) .weather-detail-region,
+html:has(.renewal-shell.v2-design) .weather-detail-location-copy > span {
   overflow: hidden;
   padding-left: 33px;
+  margin-top: -4px !important;
   color: var(--v2-ink-3, var(--text-muted, #756d84));
   font-size: var(--v2-fs-xs, 0.66rem);
   font-weight: 650;
@@ -4381,7 +4383,11 @@ html:has(.renewal-shell.v2-design) .weather-detail-days-strip {
   padding: 10px var(--weather-detail-space);
   overflow-x: auto;
   overflow-y: hidden;
-  border-bottom: 1px solid var(--v2-line, #f0eef5);
+  border-radius: 0 !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--v2-line, #f0eef5) !important;
   background: var(--bg-primary, #faf9fd);
   background: color-mix(in srgb, var(--bg-primary, #faf9fd) 80%, transparent);
   cursor: grab;
@@ -4390,6 +4396,13 @@ html:has(.renewal-shell.v2-design) .weather-detail-days-strip {
   user-select: none;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-inline: contain;
+}
+
+html:has(.renewal-shell.v2-design) .region-setting-current-location {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: var(--v2-primary, #7c2fe5) !important;
+  margin-left: 8px !important;
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-days-strip:active { cursor: grabbing; }
@@ -4432,23 +4445,15 @@ html:has(.renewal-shell.v2-design) .weather-highlight-card {
   justify-content: space-between;
   gap: 14px;
   overflow: hidden;
-  padding: 18px;
-  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(124, 47, 229, 0.13), rgba(53, 167, 237, 0.12));
-  background: linear-gradient(135deg, color-mix(in srgb, var(--v2-primary, #7c2fe5) 13%, var(--bg-card)), color-mix(in srgb, #35a7ed 12%, var(--bg-card)));
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.16), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  color: #ffffff;
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-card::after {
-  position: absolute;
-  inset: auto -24px -36px auto;
-  width: 132px;
-  height: 132px;
-  border-radius: var(--radius-full, 999px);
-  background: rgba(120, 200, 255, 0.24);
-  background: color-mix(in srgb, #78c8ff 24%, transparent);
-  content: '';
-  pointer-events: none;
+  display: none;
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-summary,
@@ -4593,11 +4598,15 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-note {
 html:has(.renewal-shell.v2-design) .weather-detail-metric-note.is-accent { color: var(--status-info, #3b82f6); }
 
 html:has(.renewal-shell.v2-design) .weather-hourly-timeline {
-  scroll-snap-type: inline proximity;
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
 }
 html:has(.renewal-shell.v2-design) .weather-hourly-timeline > * { scroll-snap-align: start; }
+html:has(.renewal-shell.v2-design) .weather-hourly-col {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
 
 html:has(.renewal-shell.v2-design) .weather-detail-footer {
   display: flex;

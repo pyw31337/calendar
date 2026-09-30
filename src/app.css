@@ -8409,3 +8409,22 @@ button.toggle-switch[role="switch"] {
   content-visibility: auto;
   contain-intrinsic-size: 90px 90px;
 }
+
+body .modal-overlay.region-filter-overlay .modal-header > h3 .region-setting-current-location {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: var(--brand, #7c2fe5) !important;
+  margin-left: 8px !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-detail-days-strip {
+  border-radius: 0 !important;
+  border-top: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-detail-header .weather-detail-location-copy > span {
+  margin-top: -4px !important;
+}
+

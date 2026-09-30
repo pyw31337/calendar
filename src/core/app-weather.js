@@ -186,7 +186,7 @@ export function fetchDetailedWeatherForecast(lat, lon) {
     }
   }
 
-  const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
+  const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
   const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=pm10,pm2_5,european_aqi&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
 
   return Promise.all([
@@ -221,6 +221,7 @@ export function fetchDetailedWeatherForecast(lat, lon) {
       forecastData.hourly.time.forEach((isoTime, idx) => {
         const dStr = isoTime.slice(0, 10);
         if (!hourlyMap[dStr]) hourlyMap[dStr] = [];
+        const rawWind = forecastData.hourly.wind_speed_10m?.[idx];
         hourlyMap[dStr].push({
           time: isoTime.slice(11, 16),
           isoTime,
@@ -230,6 +231,7 @@ export function fetchDetailedWeatherForecast(lat, lon) {
           precipProb: forecastData.hourly.precipitation_probability?.[idx] ?? 0,
           precip: forecastData.hourly.precipitation?.[idx] ?? 0,
           code: forecastData.hourly.weather_code?.[idx] ?? 0,
+          windSpeed: rawWind != null ? Math.round((rawWind / 3.6) * 10) / 10 : null,
         });
       });
     }

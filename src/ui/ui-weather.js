@@ -787,6 +787,19 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
     }
   };
 
+  const displayLocationName = currentLocationName || (() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem('gather_weather_user_location');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return formatWeatherLocationArea(parsed) || parsed.name || '';
+        }
+      }
+    } catch (_) {}
+    return '';
+  })();
+
   const modalNode = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay region-filter-overlay",
     onClick: onClose,
@@ -805,7 +818,20 @@ export function WeatherLocationSettingModal({ isOpen, onClose, onSelectLocation,
     }),
     /* Header */
     /*#__PURE__*/React.createElement("div", { className: "modal-header" },
-      /*#__PURE__*/React.createElement("h3", null, "지역 설정"),
+      /*#__PURE__*/React.createElement("h3", {
+        style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+      },
+        "지역 설정",
+        displayLocationName ? /*#__PURE__*/React.createElement("span", {
+          className: "region-setting-current-location",
+          style: {
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            color: 'var(--brand, #7C2FE5)',
+            letterSpacing: '-0.01em'
+          }
+        }, `설정위치 : ${displayLocationName}`) : null
+      ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
         (expandedSido || draftGugun || query) && /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -977,6 +1003,217 @@ function WeatherRegionSettingsIcon({ size = 20 }) {
   /*#__PURE__*/React.createElement('path', { d: 'm6.34 17.66-1.41 1.41' }));
 }
 
+function MetricIconRain({ size = 16, color = '#3ba7ee' }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    className: 'lucide lucide-cloud-rain-wind preview-icon',
+    'aria-hidden': 'true',
+    style: { display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm9.2 22 3-7' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm9 13-3 7' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm17 13-3 7' })
+  );
+}
+
+function MetricIconFactory({ size = 16, color = '#32b588' }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    className: 'lucide lucide-factory preview-icon',
+    'aria-hidden': 'true',
+    style: { display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M12 16h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M16 16h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M8 16h.01' })
+  );
+}
+
+function MetricIconWind({ size = 16, color = '#7c2fe5' }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    className: 'lucide lucide-wind preview-icon',
+    'aria-hidden': 'true',
+    style: { display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M12.8 19.6A2 2 0 1 0 14 16H2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M17.5 8a2.5 2.5 0 1 1 2 4H2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M9.8 4.4A2 2 0 1 1 11 8H2' })
+  );
+}
+
+function MetricIconUvIndex({ size = 16, color = '#f2ae2e' }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    className: 'icon icon-tabler icons-tabler-outline icon-tabler-uv-index',
+    'aria-hidden': 'true',
+    style: { display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }
+  },
+    /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M3 12h1m16 0h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7m-9.7 5.7a4 4 0 1 1 8 0' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 4v-1' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M13 16l2 5h1l2 -5' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M6 16v3a2 2 0 1 0 4 0v-3' })
+  );
+}
+
+function getWeatherCardTheme(code, isNight = false) {
+  const React = window.React;
+  if (isNight) {
+    return {
+      gradient: 'linear-gradient(135deg, #312E81 0%, #4338CA 45%, #6366F1 80%, #7C3AED 100%)',
+      art: /*#__PURE__*/React.createElement('svg', {
+        className: 'weather-highlight-art-night',
+        viewBox: '0 0 140 140',
+        fill: 'none',
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+      },
+        /* Stars */
+        /*#__PURE__*/React.createElement('circle', { cx: '30', cy: '25', r: '1.5', fill: 'rgba(255,255,255,0.85)' }),
+        /*#__PURE__*/React.createElement('circle', { cx: '55', cy: '18', r: '2', fill: 'rgba(255,255,255,0.95)' }),
+        /*#__PURE__*/React.createElement('circle', { cx: '48', cy: '48', r: '1.5', fill: 'rgba(255,255,255,0.7)' }),
+        /* Crescent moon */
+        /*#__PURE__*/React.createElement('path', { d: 'M96 28 A24 24 0 1 0 116 60 A28 28 0 0 1 96 28 Z', fill: '#FBBF24' }),
+        /* Soft cloud */
+        /*#__PURE__*/React.createElement('path', {
+          d: 'M55 78 A18 18 0 0 1 78 62 A22 22 0 0 1 112 66 A18 18 0 0 1 125 82 A16 16 0 0 1 120 95 L55 95 A16 16 0 0 1 55 78 Z',
+          fill: 'rgba(255, 255, 255, 0.88)'
+        })
+      )
+    };
+  }
+
+  // Rain / Shower / Thunderstorm
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99)) {
+    return {
+      gradient: 'linear-gradient(135deg, #0F766E 0%, #0D9488 40%, #06B6D4 75%, #3B82F6 100%)',
+      art: /*#__PURE__*/React.createElement('svg', {
+        className: 'weather-highlight-art-rain',
+        viewBox: '0 0 140 140',
+        fill: 'none',
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+      },
+        /* Cloud */
+        /*#__PURE__*/React.createElement('path', {
+          d: 'M45 56 A18 18 0 0 1 68 42 A22 22 0 0 1 104 46 A18 18 0 0 1 118 62 A15 15 0 0 1 112 76 L45 76 A15 15 0 0 1 45 56 Z',
+          fill: 'rgba(255, 255, 255, 0.92)'
+        }),
+        /* Lightning for storm */
+        (code >= 95) ? /*#__PURE__*/React.createElement('polygon', {
+          points: '76,74 68,88 75,88 70,102 84,84 78,84',
+          fill: '#FDE047'
+        }) : null,
+        /* Rain drops */
+        /*#__PURE__*/React.createElement('line', { x1: '52', y1: '82', x2: '47', y2: '94', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' }),
+        /*#__PURE__*/React.createElement('line', { x1: '64', y1: '86', x2: '59', y2: '98', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' }),
+        /*#__PURE__*/React.createElement('line', { x1: '88', y1: '82', x2: '83', y2: '94', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' }),
+        /*#__PURE__*/React.createElement('line', { x1: '100', y1: '84', x2: '95', y2: '96', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' })
+      )
+    };
+  }
+
+  // Snow
+  if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
+    return {
+      gradient: 'linear-gradient(135deg, #1E293B 0%, #334155 45%, #475569 80%, #64748B 100%)',
+      art: /*#__PURE__*/React.createElement('svg', {
+        className: 'weather-highlight-art-snow',
+        viewBox: '0 0 140 140',
+        fill: 'none',
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+      },
+        /* Cloud */
+        /*#__PURE__*/React.createElement('path', {
+          d: 'M45 56 A18 18 0 0 1 68 42 A22 22 0 0 1 104 46 A18 18 0 0 1 118 62 A15 15 0 0 1 112 76 L45 76 A15 15 0 0 1 45 56 Z',
+          fill: 'rgba(255, 255, 255, 0.92)'
+        }),
+        /* Snow dots */
+        /*#__PURE__*/React.createElement('circle', { cx: '52', cy: '88', r: '3', fill: 'rgba(255,255,255,0.95)' }),
+        /*#__PURE__*/React.createElement('circle', { cx: '68', cy: '96', r: '2.5', fill: 'rgba(255,255,255,0.9)' }),
+        /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '86', r: '3.5', fill: 'rgba(255,255,255,0.95)' }),
+        /*#__PURE__*/React.createElement('circle', { cx: '104', cy: '92', r: '2.5', fill: 'rgba(255,255,255,0.9)' })
+      )
+    };
+  }
+
+  // Cloudy / Partly Cloudy (codes 2, 3, 45, 48)
+  if (code === 2 || code === 3 || code === 45 || code === 48) {
+    return {
+      gradient: 'linear-gradient(135deg, #1D4ED8 0%, #2563EB 40%, #60A5FA 75%, #93C5FD 100%)',
+      art: /*#__PURE__*/React.createElement('svg', {
+        className: 'weather-highlight-art-cloud',
+        viewBox: '0 0 140 140',
+        fill: 'none',
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+      },
+        /* Peeking sun */
+        /*#__PURE__*/React.createElement('circle', { cx: '66', cy: '44', r: '24', fill: '#FDE047', opacity: '0.95' }),
+        /* Main cloud */
+        /*#__PURE__*/React.createElement('path', {
+          d: 'M40 76 A18 18 0 0 1 65 58 A24 24 0 0 1 102 62 A18 18 0 0 1 118 78 A16 16 0 0 1 112 95 L38 95 A16 16 0 0 1 40 76 Z',
+          fill: 'rgba(255, 255, 255, 0.92)'
+        })
+      )
+    };
+  }
+
+  // Default: Sunny / Clear (code 0, 1)
+  return {
+    gradient: 'linear-gradient(135deg, #1E88E5 0%, #29B6F6 45%, #38BDF8 70%, #FBBF24 100%)',
+    art: /*#__PURE__*/React.createElement('svg', {
+      className: 'weather-highlight-art-sun',
+      viewBox: '0 0 140 140',
+      fill: 'none',
+      style: { position: 'absolute', right: '-12px', top: '-18px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+    },
+      /* Outer soft aura */
+      /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '56', fill: 'rgba(254, 240, 138, 0.24)' }),
+      /* Mid aura */
+      /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '42', fill: 'rgba(253, 224, 71, 0.38)' }),
+      /* Sun disk */
+      /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '28', fill: '#FDE047' })
+    )
+  };
+}
+
 export function WeatherDetailModal({
   dateStr: initialDateStr,
   weatherLocation,
@@ -999,6 +1236,8 @@ export function WeatherDetailModal({
   const dayStripDragRef = React.useRef(null);
   const ignoreDayClickRef = React.useRef(false);
   const onSaveLocationRef = React.useRef(onSaveLocation);
+  const [hourlyTab, setHourlyTab] = React.useState('weather');
+  const timelineRef = React.useRef(null);
 
   React.useEffect(() => {
     onSaveLocationRef.current = onSaveLocation;
@@ -1136,6 +1375,10 @@ export function WeatherDetailModal({
 
   const targetDate = new Date(`${selectedDate}T00:00:00`);
   const isDateValid = !Number.isNaN(targetDate.getTime());
+  const now = new Date();
+  const isToday = isDateValid && now.toDateString() === targetDate.toDateString();
+  const currentHourNum = now.getHours();
+  const isNight = isToday ? (currentHourNum < 6 || currentHourNum >= 19) : false;
   const formattedDateTitle = isDateValid
     ? `${targetDate.getFullYear()}년 ${targetDate.getMonth() + 1}월 ${targetDate.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][targetDate.getDay()]})`
     : selectedDate;
@@ -1152,6 +1395,23 @@ export function WeatherDetailModal({
   const precipProb = daily?.precipProbMax != null ? Math.round(daily.precipProbMax) : 0;
   const windSpeed = daily?.windSpeedMax != null ? (Math.round((daily.windSpeedMax / 3.6) * 10) / 10).toFixed(1) : null;
   const uvIndex = daily?.uvIndexMax != null ? Math.round(daily.uvIndexMax) : null;
+
+  const currentHourly = isToday ? hourlyList.find(h => parseInt(h.time.split(':')[0], 10) === currentHourNum) : null;
+  const displayTemp = currentHourly?.temp != null
+    ? Math.round(currentHourly.temp)
+    : (maxTemp != null ? maxTemp : (hourlyList[0]?.temp != null ? Math.round(hourlyList[0].temp) : null));
+  const cardTheme = getWeatherCardTheme(weatherCode, isNight);
+  const dateParts = getWeatherDateParts(selectedDate);
+  const formattedDateText = dateParts
+    ? `${dateParts.monthDay} (${dateParts.weekday})`
+    : selectedDate;
+
+  React.useEffect(() => {
+    if (timelineRef.current && isToday) {
+      const scrollPos = Math.max(0, currentHourNum * 54 - 54);
+      timelineRef.current.scrollLeft = scrollPos;
+    }
+  }, [selectedDate, hourlyTab, isToday, currentHourNum]);
 
   const uvText = (uv) => {
     if (uv == null) return '보통';
@@ -1344,49 +1604,105 @@ export function WeatherDetailModal({
       !loading && !error && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Primary Highlight Card */
         /*#__PURE__*/React.createElement("div", {
-          className: "weather-highlight-card"
+          className: "weather-highlight-card",
+          style: {
+            background: cardTheme.gradient,
+            borderRadius: '20px',
+            padding: '20px 22px',
+            color: '#FFFFFF',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.16), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            minHeight: '124px'
+          }
         },
-          /* Left: Icon & Description */
+          /* Background Weather Art */
+          cardTheme.art,
+
+          /* Left: Condition, Big Temp, Feels like / High-Low */
           /*#__PURE__*/React.createElement("div", {
-            className: "weather-highlight-summary"
+            className: "weather-highlight-content-left",
+            style: { position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '2px' }
           },
+            /* Weather Condition */
+            /*#__PURE__*/React.createElement("span", {
+              className: "weather-highlight-condition",
+              style: { fontSize: '1.05rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.95)', letterSpacing: '-0.02em' }
+            }, weatherDesc),
+            /* Prominent Temperature Typography */
             /*#__PURE__*/React.createElement("div", {
-              className: "weather-highlight-icon"
-            }, getWeatherIcon(weatherCode, 32)),
+              className: "weather-highlight-temp-big",
+              style: {
+                fontSize: '3.2rem',
+                fontWeight: 850,
+                lineHeight: 1.05,
+                color: '#FFFFFF',
+                letterSpacing: '-0.035em',
+                fontVariantNumeric: 'tabular-nums'
+              }
+            }, `${displayTemp != null ? displayTemp : '--'}°`),
+            /* Sub details: feels-like & max/min */
             /*#__PURE__*/React.createElement("div", {
-              className: "weather-highlight-copy"
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.76rem',
+                fontWeight: 600,
+                color: 'rgba(255, 255, 255, 0.85)',
+                marginTop: '4px'
+              }
             },
-              /*#__PURE__*/React.createElement("span", {
-                className: "weather-highlight-condition"
-              }, weatherDesc),
-              apparentMax != null && /*#__PURE__*/React.createElement("span", {
-                className: "weather-highlight-feels-like"
-              }, `체감온도 약 ${apparentMax}°C`)
+              apparentMax != null && /*#__PURE__*/React.createElement("span", null, `체감 ${apparentMax}°C`),
+              maxTemp != null && minTemp != null && /*#__PURE__*/React.createElement("span", null, `최고 ${maxTemp}° / 최저 ${minTemp}°`)
             )
           ),
-          /* Right: High & Low Temperatures */
+
+          /* Right: Date & Location */
           /*#__PURE__*/React.createElement("div", {
-            className: "weather-highlight-temperatures"
+            className: "weather-highlight-content-right",
+            style: {
+              position: 'relative',
+              zIndex: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              gap: '4px',
+              textAlign: 'right'
+            }
           },
-            maxTemp != null && /*#__PURE__*/React.createElement("div", {
-              className: "weather-highlight-temperature weather-highlight-temperature-high"
+            /* Formatted Date */
+            /*#__PURE__*/React.createElement("span", {
+              style: {
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                color: 'rgba(255, 255, 255, 0.95)',
+                textShadow: '0 1px 3px rgba(0,0,0,0.15)'
+              }
+            }, formattedDateText),
+            /* Location with pin icon */
+            /*#__PURE__*/React.createElement("span", {
+              style: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                color: 'rgba(255, 255, 255, 0.85)',
+                textShadow: '0 1px 3px rgba(0,0,0,0.15)'
+              }
             },
-              /*#__PURE__*/React.createElement("span", {
-                className: "weather-highlight-temperature-label"
-              }, "최고"),
-              /*#__PURE__*/React.createElement("span", {
-                className: "weather-highlight-temperature-value"
-              }, `${maxTemp}°`)
-            ),
-            minTemp != null && /*#__PURE__*/React.createElement("div", {
-              className: "weather-highlight-temperature weather-highlight-temperature-low"
-            },
-              /*#__PURE__*/React.createElement("span", {
-                className: "weather-highlight-temperature-label"
-              }, "최저"),
-              /*#__PURE__*/React.createElement("span", {
-                className: "weather-highlight-temperature-value"
-              }, `${minTemp}°`)
+              /*#__PURE__*/React.createElement("svg", {
+                width: 12, height: 12, viewBox: "0 0 24 24", fill: "currentColor"
+              },
+                /*#__PURE__*/React.createElement("path", { d: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" })
+              ),
+              locationAreaLabel || locationName
             )
           )
         ),
@@ -1400,9 +1716,11 @@ export function WeatherDetailModal({
             className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              className: "weather-detail-metric-label"
+              className: "weather-detail-metric-label",
+              style: { display: 'flex', alignItems: 'center', gap: '6px' }
             },
-              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "강수량 및 확률"
+              /*#__PURE__*/React.createElement(MetricIconRain, { size: 16 }),
+              "강수량 및 확률"
             ),
             /*#__PURE__*/React.createElement("div", {
               className: "weather-detail-metric-value-row"
@@ -1421,9 +1739,11 @@ export function WeatherDetailModal({
             className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              className: "weather-detail-metric-label"
+              className: "weather-detail-metric-label",
+              style: { display: 'flex', alignItems: 'center', gap: '6px' }
             },
-              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "대기질 (미세먼지)"
+              /*#__PURE__*/React.createElement(MetricIconFactory, { size: 16 }),
+              "대기질 (미세먼지)"
             ),
             airQuality ? /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', gap: '3px' }
@@ -1468,9 +1788,11 @@ export function WeatherDetailModal({
             className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              className: "weather-detail-metric-label"
+              className: "weather-detail-metric-label",
+              style: { display: 'flex', alignItems: 'center', gap: '6px' }
             },
-              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "최대 풍속"
+              /*#__PURE__*/React.createElement(MetricIconWind, { size: 16 }),
+              "최대 풍속"
             ),
             /*#__PURE__*/React.createElement("span", {
               style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
@@ -1482,9 +1804,11 @@ export function WeatherDetailModal({
             className: "weather-detail-metric"
           },
             /*#__PURE__*/React.createElement("div", {
-              className: "weather-detail-metric-label"
+              className: "weather-detail-metric-label",
+              style: { display: 'flex', alignItems: 'center', gap: '6px' }
             },
-              /*#__PURE__*/React.createElement("span", { className: "weather-detail-metric-mark", "aria-hidden": "true" }), "자외선 지수"
+              /*#__PURE__*/React.createElement(MetricIconUvIndex, { size: 16 }),
+              "자외선 지수"
             ),
             /*#__PURE__*/React.createElement("span", {
               style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
@@ -1494,63 +1818,348 @@ export function WeatherDetailModal({
 
         /* Hourly Weather Timeline */
         hourlyList.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+          className: "weather-hourly-section",
+          style: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }
         },
+          /* Header: Title + Sub-tabs */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' }
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }
           },
             /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: 'var(--font-size-sm, 0.85rem)', fontWeight: 800, color: 'var(--text-main)' }
+              style: { fontSize: 'var(--font-size-sm, 0.88rem)', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
             }, "시간별 일기예보"),
-            /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: 'var(--font-size-xs, 0.75rem)', color: 'var(--text-muted)' }
-            }, "24시간")
+            /* 4 Sub-tabs: 날씨, 강수, 바람, 습도 */
+            /*#__PURE__*/React.createElement("div", {
+              className: "weather-hourly-tabs",
+              role: "tablist",
+              style: { display: 'flex', gap: '5px', alignItems: 'center' }
+            },
+              [
+                { key: 'weather', label: '날씨' },
+                { key: 'precip', label: '강수' },
+                { key: 'wind', label: '바람' },
+                { key: 'humidity', label: '습도' }
+              ].map(tab => /*#__PURE__*/React.createElement("button", {
+                key: tab.key,
+                type: "button",
+                role: "tab",
+                "aria-selected": hourlyTab === tab.key,
+                className: `weather-hourly-tab-btn${hourlyTab === tab.key ? ' is-active' : ''}`,
+                onClick: () => setHourlyTab(tab.key),
+                style: {
+                  padding: '4px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: hourlyTab === tab.key ? 800 : 600,
+                  color: hourlyTab === tab.key ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)',
+                  borderRadius: '999px',
+                  border: hourlyTab === tab.key ? '1.5px solid var(--v2-primary, #7C2FE5)' : '1px solid var(--border-subtle, rgba(0,0,0,0.12))',
+                  backgroundColor: hourlyTab === tab.key ? 'rgba(124, 47, 229, 0.08)' : 'transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }
+              }, tab.label))
+            )
           ),
+          /* Horizontally Scrollable Timeline (No box borders!) */
           /*#__PURE__*/React.createElement("div", {
+            ref: timelineRef,
             className: "weather-hourly-timeline",
             style: {
               display: 'flex',
-              gap: '8px',
               overflowX: 'auto',
-              padding: '4px 2px 8px',
-              scrollbarWidth: 'thin'
+              padding: '6px 2px 10px',
+              scrollbarWidth: 'thin',
+              touchAction: 'pan-x',
+              WebkitOverflowScrolling: 'touch'
             }
           },
-            hourlyList.map((h, idx) => {
-              const hourNum = parseInt(h.time.split(':')[0], 10);
-              const isNow = isDateValid && new Date().toDateString() === targetDate.toDateString() && new Date().getHours() === hourNum;
+            (() => {
+              const colWidth = 54;
+              const totalWidth = hourlyList.length * colWidth;
+
+              if (hourlyTab === 'weather') {
+                const temps = hourlyList.map(h => Number(h.temp ?? 0));
+                const minT = Math.min(...temps);
+                const maxT = Math.max(...temps);
+                const spanT = (maxT - minT) > 0 ? (maxT - minT) : 2;
+                const chartHeight = 64;
+                const pts = hourlyList.map((h, idx) => {
+                  const x = idx * colWidth + colWidth / 2;
+                  const tempVal = Number(h.temp ?? minT);
+                  const y = 20 + ((maxT - tempVal) / spanT) * (chartHeight - 34);
+                  return { x, y, temp: Math.round(tempVal), hourNum: parseInt(h.time.split(':')[0], 10), code: h.code };
+                });
+                const linePath = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+                return /*#__PURE__*/React.createElement("div", {
+                  style: { width: `${totalWidth}px`, display: 'flex', flexDirection: 'column' }
+                },
+                  /* SVG Curve Chart */
+                  /*#__PURE__*/React.createElement("svg", {
+                    width: totalWidth,
+                    height: chartHeight,
+                    style: { display: 'block', overflow: 'visible' }
+                  },
+                    /* Curve */
+                    /*#__PURE__*/React.createElement("path", {
+                      d: linePath,
+                      fill: "none",
+                      stroke: "var(--v2-primary, #7C2FE5)",
+                      strokeWidth: 2.2,
+                      strokeLinecap: "round",
+                      strokeLinejoin: "round",
+                      opacity: 0.55
+                    }),
+                    /* Points, Guide lines, and Temp labels */
+                    pts.map((p, idx) => {
+                      const isNow = isToday && currentHourNum === p.hourNum;
+                      return /*#__PURE__*/React.createElement("g", { key: idx },
+                        /* Vertical faint guide line */
+                        /*#__PURE__*/React.createElement("line", {
+                          x1: p.x,
+                          y1: p.y + 5,
+                          x2: p.x,
+                          y2: chartHeight,
+                          stroke: "var(--border-subtle, rgba(0,0,0,0.08))",
+                          strokeWidth: 1,
+                          strokeDasharray: "2,2"
+                        }),
+                        /* Temperature text */
+                        /*#__PURE__*/React.createElement("text", {
+                          x: p.x,
+                          y: p.y - 7,
+                          textAnchor: "middle",
+                          fontSize: "12",
+                          fontWeight: isNow ? "850" : "750",
+                          fill: isNow ? "var(--v2-primary, #7C2FE5)" : "var(--text-main, #1E293B)"
+                        }, `${p.temp}°`),
+                        /* Point circle */
+                        /*#__PURE__*/React.createElement("circle", {
+                          cx: p.x,
+                          cy: p.y,
+                          r: isNow ? 4.5 : 3.5,
+                          fill: isNow ? "var(--v2-primary, #7C2FE5)" : "var(--bg-card, #FFFFFF)",
+                          stroke: isNow ? "var(--v2-primary, #7C2FE5)" : "#94A3B8",
+                          strokeWidth: 2
+                        })
+                      );
+                    })
+                  ),
+                  /* Bottom Row: Weather Icon + Hour Label (No box borders) */
+                  /*#__PURE__*/React.createElement("div", {
+                    style: { display: 'flex', width: `${totalWidth}px` }
+                  },
+                    hourlyList.map((h, idx) => {
+                      const hourNum = parseInt(h.time.split(':')[0], 10);
+                      const isNow = isToday && currentHourNum === hourNum;
+                      return /*#__PURE__*/React.createElement("div", {
+                        key: idx,
+                        className: "weather-hourly-col",
+                        style: {
+                          width: `${colWidth}px`,
+                          flex: '0 0 auto',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 0',
+                          border: 'none',
+                          background: 'transparent'
+                        }
+                      },
+                        /* Weather Icon */
+                        /*#__PURE__*/React.createElement("div", {
+                          style: { height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+                        }, getWeatherIcon(h.code, 20)),
+                        /* Hour label */
+                        /*#__PURE__*/React.createElement("span", {
+                          style: {
+                            fontSize: '0.72rem',
+                            fontWeight: isNow ? 800 : 500,
+                            color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
+                          }
+                        }, isNow ? '현재' : `${hourNum}시`)
+                      );
+                    })
+                  )
+                );
+              }
+
+              if (hourlyTab === 'precip') {
+                return /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', width: `${totalWidth}px` }
+                },
+                  hourlyList.map((h, idx) => {
+                    const hourNum = parseInt(h.time.split(':')[0], 10);
+                    const isNow = isToday && currentHourNum === hourNum;
+                    const prob = Math.round(h.precipProb ?? 0);
+                    const barHeight = Math.max(4, Math.round(prob * 0.45));
+                    return /*#__PURE__*/React.createElement("div", {
+                      key: idx,
+                      className: "weather-hourly-col",
+                      style: {
+                        width: `${colWidth}px`,
+                        flex: '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 0',
+                        border: 'none',
+                        background: 'transparent'
+                      }
+                    },
+                      /* Percentage */
+                      /*#__PURE__*/React.createElement("span", {
+                        style: { fontSize: '0.74rem', fontWeight: 750, color: prob > 0 ? '#3B82F6' : 'var(--text-muted)' }
+                      }, `${prob}%`),
+                      /* Bar area */
+                      /*#__PURE__*/React.createElement("div", {
+                        style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }
+                      },
+                        /*#__PURE__*/React.createElement("div", {
+                          style: {
+                            width: '14px',
+                            height: `${barHeight}px`,
+                            borderRadius: '4px',
+                            backgroundColor: prob > 0 ? '#3B82F6' : 'rgba(0,0,0,0.06)'
+                          }
+                        })
+                      ),
+                      /* Rain Icon */
+                      /*#__PURE__*/React.createElement("div", {
+                        style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+                      }, /*#__PURE__*/React.createElement(MetricIconRain, { size: 14, color: prob > 0 ? '#3B82F6' : 'var(--text-muted)' })),
+                      /* Hour label */
+                      /*#__PURE__*/React.createElement("span", {
+                        style: {
+                          fontSize: '0.72rem',
+                          fontWeight: isNow ? 800 : 500,
+                          color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
+                        }
+                      }, isNow ? '현재' : `${hourNum}시`)
+                    );
+                  })
+                );
+              }
+
+              if (hourlyTab === 'wind') {
+                return /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', width: `${totalWidth}px` }
+                },
+                  hourlyList.map((h, idx) => {
+                    const hourNum = parseInt(h.time.split(':')[0], 10);
+                    const isNow = isToday && currentHourNum === hourNum;
+                    const speed = h.windSpeed != null ? Number(h.windSpeed).toFixed(1) : (windSpeed || '2.0');
+                    const barHeight = Math.min(48, Math.max(6, Math.round(Number(speed) * 6)));
+                    return /*#__PURE__*/React.createElement("div", {
+                      key: idx,
+                      className: "weather-hourly-col",
+                      style: {
+                        width: `${colWidth}px`,
+                        flex: '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 0',
+                        border: 'none',
+                        background: 'transparent'
+                      }
+                    },
+                      /* Speed text */
+                      /*#__PURE__*/React.createElement("span", {
+                        style: { fontSize: '0.72rem', fontWeight: 750, color: 'var(--v2-primary, #7C2FE5)' }
+                      }, `${speed}m/s`),
+                      /* Bar area */
+                      /*#__PURE__*/React.createElement("div", {
+                        style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }
+                      },
+                        /*#__PURE__*/React.createElement("div", {
+                          style: {
+                            width: '14px',
+                            height: `${barHeight}px`,
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--v2-primary, #7C2FE5)',
+                            opacity: 0.8
+                          }
+                        })
+                      ),
+                      /* Wind Icon */
+                      /*#__PURE__*/React.createElement("div", {
+                        style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+                      }, /*#__PURE__*/React.createElement(MetricIconWind, { size: 14 })),
+                      /* Hour label */
+                      /*#__PURE__*/React.createElement("span", {
+                        style: {
+                          fontSize: '0.72rem',
+                          fontWeight: isNow ? 800 : 500,
+                          color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
+                        }
+                      }, isNow ? '현재' : `${hourNum}시`)
+                    );
+                  })
+                );
+              }
+
+              // humidity
               return /*#__PURE__*/React.createElement("div", {
-                key: idx,
-                style: {
-                  flex: '0 0 auto',
-                  width: '62px',
-                  padding: '10px 4px',
-                  borderRadius: '14px',
-                  backgroundColor: isNow ? 'rgba(124, 58, 237, 0.12)' : 'var(--bg-primary, rgba(0,0,0,0.02))',
-                  border: isNow ? '1.5px solid var(--v2-accent, #7C3AED)' : '1px solid var(--border-subtle, rgba(0,0,0,0.06))',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  boxSizing: 'border-box'
-                }
+                style: { display: 'flex', width: `${totalWidth}px` }
               },
-                /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.72rem', fontWeight: isNow ? 800 : 600, color: isNow ? 'var(--v2-accent, #7C3AED)' : 'var(--text-muted)' }
-                }, isNow ? '현재' : h.time),
-                /*#__PURE__*/React.createElement("div", {
-                  style: { height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-                }, getWeatherIcon(h.code, 18)),
-                /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }
-                }, h.temp != null ? `${Math.round(h.temp)}°` : '-'),
-                h.precipProb > 0 ? /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.66rem', fontWeight: 700, color: '#3B82F6' }
-                }, `${Math.round(h.precipProb)}%`) : /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.66rem', color: 'transparent' }
-                }, "-")
+                hourlyList.map((h, idx) => {
+                  const hourNum = parseInt(h.time.split(':')[0], 10);
+                  const isNow = isToday && currentHourNum === hourNum;
+                  const hum = Math.round(h.humidity ?? 50);
+                  const barHeight = Math.max(6, Math.round(hum * 0.48));
+                  return /*#__PURE__*/React.createElement("div", {
+                    key: idx,
+                    className: "weather-hourly-col",
+                    style: {
+                      width: `${colWidth}px`,
+                      flex: '0 0 auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 0',
+                      border: 'none',
+                      background: 'transparent'
+                    }
+                  },
+                    /* Humidity text */
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { fontSize: '0.74rem', fontWeight: 750, color: '#06B6D4' }
+                    }, `${hum}%`),
+                    /* Bar area */
+                    /*#__PURE__*/React.createElement("div", {
+                      style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }
+                    },
+                      /*#__PURE__*/React.createElement("div", {
+                        style: {
+                          width: '14px',
+                          height: `${barHeight}px`,
+                          borderRadius: '4px',
+                          backgroundColor: '#06B6D4',
+                          opacity: 0.85
+                        }
+                      })
+                    ),
+                    /* Droplet icon */
+                    /*#__PURE__*/React.createElement("div", {
+                      style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+                    }, /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem' } }, "💧")),
+                    /* Hour label */
+                    /*#__PURE__*/React.createElement("span", {
+                      style: {
+                        fontSize: '0.72rem',
+                        fontWeight: isNow ? 800 : 500,
+                        color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
+                      }
+                    }, isNow ? '현재' : `${hourNum}시`)
+                  );
+                })
               );
-            })
+            })()
           )
         )
       )
@@ -1589,7 +2198,7 @@ export function WeatherDetailModal({
     /* Location Setting Modal */
     showLocationPicker && /*#__PURE__*/React.createElement(WeatherLocationSettingModal, {
       isOpen: true,
-      currentLocationName: locationName,
+      currentLocationName: locationAreaLabel || locationName,
       onClose: () => setShowLocationPicker(false),
       onSelectLocation: (newLoc) => {
         setShowLocationPicker(false);
