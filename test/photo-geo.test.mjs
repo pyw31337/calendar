@@ -17,7 +17,7 @@ test('geo map is keyed by the canonical asset key and skips photos without GPS',
   assert.ok(!isValidCoordinatePair(91, 0));
 });
 
-test('persisting is best effort: a rejected update resolves false instead of throwing', async () => {
+test('legacy follow-up persistence remains best effort for already-installed older clients', async () => {
   const calls = [];
   const db = { collection: c1 => ({ doc: d1 => ({ collection: c2 => ({ doc: d2 => ({ update: async data => { calls.push([c1, d1, c2, d2, data]); throw Object.assign(new Error('denied'), { code: 'permission-denied' }); } }) }) }) }) };
   const ok = await persistImageGeoMap({ db, calendarId: 'cw', docId: 'm1', geoMap: { k: { lat: 1, lng: 2 } } });

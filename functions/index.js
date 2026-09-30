@@ -9,6 +9,7 @@ const nodemailer = require('nodemailer');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
+const { buildKakaoLocationTags, appendLocationTags } = require('./photo-location-tags');
 const { MAX_BATCH_ITEMS, MAX_TAGS, sanitizeAnalysisItem, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
 const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
@@ -1499,6 +1500,111 @@ exports.kakaoLocalSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIM
     res.status(502).json({ ok: false, message: isCoord ? 'Kakao coord2address request failed' : 'Kakao local search request failed' });
   }
 });
+
+function photoGeoSignature(geo) {
+  const lat = Number(geo?.latitude);
+  const lng = Number(geo?.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(5)},${lng.toFixed(5)}` : '';
+}
+
+async function fetchKakaoCoordinateTags(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return [];
+  const cacheKey = `coord-tags:${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const cached = await readExternalCache('kakaoCoordTags', cacheKey);
+  if (Array.isArray(cached?.tags)) return cached.tags;
+  if (!KAKAO_REST_API_KEY) {
+    console.error('Photo location tagging skipped: KAKAO_REST_API_KEY is not configured.');
+    return [];
+  }
+  const kakaoUrl = `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${encodeURIComponent(String(lng))}&y=${encodeURIComponent(String(lat))}`;
+  const response = await fetch(kakaoUrl, { headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` } });
+  await incrementKakaoLocalSearchStat();
+  if (!response.ok) throw new Error(`Kakao photo reverse geocode failed: ${response.status}`);
+  const payload = await response.json();
+  const tags = buildKakaoLocationTags(payload?.documents?.[0]);
+  // Cache even an empty Korean result so a coordinate outside Kakao's coverage cannot repeatedly
+  // consume quota on future edits of the same message.
+  await writeExternalCache('kakaoCoordTags', cacheKey, { tags }, 24 * 60 * 60 * 1000);
+  return tags;
+}
+
+async function mapWithConcurrency(items, mapper, concurrency = 4) {
+  const source = Array.isArray(items) ? items : [];
+  const workers = Array.from({ length: Math.min(Math.max(1, concurrency), source.length) }, async (_, workerIndex) => {
+    for (let index = workerIndex; index < source.length; index += concurrency) await mapper(source[index]);
+  });
+  await Promise.all(workers);
+}
+
+// Browser reverse geocoding is intentionally optional: a network interruption must not hold up an
+// image upload. When EXIF GPS did arrive, this trusted server-side backstop completes only the
+// missing administrative tags. It runs only for a newly-added coordinate, so a later user tag
+// deletion is respected and never reintroduced by an unrelated message edit.
+exports.completePhotoLocationTags = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'] })
+  .firestore.document('calendars/{calendarDocId}/messages/{messageId}')
+  .onWrite(async change => {
+    if (!change.after.exists) return null;
+    const after = change.after.data() || {};
+    const before = change.before.exists ? (change.before.data() || {}) : {};
+    const previousGeoByAsset = new Map(getMessageImageEntriesForIndex(before).map(entry => [
+      getPhotoAssetKey(entry.imageUrl || entry.thumbUrl),
+      photoGeoSignature(readImageGeo(before, getPhotoAssetKey(entry.imageUrl || entry.thumbUrl)))
+    ]));
+    const newGeoEntries = getMessageImageEntriesForIndex(after)
+      .map(entry => ({ ...entry, assetKey: getPhotoAssetKey(entry.imageUrl || entry.thumbUrl) }))
+      .map(entry => ({ ...entry, geo: readImageGeo(after, entry.assetKey) }))
+      .filter(entry => entry.assetKey && entry.geo && photoGeoSignature(entry.geo) !== previousGeoByAsset.get(entry.assetKey));
+    if (!newGeoEntries.length) return null;
+
+    const geoByCoordinate = new Map();
+    newGeoEntries.forEach(entry => {
+      const coordinate = photoGeoSignature(entry.geo);
+      if (!geoByCoordinate.has(coordinate)) geoByCoordinate.set(coordinate, entry.geo);
+    });
+    const tagsByCoordinate = new Map();
+    await mapWithConcurrency(Array.from(geoByCoordinate.entries()), async ([coordinate, geo]) => {
+      tagsByCoordinate.set(coordinate, await fetchKakaoCoordinateTags(geo.latitude, geo.longitude));
+    });
+    const locationTagsByAsset = new Map();
+    await mapWithConcurrency(newGeoEntries, async entry => {
+      const coordinate = photoGeoSignature(entry.geo);
+      const tags = tagsByCoordinate.get(coordinate);
+      if (tags?.length) locationTagsByAsset.set(entry.assetKey, tags);
+    });
+    if (!locationTagsByAsset.size) return null;
+
+    await admin.firestore().runTransaction(async transaction => {
+      const snapshot = await transaction.get(change.after.ref);
+      if (!snapshot.exists) return;
+      const latest = snapshot.data() || {};
+      const imageTags = Array.isArray(latest.imageTags) ? latest.imageTags.slice() : [];
+      const imageTagMap = latest.imageTagMap && typeof latest.imageTagMap === 'object' && !Array.isArray(latest.imageTagMap)
+        ? { ...latest.imageTagMap }
+        : {};
+      let changed = false;
+      getMessageImageEntriesForIndex(latest).forEach(entry => {
+        const assetKey = getPhotoAssetKey(entry.imageUrl || entry.thumbUrl);
+        const locationTags = locationTagsByAsset.get(assetKey);
+        if (!locationTags?.length) return;
+        const current = String(Object.prototype.hasOwnProperty.call(imageTagMap, assetKey) ? imageTagMap[assetKey] : (imageTags[entry.index] || ''));
+        const next = appendLocationTags(current, locationTags);
+        if (next === current) return;
+        while (imageTags.length <= entry.index) imageTags.push('');
+        imageTags[entry.index] = next;
+        imageTagMap[assetKey] = next;
+        changed = true;
+      });
+      if (!changed) return;
+      transaction.update(change.after.ref, {
+        imageTags,
+        imageTagMap: reconcileImageTagMapForIndex({ ...latest, imageTags, imageTagMap }, imageTagMap)
+      });
+    });
+    return null;
+  });
 
 // Overseas 장소 검색 폴백 -- Kakao Local is Korea-only, so PlaceRegisterModal.handleSearch only
 // calls this when a Kakao search comes back empty (see assets/app-main.js), which in practice

@@ -5,9 +5,9 @@
  * 장소 files a photo under the registered place it was taken at -- including places registered
  * after the upload, which the upload-time place tag cannot cover.
  *
- * Coordinates are written as a separate, best-effort update AFTER the message itself is saved: a
- * client that runs before the matching firestore.rules deploy then only loses the coordinates,
- * never the upload.
+ * Current upload paths write coordinates atomically with their message. `persistImageGeoMap` stays
+ * as a safe compatibility helper for already-installed clients that still use the old follow-up
+ * update, so a rules mismatch can never make the actual image upload fail.
  */
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 

@@ -1,7 +1,7 @@
 'use strict';
-// GPS on photoIndex rows (보관함 > 장소). The client stores per-photo coordinates on the message as
-// imageGeoMap (src/core/photo-geo.js); getPhotoIndexEntries copies them onto each owner entry and
-// syncCanonicalPhotoIndex puts them on the canonical row via pickPhotoIndexGeo.
+// GPS on photoIndex rows (보관함 > 장소). Current clients store per-photo coordinates atomically on
+// the message as imageGeoMap (older clients may use a follow-up compatibility write); getPhotoIndexEntries
+// copies them onto each owner entry and syncCanonicalPhotoIndex puts them on the canonical row.
 
 function isIndexGeoPair(lat, lng) {
   return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
@@ -17,10 +17,8 @@ function readImageGeo(data, assetKey) {
 }
 
 // GPS for the canonical row: from any owner that carries it (the selected owner may be another
-// copy of the same asset that never had coordinates), else kept from the existing row. The
-// client writes imageGeoMap in a second update right after creating the message, so the create
-// and update events race; when the create event's transaction commits last, its owner has no
-// coordinates and would otherwise wipe the ones the update event just stored.
+// copy of the same asset that never had coordinates), else kept from the existing row. The latter
+// preserves a coordinate written by an older client in a follow-up update if event delivery races.
 function pickPhotoIndexGeo(owners, existing) {
   const withGeo = (owners || []).find(owner => isIndexGeoPair(Number(owner && owner.latitude), Number(owner && owner.longitude)));
   if (withGeo) return { latitude: Number(withGeo.latitude), longitude: Number(withGeo.longitude) };
