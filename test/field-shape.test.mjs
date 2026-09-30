@@ -130,9 +130,13 @@ test('Chat and memo file attachments collection and gallery photo filtering', as
   assert.match(chatFilesJs, /\(Array\.isArray\(memos\) \? memos : \[\]\)\.forEach\(memo => \{/, 'scans memos for file attachments');
   assert.match(galleryJs, /import \{ collectChatFileAttachmentsFromMessages \} from '\.\.\/core\/chat-file-attachments\.js';/, 'ui-chat-gallery imports collectChatFileAttachmentsFromMessages');
 
-  // Photo filtering excludes links and external service urls
-  assert.match(galleryJs, /\.filter\(photo => !isGalleryWebLinkPhoto\(photo\)\)/, 'sharedPhotos keeps stored media and drops webpage links');
-  assert.match(galleryDataJs, /export function isGalleryWebLinkPhoto/, 'stored gallery media is not treated as an external link');
+  // Photo, file, and link tabs share one classifier. A storage host is not a photo.
+  assert.match(galleryJs, /classifyGalleryItem\(photo\) === 'photo'/, 'sharedPhotos keeps only items classified as photos');
+  assert.match(galleryJs, /classifyGalleryItem\(item\) === 'link'/, 'links tab uses the gallery classifier');
+  assert.match(galleryJs, /classifyGalleryItem\(item\) === 'file'/, 'files tab uses the gallery classifier');
+  assert.match(galleryJs, /getPhotoTagCompleteness/, 'AI analysis uses the shared person-tag completeness check');
+  assert.match(galleryDataJs, /export function isGalleryWebLinkPhoto/, 'webpage rows are still excluded from stored photos');
+  assert.match(galleryDataJs, /classifyGalleryItem\(photo\) === 'link'/, 'web-link check delegates to the classifier');
   assert.match(galleryDataJs, /const hasPhotos = Boolean\(memo\.imageUrl \|\| \(Array\.isArray\(memo\.imageUrls\) && memo\.imageUrls\.length > 0\)/, 'composeGalleryPhotos skips memos without uploaded photos');
 });
 

@@ -2,7 +2,9 @@
  * Chat / gallery modal (P4-13)
  */
 
-import { composeGalleryPhotos, getPaginationWindow, isGalleryWebLinkPhoto, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
+import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
+import { classifyGalleryItem, dedupeGalleryFiles, galleryFileViewModel } from '../core/gallery-item-kind.js';
+import { getPhotoTagCompleteness } from '../core/photo-tag-completeness.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
@@ -54,41 +56,6 @@ function createAnalysisTagChange(item, photo, finalTags) {
       thumb: thumbUrl,
       thumbUrl,
     },
-  };
-}
-
-function getPhotoTagCompleteness(tagsText, calendar) {
-  const rawTags = String(tagsText || '')
-    .split(/[\s,#]+/)
-    .map(t => t.trim().toLowerCase())
-    .filter(Boolean);
-
-  // 1. 날짜: 6자리 숫자 (예: 250615, 250330) 또는 8자리 숫자 (20250615) 또는 YYYY-MM-DD
-  const hasDate = rawTags.some(tag => /^\d{6}$/.test(tag) || /^\d{8}$/.test(tag) || /^\d{4}[.\-_]?\d{2}[.\-_]?\d{2}$/.test(tag));
-
-  // 2. 장소: calendar.places 매칭
-  const placeNames = (Array.isArray(calendar?.places) ? calendar.places : [])
-    .map(p => String(p?.name || p?.title || '').trim().toLowerCase())
-    .filter(Boolean);
-  const hasPlace = rawTags.some(tag => placeNames.some(name => tag.includes(name) || name.includes(tag)));
-
-  // 3. 인물: calendar.participants 매칭
-  const participantNames = (Array.isArray(calendar?.participants) ? calendar.participants : [])
-    .map(p => String(p?.name || '').trim().toLowerCase())
-    .filter(Boolean);
-  const hasPerson = rawTags.some(tag => participantNames.some(name => tag.includes(name) || name.includes(tag)));
-
-  const missing = [];
-  if (!hasDate) missing.push('날짜');
-  if (!hasPlace) missing.push('장소');
-  if (!hasPerson) missing.push('인물');
-
-  return {
-    hasDate,
-    hasPlace,
-    hasPerson,
-    isComplete: missing.length === 0,
-    missing
   };
 }
 
@@ -794,8 +761,13 @@ export function ChatGalleryModal({
     const unreviewed = (mediaAnalysis.items || []).filter(item => {
       if (!item?.assetKey || item.review) return false;
       const photo = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+      if (photo && classifyGalleryItem(photo) !== 'photo') return false;
       const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
-      const completeness = getPhotoTagCompleteness(currentTagsText, calendar);
+      const completeness = getPhotoTagCompleteness(currentTagsText, calendar, {
+        caption: photo?.caption,
+        tags: photo?.tags,
+        personTags: photo?.personTags
+      });
       return !completeness.isComplete;
     });
     if (!unreviewed.length) {
@@ -1150,7 +1122,9 @@ export function ChatGalleryModal({
         });
       });
     });
-    return list.sort((a, b) => b.timestamp - a.timestamp);
+    return list
+      .filter(item => classifyGalleryItem(item) === 'link')
+      .sort((a, b) => b.timestamp - a.timestamp);
   }, [sourceChatMessages, sourceMemos, calendar]);
 
   const sharedPhotos = React.useMemo(() => {
@@ -1167,8 +1141,8 @@ export function ChatGalleryModal({
         })
         // Meme keyboard stickers
         .filter(photo => !isMemeKeyboardPhotoEntry(photo))
-        // Photos tab must only contain real photos, not link URLs
-        .filter(photo => !isGalleryWebLinkPhoto(photo))
+        // One classifier: storage PDFs are files, webpages are links, images are photos.
+        .filter(photo => classifyGalleryItem(photo) === 'photo')
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)
@@ -1345,9 +1319,25 @@ export function ChatGalleryModal({
 
   const sharedFiles = React.useMemo(() => {
     const collect = collectChatFileAttachments;
-    if (typeof collect !== 'function') return [];
-    return collect(sourceChatMessages || [], sourceMemos || []);
-  }, [sourceChatMessages, sourceMemos]);
+    const fromMessages = typeof collect === 'function'
+      ? collect(sourceChatMessages || [], sourceMemos || [])
+      : [];
+    // Photo-index rows used to stay in 사진 whenever the URL was Firebase Storage,
+    // so a PDF storage object was both a file card and a photo tile.
+    const fromIndex = (Array.isArray(indexedPhotos) ? indexedPhotos : [])
+      .filter(photo => classifyGalleryItem(photo) === 'file')
+      .map(galleryFileViewModel);
+    const fromLinkText = [];
+    (sourceChatMessages || []).forEach(msg => {
+      extractAllUrlInfosLoose(msg?.text || '').forEach(info => {
+        if (info?.url && classifyGalleryItem({ url: info.url }) === 'file') {
+          fromLinkText.push(galleryFileViewModel({ url: info.url, messageId: msg.id, timestamp: msg.timestamp, uploadSource: 'chat' }));
+        }
+      });
+    });
+    return dedupeGalleryFiles([...fromMessages, ...fromIndex, ...fromLinkText]
+      .filter(item => classifyGalleryItem(item) === 'file'));
+  }, [sourceChatMessages, sourceMemos, indexedPhotos]);
 
   const filteredFiles = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedFiles;
@@ -1376,7 +1366,7 @@ export function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
   const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
-    if (isGalleryWebLinkPhoto(photo)) return false;
+    if (classifyGalleryItem(photo) !== 'photo') return false;
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
@@ -2958,9 +2948,14 @@ export function ChatGalleryModal({
       const reviewed = [];
       for (const item of allItems) {
         const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+        if (photo && classifyGalleryItem(photo) !== 'photo') continue;
         const isReviewed = Boolean(item.review);
         const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
-        const completeness = getPhotoTagCompleteness(currentTagsText, calendar);
+        const completeness = getPhotoTagCompleteness(currentTagsText, calendar, {
+        caption: photo?.caption,
+        tags: photo?.tags,
+        personTags: photo?.personTags
+      });
         const isHandled = isReviewed || completeness.isComplete;
         const meta = { item, photo, completeness, isReviewed, isHandled };
         if (isHandled) {

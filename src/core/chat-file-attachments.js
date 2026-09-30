@@ -1,6 +1,7 @@
 /* Chat file attachment helpers — documents upload beside the existing chat image pipeline. */
 
 import { uploadBlobWithWatchdog } from './app-media-upload.js';
+import { dedupeGalleryFiles } from './gallery-item-kind.js';
 
 export const MAX_CHAT_FILE_BYTES = 20 * 1024 * 1024;
 export const MAX_CHAT_FILE_ATTACHMENTS = 20;
@@ -462,7 +463,11 @@ export function collectChatFileAttachmentsFromMessages(messages, memos = []) {
     });
   });
   list.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-  return list;
+  // The same PDF was emitted twice because this concatenated every message and
+  // every memo attachment with no identity check. A shared Storage path (or the
+  // same name+size when the path is missing) is one file, even when two
+  // documents point at it. Message id is the owner, not the duplicate key.
+  return dedupeGalleryFiles(list);
 }
 
 if (typeof window !== 'undefined') {
