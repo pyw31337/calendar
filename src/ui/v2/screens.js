@@ -991,7 +991,7 @@ export function SettlementScreen(p) {
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
         ),
-        overlays({ ...slots, tabs: flushTabs, body: flushBody }, ['body', 'tabs'])
+        overlays({ ...slots, tabs: flushTabs, body: flushBody }, ['body', 'tabs', 'search'])
       );
     }
     return h(

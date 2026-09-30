@@ -2116,7 +2116,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         });
         return;
       }
-      if (/memo-view-header|admin-side-menu-overlay/.test(cls)) return;
+      if (/memo-view-header|admin-side-menu-overlay|inline-search-bar/.test(cls)) return;
       if (node.type === 'button') return;
       lifted.push(node);
     });
