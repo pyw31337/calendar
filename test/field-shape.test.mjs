@@ -99,7 +99,7 @@ test('Hero weather D-day calculation and badge styling', async () => {
   assert.match(appUtilsJs, /return `D-\$\{diffDays\}`;/, 'formatDDayLabel returns D-N for future dates');
 
   // Verify weather row badge font size and white-space
-  assert.match(designCss, /\.v2-design \.bp-hero-weather-dday-badge\s*\{[\s\S]*?font-size:\s*\.6rem !important;/, 'dday badge uses .6rem font size');
+  assert.match(designCss, /\.v2-design \.bp-hero-weather-dday-badge\s*\{[\s\S]*?font-size:\s*0?\.75rem !important;/, 'dday badge stays at the 12px floor');
   assert.match(designCss, /\.v2-design \.bp-hero-weather-dday-badge\s*\{[\s\S]*?white-space:\s*nowrap !important;/, 'dday badge prevents wrapping');
   assert.match(designCss, /\.v2-design \.bp-hero-weather-past-dday\s*\{[\s\S]*?animation:\s*none !important;/, 'past dday badge disables animation');
 
