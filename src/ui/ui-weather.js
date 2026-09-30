@@ -5,7 +5,8 @@
 import {
   getWeatherIcon as getCoreWeatherIcon,
   getWeatherDescription,
-  fetchDetailedWeatherForecast
+  fetchDetailedWeatherForecast,
+  resolveDailyForecast
 } from '../core/app-weather.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
@@ -272,11 +273,10 @@ export function WeatherBadge({ weatherLocation }) {
 
 /**
  * Daily forecast for a single date (confirmed-meeting banner). Open-Meteo only forecasts ~16 days
- * ahead, so past dates and dates further out render nothing. Memory-only cache (no Firestore /
- * localStorage) keyed by rounded coords + date; concurrent banners share one in-flight request.
+ * ahead, so past dates and dates further out render nothing. The hero strip and this badge share
+ * resolveDailyForecast (same rounded coordinates, same daily max + weather code).
  */
 const DAILY_FORECAST_MAX_DAYS = 15;
-const __dailyWeatherMem = typeof Map !== 'undefined' ? new Map() : null;
 
 function daysAheadOf(dateStr) {
   const target = new Date(`${dateStr}T00:00:00`);
@@ -284,37 +284,6 @@ function daysAheadOf(dateStr) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / 86400000);
-}
-
-function fetchDailyForecast(lat, lon, dateStr) {
-  const key = `${weatherCacheKey(lat, lon)}_${dateStr}`;
-  const hit = __dailyWeatherMem && __dailyWeatherMem.get(key);
-  if (hit && (hit.promise || (Date.now() - hit.fetchedAt) < WEATHER_CACHE_TTL_MS)) {
-    return hit.promise || Promise.resolve(hit.value);
-  }
-  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + Number(lat).toFixed(3)
-    + '&longitude=' + Number(lon).toFixed(3)
-    + '&daily=weather_code,temperature_2m_max,temperature_2m_min'
-    + '&timezone=Asia%2FSeoul&start_date=' + dateStr + '&end_date=' + dateStr;
-  const promise = withWeatherTimeout(fetch(url))
-    .then((res) => {
-      if (!res.ok) throw new Error('daily forecast failed');
-      return res.json();
-    })
-    .then((data) => {
-      const daily = (data && data.daily) || {};
-      const code = Array.isArray(daily.weather_code) ? daily.weather_code[0] : null;
-      if (code == null) return null;
-      const max = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max[0] : null;
-      const min = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min[0] : null;
-      return { code, max, min };
-    });
-  if (__dailyWeatherMem) __dailyWeatherMem.set(key, { promise, fetchedAt: Date.now() });
-  promise.then(
-    (value) => { if (__dailyWeatherMem) __dailyWeatherMem.set(key, { value, fetchedAt: Date.now() }); },
-    () => { if (__dailyWeatherMem) __dailyWeatherMem.delete(key); }
-  );
-  return promise;
 }
 
 export function DailyWeatherIcon({ date, lat, lon, locationName, className, size = 18 }) {
@@ -330,7 +299,7 @@ export function DailyWeatherIcon({ date, lat, lon, locationName, className, size
     setForecast(null);
     if (!inRange) return undefined;
     let active = true;
-    fetchDailyForecast(latNum, lonNum, date)
+    resolveDailyForecast(latNum, lonNum, date)
       .then((value) => { if (active) setForecast(value); })
       .catch(() => { if (active) setForecast(null); });
     return () => { active = false; };

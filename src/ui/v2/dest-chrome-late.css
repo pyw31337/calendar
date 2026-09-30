@@ -1566,6 +1566,32 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body {
 html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div {
   padding: 0 !important;
 }
+
+/* Log filters (전체/일정/장소/정산/투표/메모) are a sibling under 일반/투표/복구/로그,
+   not a row inside the scrolling body. The hairline is the row's own border so it
+   reaches both modal edges. Button padding is 0 and the label is centered, so the
+   gap above the label (up to the primary hairline) matches the gap down to this one.
+   The body cap drops another row-height so the sheet still fits the visual viewport. */
+html:has(.renewal-shell.v2-design) .modal-overlay .admin-settings-modal > .admin-log-category-tabs.underline-tabs--flush {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--bg-card) !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .admin-settings-modal > .admin-log-category-tabs.underline-tabs--flush > button {
+  padding: 0 4px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal:has(> .admin-log-category-tabs) .modal-body {
+  max-height: calc(
+    var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap, 12px) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)) - 170px
+  ) !important;
+}
 html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container.v2-settings-modal {
   height: auto !important;
   max-height: min(92dvh, 780px) !important;
