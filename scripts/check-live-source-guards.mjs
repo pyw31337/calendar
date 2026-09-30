@@ -118,11 +118,13 @@ if (/setActiveTab\('calendar'\)|activeTab === 'calendar'/.test(adminModals)) {
   fail('Calendar settings modal must not expose the removed empty 일정/calendar tab.');
 }
 
-const adminModalTabHandlers = [...adminModals.matchAll(/setActiveTab\('([^']+)'\)/g)].map(match => match[1]);
-// 일반 / 투표 / 복구 / 로그 -- 기념일 tab was split out into its own top-level side-menu entry
-// (기념일 설정, see MainSideMenu in ui-side-menu.js) since nesting it here was accumulating
-// too many sub-tabs inside a single settings modal. 투표 was later split out of the 일반 tab
-// into its own tab for the same reason.
+// 일반 / 투표 / 복구 / 로그. The bar is UnderlineTabs (value: 'settings' | ...), not four
+// setActiveTab('...') buttons. Scope the match to that tablist so the log-filter
+// row (전체/일정/...) is not counted as extra settings tabs.
+const settingsTabList = adminModals.match(/ariaLabel: "캘린더 설정 탭"[\s\S]{0,1600}?\]/);
+const adminModalTabHandlers = settingsTabList
+  ? [...settingsTabList[0].matchAll(/value: '([^']+)'/g)].map(match => match[1])
+  : [...adminModals.matchAll(/setActiveTab\('([^']+)'\)/g)].map(match => match[1]);
 const allowedAdminModalTabs = new Set(['settings', 'polls', 'recovery', 'logs']);
 const unexpectedAdminModalTabs = adminModalTabHandlers.filter(tab => !allowedAdminModalTabs.has(tab));
 if (unexpectedAdminModalTabs.length > 0) {
@@ -132,9 +134,9 @@ if (adminModalTabHandlers.length !== 4) {
   fail(`Calendar settings modal must render exactly 4 tabs (settings/polls/recovery/logs), found ${adminModalTabHandlers.length}.`);
 }
 
-for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('polls')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
-  if (!adminModals.includes(requiredTab)) {
-    fail(`Calendar settings modal is missing required tab handler: ${requiredTab}`);
+for (const requiredTab of ['settings', 'polls', 'recovery', 'logs']) {
+  if (!adminModalTabHandlers.includes(requiredTab)) {
+    fail(`Calendar settings modal is missing required tab: ${requiredTab}`);
   }
 }
 
