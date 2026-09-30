@@ -6409,3 +6409,114 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-input {
   color: var(--text-main) !important;
   border-color: var(--border-subtle) !important;
 }
+
+/* Tiny motion: press, destructive head-shake, staggered lists, skeletons. */
+@keyframes bp-list-in {
+  from { opacity: 0; scale: 0.94; }
+  to { opacity: 1; scale: 1; }
+}
+@keyframes bp-list-out {
+  from { opacity: 1; scale: 1; }
+  to { opacity: 0; scale: 0.94; }
+}
+@keyframes bp-no-shake {
+  0%, 100% { translate: 0 0; }
+  18% { translate: -3px 0; }
+  36% { translate: 3px 0; }
+  54% { translate: -2px 0; }
+  72% { translate: 2px 0; }
+  86% { translate: -1px 0; }
+}
+@keyframes bp-skel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+html:has(.renewal-shell.v2-design) :is(button, [role="button"]):not(.bp-btn-gamified-confirm):not(:disabled) {
+  transition: scale 90ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+html:has(.renewal-shell.v2-design) :is(button, [role="button"]):not(.bp-btn-gamified-confirm):not(:disabled):active {
+  scale: 0.96;
+}
+@media (hover: hover) and (pointer: fine) {
+  html:has(.renewal-shell.v2-design) :is(
+    button[aria-label*="삭제"],
+    button[title*="삭제"],
+    button[aria-label*="제거"],
+    button[title*="제거"],
+    .btn-danger,
+    .content-thumb-delete-btn
+  ):hover {
+    animation: bp-no-shake 0.42s ease;
+  }
+  .v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article):hover {
+    translate: 0 -1px;
+  }
+}
+.v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article) {
+  transition: translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list) > :is(article, button, a, li, div),
+.v2-design .chat-messages-scroll > [data-msg-row-id],
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :is(article, button, a, li, div) {
+  animation: bp-list-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(2),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(2) { animation-delay: 28ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(3),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(3) { animation-delay: 56ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(4),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(4) { animation-delay: 84ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(5),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(5) { animation-delay: 112ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(6),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(6) { animation-delay: 140ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(7),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(7) { animation-delay: 168ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(8),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(8) { animation-delay: 196ms; }
+.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(n+9),
+html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(n+9) { animation-delay: 224ms; }
+html:has(.renewal-shell.v2-design) .bp-motion-leave {
+  animation-name: bp-list-out;
+  animation-duration: 180ms;
+  animation-timing-function: ease;
+  animation-fill-mode: both;
+  pointer-events: none;
+}
+
+.v2-design .bp-skel-page,
+.v2-design .renewal-shell-placeholder.is-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 16px 28px;
+}
+.v2-design :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar) {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--v2-surface-2, #eceaf2) 0%, var(--bg-card, #f7f6fb) 48%, var(--v2-surface-2, #eceaf2) 100%);
+  background-size: 200% 100%;
+  animation: bp-skel-shimmer 1.15s ease-in-out infinite;
+}
+.v2-design .bp-skel-block.is-title { height: 22px; width: 42%; }
+.v2-design .bp-skel-block.is-card { height: 96px; width: 100%; border-radius: 16px; }
+.v2-design .bp-skel-list { display: flex; flex-direction: column; gap: 10px; }
+.v2-design .bp-skel-row { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+.v2-design .bp-skel-avatar { width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto; }
+.v2-design .bp-skel-copy { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.v2-design .bp-skel-line { height: 10px; width: 72%; }
+.v2-design .bp-skel-line.is-short { width: 40%; }
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.renewal-shell.v2-design) :is(button, [role="button"]):active { scale: 1; }
+  .v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list) > *,
+  .v2-design .chat-messages-scroll > [data-msg-row-id],
+  html:has(.renewal-shell.v2-design) .bp-motion-leave,
+  html:has(.renewal-shell.v2-design) :is(button[aria-label*="삭제"], .btn-danger, .content-thumb-delete-btn):hover,
+  .v2-design :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar) {
+    animation: none;
+  }
+}
+

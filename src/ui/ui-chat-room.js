@@ -1737,7 +1737,18 @@ export function ChatRoomView({
       // bubbles slide underneath the sheet when thumbnails or the keyboard are expanded.
       paddingBottom: `calc(${Math.max(152, composerHeight + 24) + viewportBottom}px + var(--emoji-sheet-h, 0px) + 16px)`
     }
-  }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
+  }, !visibleChatMessages.length && loadingOlderChat && /*#__PURE__*/React.createElement("div", {
+    className: "bp-skel-list",
+    role: "status",
+    "aria-label": "대화 불러오는 중"
+  }, [0, 1, 2, 3].map(index => /*#__PURE__*/React.createElement("div", {
+    key: index,
+    className: "bp-skel-row",
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("span", { className: "bp-skel-avatar" }), /*#__PURE__*/React.createElement("span", { className: "bp-skel-copy" },
+    /*#__PURE__*/React.createElement("span", { className: "bp-skel-line" }),
+    /*#__PURE__*/React.createElement("span", { className: "bp-skel-line is-short" })
+  )))), (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', padding: '8px 0 12px' }
   }, loadingOlderChat ? '이전 대화를 불러오는 중…' : (
     !visibleChatMessages.length && typeof onLoadOlderChat === 'function'

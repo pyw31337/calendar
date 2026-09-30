@@ -1,3 +1,4 @@
+import './tiny-motion.js';
 /**
  * Pin V2 chrome to the visual viewport and keep lightbox overlays flush.
  * Side-effect import from chat-bubble-modules.js (loaded with RenewalAppShell).

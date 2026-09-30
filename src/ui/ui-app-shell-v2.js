@@ -1960,6 +1960,25 @@ function HomePlaceCard({ place, calendar, onOpen }) {
 }
 
 /** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
+function HomeLoadingRows({ label, count = 3 }) {
+  const React = window.React;
+  return React.createElement('div', {
+    className: 'bp-skel-list',
+    role: 'status',
+    'aria-label': label,
+  }, Array.from({ length: count }, (_, index) => React.createElement('div', {
+    key: index,
+    className: 'bp-skel-row',
+    'aria-hidden': 'true',
+  },
+    React.createElement('span', { className: 'bp-skel-avatar' }),
+    React.createElement('span', { className: 'bp-skel-copy' },
+      React.createElement('span', { className: 'bp-skel-line' }),
+      React.createElement('span', { className: 'bp-skel-line is-short' })
+    )
+  )));
+}
+
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2139,7 +2158,9 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           )
         ));
       }
-      }) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
+      }) : (calendarContext?.isLoading
+        ? React.createElement(HomeLoadingRows, { label: '최근 대화 불러오는 중' })
+        : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.'))
     ),
     React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
       memos.length ? React.createElement(HomeSummaryPager, {
@@ -2182,7 +2203,9 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           })
           : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모')));
       }
-      }) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
+      }) : (calendarContext?.isLoading
+        ? React.createElement(HomeLoadingRows, { label: '최근 메모 불러오는 중' })
+        : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.'))
     ),
     sharingMemo && MemoShareModal && ReactDOM?.createPortal
       ? ReactDOM.createPortal(React.createElement(MemoShareModal, {
@@ -2250,7 +2273,9 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           calendar: calendarContext?.calendar,
           onOpen: () => onChangeView?.('places'),
         }))
-      }) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
+      }) : (calendarContext?.isLoading
+        ? React.createElement(HomeLoadingRows, { label: '최근 장소 불러오는 중' })
+        : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.'))
     )
   );
 }
@@ -2528,8 +2553,12 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
 function EmptyState({ icon, title, subtitle }) {
   const React = window.React;
   const isLoading = /불러오는 중|로딩/.test(String(title || ''));
+  if (isLoading) {
+    return React.createElement('div', { className: 'renewal-shell-placeholder is-loading' },
+      React.createElement(HomeLoadingRows, { label: '불러오는 중', count: 4 })
+    );
+  }
   return React.createElement('div', { className: 'renewal-shell-placeholder' },
-    isLoading && React.createElement('span', { className: 'renewal-shell-loading-spinner', role: 'status', 'aria-label': '불러오는 중' }),
     icon && React.createElement('div', { className: 'renewal-shell-placeholder-icon' }, icon),
     React.createElement('div', { className: 'renewal-shell-placeholder-title' }, title),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub' }, subtitle)
@@ -2541,10 +2570,14 @@ const lazyUiReady = Object.create(null);
 function DestinationLoadingSurface() {
   const React = window.React;
   return React.createElement('div', {
-    className: 'renewal-shell-loading-surface',
+    className: 'renewal-shell-loading-surface bp-skel-page',
     'aria-busy': 'true',
     'aria-label': '화면 준비 중',
-  });
+  },
+    React.createElement('div', { className: 'bp-skel-block is-title', 'aria-hidden': 'true' }),
+    React.createElement('div', { className: 'bp-skel-block is-card', 'aria-hidden': 'true' }),
+    React.createElement(HomeLoadingRows, { label: '내용 불러오는 중', count: 4 })
+  );
 }
 
 function useLazyUi(key, isReadyFn, loadFn, onError) {
