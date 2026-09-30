@@ -559,7 +559,7 @@ export function AdminModal({
       ariaLabel: "캘린더 설정 탭",
       variant: "flush",
       value: activeTab,
-      onChange: setActiveTab,
+      onChange: (id) => setActiveTab(id),
       options: [
         { value: 'settings', label: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon", style: { marginRight: '6px' } }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반") },
         { value: 'polls', label: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon", style: { marginRight: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null)), "투표") },
@@ -901,7 +901,7 @@ export function AdminModal({
           ariaLabel: "활동 로그 분류",
           variant: "flush",
           value: logCategoryFilter,
-          onChange: setLogCategoryFilter,
+          onChange: (id) => setLogCategoryFilter(id),
           style: { margin: '0 -16px' },
           options: [
             { value: 'all', label: '전체' },
