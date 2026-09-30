@@ -43,6 +43,24 @@ export function itemIdentity(node) {
   return text ? `t:${text}` : '';
 }
 
+export function collectMotionLists(node) {
+  if (!node || node.nodeType !== 1) return [];
+  const lists = [];
+  const seen = new Set();
+  const add = (el) => {
+    if (!el || el.nodeType !== 1 || seen.has(el)) return;
+    if (typeof el.matches === 'function' && el.matches(MOTION_LIST_SELECTOR)) {
+      seen.add(el);
+      lists.push(el);
+    }
+  };
+  add(node);
+  if (typeof node.querySelectorAll === 'function') {
+    node.querySelectorAll(MOTION_LIST_SELECTOR).forEach(add);
+  }
+  return lists;
+}
+
 export function isMotionItem(parent, node) {
   if (!node || node.nodeType !== 1 || node.getAttribute?.('data-bp-leave')) return false;
   if (node.classList?.contains('bp-skel-list') || node.classList?.contains('bp-skel-row') || node.classList?.contains('bp-skel-block')) return false;
@@ -185,15 +203,20 @@ export function installTinyMotion(doc = document) {
     node.addEventListener?.('animationend', remove, { once: true });
     setTimeout(remove, delayMs + 760);
   };
+  const springListChildren = (list) => {
+    [...list.children].forEach((child, index) => {
+      if (!isMotionItem(list, child)) return;
+      springEnter(child, Math.min(index, STAGGER_CAP) * STAGGER_MS);
+    });
+  };
+  // A destination page is inserted as one subtree. MutationObserver only
+  // reports that outer node, so a list nested inside it (places, memos,
+  // archive bento) never had its rows marked data-bp-sprung and the spring
+  // gate left them at opacity 0.
   const enterAdded = node => {
     if (!node || node.nodeType !== 1 || node.getAttribute?.('data-bp-leave')) return;
-    if (isList(node)) {
-      [...node.children].forEach((child, index) => {
-        if (!isMotionItem(node, child)) return;
-        springEnter(child, Math.min(index, STAGGER_CAP) * STAGGER_MS);
-      });
-      return;
-    }
+    collectMotionLists(node).forEach(springListChildren);
+    if (isList(node)) return;
     const parent = node.parentElement;
     if (!parent || !isList(parent) || !isMotionItem(parent, node)) return;
     const index = [...parent.children].indexOf(node);

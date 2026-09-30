@@ -330,6 +330,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
   const unifiedSearch = typeof onSearchQuery === 'function';
   const [searchOpen, setSearchOpen] = React.useState(false);
   const searchOpenRef = React.useRef(false);
+  const [searchMounted, setSearchMounted] = React.useState(false);
   const headerControlled = typeof forcedHidden === 'boolean';
   const revealHeader = React.useCallback(() => {
     lastScrollTopRef.current = 0;
@@ -345,30 +346,50 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     if (typeof onSearchQuery === 'function') onSearchQuery('');
     if (typeof onSearchClose === 'function') onSearchClose();
   }, [onSearchQuery, onSearchClose]);
-  const toggleUnifiedSearch = React.useCallback(() => {
-    const next = !searchOpenRef.current;
-    searchOpenRef.current = next;
-    setSearchOpen(next);
-    if (!next) {
-      if (typeof onSearchQuery === 'function') onSearchQuery('');
-      if (typeof onSearchClose === 'function') onSearchClose();
+  const openUnifiedSearch = React.useCallback(() => {
+    searchOpenRef.current = true;
+    setSearchMounted(true);
+    let reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    if (reduce) {
+      setSearchOpen(true);
+      return;
     }
-  }, [onSearchQuery, onSearchClose]);
+    // Paint the closed (0fr) bar once, then expand, so the open transition runs.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (searchOpenRef.current) setSearchOpen(true);
+      });
+    });
+  }, []);
+  const toggleUnifiedSearch = React.useCallback(() => {
+    if (searchOpenRef.current) closeUnifiedSearch();
+    else openUnifiedSearch();
+  }, [closeUnifiedSearch, openUnifiedSearch]);
   React.useEffect(() => {
     if (!unifiedSearch) return undefined;
     const open = () => {
-      searchOpenRef.current = true;
-      setSearchOpen(true);
+      openUnifiedSearch();
       revealHeader();
     };
     document.addEventListener('v2-page-search-open', open);
     return () => document.removeEventListener('v2-page-search-open', open);
-  }, [unifiedSearch, revealHeader]);
+  }, [unifiedSearch, revealHeader, openUnifiedSearch]);
   React.useEffect(() => {
     if (!searchForceOpen) return;
-    searchOpenRef.current = true;
-    setSearchOpen(true);
-  }, [searchForceOpen]);
+    openUnifiedSearch();
+  }, [searchForceOpen, openUnifiedSearch]);
+  React.useEffect(() => {
+    if (!unifiedSearch || searchOpen) return undefined;
+    let reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    if (reduce) {
+      setSearchMounted(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setSearchMounted(false), 280);
+    return () => window.clearTimeout(timer);
+  }, [unifiedSearch, searchOpen]);
   const userIntentUntilRef = React.useRef(0);
   const markUserScrollIntent = React.useCallback(() => {
     userIntentUntilRef.current = Date.now() + 800;
@@ -540,13 +561,21 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
           showMenu && onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
         )
       ),
-      unifiedSearch && searchOpen && h(ContainedSearchBar, {
-        value: searchQuery || '',
-        onChange: onSearchQuery,
-        onClose: closeUnifiedSearch,
-        placeholder: placeholder || searchPlaceholder || searchLabel || `${title} 검색`,
-        trailing: searchTrailing,
-      }),
+      unifiedSearch && h(
+        'div',
+        { className: `v2-header-search${searchOpen ? ' is-open' : ''}` },
+        h(
+          'div',
+          { className: 'v2-header-search-inner' },
+          searchMounted && h(ContainedSearchBar, {
+            value: searchQuery || '',
+            onChange: onSearchQuery,
+            onClose: closeUnifiedSearch,
+            placeholder: placeholder || searchPlaceholder || searchLabel || `${title} 검색`,
+            trailing: searchTrailing,
+          })
+        )
+      ),
       children
     ),
     floatingBackNode
@@ -670,9 +699,14 @@ export function MemoScreen(p) {
   const visibleMemos = window.React.useMemo(() => {
     const rows = Array.isArray(p.memos) ? p.memos.filter(Boolean) : [];
     const filtering = String(p.searchQuery || '').trim() || p.selectedTag;
-    if (filtering) return rows;
-    if (!p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)) return rows;
-    return [p.focusedMemo, ...rows];
+    const withFocus = filtering || !p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)
+      ? rows
+      : [p.focusedMemo, ...rows];
+    // Pin-on memos stay above every other card, including search results.
+    const pinned = [];
+    const rest = [];
+    withFocus.forEach(memo => (memo?.isPinned ? pinned : rest).push(memo));
+    return [...pinned, ...rest];
   }, [p.memos, p.focusedMemo, p.searchQuery, p.selectedTag]);
   const memoFiltering = Boolean(String(p.searchQuery || '').trim() || p.selectedTag);
   const countedMemos = typeof p.totalMemoCount === 'number' && p.totalMemoCount >= 0 ? p.totalMemoCount : null;

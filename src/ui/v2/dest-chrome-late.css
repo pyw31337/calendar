@@ -4315,7 +4315,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-modal-container > .v2-modal-d
 html:has(.renewal-shell.v2-design) .weather-detail-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding: 8px var(--weather-detail-space) 6px;
   flex: 0 0 auto;
@@ -4495,7 +4495,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-card {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  overflow: hidden;
+  overflow: visible;
   min-height: 156px;
   padding: 20px 8px 18px 22px;
   border: 0;
@@ -4625,6 +4625,26 @@ html:has(.renewal-shell.v2-design) .weather-highlight-range {
   font-size: 0.75rem;
   font-weight: 650;
 }
+html:has(.renewal-shell.v2-design) .weather-highlight-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-setting-pin {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #fff;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-setting-text {
+  min-width: 0;
+}
 html:has(.renewal-shell.v2-design) .weather-scene {
   position: relative;
   z-index: 1;
@@ -4632,7 +4652,7 @@ html:has(.renewal-shell.v2-design) .weather-scene {
   width: 168px;
   height: 148px;
   margin: 0;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
 }
 html:has(.renewal-shell.v2-design) .weather-scene::before {
@@ -4647,7 +4667,7 @@ html:has(.renewal-shell.v2-design) .weather-scene::before {
 }
 html:has(.renewal-shell.v2-design) .weather-sun {
   position: absolute;
-  top: 8px;
+  top: 28px;
   right: 18px;
   width: 92px;
   height: 92px;
@@ -4662,7 +4682,7 @@ html:has(.renewal-shell.v2-design) .weather-sun {
 }
 html:has(.renewal-shell.v2-design) .weather-sun-rays {
   position: absolute;
-  inset: -22px;
+  inset: -14px;
   border-radius: 50%;
   background: repeating-conic-gradient(from 0deg, transparent 0 12deg, rgba(255, 236, 150, 0.55) 12deg 18deg);
   -webkit-mask: radial-gradient(circle, transparent 54%, #000 58%, #000 70%, transparent 74%);
@@ -4670,14 +4690,14 @@ html:has(.renewal-shell.v2-design) .weather-sun-rays {
   animation: bp-weather-spin 16s linear infinite;
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="cloudy"] .weather-sun {
-  top: 10px;
+  top: 28px;
   right: 46px;
   width: 64px;
   height: 64px;
 }
 html:has(.renewal-shell.v2-design) .weather-moon {
   position: absolute;
-  top: 22px;
+  top: 30px;
   right: 36px;
   width: 52px;
   height: 52px;
@@ -5689,6 +5709,9 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
 html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-bar-stack {
   margin-top: 2px !important;
   gap: 2px !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-dot-row + .bp-day-bar-stack {
+  margin-top: 10px !important;
 }
 
 html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child {
@@ -6735,9 +6758,29 @@ html:has(.renewal-shell.v2-design) .v2-places .v2-page-header .inline-search-bar
   box-sizing: border-box !important;
   align-self: stretch !important;
 }
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-header-search {
+  display: grid !important;
+  grid-template-rows: 0fr;
+  margin: 0 !important;
+  transition: grid-template-rows 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+  opacity: 0;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-header-search.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-header-search-inner {
+  min-height: 0;
+  overflow: hidden;
+}
 html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-bar,
 html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-bar.is-fixed {
-  margin: 0 !important;
+  margin: 8px 0 0 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.renewal-shell.v2-design) .v2-page-header .v2-header-search {
+    transition: none !important;
+  }
 }
 html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-capsule {
   flex: 1 1 auto !important;

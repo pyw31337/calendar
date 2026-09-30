@@ -2243,7 +2243,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       legacyView: __memoLegacyTree,
       calendar,
       allMemos: memos || [],
-      memos: filteredMemos,
+      memos: orderedMemoCards,
       // The V2 screen pages this list. Without the window size and the loader, the
       // memo page stopped at the first server page and older memos were unreachable.
       hasMoreMemos: !!hasMoreMemos,
