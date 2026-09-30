@@ -18,6 +18,6 @@ test('webpage links are not gallery photos', () => {
     source: 'chat',
     full: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
   }), true);
-  assert.equal(isGalleryWebLinkPhoto({ source: 'link', full: storage }), true);
+  assert.equal(isGalleryWebLinkPhoto({ source: 'link', full: storage }), false);
   assert.equal(isGalleryWebLinkPhoto({ directMediaUrl: 'https://naver.me/abc', full: storage }), true);
 });
