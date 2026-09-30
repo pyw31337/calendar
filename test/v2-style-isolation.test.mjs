@@ -17,7 +17,9 @@ test('every V2 style selector is confined to a V2 root', () => {
         // is this codebase's established way to scope such a rule (used throughout this very file
         // for modal-overlay theming): it still only matches while a .v2-design root is mounted
         // somewhere in the document, so it carries the same isolation guarantee.
-        assert.match(selector, /^(?:\.renewal-shell)?\.v2-(?:design|chat|memo|places|settlement)(?=[\s.:>]|$)|^(?:html|body):has\([\s\S]*\.v2-design/, `${file}: unscoped selector ${selector}`);
+        // html/body may be qualified (`html:not(...)` / `html[data-...]`) before :has(.v2-design).
+        // That still matches only while a V2 root is mounted. A bare body/html selector does not.
+        assert.match(selector, /^(?:\.renewal-shell)?\.v2-(?:design|chat|memo|places|settlement)(?=[\s.:>]|$)|^(?:html|body)(?::not\([^)]*\)|\[[^\]]*\])*:has\([\s\S]*\.v2-design/, `${file}: unscoped selector ${selector}`);
         assert.doesNotMatch(selector, /\.bp-[\w-]*\.v2-(?:design|chat|memo|places|settlement)\b/, `${file}: a class name was mistaken for a body selector`);
       }
     });

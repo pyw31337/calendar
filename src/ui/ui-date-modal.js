@@ -3,8 +3,8 @@
  */
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
-import { launchClipboardConfetti } from './celebrate-confetti.js';
 import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
+import { launchClipboardConfetti } from './celebrate-confetti.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};

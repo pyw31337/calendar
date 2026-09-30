@@ -417,13 +417,17 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
-    // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers) --
-    // this path only fires for genuinely oversized sources (small ones already return the
-    // original file untouched below), so a bigger cap and higher quality here doesn't cost much:
-    // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is.
+    // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers).
+    // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is,
+    // so every stored still-image original uses this 2000px / WebP 0.85 encode. A camera
+    // JPG/PNG is not uploaded once that WebP blob exists. Animated GIF cannot survive a
+    // canvas re-encode, so a GIF that already fit the old small-file rule stays the original
+    // bytes; oversized GIFs still follow the canvas path below.
     const maxDimHigh = 2000;
     const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
-    if (!isOversized && workingFile.size <= 1.5 * 1024 * 1024) {
+    const gifName = (workingFile.name || file.name || '').toLowerCase();
+    const isGif = sniffed?.kind === 'gif' || (!sniffed && (workingFile.type === 'image/gif' || gifName.endsWith('.gif')));
+    if (isGif && !isOversized && workingFile.size <= 1.5 * 1024 * 1024) {
       return Promise.resolve(workingFile);
     }
     return new Promise(res => {
