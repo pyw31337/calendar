@@ -212,7 +212,11 @@ test('V2 destination screens keep live feature entry points', async () => {
   // Gallery/media keeps share + lightbox plumbing; v2 wrapper is presentation-only.
   assert.match(shell, /v2-records-media/);
   assert.match(shell, /onOpenGalleryShare/);
-  assert.match(shell, /clickLegacyAriaButton\('갤러리 검색'/);
+  assert.match(shell, /galleryActionsRef\.current\.search/);
+  assert.match(shell, /contentActionsRef\.current\.search/);
+  assert.match(shell, /historyActionsRef\.current\.search/);
+  assert.match(screens, /icon: 'search'/);
+  assert.match(screens, /v2-memo-active-tag/);
   assert.match(screens, /searchLabel: '갤러리 검색'|label: '갤러리 검색'/);
   assert.match(shell, /setActiveLightbox/);
   assert.match(shell, /dday-participant-memos/);

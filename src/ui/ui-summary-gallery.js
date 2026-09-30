@@ -1500,7 +1500,7 @@ export function HistoryView({
   // v2 shell (PC): side-nav's per-tab submenu needs 보관함 검색 -- otherwise local to this component.
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
+    onRegisterMenuActions({ search: () => setIsSearchOpen(v => !v) });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions]);
   const VALID_HISTORY_TABS = ['meetings', 'memories', 'people', 'places'];
@@ -3676,6 +3676,7 @@ export function ContentView({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
+      search: () => setIsSearchOpen(v => !v),
       register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); },
       openRegion: () => setIsRegionFilterOpen(true),
       setGridCols: persistGridCols,

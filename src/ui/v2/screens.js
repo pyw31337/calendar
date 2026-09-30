@@ -428,12 +428,15 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
             !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
           )
         ),
-        // Center brand text and search/share icons are not rendered. Every
-        // destination, including chat, opens the side menu from the purple FAB.
-        // `extra` is the page's own tools (공지, 업로드, 정산 생성, …).
+        // Search lives in the header again. The purple FAB is the side menu.
         h(
           'div',
           { className: 'bp-header-actions' },
+          typeof onSearch === 'function' && h(IconButton, {
+            label: searchLabel || `${title} 검색`,
+            icon: 'search',
+            onClick: onSearch,
+          }),
           extra,
           showMenu && onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
         )
@@ -524,9 +527,11 @@ export function MemoScreen(p) {
   // page window, so add it once when necessary before scrolling to it.
   const visibleMemos = window.React.useMemo(() => {
     const rows = Array.isArray(p.memos) ? p.memos.filter(Boolean) : [];
+    const filtering = String(p.searchQuery || '').trim() || p.selectedTag;
+    if (filtering) return rows;
     if (!p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)) return rows;
     return [p.focusedMemo, ...rows];
-  }, [p.memos, p.focusedMemo]);
+  }, [p.memos, p.focusedMemo, p.searchQuery, p.selectedTag]);
   window.React.useEffect(() => {
     if (!focusedMemoId || typeof document === 'undefined') return undefined;
     const focusTarget = () => {
@@ -671,6 +676,15 @@ export function MemoScreen(p) {
         'div',
         { className: 'v2-dest-body v2-memo-body' },
         p.isComposerExpanded ? ((p.slots && p.slots.shared) || null) : ((p.slots && p.slots.shared) || dedicatedComposerSlot),
+        p.selectedTag && h(
+          'button',
+          {
+            type: 'button',
+            className: 'v2-memo-active-tag',
+            onClick: () => p.onSelectTag && p.onSelectTag(''),
+          },
+          `#${p.selectedTag} 해제`
+        ),
         h(
           'div',
           { className: 'bp-memo-grid' },
@@ -1602,7 +1616,14 @@ function makeTabbedScreen(name, title) {
     return h(
       'section',
       { className: `v2-${name} v2-dest-page v2-embed-frame v2-has-page-header` },
-      h(PageHeader, { title, onBack: p.onBack, onMenu: p.onMenu, extra },
+      h(PageHeader, {
+        title,
+        onBack: p.onBack,
+        onMenu: p.onMenu,
+        onSearch: p.onSearch,
+        searchLabel: p.searchLabel || `${title} 검색`,
+        extra,
+      },
         h('div', { id: `v2-${name}-header-tabs-slot`, className: `v2-${name}-tabs-slot` })
       ),
       wrapLegacy(p.legacyView, `v2-legacy-body v2-${name}-legacy`),

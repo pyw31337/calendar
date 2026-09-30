@@ -2877,7 +2877,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
         onMenu: onOpenSideNav || onOpenAppSettings,
-        onSearch: () => clickLegacyAriaButton('갤러리 검색', '.v2-gallery'),
+        onSearch: () => galleryActionsRef.current.search?.(),
         onUploadFiles: () => galleryActionsRef.current.uploadMixed?.(),
         onUploadLink: () => galleryActionsRef.current.uploadLink?.(),
         slots: {},
@@ -2890,16 +2890,6 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
   );
 }
 
-
-/** Click still-mounted legacy header search (parent may be display:none under V2 PageHeader).
- * Scope to legacy page headers so we do not re-click the V2 PageHeader IconButton (same aria-label).
- * Content/Archive use .places-view-header; Gallery uses .gallery-page-header. */
-function clickLegacyAriaButton(ariaLabel, scopeSelector) {
-  const scope = (scopeSelector && document.querySelector(scopeSelector)) || document;
-  const btn = scope.querySelector(`.places-view-header button[aria-label="${ariaLabel}"]`)
-    || scope.querySelector(`.gallery-page-header button[aria-label="${ariaLabel}"]`);
-  if (btn) btn.click();
-}
 
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
 function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
@@ -2927,7 +2917,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     subtitle: calendarName || undefined,
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
-    onSearch: () => clickLegacyAriaButton('컨텐츠 검색', '.v2-content'),
+    onSearch: () => contentActionsRef.current.search?.(),
     onOpenRegion: () => contentActionsRef.current.openRegion?.(),
     onOpenRegister: () => contentActionsRef.current.register?.(),
     onSetGridCols: (cols) => {
@@ -2953,6 +2943,11 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
 function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
+  const historyActionsRef = React.useRef({});
+  const registerHistoryActions = React.useCallback((actions) => {
+    historyActionsRef.current = actions || {};
+    if (typeof onRegisterMenuActions === 'function') onRegisterMenuActions(actions);
+  }, [onRegisterMenuActions]);
   const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
   const historyView = React.createElement(HistoryView, {
     ...recordsContext.historyProps,
@@ -2961,7 +2956,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
     onOpenShare: recordsContext.onOpenHistoryShare,
     onOpenAppSettings,
     v2Embed: true,
-    onRegisterMenuActions,
+    onRegisterMenuActions: registerHistoryActions,
   });
   return React.createElement(React.Fragment, null,
     renderArchiveScreen({
@@ -2971,7 +2966,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
       onMenu: onOpenSideNav || onOpenAppSettings,
-      onSearch: () => clickLegacyAriaButton('보관함 검색', '.v2-archive'),
+      onSearch: () => historyActionsRef.current.search?.(),
       slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {

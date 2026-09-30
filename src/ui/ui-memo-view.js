@@ -2127,7 +2127,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       legacyView: __memoLegacyTree,
       calendar,
       allMemos: memos || [],
-      memos: memos || [],
+      memos: filteredMemos,
       // The V2 screen renders "메모 더 보기" from these; without them the list stopped at the
       // first page (20) and older memos were unreachable from the memo page.
       hasMoreMemos: !!hasMoreMemos,

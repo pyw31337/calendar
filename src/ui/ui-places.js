@@ -2207,7 +2207,10 @@ export function PlacesView({
       onBack,
       onShare: onSharePlaces,
       onMenu: () => setIsPlacesMenuOpen(true),
-      onSearch: (value) => { setListSearchQuery(value); setIsSearchOpen(true); },
+      onSearch: (value) => {
+        setListSearchQuery(value);
+        if (String(value || '').trim()) setCategoryFilter('all');
+      },
       onCompose: () => { setEditingPlace(null); setIsRegisterOpen(true); },
       onToggleMap: () => setMapExpanded(v => !v),
       // The header 지도보기 icon mirrors this state (the map's own resize handle toggles it too).

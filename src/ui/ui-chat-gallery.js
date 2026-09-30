@@ -1962,7 +1962,7 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSearchOpen(true),
+      search: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
       uploadMixed: () => handleUploadClick(),
       uploadImage: () => handleUploadClick(),
       uploadFile: () => handleUploadClick(),
