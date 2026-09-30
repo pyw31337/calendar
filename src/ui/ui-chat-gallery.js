@@ -956,7 +956,6 @@ export function ChatGalleryModal({
   const bulkSelectionAnchorKeyRef = React.useRef('');
   const [isBulkTagPanelOpen, setIsBulkTagPanelOpen] = React.useState(false);
   const [bulkTagDraft, setBulkTagDraft] = React.useState('');
-  const [isBulkTagSaving, setIsBulkTagSaving] = React.useState(false);
   const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
   const [bulkShareResultUrl, setBulkShareResultUrl] = React.useState('');
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
@@ -1404,7 +1403,11 @@ export function ChatGalleryModal({
       showToast?.('일괄 태그 저장 기능을 준비하지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
       return;
     }
-    setIsBulkTagSaving(true);
+    // The save patches the gallery index before its network write. Close the
+    // panel now so the next batch can be classified while that write runs.
+    setBulkTagDraft('');
+    setIsBulkTagPanelOpen(false);
+    setSelectedBulkShareKeys(new Set());
     try {
       const result = await save(changes);
       if (!result?.ok) throw new Error('사진 태그 일괄 저장 실패');
@@ -1420,14 +1423,9 @@ export function ChatGalleryModal({
             showToast?.('태그 되돌리기에 실패했습니다.', 'error');
           });
       }, null, '되돌리기');
-      setBulkTagDraft('');
-      setIsBulkTagPanelOpen(false);
-      setSelectedBulkShareKeys(new Set());
     } catch (error) {
       console.error('Bulk photo tag save failed:', error);
       showToast?.(String(error?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
-    } finally {
-      setIsBulkTagSaving(false);
     }
   };
   const pagedFallbackPhotos = React.useMemo(
@@ -1872,12 +1870,12 @@ export function ChatGalleryModal({
       activeTab === 'photos' && /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-outline",
         onClick: () => setIsBulkTagPanelOpen(open => !open),
-        disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting || isBulkTagSaving,
+        disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting,
         title: "일괄 태그", "aria-label": "일괄 태그",
         style: {
           ...textBtn,
-          cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting || isBulkTagSaving) ? 'default' : 'pointer',
-          opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting || isBulkTagSaving) ? 0.5 : 1
+          cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 0.5 : 1
         }
       }, `태그${selectedBulkShareKeys.size ? ` (${selectedBulkShareKeys.size})` : ''}`),
       /*#__PURE__*/React.createElement("button", {
@@ -2841,10 +2839,10 @@ export function ChatGalleryModal({
         style: { flex: 1, minWidth: 0, minHeight: '38px', borderRadius: 'var(--radius-full)' }
       }),
       /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "btn btn-action btn-action-dark", disabled: isBulkTagSaving,
+        type: "button", className: "btn btn-action btn-action-dark",
         onClick: () => { void applyBulkPhotoTags('add'); },
         style: { minHeight: '38px', padding: '0 12px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', fontWeight: 800 }
-      }, isBulkTagSaving ? '저장 중' : '추가')
+      }, '추가')
     ),
     selectedBulkTagTokens.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' } },
       selectedBulkTagTokens.map(({ tag, count }) => /*#__PURE__*/React.createElement("button", {
@@ -2870,7 +2868,7 @@ export function ChatGalleryModal({
         }, "태그 복사"),
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-action btn-action-outline",
-          disabled: isBulkTagSaving || getTagClipboard().length === 0,
+          disabled: getTagClipboard().length === 0,
           onClick: () => {
             const tags = getTagClipboard();
             if (!tags.length) {
@@ -2887,7 +2885,7 @@ export function ChatGalleryModal({
         )
       ),
       /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "btn btn-action btn-action-danger", disabled: isBulkTagSaving || !bulkTagDraft.trim(),
+        type: "button", className: "btn btn-action btn-action-danger", disabled: !bulkTagDraft.trim(),
         onClick: () => { void applyBulkPhotoTags('remove'); },
         style: { minHeight: '34px', padding: '0 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
       }, '입력한 태그 일괄 삭제')

@@ -450,9 +450,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const [optimisticTags, setOptimisticTags] = React.useState(null);
   const tagTokens = String(optimisticTags != null ? optimisticTags : (tags || '')).split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   const [tagInput, setTagInput] = React.useState('');
-  const [isSavingTags, setIsSavingTags] = React.useState(false);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
-  const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   const tagInputRef = React.useRef(null);
   const keepTagFocusRef = React.useRef(false);
   const refocusComposerField = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField)
@@ -475,7 +473,6 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   if (tagTokens.length === 0 && !onSaveTags) return null;
   const MAX_TAGS = 20;
   const handleSaveTags = async () => {
-    if (isSavingTags) return;
     if (!onSaveTags) {
       if (typeof showToast === 'function') showToast('이 사진에는 태그를 저장할 수 없습니다.', 'error');
       return;
@@ -499,48 +496,38 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       }
     }
     const finalTags = merged.slice(0, MAX_TAGS);
-    // Optimistic: show the new chip and clear the input immediately, before the server round
-    // trip. A failure rolls back to the last confirmed value (see optimisticTags' declaration).
+    // Optimistic: show the new chip and clear the input immediately. The Firebase
+    // write continues in the background; only a failed write puts the chip back.
     const finalTagsStr = finalTags.join(' ');
     setOptimisticTags(finalTagsStr);
     setTagInput('');
     keepTagFocusRef.current = true;
     refocusComposerField(tagInputRef);
-    setIsSavingTags(true);
     try {
       const saved = await onSaveTags(finalTagsStr);
-      if (saved === false) {
-        setOptimisticTags(null);
-        if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
-        return;
-      }
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === finalTagsStr ? null : current));
+      if (saved === false && typeof showToast === 'function') showToast('태그 저장 실패', 'error');
     } catch (err) {
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === finalTagsStr ? null : current));
       console.error('Lightbox tag save failed:', err);
       if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
-    } finally {
-      setIsSavingTags(false);
     }
   };
   const handleConfirmDeleteTag = async () => {
-    if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
+    if (!onSaveTags || !confirmDeleteTag) return;
     const nextTagsStr = tagTokens.filter(t => t !== confirmDeleteTag).join(' ');
     // Optimistic: the chip and its confirm dialog disappear immediately; roll back (chip
     // reappears) only if the server rejects the delete.
     setOptimisticTags(nextTagsStr);
     setConfirmDeleteTag(null);
-    setIsDeletingTag(true);
     try {
       const saved = await onSaveTags(nextTagsStr);
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === nextTagsStr ? null : current));
       if (saved === false && typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
     } catch (err) {
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === nextTagsStr ? null : current));
       console.error('Lightbox tag delete failed:', err);
       if (typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
-    } finally {
-      setIsDeletingTag(false);
     }
   };
   const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
@@ -637,14 +624,14 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         onMouseDown: e => e.stopPropagation(),
         onTouchStart: e => e.stopPropagation(),
         onClick: e => { e.stopPropagation(); handleSaveTags(); },
-        disabled: isSavingTags || tagTokens.length >= MAX_TAGS,
+        disabled: tagTokens.length >= MAX_TAGS,
         style: {
           flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
           color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-          opacity: (isSavingTags || tagTokens.length >= MAX_TAGS) ? 0.45 : 1
+          opacity: tagTokens.length >= MAX_TAGS ? 0.45 : 1
         }
-      }, isSavingTags ? '...' : '저장')
+      }, '저장')
     )
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
@@ -1168,10 +1155,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
-        const prevOverride = tagOverrideKey ? tagOverrides[tagOverrideKey] : undefined;
         const normalized = normalizeTagsForDisplay(tagsText);
-        // 0ms 낙관적 UI 업데이트: 클릭 즉시 태그 추가/삭제가 화면에 즉시 반영됨
+        // Show the edited tags immediately. A newer edit on this photo owns the
+        // override, so a failed older write must not put its own value back.
         if (tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalized }));
+        const dropFailedOverride = () => {
+          if (!tagOverrideKey) return;
+          setTagOverrides(prev => {
+            if (prev[tagOverrideKey] !== normalized) return prev;
+            const next = { ...prev };
+            delete next[tagOverrideKey];
+            return next;
+          });
+        };
         try {
           const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {
             ...currentMeta,
@@ -1179,24 +1175,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
             sourceImageIndex: currentSourceImageIndex,
             imageUrl: currentUrl
           });
-          if (!ok && tagOverrideKey) {
-            setTagOverrides(prev => {
-              const next = { ...prev };
-              if (prevOverride !== undefined) next[tagOverrideKey] = prevOverride;
-              else delete next[tagOverrideKey];
-              return next;
-            });
-          }
+          if (!ok) dropFailedOverride();
           return ok;
         } catch (err) {
-          if (tagOverrideKey) {
-            setTagOverrides(prev => {
-              const next = { ...prev };
-              if (prevOverride !== undefined) next[tagOverrideKey] = prevOverride;
-              else delete next[tagOverrideKey];
-              return next;
-            });
-          }
+          dropFailedOverride();
           throw err;
         }
       }

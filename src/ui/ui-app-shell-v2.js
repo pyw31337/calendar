@@ -33,6 +33,7 @@ function galleryCommentMotion(photo, index) {
   };
 }
 
+import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
@@ -311,13 +312,11 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
  * artboard)'s hero-zone brand row. Unlike that mockup, there is no separate 메뉴/hamburger icon
  * here: 더보기 is now one of the 5 tabs (§4.1), so a second, redundant menu affordance in the
  * header would just recreate the duplicate-entry-point problem the master plan calls out
- * (docs/renewal-baseline.md §5). 검색 stays a header action since 검색 has no tab of its own
- * (§4.1: "더보기 탭에 검색, 공유, 기념일, 설정, 도움말을 정리한다" -- it lives inside 더보기,
- * but WP-01 §5.1 also keeps a direct header shortcut: "모바일 헤더에는 브랜드/캘린더명, 검색,
- * 더보기만 둔다"). Shared across all 5 tabs, sitting above wherever each tab's own summary badge
- * (예: 캘린더 tab의 D-day 요약, WP-03) will render.
+ * (docs/renewal-baseline.md §5). 통합검색 stays on the side nav, not as a second magnifier
+ * in this hero title row. Shared across all 5 tabs, sitting above wherever each tab's own
+ * summary badge (예: 캘린더 tab의 D-day 요약, WP-03) will render.
  */
-function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }) {
+function TopHeader({ calendarName, onOpenCalendarSettings, onOpenAnniversaries }) {
   const React = window.React;
   const brandName = String(calendarName || '모여라 캘린더')
     .replace(/^[^\p{L}\p{N}]+/u, '')
@@ -337,12 +336,6 @@ function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenA
       ),
       React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-plain-icon-btn'), 'aria-label': '기념일 설정', title: '기념일 설정', onClick: onOpenAnniversaries },
         React.createElement(TabIcon, { id: 'cake', size: 18 })
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-search-icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
-        React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
-          React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
-          React.createElement('path', { d: 'm21 21-4.3-4.3' })
-        )
       )
     )
   );
@@ -481,6 +474,47 @@ function meetingPlaceWeatherCoords(calendar, dateStr) {
   return { lat: 37.566, lon: 126.9784, name: '서울' };
 }
 
+
+function DdayParticipantMemoChip({ memo }) {
+  const React = window.React;
+  const textRef = React.useRef(null);
+  const [lineMode, setLineMode] = React.useState('1');
+  const measure = React.useCallback(() => {
+    const el = textRef.current;
+    if (!el || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return;
+    const style = window.getComputedStyle(el);
+    const fontSize = parseFloat(style.fontSize) || 12;
+    const parsedLine = parseFloat(style.lineHeight);
+    const lineHeight = Number.isFinite(parsedLine) ? parsedLine : fontSize * 1.35;
+    const next = fieldLineModeFromBox(el.scrollHeight, lineHeight);
+    setLineMode(prev => (prev === next ? prev : next));
+  }, []);
+  React.useLayoutEffect(() => {
+    measure();
+    const el = textRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(el);
+    if (el.parentElement) observer.observe(el.parentElement);
+    return () => observer.disconnect();
+  }, [memo && memo.note, measure]);
+  return React.createElement('span', {
+    className: 'bp-dday-participant-memo',
+    'data-field-lines': lineMode,
+    title: `${memo.name}: ${memo.fullNote || memo.note}`,
+    style: { borderColor: memo.color },
+  },
+    React.createElement('span', {
+      className: 'bp-dday-participant-memo-name',
+      style: { backgroundColor: memo.color },
+    }, memo.name),
+    React.createElement('span', {
+      className: 'bp-dday-participant-memo-text',
+      ref: textRef,
+    }, memo.note)
+  );
+}
+
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
@@ -611,20 +645,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
         React.createElement('span', { className: bentoClass('dday-expanded-tag') }, meeting.note.trim())
       ),
       memos.length ? React.createElement('div', { className: bentoClass('dday-participant-memos'), 'aria-label': '참여자 일정 메모' },
-        memos.map(m => React.createElement('span', {
-          key: m.id,
-          className: bentoClass('dday-participant-memo'),
-          title: `${m.name}: ${m.fullNote || m.note}`,
-          style: { borderColor: m.color },
-        },
-          React.createElement('span', {
-            className: bentoClass('dday-participant-memo-name'),
-            style: { backgroundColor: m.color }
-          }, m.name),
-          React.createElement('span', {
-            className: bentoClass('dday-participant-memo-text')
-          }, m.note)
-        ))
+        memos.map(m => React.createElement(DdayParticipantMemoChip, { key: m.id, memo: m }))
       ) : null
     );
   };
@@ -1690,20 +1711,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
         className: 'bp-dday-participant-memos bp-hero-today-memos',
         'aria-label': '오늘 참여자 메모'
       },
-        todayMemos.map(m => React.createElement('span', {
-          key: m.id,
-          className: 'bp-dday-participant-memo',
-          title: `${m.name}: ${m.fullNote || m.note}`,
-          style: { borderColor: m.color }
-        },
-          React.createElement('span', {
-            className: 'bp-dday-participant-memo-name',
-            style: { backgroundColor: m.color }
-          }, m.name),
-          React.createElement('span', {
-            className: 'bp-dday-participant-memo-text'
-          }, m.note)
-        ))
+        todayMemos.map(m => React.createElement(DdayParticipantMemoChip, { key: m.id, memo: m }))
       ) : null
     );
   }
@@ -1726,7 +1734,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1759,7 +1767,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: `bp-hero-zone${hasUpcomingMeeting ? '' : ' bp-hero-zone--no-dday'}` },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
-      React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }),
+      React.createElement(TopHeader, { calendarName, onOpenCalendarSettings, onOpenAnniversaries }),
       React.createElement(HeroTodayOrWeather, {
         calendar: mergedCalendar,
         upcomingMeetings: calendarContext?.upcomingMeetings,
@@ -4338,7 +4346,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { URL } from 'node:url';
 
-const { countPlaceholderLines } = await import('../src/core/field-shape.js');
+const { countPlaceholderLines, fieldLineModeFromBox } = await import('../src/core/field-shape.js');
 const tenPxPerChar = text => text.length * 10;
 
 test('placeholder line count drives capsule (1) vs box (2+)', () => {
@@ -140,4 +140,19 @@ test('Chat and memo file attachments collection and gallery photo filtering', as
   assert.match(galleryDataJs, /const hasPhotos = Boolean\(memo\.imageUrl \|\| \(Array\.isArray\(memo\.imageUrls\) && memo\.imageUrls\.length > 0\)/, 'composeGalleryPhotos skips memos without uploaded photos');
 });
 
-
+test('d-day name badges use the shared one-line capsule and multi-line rounded box', async () => {
+  assert.equal(fieldLineModeFromBox(18, 16), '1');
+  assert.equal(fieldLineModeFromBox(16, 16), '1');
+  assert.equal(fieldLineModeFromBox(32, 16), 'multi');
+  assert.equal(fieldLineModeFromBox(0, 16), '1');
+  const [css, shell] = await Promise.all([
+    readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8'),
+  ]);
+  assert.match(css, /\.bp-dday-participant-memo-name\s*\{[\s\S]*?border-radius:\s*var\(--field-radius-single-line\) !important;/, 'one-line name badge is a capsule');
+  assert.match(css, /\.bp-dday-participant-memo\[data-field-lines="multi"\] \.bp-dday-participant-memo-name\s*\{[\s\S]*?border-radius:\s*var\(--field-radius-multiline\) !important;/, 'multi-line name badge is a rounded rectangle');
+  assert.match(shell, /data-field-lines': lineMode/, 'name badge shape follows the measured memo line count');
+  assert.doesNotMatch(shell, /hero-search-icon-btn/, 'hero title row no longer renders the integrated-search magnifier');
+  assert.match(css, /background:\s*linear-gradient\(165deg, rgba\(42, 18, 78, 0\.62\), rgba\(14, 6, 32, 0\.74\)\) !important;/, 'expanded d-day glass uses a dark tint instead of a white plate');
+  assert.doesNotMatch(css, /bp-dday-reveal \.bp-dday-expanded,[\s\S]{0,180}background:\s*rgba\(255, 255, 255, 0\.28\)/, 'expanded d-day card is no longer a 0.28 white wash');
+});
