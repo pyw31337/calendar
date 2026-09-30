@@ -369,19 +369,23 @@
   };
 
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => scan()) : null;
+  const styleObservers = new WeakSet();
   const watch = () => {
     scan();
-    if (ro) {
-      document.querySelectorAll('.lightbox-overlay .lightbox-stage').forEach(el => ro.observe(el));
-    }
+    document.querySelectorAll('.lightbox-overlay').forEach(overlay => {
+      if (ro) overlay.querySelectorAll('.lightbox-stage').forEach(el => ro.observe(el));
+      if (styleObservers.has(overlay)) return;
+      styleObservers.add(overlay);
+      // React rewrites the track transform while dragging. Watching the overlay
+      // (not every style change in the document) is enough to rebase the slots.
+      new MutationObserver(scan).observe(overlay, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style'],
+      });
+    });
   };
   new MutationObserver(watch).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', scan);
   window.visualViewport?.addEventListener('resize', scan);
-  // Re-assert after React writes inline transform during drag/nav.
-  new MutationObserver(scan).observe(document.body, {
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['style'],
-  });
 })();

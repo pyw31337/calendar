@@ -1976,8 +1976,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     ? {
         width: '100vw',
         maxWidth: '100vw',
-        height: `calc(100vh - ${reservedBottomPx}px)`,
-        maxHeight: `calc(100vh - ${reservedBottomPx}px)`,
+        height: `calc(100dvh - ${reservedBottomPx}px)`,
+        maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
         overflow: 'hidden',
         position: 'relative',
         transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
