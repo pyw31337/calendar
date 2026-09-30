@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '19a8fc78f2851086c028d1eb179e0d6a14ab8283';
+const BUILD_SHA = 'fdb9ecd9b3715cd82c84cacc651d06e6de3a8a71';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -300,7 +300,9 @@ self.addEventListener('push', event => {
     icon: iconUrl,
     badge: iconUrl,
     tag: payload.tag || 'gather-push',
-    renotify: true,
+    // Same tag replaces the previous card. A caller must opt in to buzz again;
+    // memo/chat retries send renotify:false so a duplicate delivery stays one card.
+    renotify: payload.renotify !== false,
     data: payload.url || './',
     vibrate: [80, 40, 80]
   };
