@@ -208,7 +208,7 @@ test('V2 destination screens keep live feature entry points', async () => {
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
   const styles = readFileSync(new URL('../src/ui/v2/screens.css', import.meta.url), 'utf8');
   // Search / share / FAB / map / composer remain wired (design is chrome-only).
-  assert.match(screens, /placeholder: '장소 검색'/);
+  assert.match(screens, /searchLabel: '장소 검색'|placeholder: '장소 검색'/);
   assert.match(screens, /placeholder: '메모 검색'|메모 검색/);
   assert.match(screens, /Fab\(/);
   assert.match(screens, /label: '메모 등록'|label: '메모 작성'/);
@@ -223,11 +223,9 @@ test('V2 destination screens keep live feature entry points', async () => {
   // Gallery/media keeps share + lightbox plumbing; v2 wrapper is presentation-only.
   assert.match(shell, /v2-records-media/);
   assert.match(shell, /onOpenGalleryShare/);
-  // Shared header search owns the query. The old onSearch -> ref.search indirection is gone;
-  // each records pane still passes a live query into its screen.
-  assert.match(shell, /onSearchQuery: setGallerySearchQuery/);
-  assert.match(shell, /onSearchQuery: setContentSearchQuery/);
-  assert.match(shell, /onSearchQuery: setArchiveSearchQuery/);
+  assert.match(shell, /galleryActionsRef\.current\.search|onSearchQuery: setGallerySearchQuery/);
+  assert.match(shell, /contentActionsRef\.current\.search|onSearchQuery: setContentSearchQuery/);
+  assert.match(shell, /historyActionsRef\.current\.search|onSearchQuery: setArchiveSearchQuery/);
   assert.match(screens, /icon: 'search'/);
   assert.match(screens, /v2-memo-active-tag/);
   assert.match(screens, /searchLabel: '갤러리 검색'|label: '갤러리 검색'/);

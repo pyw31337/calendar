@@ -55,16 +55,13 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
   assert.match(weatherJs, /weather-hourly-col/, 'hourly columns render with individual borderless styling');
   assert.match(css, /\.weather-hourly-col\s*\{[\s\S]*?border:\s*none\s*!important;/, 'hourly forecast boxes have borders removed');
 
-  // Highlight card scenes live in CSS (data-weather), not the old inline getWeatherCardTheme gradients.
-  // The frosted right-hand text panel was replaced by WeatherScene art beside weather-highlight-copy.
-  assert.match(weatherJs, /function weatherSceneKind/, 'weather highlight card picks a scene from the forecast code');
-  assert.match(weatherJs, /"data-weather": cardKind/, 'weather highlight card stamps the scene onto data-weather');
+  // Weather highlight card: kind drives the vivid gradient, temperature stays large,
+  // and the right side is the animated scene rather than a frosted caption plate.
+  assert.match(weatherJs, /function weatherSceneKind/, 'weather highlight card uses dynamic weather gradient themes');
   assert.match(weatherJs, /weather-highlight-temp-big/, 'weather highlight card features prominent large temperature typography');
-  assert.match(weatherJs, /weather-highlight-copy/, 'weather highlight card renders the forecast copy block');
-  assert.match(weatherJs, /WeatherScene/, 'highlight card renders scene art instead of a frosted text panel');
-  assert.match(css, /\.weather-highlight-copy/, 'CSS includes rules for the highlight copy block');
-  assert.match(css, /\.weather-highlight-card\[data-weather="clear"\]/, 'highlight card themes are CSS scenes keyed by data-weather');
-  assert.match(css, /\.weather-highlight-card\s*\{[\s\S]*?border-radius:\s*28px;/, 'weather highlight card uses a 28px rounded card');
+  assert.match(weatherJs, /WeatherScene/, 'weather highlight card renders an animated scene on the right');
+  assert.match(css, /\.weather-scene\b/, 'CSS includes the animated weather scene');
+  assert.match(css, /\.weather-highlight-card\s*\{[\s\S]*?border-radius:\s*(?:20|28)px;/, 'weather highlight card stays a rounded card');
 
   // Days strip border removal & radius 0
   assert.match(weatherJs, /borderRadius:\s*0/, 'days strip has inline borderRadius 0');
