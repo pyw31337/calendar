@@ -457,16 +457,16 @@ export function buildRenewalCalendarContext(calendar, deps) {
 }
 
 
-/** Coordinates for a confirmed date's forecast. Place pin first, then the calendar
- *  weather region, then Seoul. The hero strip and the D-day badge both use this
- *  so the same place and calendar date cannot resolve two different points. */
-function meetingPlaceWeatherCoords(calendar, dateStr) {
-  const places = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
+function orderedPlacesForDate(calendar, dateStr) {
+  return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
     const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
     const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
     return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
   });
-  const withCoords = places.find(p => p != null && p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+}
+
+function meetingPlaceWeatherCoords(calendar, dateStr) {
+  const withCoords = orderedPlacesForDate(calendar, dateStr).find(p => p != null && p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
   if (withCoords) {
     return {
       lat: Number(withCoords.lat),
@@ -492,15 +492,10 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
   const primary = list[0];
   const participants = getActiveParticipants(calendar || {});
 
-  const primaryPlaces = React.useMemo(() => {
-    if (!primary?.date) return [];
-    const allPlaces = getCalendarPlaces(calendar);
-    return allPlaces.filter(p => doesPlaceMatchDate(p, primary.date)).slice().sort((a, b) => {
-      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    });
-  }, [calendar, primary?.date]);
+  const primaryPlaces = React.useMemo(
+    () => (primary?.date ? orderedPlacesForDate(calendar, primary.date) : []),
+    [calendar, primary?.date]
+  );
 
   const formattedDate = React.useMemo(() => {
     if (!primary?.date) return '';
@@ -516,14 +511,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     : (typeof primary?.place === 'string' ? primary.place.trim() : '');
 
   const collapsedLabel = firstPlaceName ? `${formattedDate} / ${firstPlaceName}` : formattedDate;
-  const placesForDate = (dateStr) => {
-    if (!dateStr) return [];
-    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
-      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    });
-  };
+  const placesForDate = (dateStr) => (dateStr ? orderedPlacesForDate(calendar, dateStr) : []);
   const fullDateLabel = (dateValue) => {
     const date = new Date(`${dateValue}T00:00:00`);
     if (Number.isNaN(date.getTime())) return String(dateValue || '');
@@ -1482,10 +1470,6 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     });
     return map;
   }, [days, confirmedMeetingDates, calendar]);
-  const placeCoordKey = Object.entries(placeCoordsByDate)
-    .map(([dateStr, coords]) => `${dateStr}:${Number(coords.lat).toFixed(3)},${Number(coords.lon).toFixed(3)}`)
-    .sort()
-    .join('|');
   const [placeForecasts, setPlaceForecasts] = React.useState({});
 
   React.useEffect(() => {
@@ -1506,17 +1490,13 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
       setPlaceForecasts(next);
     });
     return () => { active = false; };
-  }, [placeCoordKey, placeCoordsByDate]);
+  }, [placeCoordsByDate]);
 
   // 3. 모달 오픈 시 위치 결정: 모임확정 일자이면 등록된 장소 우선, 그 외는 사용자 기본 위치
   const modalWeatherLocation = React.useMemo(() => {
     if (!selectedWeatherDate) return effectiveBaseLocation;
     if (confirmedMeetingDates.has(selectedWeatherDate)) {
-      const places = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, selectedWeatherDate)).slice().sort((a, b) => {
-        const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-        const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-        return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-      });
+      const places = orderedPlacesForDate(calendar, selectedWeatherDate);
       const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
       if (withCoords) {
         const placeAreaName = String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim();
