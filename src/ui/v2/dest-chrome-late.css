@@ -7172,3 +7172,27 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   min-height: 0 !important;
   z-index: 0 !important;
 }
+
+/* Mobile calendar type and home footer clearance.
+   Holiday names (추석 연휴) sit in the day button; 모임/모임확정 is the
+   direct span under .bp-day-head-row. The footer is a sibling after the
+   bento grid, so the grid's nav padding never lifts it — give the footer
+   its own inset or the bottom nav covers it. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid button.bp-day-cell .bp-day-corner-label.bp-is-holiday {
+    font-size: 0.6rem !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row > span {
+    font-size: 10px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-dday-strip button > span {
+    font-weight: 700 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-renewal-home-summary.bp-bento-grid > :first-child {
+    padding-top: 30px !important;
+    padding-bottom: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) main.bp-app-shell > footer {
+    padding-bottom: calc(var(--mobile-bottom-nav-total, 58px) + 16px) !important;
+  }
+}

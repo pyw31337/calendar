@@ -23,7 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compactItem, isVisible, mergeDuplicates, normalizeItem } from './lib/culture-normalize.mjs';
+import { compactItem, isVisible, mergeDuplicates, normalizeItem, timeTicketPosterFromHtml, timeTicketPosterNeedsCanonical, timeTicketProductUrl } from './lib/culture-normalize.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_URL = 'https://pyw31337.github.io/culture/data/performances.json';
@@ -87,6 +87,45 @@ async function enrichMovieFromNaver(item) {
     console.warn(`[sync-culture-performances] movie enrichment skipped for ${item.title}: ${error.message}`);
   }
   return item;
+}
+
+
+async function mapPool(items, limit, worker) {
+  const queue = items.slice();
+  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await worker(queue.shift());
+  });
+  await Promise.all(runners);
+}
+
+// Culture Flow keeps the list-API thumbnail. That file 404s once TimeTicket
+// replaces the poster; the product page's og:image is the file that still loads.
+// A failed fetch leaves the previous URL in place — we do not invent one.
+async function enrichTimeTicketPosters(items) {
+  const targets = items.filter(timeTicketPosterNeedsCanonical);
+  if (!targets.length) return;
+  let refreshed = 0;
+  let failed = 0;
+  await mapPool(targets, 6, async item => {
+    const pageUrl = timeTicketProductUrl(item);
+    try {
+      const response = await fetch(pageUrl, {
+        headers: { 'user-agent': 'Mozilla/5.0 (compatible; CalendarContentSync/1.0)' },
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!response.ok) { failed++; return; }
+      const poster = timeTicketPosterFromHtml(await response.text(), pageUrl);
+      if (!poster) { failed++; return; }
+      if (poster !== item.image) {
+        item.image = poster;
+        refreshed++;
+      }
+    } catch (error) {
+      failed++;
+      console.warn(`[sync-culture-performances] timeticket poster skipped for ${item.title}: ${error.message}`);
+    }
+  });
+  console.log(`[sync-culture-performances] timeticket posters: refreshed ${refreshed}, unchanged ${targets.length - refreshed - failed}, failed ${failed}`);
 }
 
 function writeFeedIfHealthy(outputPath, items, label) {
@@ -174,6 +213,7 @@ async function main() {
     if (feed.label === 'movies') {
       for (const item of normalized) await enrichMovieFromNaver(item);
     }
+    if (feed.label === 'performances') await enrichTimeTicketPosters(normalized);
     writeFeedIfHealthy(path.resolve(DATA_DIR, feed.file), normalized, feed.label);
   }
 }
