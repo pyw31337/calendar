@@ -661,7 +661,7 @@
       font-weight: 700; font-size: 0.72rem; color: var(--text-muted); cursor: pointer;
     }
     .v2-design .bp-side-nav-collapse-btn:hover { background: var(--bg-primary); color: var(--brand); }
-    .v2-design .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
+    .v2-design .bp-app-shell { width: 100%; max-width: none; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
 
     @media (min-width: 640px) {
       .v2-design .bp-day-corner-label, .v2-design .bp-day-event-title { display: block; }

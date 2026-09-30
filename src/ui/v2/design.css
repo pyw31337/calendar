@@ -119,38 +119,6 @@
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
 
-/* Mobile-only quick-nav row (채팅/정산/메모/갤러리) between the hero header and the D-day
- * badge -- lets those four destinations stay one tap away when there is no persistent side
- * rail to reach them from (see aurora-theme.css "Mobile: no rail", <768px). >=768px already has
- * the rail for the same destinations, so this row must stay hidden there -- never show both. Each
- * button reuses .bp-icon-btn (circular glass button, reference-home.css) unchanged, so it needs
- * no button-shape CSS of its own; only the row layout and settlement badge overlay are new. */
-.v2-design .bp-hero-quick-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 0 16px 10px;
-}
-.v2-design .bp-hero-quick-nav-item { position: relative; }
-.v2-design .bp-hero-quick-nav-badge {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: var(--radius-full);
-  box-shadow: 0 0 0 2px rgba(124, 47, 229, 0.55);
-  white-space: nowrap;
-}
-@media (min-width: 1200px) {
-  /* Persistent side rail covers 채팅/정산/메모/갤러리 — hide the hero row on desktop only. */
-  .v2-design .bp-hero-quick-nav { display: none; }
-}
-
 /* Hero TODAY schedule box */
 .v2-design .bp-hero-today-box {
   display: flex;

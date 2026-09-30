@@ -1747,10 +1747,6 @@
   min-height: 0 !important;
   padding-top: 8px !important;
 }
-.v2-design .v2-memo .bp-tag-filter-row,
-.v2-design .v2-memo .tag-filter-row {
-  display: none !important;
-}
 
 /* Settlement density polish (ledger model — no fake 1/N meeting cards) */
 .v2-design .v2-settlement .settlement-metric-grid {
