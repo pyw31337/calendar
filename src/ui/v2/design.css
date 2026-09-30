@@ -2293,7 +2293,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .global-search-page {
   display: block;
   padding: 0;
-  background: #f4f3f8;
+  background: var(--bg-primary);
 }
 .v2-design .global-search-page-card {
   width: 100%;
@@ -2303,7 +2303,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  background: #f4f3f8;
+  background: var(--bg-primary);
 }
 .v2-design .global-search-page-card .global-search-header {
   display: flex;
@@ -2346,7 +2346,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .global-search-page-card .modal-body {
   padding: 0 20px 28px;
-  background: #f4f3f8;
+  background: var(--bg-primary);
 }
 .v2-design .global-search-page-card .global-search-tabs {
   width: calc(100% + 40px);

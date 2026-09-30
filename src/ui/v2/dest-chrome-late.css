@@ -2327,7 +2327,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
   min-height: 100dvh !important;
   padding: 0 !important;
   overflow: auto !important;
-  background: #f4f3f8 !important;
+  background: var(--bg-primary) !important;
 }
 .renewal-shell.v2-design .global-search-page {
   display: flex !important;
@@ -2335,7 +2335,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
   flex: 1 1 auto !important;
   min-height: 100% !important;
   padding: 0 !important;
-  background: #f4f3f8 !important;
+  background: var(--bg-primary) !important;
 }
 .renewal-shell.v2-design .global-search-page-card {
   display: flex !important;
@@ -2348,7 +2348,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .settlement-participant-list {
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  background: #f4f3f8 !important;
+  background: var(--bg-primary) !important;
   position: relative !important;
 }
 .renewal-shell.v2-design .global-search-page-card .global-search-header,
@@ -2454,7 +2454,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge
   min-height: calc(100dvh - 64px - 48px) !important;
   overflow: visible !important;
   padding: 16px var(--v2-dest-content-pad-x, 20px) 32px !important;
-  background: #f4f3f8 !important;
+  background: var(--bg-primary) !important;
 }
 .renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
   display: flex !important;
@@ -2463,7 +2463,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge
   justify-content: flex-start !important;
   min-height: calc(100dvh - 64px) !important;
   padding: max(140px, 18vh) 24px 80px !important;
-  background: #f4f3f8 !important;
+  background: var(--bg-primary) !important;
 }
 .renewal-shell.v2-design .global-search-empty {
   width: 100% !important;
@@ -5691,7 +5691,9 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attributi
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution a {
   color: var(--text-main) !important;
 }
-/* Integrated search page paints its whole canvas #f4f3f8 (light page tint). */
+/* Integrated search canvas follows the theme token. A fixed #f4f3f8 plate
+   stayed light after dark mode, including the shell main the later override missed. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .renewal-shell-main.v2-search,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-destination.v2-search,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card,
