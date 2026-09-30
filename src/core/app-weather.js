@@ -104,11 +104,27 @@ export function getAirQualityGrade(type, value) {
 
 const FOUR_DAY_WEATHER_TTL_MS = 60 * 60 * 1000; // 1 hour
 const __fourDayWeatherMem = typeof Map !== 'undefined' ? new Map() : null;
+const __fourDayInflight = typeof Map !== 'undefined' ? new Map() : null;
+const __singleDayWeatherMem = typeof Map !== 'undefined' ? new Map() : null;
+const __singleDayInflight = typeof Map !== 'undefined' ? new Map() : null;
 const __detailedWeatherMem = typeof Map !== 'undefined' ? new Map() : null;
+
+function weatherCoordKey(lat, lon) {
+  return `${Number(lat).toFixed(3)}_${Number(lon).toFixed(3)}`;
+}
+
+/** Calendar-day distance from local today. Matches the hero column dates and DailyWeatherIcon. */
+function localDayOffset(dateStr) {
+  const target = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return NaN;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
 
 export function readFourDayWeatherMem(lat, lon) {
   if (!__fourDayWeatherMem) return null;
-  const key = `${Number(lat).toFixed(3)}_${Number(lon).toFixed(3)}`;
+  const key = weatherCoordKey(lat, lon);
   const entry = __fourDayWeatherMem.get(key);
   if (entry && (Date.now() - entry.fetchedAt) < FOUR_DAY_WEATHER_TTL_MS) {
     return entry.value;
@@ -117,16 +133,17 @@ export function readFourDayWeatherMem(lat, lon) {
 }
 
 export function fetchFourDayForecast(lat, lon) {
-  const key = `${Number(lat).toFixed(3)}_${Number(lon).toFixed(3)}`;
+  const key = weatherCoordKey(lat, lon);
   const hit = readFourDayWeatherMem(lat, lon);
   if (hit) return Promise.resolve(hit);
+  if (__fourDayInflight && __fourDayInflight.has(key)) return __fourDayInflight.get(key);
 
   // One past day plus today and up to 9 future days gives the hero its compact
   // columns (up to 10 days for responsive desktop/tablet/mobile).
   // Note: past_days=1&forecast_days=4 query pattern is retained in fallback.
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
 
-  return fetch(url)
+  const promise = fetch(url)
     .then(res => {
       if (!res.ok) throw new Error(`Weather fetch failed: ${res.status}`);
       return res.json();
@@ -174,7 +191,75 @@ export function fetchFourDayForecast(lat, lon) {
           }
           return result;
         });
+    })
+    .finally(() => {
+      if (__fourDayInflight) __fourDayInflight.delete(key);
     });
+  if (__fourDayInflight) __fourDayInflight.set(key, promise);
+  return promise;
+}
+
+function readSingleDayWeatherMem(lat, lon, dateStr) {
+  if (!__singleDayWeatherMem) return undefined;
+  const entry = __singleDayWeatherMem.get(`${weatherCoordKey(lat, lon)}_${dateStr}`);
+  if (entry && (Date.now() - entry.fetchedAt) < FOUR_DAY_WEATHER_TTL_MS) return entry.value;
+  return undefined;
+}
+
+function fetchSingleDayForecast(lat, lon, dateStr) {
+  const key = `${weatherCoordKey(lat, lon)}_${dateStr}`;
+  const cached = readSingleDayWeatherMem(lat, lon, dateStr);
+  if (cached !== undefined) return Promise.resolve(cached);
+  if (__singleDayInflight && __singleDayInflight.has(key)) return __singleDayInflight.get(key);
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FSeoul&start_date=${encodeURIComponent(dateStr)}&end_date=${encodeURIComponent(dateStr)}`;
+  const promise = fetch(url)
+    .then(res => {
+      if (!res.ok) throw new Error('daily forecast failed');
+      return res.json();
+    })
+    .then(data => {
+      const daily = (data && data.daily) || {};
+      const code = Array.isArray(daily.weather_code) ? daily.weather_code[0] : null;
+      if (code == null) return null;
+      const value = {
+        code,
+        max: Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max[0] : null,
+        min: Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min[0] : null,
+      };
+      if (__singleDayWeatherMem) __singleDayWeatherMem.set(key, { value, fetchedAt: Date.now() });
+      const bulk = __fourDayWeatherMem && __fourDayWeatherMem.get(weatherCoordKey(lat, lon));
+      if (bulk && bulk.value) bulk.value[dateStr] = value;
+      return value;
+    })
+    .catch(() => null)
+    .finally(() => {
+      if (__singleDayInflight) __singleDayInflight.delete(key);
+    });
+  if (__singleDayInflight) __singleDayInflight.set(key, promise);
+  return promise;
+}
+
+/**
+ * One daily max + weather code for a coordinate and calendar date.
+ * The home hero and the D-day badge both read this so they cannot diverge:
+ * dates inside the hero window come from the shared bulk cache (one in-flight
+ * request per rounded lat/lon); later dates use one start/end request cached
+ * on the same key.
+ */
+export function resolveDailyForecast(lat, lon, dateStr) {
+  if (lat == null || lon == null || !dateStr) return Promise.resolve(null);
+  const cached = readFourDayWeatherMem(lat, lon);
+  if (cached && Object.prototype.hasOwnProperty.call(cached, dateStr)) {
+    return Promise.resolve(cached[dateStr] || null);
+  }
+  const single = readSingleDayWeatherMem(lat, lon, dateStr);
+  if (single !== undefined) return Promise.resolve(single);
+  const ahead = localDayOffset(dateStr);
+  // forecast_days=10 includes today through today+9; past_days=1 adds yesterday.
+  if (Number.isFinite(ahead) && ahead >= -1 && ahead <= 9 && !(cached && !cached[dateStr])) {
+    return fetchFourDayForecast(lat, lon).then(map => (map && map[dateStr]) || null);
+  }
+  return fetchSingleDayForecast(lat, lon, dateStr);
 }
 
 export function fetchDetailedWeatherForecast(lat, lon) {

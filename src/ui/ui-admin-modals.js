@@ -568,6 +568,22 @@ export function AdminModal({
       ]
     }),
 
+    activeTab === 'logs' && UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "활동 로그 분류",
+      className: "admin-log-category-tabs",
+      variant: "flush",
+      value: logCategoryFilter,
+      onChange: (id) => setLogCategoryFilter(id),
+      options: [
+        { value: 'all', label: '전체' },
+        { value: 'schedule', label: '일정' },
+        { value: 'place', label: '장소' },
+        { value: 'expense', label: '정산' },
+        { value: 'poll', label: '투표' },
+        { value: 'memo', label: '메모' }
+      ]
+    }),
+
     /* Modal Scrollable Body -- one scroll container. Tab wrappers stay flush (no extra
        padding/card chrome) so the sheet can grow with the content up to the viewport. */
     /*#__PURE__*/React.createElement("div", {
@@ -896,23 +912,6 @@ export function AdminModal({
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '12px' }
       },
-        /* Log category row: same underline-tab module as content subnav (purple label + underline). */
-        UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-          ariaLabel: "활동 로그 분류",
-          variant: "flush",
-          value: logCategoryFilter,
-          onChange: (id) => setLogCategoryFilter(id),
-          style: { margin: '0 -16px' },
-          options: [
-            { value: 'all', label: '전체' },
-            { value: 'schedule', label: '일정' },
-            { value: 'place', label: '장소' },
-            { value: 'expense', label: '정산' },
-            { value: 'poll', label: '투표' },
-            { value: 'memo', label: '메모' }
-          ]
-        }),
-
         /* Search Input Box */
         /*#__PURE__*/React.createElement("input", {
           type: "text",

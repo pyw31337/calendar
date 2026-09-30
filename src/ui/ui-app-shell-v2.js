@@ -55,7 +55,7 @@ import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
-import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem } from '../core/app-weather.js';
+import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
 
 /** Legacy 5-tab labels kept for PlaceholderPane; primary IA is V2_PRIMARY side-nav. */
 const TABS = [
@@ -456,6 +456,31 @@ export function buildRenewalCalendarContext(calendar, deps) {
   };
 }
 
+
+function orderedPlacesForDate(calendar, dateStr) {
+  return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
+    const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+    const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+    return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
+function meetingPlaceWeatherCoords(calendar, dateStr) {
+  const withCoords = orderedPlacesForDate(calendar, dateStr).find(p => p != null && p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+  if (withCoords) {
+    return {
+      lat: Number(withCoords.lat),
+      lon: Number(withCoords.lng),
+      name: String(withCoords.name || withCoords.alias || '').trim(),
+    };
+  }
+  const loc = calendar && calendar.weatherLocation;
+  if (loc && loc.lat != null && loc.lon != null && Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lon))) {
+    return { lat: Number(loc.lat), lon: Number(loc.lon), name: String(loc.name || '').trim() };
+  }
+  return { lat: 37.566, lon: 126.9784, name: '서울' };
+}
+
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
@@ -467,15 +492,10 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
   const primary = list[0];
   const participants = getActiveParticipants(calendar || {});
 
-  const primaryPlaces = React.useMemo(() => {
-    if (!primary?.date) return [];
-    const allPlaces = getCalendarPlaces(calendar);
-    return allPlaces.filter(p => doesPlaceMatchDate(p, primary.date)).slice().sort((a, b) => {
-      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    });
-  }, [calendar, primary?.date]);
+  const primaryPlaces = React.useMemo(
+    () => (primary?.date ? orderedPlacesForDate(calendar, primary.date) : []),
+    [calendar, primary?.date]
+  );
 
   const formattedDate = React.useMemo(() => {
     if (!primary?.date) return '';
@@ -491,14 +511,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     : (typeof primary?.place === 'string' ? primary.place.trim() : '');
 
   const collapsedLabel = firstPlaceName ? `${formattedDate} / ${firstPlaceName}` : formattedDate;
-  const placesForDate = (dateStr) => {
-    if (!dateStr) return [];
-    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
-      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    });
-  };
+  const placesForDate = (dateStr) => (dateStr ? orderedPlacesForDate(calendar, dateStr) : []);
   const fullDateLabel = (dateValue) => {
     const date = new Date(`${dateValue}T00:00:00`);
     if (Number.isNaN(date.getTime())) return String(dateValue || '');
@@ -555,18 +568,12 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     };
   };
 
-  const weatherCoordsFor = (places) => {
-    const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
-    if (withCoords) return { lat: Number(withCoords.lat), lon: Number(withCoords.lng), name: String(withCoords.name || withCoords.alias || '').trim() };
-    const loc = calendar && calendar.weatherLocation;
-    if (loc && loc.lat != null && loc.lon != null) return { lat: Number(loc.lat), lon: Number(loc.lon), name: loc.name || '' };
-    return { lat: 37.566, lon: 126.9784, name: '서울' };
-  };
+  const weatherCoordsFor = (dateStr) => meetingPlaceWeatherCoords(calendar, dateStr);
 
   const renderExpandedCard = (meeting, onClose, extraClass, open) => {
     const places = placesForDate(meeting.date);
     const DailyWeatherIcon = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DailyWeatherIcon;
-    const weatherCoords = open && DailyWeatherIcon ? weatherCoordsFor(places) : null;
+    const weatherCoords = open && DailyWeatherIcon ? weatherCoordsFor(meeting.date) : null;
     const placeName = places[0]
       ? String(places[0].name || places[0].alias || '').trim()
       : (typeof meeting.place === 'string' ? meeting.place.trim() : '');
@@ -1453,15 +1460,43 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     return () => { active = false; };
   }, [lat, lon]);
 
+  // Confirmed columns use the meeting place, not the saved home region. The D-day
+  // badge calls the same resolver, so both paint one daily max and weather code.
+  const placeCoordsByDate = React.useMemo(() => {
+    const map = {};
+    days.forEach(day => {
+      if (!confirmedMeetingDates.has(day.dateStr)) return;
+      map[day.dateStr] = meetingPlaceWeatherCoords(calendar, day.dateStr);
+    });
+    return map;
+  }, [days, confirmedMeetingDates, calendar]);
+  const [placeForecasts, setPlaceForecasts] = React.useState({});
+
+  React.useEffect(() => {
+    let active = true;
+    const entries = Object.entries(placeCoordsByDate);
+    if (!entries.length) {
+      setPlaceForecasts({});
+      return undefined;
+    }
+    Promise.all(entries.map(([dateStr, coords]) => (
+      resolveDailyForecast(coords.lat, coords.lon, dateStr)
+        .then(value => [dateStr, value])
+        .catch(() => [dateStr, null])
+    ))).then(rows => {
+      if (!active) return;
+      const next = {};
+      rows.forEach(([dateStr, value]) => { if (value) next[dateStr] = value; });
+      setPlaceForecasts(next);
+    });
+    return () => { active = false; };
+  }, [placeCoordsByDate]);
+
   // 3. 모달 오픈 시 위치 결정: 모임확정 일자이면 등록된 장소 우선, 그 외는 사용자 기본 위치
   const modalWeatherLocation = React.useMemo(() => {
     if (!selectedWeatherDate) return effectiveBaseLocation;
     if (confirmedMeetingDates.has(selectedWeatherDate)) {
-      const places = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, selectedWeatherDate)).slice().sort((a, b) => {
-        const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-        const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-        return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-      });
+      const places = orderedPlacesForDate(calendar, selectedWeatherDate);
       const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
       if (withCoords) {
         const placeAreaName = String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim();
@@ -1503,13 +1538,17 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
       'aria-label': `${effectiveBaseLocation.name || '지역'} 날씨`
     },
       days.map(day => {
-        const forecast = weatherData ? weatherData[day.dateStr] : null;
+        const isConfirmed = confirmedMeetingDates.has(day.dateStr);
+        const placeCoords = isConfirmed ? placeCoordsByDate[day.dateStr] : null;
+        const cachedPlace = placeCoords ? readFourDayWeatherMem(placeCoords.lat, placeCoords.lon) : null;
+        const forecast = isConfirmed
+          ? (placeForecasts[day.dateStr] || (cachedPlace && cachedPlace[day.dateStr]) || null)
+          : (weatherData ? weatherData[day.dateStr] : null);
         const code = forecast?.code ?? 1;
         const maxTemp = forecast?.max != null ? Math.round(forecast.max) : null;
         const minTemp = forecast?.min != null ? Math.round(forecast.min) : null;
         const tempText = maxTemp != null ? `${maxTemp}°` : (weatherData ? '-' : '...');
 
-        const isConfirmed = confirmedMeetingDates.has(day.dateStr);
         const ddayText = isConfirmed ? formatDDayLabel(day.dateStr) : null;
         const fullTitle = `${day.label}${ddayText ? ` (${ddayText} 모임확정)` : ''} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''} - 일기예보 상세 보기`;
 
