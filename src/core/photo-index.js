@@ -215,6 +215,7 @@ function mapPhotoIndexRow(row, decodeDocument) {
     ...data,
     full: data.full || data.imageUrl || data.thumb || data.thumbUrl || '',
     thumb: data.thumb || data.thumbUrl || data.full || data.imageUrl || '',
+    smallThumb: data.smallThumb || data.smallThumbUrl || '',
     mediaKey: data.assetKey || row.document.name.split('/').pop(),
     refKey: data.assetKey || row.document.name.split('/').pop(),
     indexBacked: true

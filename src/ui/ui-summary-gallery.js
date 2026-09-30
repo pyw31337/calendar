@@ -16,6 +16,7 @@ import {
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { selectImageVariant } from '../core/image-variants.js';
 import { useTabStripGesture } from './tab-strip-gesture.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
@@ -103,7 +104,14 @@ function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
     const nextPageItems = list.slice(nextPageStart, nextPageStart + ARCHIVE_GRID_INITIAL_COUNT);
     const prefetch = () => {
       nextPageItems.slice(0, 16).forEach(p => {
-        const url = p?.thumb || p?.thumbnailUrl || p?.thumbUrl || p?.imageUrl || p?.full;
+        const url = selectImageVariant({
+          surface: 'grid',
+          uploadSource: p?.uploadSource || p?.source,
+          channel: p?.source === 'memo' ? 'memo' : (p?.source === 'meeting' ? 'meeting' : ''),
+          original: p?.full || p?.imageUrl,
+          chatThumb: p?.thumb || p?.thumbnailUrl || p?.thumbUrl,
+          smallThumb: p?.smallThumb || p?.smallThumbUrl,
+        });
         if (url && typeof Image !== 'undefined') {
           const img = new Image();
           img.decoding = 'async';

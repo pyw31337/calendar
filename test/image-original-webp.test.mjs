@@ -52,12 +52,16 @@ test('a small camera JPEG is stored as WebP at the large-photo quality, not the 
   assert.equal(compressed.originalBlob.type, 'image/webp');
   assert.notEqual(compressed.originalBlob, file);
   assert.equal(compressed.thumbnailBlob.type, 'image/webp');
-  assert.deepEqual(encodes.map(item => item.type), ['image/webp', 'image/webp']);
+  assert.equal(compressed.smallThumbBlob.type, 'image/webp');
+  assert.deepEqual(encodes.map(item => item.type), ['image/webp', 'image/webp', 'image/webp']);
   assert.equal(encodes[0].quality, 0.85);
   assert.equal(encodes[0].width, 1200);
   assert.equal(encodes[0].height, 800);
   assert.equal(encodes[1].quality, 0.80);
   assert.equal(encodes[1].width, 512);
+  assert.equal(encodes[2].quality, 0.80);
+  assert.equal(encodes[2].width, 160);
+  assert.equal(encodes[2].height, 107);
 });
 
 test('an oversized still is still capped at 2000px and WebP quality 0.85', async () => {
@@ -79,6 +83,10 @@ test('a small GIF keeps its original bytes so animation is not flattened', async
   assert.equal(compressed.originalBlob, file);
   assert.equal(compressed.originalBlob.type, 'image/gif');
   assert.equal(compressed.thumbnailBlob.type, 'image/webp');
-  assert.equal(encodes.length, 1);
+  assert.equal(compressed.smallThumbBlob.type, 'image/webp');
+  assert.equal(encodes.length, 2);
   assert.equal(encodes[0].quality, 0.80);
+  assert.equal(encodes[0].width, 400);
+  assert.equal(encodes[1].quality, 0.80);
+  assert.equal(encodes[1].width, 160);
 });

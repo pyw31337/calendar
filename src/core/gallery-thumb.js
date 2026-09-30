@@ -8,6 +8,7 @@
 
 import { isMemeKeyboardPhotoEntry } from './gallery-data.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { selectImageVariant } from './image-variants.js';
 
 const THUMB_FIELD_ORDER = [
   'thumb',
@@ -104,23 +105,77 @@ export function projectPhotoAssetPair(item = {}) {
 
 /**
  * One photo, one key, one pair.
- * displaySrc is the first ready candidate (thumb preferred). fallbackSrc is the
- * other URL in the pair. assetKey matches getPhotoAssetCommentKey / the server index.
+ * displaySrc follows the surface: grids request the small thumb, chat bubbles
+ * the 512 chat thumb, lightbox the original. fallbackSrc is the next ready
+ * candidate of the same photo. assetKey matches getPhotoAssetCommentKey.
  */
 export function resolvePhotoAsset(item, options = {}) {
   const pair = projectPhotoAssetPair(item || {});
-  const display = resolveGalleryThumbUrl({ thumb: pair.thumb, full: pair.full }, options);
+  const surface = options.surface || 'grid';
   const full = pair.full || pair.thumb;
   const thumb = pair.thumb || pair.full;
+  const small = [item?.smallThumb, item?.smallThumbUrl, item?.smallThumbnailUrl]
+    .find(value => typeof value === 'string' && value.trim()) || '';
+  const requested = selectImageVariant({
+    surface,
+    uploadSource: item?.uploadSource || item?.source,
+    channel: item?.channel || (item?.source === 'memo' ? 'memo' : item?.source === 'meeting' ? 'meeting' : ''),
+    original: pair.full,
+    chatThumb: pair.thumb,
+    smallThumb: small,
+  });
+  const ordered = [];
+  const push = (value) => {
+    const url = typeof value === 'string' ? value.trim() : '';
+    if (!url || ordered.includes(url)) return;
+    ordered.push(url);
+  };
+  push(requested);
+  if (surface === 'lightbox') {
+    push(pair.full);
+    push(pair.thumb);
+    push(small);
+  } else if (surface === 'chat' || surface === 'chat-bubble') {
+    push(pair.thumb);
+    push(small);
+    push(pair.full);
+  } else {
+    push(small);
+    push(pair.thumb);
+    push(pair.full);
+  }
+  const {
+    isRenderable = isGalleryThumbUrl,
+    isBroken = () => false,
+    loading = false,
+  } = options;
+  if (loading) {
+    return {
+      assetKey: canonicalPhotoAssetKey({ full, thumb, imageUrl: pair.full }),
+      full, thumb, displaySrc: '', fallbackSrc: '', state: 'loading',
+      tags: typeof item?.tags === 'string' ? item.tags : '', candidates: [],
+    };
+  }
+  const stored = new Set([pair.thumb, pair.full, small].map(value => String(value || '').trim()).filter(Boolean));
+  const storedAlive = [...stored].some(url => isRenderable(url) && !isBroken(url));
+  const candidates = ordered.filter(url => {
+    if (!isRenderable(url) || isBroken(url)) return false;
+    // A derived 160px sibling is what grids should request, but it is not proof
+    // the photo still exists. If every stored URL is already broken, skip it.
+    if (!stored.has(url) && !storedAlive) return false;
+    return true;
+  });
+  const displaySrc = candidates[0] || '';
+  const fallbackSrc = candidates.find(url => url !== displaySrc) || '';
   return {
     assetKey: canonicalPhotoAssetKey({ full, thumb, imageUrl: pair.full }),
     full,
     thumb,
-    displaySrc: display.src,
-    fallbackSrc: display.fallbackSrc,
-    state: display.state,
+    displaySrc,
+    fallbackSrc,
+    state: displaySrc ? 'ready' : 'missing',
     tags: typeof item?.tags === 'string' ? item.tags : '',
-    candidates: display.candidates,
+    candidates,
   };
 }
 
@@ -183,15 +238,15 @@ export function selectGalleryPreviewPhotos(items, options = {}) {
   for (let i = 0; i < sorted.length && i < scan && picked.length < limit; i += 1) {
     const photo = sorted[i];
     if (typeof isMeme === 'function' && isMeme(photo)) continue;
-    const resolved = resolveGalleryThumbUrl(photo, { isRenderable, isBroken });
+    const resolved = resolvePhotoAsset(photo, { isRenderable, isBroken, surface: 'grid' });
     if (resolved.state !== 'ready') continue;
     const key = photoIdentityKey(photo, i);
     if (seen.has(key)) continue;
     seen.add(key);
     picked.push({
       ...photo,
-      thumb: resolved.src,
-      full: photo.full || resolved.fallbackSrc || resolved.src,
+      thumb: resolved.displaySrc,
+      full: photo.full || resolved.full || resolved.fallbackSrc || resolved.displaySrc,
       __thumbResolved: resolved,
     });
   }
