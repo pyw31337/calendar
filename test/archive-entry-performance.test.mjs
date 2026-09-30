@@ -11,9 +11,11 @@ test('archive only reads legacy memo snapshots when the canonical index is absen
   assert.match(appMain, /fetchMemosRest\(activeCalId, 100\)/);
 });
 
-test('gallery and archive browsing never trigger a full chat archive hydrate', () => {
-  assert.match(archiveState, /const isMediaBrowse = !isGlobalSearchOpen && \(activeView === 'history' \|\| activeView === 'gallery'\);/);
-  assert.match(archiveState, /if \(isMediaBrowse\) return;/);
+test('history browsing and the gallery photo grid do not hydrate the full chat archive', () => {
+  assert.match(archiveState, /if \(activeView === 'history' && !wantsSearchCorpus\) return undefined;/);
+  assert.match(archiveState, /const wantsGalleryCorpus = activeView === 'gallery' && galleryCorpusRequested;/);
+  assert.match(archiveState, /if \(!wantsSearchCorpus && !wantsGalleryCorpus\) return undefined;/);
+  assert.doesNotMatch(archiveState, /activeView === 'history' \|\| activeView === 'gallery'/);
 });
 
 test('archive does not expose a manual full analysis action', () => {

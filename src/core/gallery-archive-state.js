@@ -1,3 +1,11 @@
+let requestGalleryChatCorpusImpl = () => {};
+
+// Files/links call this when their tab opens. Assigned by useGalleryArchiveState during render
+// so the gallery effect can see it without waiting for a parent effect.
+export function requestGalleryChatCorpus() {
+  requestGalleryChatCorpusImpl();
+}
+
 function mergeArchiveDocsById(incoming, pendingById) {
   const incomingList = Array.isArray(incoming) ? incoming : [];
   const pending = pendingById && typeof pendingById === 'object' ? pendingById : null;
@@ -38,6 +46,8 @@ export function useGalleryArchiveState({
 }) {
   const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
   const [fullGalleryMemosByCalendar, setFullGalleryMemosByCalendar] = React.useState({});
+  const [galleryCorpusRequested, setGalleryCorpusRequested] = React.useState(false);
+  requestGalleryChatCorpusImpl = () => setGalleryCorpusRequested(true);
   // Verified tag saves that land before the search-index archive finishes loading. Applied when
   // the snapshot arrives so reopen can read imageTags without waiting on photoIndex CF.
   const pendingArchiveMessagePatchesRef = React.useRef({});
@@ -92,14 +102,16 @@ export function useGalleryArchiveState({
   }, [activeCalId, fullGalleryMemosByCalendar, memos]);
 
   React.useEffect(() => {
-    if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history' && activeView !== 'gallery')) return;
-    // Gallery and History are backed by the paged server photoIndex. Hydrating every chat and
-    // memo record in parallel caused two complete reads and two large React state writes before
-    // their first frame. That is especially harmful for legacy/no-index calendars: a missing
-    // index must degrade to the already-hydrated live window, never silently start a full client
-    // archive scan. Global search is the only surface that explicitly asks for that full corpus.
-    const isMediaBrowse = !isGlobalSearchOpen && (activeView === 'history' || activeView === 'gallery');
-    if (isMediaBrowse) return;
+    if (!activeCalId) return undefined;
+    // History and the gallery photo grid stay on the paged photoIndex. A full chat/memo read on
+    // those screens duplicated the index and stalled first paint. Files and links are the
+    // exception: gallery uploads are uploadSource=gallery, so they are outside the live chat
+    // window and are not photoIndex rows. They opt in through requestGalleryChatCorpus.
+    // Global search still asks for the corpus on its own.
+    const wantsGalleryCorpus = activeView === 'gallery' && galleryCorpusRequested;
+    const wantsSearchCorpus = !!isGlobalSearchOpen;
+    if (activeView === 'history' && !wantsSearchCorpus) return undefined;
+    if (!wantsSearchCorpus && !wantsGalleryCorpus) return undefined;
     const hasFullChat = Object.prototype.hasOwnProperty.call(fullChatHistoryByCalendar, activeCalId);
     const hasFullGalleryMemos = Object.prototype.hasOwnProperty.call(fullGalleryMemosByCalendar, activeCalId);
     if (activeView === 'gallery' ? (hasFullChat && hasFullGalleryMemos) : hasFullChat) return;
@@ -139,7 +151,7 @@ export function useGalleryArchiveState({
       }).catch(error => console.warn('full paged chat history load failed:', error));
     }
     return () => { cancelled = true; };
-  }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar, fullGalleryMemosByCalendar, fetchAllChatMessagesRest, fetchCalendarSearchIndex]);
+  }, [activeCalId, isGlobalSearchOpen, activeView, galleryCorpusRequested, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar, fullGalleryMemosByCalendar, fetchAllChatMessagesRest, fetchCalendarSearchIndex]);
 
   const patchGalleryArchiveMessage = React.useCallback((messageId, patch) => {
     if (!activeCalId || !messageId || !patch || typeof patch !== 'object') return;

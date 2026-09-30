@@ -131,7 +131,8 @@ test('Chat and memo file attachments collection and gallery photo filtering', as
   assert.match(galleryJs, /import \{ collectChatFileAttachmentsFromMessages \} from '\.\.\/core\/chat-file-attachments\.js';/, 'ui-chat-gallery imports collectChatFileAttachmentsFromMessages');
 
   // Photo filtering excludes links and external service urls
-  assert.match(galleryJs, /photo\.source !== 'link' && !isExternalServiceUrl\(photo\.full \|\| photo\.url \|\| photo\.thumb\)/, 'sharedPhotos filters out link sources and external urls');
+  assert.match(galleryJs, /\.filter\(photo => !isGalleryWebLinkPhoto\(photo\)\)/, 'sharedPhotos keeps stored media and drops webpage links');
+  assert.match(galleryDataJs, /export function isGalleryWebLinkPhoto/, 'stored gallery media is not treated as an external link');
   assert.match(galleryDataJs, /const hasPhotos = Boolean\(memo\.imageUrl \|\| \(Array\.isArray\(memo\.imageUrls\) && memo\.imageUrls\.length > 0\)/, 'composeGalleryPhotos skips memos without uploaded photos');
 });
 
