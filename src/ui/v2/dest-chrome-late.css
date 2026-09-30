@@ -420,54 +420,6 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   }
 }
 
-.v2-design .bp-hero-quick-nav-item {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  color: #fff !important;
-  font-size: 0.8rem !important;
-  font-weight: 600 !important;
-  gap: 0 !important;
-  cursor: pointer !important;
-  padding: 0 4px !important;
-}
-.v2-design .bp-hero-quick-nav-item .bp-hero-quick-nav-icon {
-  width: 48px !important;
-  height: 48px !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  color: #fff !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-.v2-design .bp-hero-quick-nav-item .bp-hero-quick-nav-label {
-  color: #fff !important;
-  font-size: 0.8rem !important;
-  font-weight: 600 !important;
-}
-.v2-design .bp-hero-quick-nav-icon svg {
-  width: 26px !important;
-  height: 26px !important;
-}
-@media (min-width: 461px) and (max-width: 1199px) {
-  .v2-design .bp-hero-quick-nav-item {
-    flex-direction: row !important;
-  }
-}
-@media (max-width: 460px) {
-  .v2-design .bp-hero-quick-nav-item {
-    flex-direction: column !important;
-  }
-  .v2-design .bp-hero-quick-nav {
-    padding: 0 16px 10px;
-  }
-}
-
 .v2-design .v2-home-chat-row {
   display: flex;
   align-items: flex-start;
@@ -3950,10 +3902,10 @@ html:has(.renewal-shell.v2-design) .v2-chat .bp-menu-fab {
 html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .bp-menu-fab {
   bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
 }
-html[data-v2-keyboard]:has(.renewal-shell.v2-design) .bp-menu-fab {
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-menu-fab {
   margin-bottom: var(--app-vv-keyboard-inset, 0px) !important;
 }
-html[data-v2-keyboard]:has(.renewal-shell.v2-design) .v2-chat .bp-menu-fab {
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .v2-chat .bp-menu-fab {
   margin-bottom: 0 !important;
 }
 
@@ -4142,44 +4094,6 @@ html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-chip {
   flex: 0 0 auto !important;
   width: 68px !important;
   min-width: 68px !important;
-}
-
-/* Quick nav: the group from the left edge of 채팅 to the right edge of 컨텐츠
-   is one centered band (about 90% of the hero), not five equal columns.
-   Equal columns centered each label in its slot, so the longer last label
-   pulled the visual group to the right. */
-html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  padding: 0 5% 10px !important;
-  box-sizing: border-box !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  gap: clamp(6px, 2vw, 18px) !important;
-}
-html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item {
-  flex: 0 1 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  padding: 0 !important;
-  justify-content: center !important;
-  align-items: center !important;
-}
-html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-hero-quick-nav-icon {
-  width: clamp(32px, 9vw, 48px) !important;
-  height: clamp(32px, 9vw, 48px) !important;
-}
-html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-hero-quick-nav-label {
-  max-width: 100% !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  /* rem + vw so it still narrows on small phones but follows the 글자크기 setting. */
-  font-size: clamp(0.62rem, 0.45rem + 1.2vw, 0.8rem) !important;
 }
 
 html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-today-box,
@@ -5794,15 +5708,6 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected .section-count-badge {
   background: transparent !important;
   color: var(--on-brand) !important;
-}
-/* Mobile hero quick-nav (채팅/정산/메모/...) sits on the lime slab. */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-item,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-label,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-icon {
-  color: var(--on-brand) !important;
-}
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-quick-nav-badge {
-  box-shadow: 0 0 0 2px var(--brand) !important;
 }
 
 /* Mobile hero weather row & today box on the lime slab (Theme 2 dark mode). */
