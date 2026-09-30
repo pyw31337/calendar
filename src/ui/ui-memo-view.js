@@ -367,6 +367,36 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   // Editing Memo State
   const [editingMemo, setEditingMemo] = React.useState(null);
+  // Overlay ref: reposition the overlay into the visible viewport when the mobile
+  // software keyboard reduces available height (visualViewport resize/scroll).
+  const memoEditOverlayRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!editingMemo) return undefined;
+    const el = memoEditOverlayRef.current;
+    if (!el) return undefined;
+    const apply = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const top = Math.max(0, vv.offsetTop);
+      const height = vv.height;
+      el.style.top = top + 'px';
+      el.style.height = height + 'px';
+      el.style.bottom = 'auto';
+    };
+    apply();
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', apply);
+      vv.addEventListener('scroll', apply);
+    }
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', apply);
+        vv.removeEventListener('scroll', apply);
+      }
+      if (el) { el.style.top = ''; el.style.height = ''; el.style.bottom = ''; }
+    };
+  }, [editingMemo]);
   const [editTitle, setEditTitle] = React.useState('');
   const [editText, setEditText] = React.useState('');
   const editMemoTextareaRef = React.useRef(null);
@@ -1706,6 +1736,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     /* Memo Editor Modal Overlay */
     editingMemo && /*#__PURE__*/React.createElement("div", {
+      ref: memoEditOverlayRef,
       onClick: memoEditorDirtyGuard.overlayOnClick,
       style: {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
