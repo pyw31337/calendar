@@ -6,11 +6,18 @@ import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcl
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
+import {
+  forgetArchiveDeleted,
+  photoHiddenByArchiveDelete,
+  projectArchivePhotoEntries,
+  rememberArchiveDeleted,
+  rememberArchiveTag,
+} from '../core/archive-photo-edits.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
-import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken } from './archive-place-groups.js';
+import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 import { CommonPagination } from './ui-shared.js';
 
@@ -1334,6 +1341,7 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
 export function HistoryView({
   calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings,
   v2Embed = false, onOpenShare = null,
+  v2SearchQuery, onV2SearchQuery = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -1348,6 +1356,7 @@ export function HistoryView({
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
   onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null,
+  onIndexedPhotoLoadAll = null,
   photoCommentCounts = {}, onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -1497,12 +1506,23 @@ export function HistoryView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const v2SearchControlled = typeof onV2SearchQuery === 'function';
+  React.useEffect(() => {
+    if (!v2SearchControlled) return;
+    setSearchQuery(v2SearchQuery || '');
+  }, [v2SearchControlled, v2SearchQuery]);
+  const [archiveIndexScan, setArchiveIndexScan] = React.useState('idle');
   // v2 shell (PC): side-nav's per-tab submenu needs 보관함 검색 -- otherwise local to this component.
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ search: () => setIsSearchOpen(v => !v) });
+    onRegisterMenuActions({
+      search: () => {
+        if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(v => !v);
+      },
+    });
     return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions]);
+  }, [onRegisterMenuActions, v2SearchControlled]);
   const VALID_HISTORY_TABS = ['meetings', 'memories', 'people', 'places'];
   // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
   // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
@@ -1710,7 +1730,16 @@ export function HistoryView({
     const placeMatch = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d)).some(p =>
       (p.alias || p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
     );
-    return d.includes(q) || namesMatch || memoMatch || placeMatch;
+    const labeledDate = formatHistoryDate(d).toLowerCase();
+    const anniversaryMatch = (anniversaries || []).some(a => {
+      if (!a) return false;
+      const start = String(a.startDate || a.date || '').slice(0, 10);
+      const end = String(a.endDate || a.startDate || a.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || d < start || d > (end || start)) return false;
+      return String(a.title || '').toLowerCase().includes(q)
+        || String(a.memo || a.note || a.description || '').toLowerCase().includes(q);
+    });
+    return d.includes(q) || labeledDate.includes(q) || namesMatch || memoMatch || placeMatch || anniversaryMatch;
   });
 
   const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
@@ -1734,6 +1763,29 @@ export function HistoryView({
     && !usesLegacyPhotoFallback
     && indexedPhotoStatus !== 'error';
   const archivePhotoIndexHasError = indexedPhotoStatus === 'error';
+  // 보관함 첫 화면은 최근 한 페이지만 그린다. 검색은 컨텐츠 검색과 같이 그 한 페이지에서
+  // 끊기면 안 되므로, 검색어가 있는 동안만 사진 인덱스 전체를 읽어 지난 태그까지 찾는다.
+  React.useEffect(() => {
+    const needle = String(searchQuery || '').trim();
+    if (!needle) {
+      setArchiveIndexScan('idle');
+      return undefined;
+    }
+    if (!usesCanonicalPhotoIndex || indexedPhotoComplete) {
+      setArchiveIndexScan(indexedPhotoComplete ? 'done' : 'idle');
+      return undefined;
+    }
+    if (typeof onIndexedPhotoLoadAll !== 'function') {
+      setArchiveIndexScan('idle');
+      return undefined;
+    }
+    let cancelled = false;
+    setArchiveIndexScan('loading');
+    Promise.resolve(onIndexedPhotoLoadAll())
+      .then(ok => { if (!cancelled) setArchiveIndexScan(ok === false ? 'error' : 'done'); })
+      .catch(() => { if (!cancelled) setArchiveIndexScan('error'); });
+    return () => { cancelled = true; };
+  }, [searchQuery.trim() ? 'search' : '', usesCanonicalPhotoIndex, indexedPhotoComplete, onIndexedPhotoLoadAll, calendar && calendar.id]);
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
@@ -1876,34 +1928,26 @@ export function HistoryView({
     });
     return () => { cancelled = true; };
   }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, hasExplicitIndexedPhotoStatus]);
-  const [deletedPhotoKeys, setDeletedPhotoKeys] = React.useState(() => new Set());
+  const [archiveTagOverrides, setArchiveTagOverrides] = React.useState(() => new Map());
+  const [archiveDeletedKeys, setArchiveDeletedKeys] = React.useState(() => new Set());
   const historyPhotoEntries = React.useMemo(() => {
     const list = indexedMeetingPhotoEntries.length
       ? [...baseHistoryPhotoEntries, ...indexedMeetingPhotoEntries]
       : baseHistoryPhotoEntries;
-    return dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey)
-      .filter((photo, idx) => {
-        if (isKnownBrokenHistoryPhoto(photo)) return false;
-        if (deletedPhotoKeys.size > 0) {
-          const selectKey = archivePhotoSelectKey(photo, idx);
-          if (deletedPhotoKeys.has(selectKey)) return false;
-          if (photo.assetKey && deletedPhotoKeys.has(String(photo.assetKey))) return false;
-          if (photo.mediaKey && deletedPhotoKeys.has(String(photo.mediaKey))) return false;
-          if (photo.refKey && deletedPhotoKeys.has(String(photo.refKey))) return false;
-        }
-        return true;
-      })
+    const visible = dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey)
+      .filter(photo => !isKnownBrokenHistoryPhoto(photo) && !photoHiddenByArchiveDelete(archiveDeletedKeys, photo))
       .sort((a, b) => (Number(b.timestamp || 0) - Number(a.timestamp || 0)));
-  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision, deletedPhotoKeys]);
+    return projectArchivePhotoEntries(visible, { tagOverrides: archiveTagOverrides });
+  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision, archiveDeletedKeys, archiveTagOverrides]);
   // Match memory date ranges from a prepared token list. This is purposely limited to the active
   // 추억 tab: person/place navigation does not pay for date parsing it cannot display.
   const historyMemoryPhotoEntries = React.useMemo(() => {
-    if (historyTab !== 'memories') return [];
+    if (historyTab !== 'memories' && !q) return [];
     return historyPhotoEntries.map(entry => ({
       ...entry,
       __gatherMemoryDateTokens: parseHistoryDateTokens(entry?.tags || '')
     }));
-  }, [historyTab, historyPhotoEntries]);
+  }, [historyTab, historyPhotoEntries, q ? 1 : 0]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   // 장소 탭: a place group's key, PLACE_UNCLASSIFIED_KEY for "분류 필요", or null (the place grid).
   const [selectedPlaceKey, setSelectedPlaceKey] = React.useState(null);
@@ -2026,7 +2070,8 @@ export function HistoryView({
   const { personPhotosByLabel, unclassifiedPeoplePhotos } = React.useMemo(() => {
     const buckets = new Map(personTagChips.map(tag => [tag.label, []]));
     const unclassified = [];
-    if (historyTab !== 'people') return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
+    // 검색 중에는 다른 탭 배지(인물 N)를 내기 위해 인물 탭이 아니어도 분류한다.
+    if (historyTab !== 'people' && !q) return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
     const matchers = personTagChips.map(tag => ({
       label: tag.label,
       variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
@@ -2047,7 +2092,7 @@ export function HistoryView({
       if (!hasPerson) unclassified.push(entry);
     });
     return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
-  }, [historyTab, historyPhotoEntries, personTagChips]);
+  }, [historyTab, historyPhotoEntries, personTagChips, q ? 1 : 0]);
   const getPhotosForTagLabel = React.useCallback(label => personPhotosByLabel.get(label) || [], [personPhotosByLabel]);
 
   const photosForPersonTag = React.useMemo(
@@ -2099,6 +2144,35 @@ export function HistoryView({
     }
   };
 
+  const publishArchiveTags = changes => {
+    if (!changes?.length) return;
+    setArchiveTagOverrides(prev => {
+      const next = new Map(prev);
+      changes.forEach(change => rememberArchiveTag(next, change.photo, change.tags));
+      return next;
+    });
+  };
+  const rollbackArchiveTags = changes => {
+    if (!changes?.length) return;
+    setArchiveTagOverrides(prev => {
+      const next = new Map(prev);
+      changes.forEach(change => rememberArchiveTag(next, change.photo, change.beforeTags));
+      return next;
+    });
+  };
+  const hideArchivePhotos = photos => {
+    if (!photos?.length) return;
+    setArchiveDeletedKeys(prev => {
+      const next = new Set(prev);
+      photos.forEach(photo => rememberArchiveDeleted(next, photo));
+      return next;
+    });
+  };
+  const restoreArchivePhotos = photos => {
+    if (!photos?.length) return;
+    setArchiveDeletedKeys(prev => photos.reduce((next, photo) => forgetArchiveDeleted(next, photo), new Set(prev)));
+  };
+
   const handleApplyPeopleTags = async (tagText) => {
     const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
     if (!photos.length) return;
@@ -2112,13 +2186,15 @@ export function HistoryView({
       showToast?.('선택한 사진에 이미 해당 태그가 지정되어 있습니다.', 'info');
       return;
     }
+    publishArchiveTags(changes);
+    setPeopleSelectedKeys(new Set());
     setIsPeopleBulkSaving(true);
     try {
       const result = await save(changes);
       if (!result?.ok) throw new Error('태그 저장 실패');
       showToast?.(`사진 ${changes.length}장에 태그를 적용했습니다.`, 'success');
-      setPeopleSelectedKeys(new Set());
     } catch (err) {
+      rollbackArchiveTags(changes);
       showToast?.(String(err?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
     } finally {
       setIsPeopleBulkSaving(false);
@@ -2129,19 +2205,7 @@ export function HistoryView({
     const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
     if (!photos.length) return;
     const deleteFn = onDeletePhotos || window.__gatherBulkDeletePhotos;
-    const keysToRemove = Array.from(peopleSelectedKeys);
-
-    // Optimistic local deletion: mark keys as deleted immediately so they vanish from the view instantly
-    setDeletedPhotoKeys(prev => {
-      const next = new Set(prev);
-      keysToRemove.forEach(k => next.add(k));
-      photos.forEach(p => {
-        if (p.assetKey) next.add(String(p.assetKey));
-        if (p.mediaKey) next.add(String(p.mediaKey));
-        if (p.refKey) next.add(String(p.refKey));
-      });
-      return next;
-    });
+    hideArchivePhotos(photos);
     setPeopleSelectedKeys(new Set());
     setPeopleSelectMode(false);
     setIsPeopleBulkDeleting(true);
@@ -2152,18 +2216,42 @@ export function HistoryView({
         const res = await deleteFn(photos, {
           onProgress: ({ current, total }) => setPeopleDeleteProgress({ current, total })
         });
-        showToast?.(`사진 ${res?.deleted ?? photos.length}장을 삭제했습니다.`, 'success');
+        const deleted = Number(res?.deleted || 0);
+        const failed = Number(res?.failed || 0);
+        if (!deleted && failed) {
+          restoreArchivePhotos(photos);
+          showToast?.('사진 삭제에 실패했습니다.', 'error');
+        } else if (failed) {
+          showToast?.(`사진 ${deleted}장을 삭제했습니다. ${failed}장은 지우지 못했습니다.`, 'error');
+        } else {
+          showToast?.(`사진 ${deleted || photos.length}장을 삭제했습니다.`, 'success');
+        }
       } else if (typeof onDeletePhoto === 'function') {
         let done = 0;
+        let failed = 0;
         for (const photo of photos) {
-          await onDeletePhoto({ ...photo, silent: true });
-          done += 1;
-          setPeopleDeleteProgress({ current: done, total: photos.length });
+          try {
+            const ok = await onDeletePhoto({ ...photo, silent: true });
+            if (ok === false) failed += 1;
+            else done += 1;
+          } catch (_) {
+            failed += 1;
+          }
+          setPeopleDeleteProgress({ current: done + failed, total: photos.length });
         }
-        showToast?.(`사진 ${photos.length}장을 삭제했습니다.`, 'success');
+        if (!done && failed) {
+          restoreArchivePhotos(photos);
+          showToast?.('사진 삭제에 실패했습니다.', 'error');
+        } else {
+          showToast?.(`사진 ${done}장을 삭제했습니다.`, failed ? 'error' : 'success');
+        }
+      } else {
+        restoreArchivePhotos(photos);
+        showToast?.('사진 삭제 기능을 준비하지 못했습니다.', 'error');
       }
     } catch (err) {
       console.error('handleDeleteSelectedPeoplePhotos failed:', err);
+      restoreArchivePhotos(photos);
       showToast?.('사진 삭제에 실패했습니다.', 'error');
     } finally {
       setIsPeopleBulkDeleting(false);
@@ -2179,7 +2267,7 @@ export function HistoryView({
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
   const placePhotoGroups = React.useMemo(() => {
-    if (historyTab !== 'places') return { groups: [], unclassified: [], unclassifiedCount: 0 };
+    if (historyTab !== 'places' && !q) return { groups: [], unclassified: [], unclassifiedCount: 0 };
     return buildPlacePhotoGroups({
       places: getCalendarPlaces(calendar),
       photos: historyPhotoEntries,
@@ -2190,7 +2278,7 @@ export function HistoryView({
       },
       doesPlaceMatchDate
     });
-  }, [historyTab, calendar, historyPhotoEntries]);
+  }, [historyTab, calendar, historyPhotoEntries, q ? 1 : 0]);
   const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
     ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
     : null;
@@ -2213,6 +2301,22 @@ export function HistoryView({
     if (selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY) { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }
     placeAnchorKeyRef.current = '';
   }, [selectedPlaceKey]);
+  React.useLayoutEffect(() => {
+    // Drill-in swaps the scroller. Reusing the previous scrollTop (or a layout
+    // jump from the new grid) was collapsing the page header while the detail
+    // was already at the top. Pin the new pane to the top, then ask the header
+    // to come back. A later paint can still emit a scroll event; repeat once.
+    if (typeof document === 'undefined') return undefined;
+    const reveal = () => {
+      const root = document.querySelector('.v2-archive');
+      const scroller = root && root.querySelector('.history-page-scroll');
+      if (scroller && (selectedPlaceKey || selectedPersonTag || selectedMemoryGroupId)) scroller.scrollTop = 0;
+      document.dispatchEvent(new Event('v2-page-header-show'));
+    };
+    reveal();
+    const raf = requestAnimationFrame(reveal);
+    return () => cancelAnimationFrame(raf);
+  }, [selectedPlaceKey, selectedPersonTag, selectedMemoryGroupId]);
   const togglePlaceSelectedKey = (key, options = {}) => setPlaceSelectedKeys(prev => {
     const next = new Set(prev);
     const orderedKeys = options.orderedKeys || (options.photos ? options.photos.map((p, i) => archivePhotoSelectKey(p, i)) : []);
@@ -2257,21 +2361,27 @@ export function HistoryView({
     // transaction. It avoids the old 60ms-per-photo loop (which still resulted in many network
     // reads/writes) and records the previous tags for an immediate undo.
     if (typeof bulkSaveImageTagsRef.current === 'function') {
+      publishArchiveTags(bulkChanges);
+      setPlaceSelectedKeys(new Set());
+      setPlaceSelectMode(false);
       setPlaceAssignProgress({ current: 0, total: bulkChanges.length, label: placeTag });
       try {
         const result = await bulkSaveImageTagsRef.current(bulkChanges);
         if (!result?.ok) throw new Error('일괄 장소 태그 저장 실패');
-        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags }));
-        setPlaceSelectedKeys(new Set());
-        setPlaceSelectMode(false);
+        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
         showToast(`${bulkChanges.length}장을 #${placeTag}(으)로 옮겼어요.`, 'success', 9000, () => {
           const undo = bulkSaveImageTagsRef.current;
           if (typeof undo !== 'function') return;
+          publishArchiveTags(undoChanges);
           void undo(undoChanges)
-            .then(undoResult => showToast(undoResult?.ok ? '장소 분류를 되돌렸습니다.' : '장소 분류를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error'))
-            .catch(error => { console.error('Place bulk-tag undo failed:', error); showToast('장소 분류 되돌리기에 실패했습니다.', 'error'); });
+            .then(undoResult => {
+              if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
+              showToast(undoResult?.ok ? '장소 분류를 되돌렸습니다.' : '장소 분류를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+            })
+            .catch(error => { rollbackArchiveTags(undoChanges); console.error('Place bulk-tag undo failed:', error); showToast('장소 분류 되돌리기에 실패했습니다.', 'error'); });
         }, null, '되돌리기');
       } catch (err) {
+        rollbackArchiveTags(bulkChanges);
         console.error('Place bulk tag save failed:', err);
         showToast(String(err?.message || '장소 태그 저장에 실패했습니다.'), 'error');
       } finally {
@@ -2305,6 +2415,79 @@ export function HistoryView({
     setPlaceSelectMode(false);
     const parts = [`${counts.done}장을 #${placeTag}(으)로 옮겼어요.`];
     if (counts.full) parts.push(`${counts.full}장은 태그가 20개라 건너뛰었어요.`);
+    if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
+    showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
+  };
+  const dismissSelectedPhotosFromPlaces = async () => {
+    const photos = Array.from(placeSelectedKeys).map(key => unclassifiedPhotoByKey.get(key)).filter(Boolean);
+    if (!photos.length || (typeof saveImageTagsRef.current !== 'function' && typeof bulkSaveImageTagsRef.current !== 'function') || placeAssignProgress) return;
+    const seen = new Set();
+    const bulkChanges = [];
+    photos.forEach(photo => {
+      const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
+      if (!assetKey || seen.has(assetKey)) return;
+      const next = withNotAPlaceTag(photo?.tags || '');
+      if (next.status !== 'add') return;
+      seen.add(assetKey);
+      bulkChanges.push({ photo, assetKey, beforeTags: next.before, tags: next.tags });
+    });
+    if (!bulkChanges.length) {
+      showToast('선택한 사진은 이미 분류에서 빠져 있어요.', 'info');
+      setPlaceSelectedKeys(new Set());
+      setPlaceSelectMode(false);
+      return;
+    }
+    if (typeof bulkSaveImageTagsRef.current === 'function') {
+      publishArchiveTags(bulkChanges);
+      setPlaceSelectedKeys(new Set());
+      setPlaceSelectMode(false);
+      setPlaceAssignProgress({ current: 0, total: bulkChanges.length, label: '제거' });
+      try {
+        const result = await bulkSaveImageTagsRef.current(bulkChanges);
+        if (!result?.ok) throw new Error('분류 제거 저장 실패');
+        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
+        showToast(`${bulkChanges.length}장을 분류 필요에서 뺐어요. 사진 파일은 그대로예요.`, 'success', 9000, () => {
+          const undo = bulkSaveImageTagsRef.current;
+          if (typeof undo !== 'function') return;
+          publishArchiveTags(undoChanges);
+          void undo(undoChanges)
+            .then(undoResult => {
+              if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
+              showToast(undoResult?.ok ? '분류 제거를 되돌렸습니다.' : '분류 제거를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+            })
+            .catch(error => { rollbackArchiveTags(undoChanges); console.error('Place dismiss undo failed:', error); showToast('분류 제거 되돌리기에 실패했습니다.', 'error'); });
+        }, null, '되돌리기');
+      } catch (err) {
+        rollbackArchiveTags(bulkChanges);
+        console.error('Place dismiss tag save failed:', err);
+        showToast(String(err?.message || '분류에서 빼지 못했습니다.'), 'error');
+      } finally {
+        setPlaceAssignProgress(null);
+      }
+      return;
+    }
+    const counts = { done: 0, failed: 0 };
+    const nextFrame = () => new Promise(resolve => setTimeout(resolve, 60));
+    for (let i = 0; i < photos.length; i += 1) {
+      setPlaceAssignProgress({ current: i + 1, total: photos.length, label: '제거' });
+      const photo = photos[i];
+      const next = withNotAPlaceTag(photo.tags);
+      if (next.status !== 'add') { counts.done += 1; continue; }
+      await nextFrame();
+      let ok = false;
+      try {
+        ok = await saveImageTagsRef.current(photo.messageId, photo.imageIndex, next.tags, {
+          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', readFresh: true, silent: true
+        });
+      } catch (err) {
+        console.warn('Place dismiss tag save failed:', err);
+      }
+      if (ok) counts.done += 1; else counts.failed += 1;
+    }
+    setPlaceAssignProgress(null);
+    setPlaceSelectedKeys(new Set());
+    setPlaceSelectMode(false);
+    const parts = [`${counts.done}장을 분류 필요에서 뺐어요.`];
     if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
     showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
   };
@@ -2374,7 +2557,7 @@ export function HistoryView({
     return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
   const travelMemoryGroups = React.useMemo(() => {
-    if (historyTab !== 'memories') return [];
+    if (historyTab !== 'memories' && !q) return [];
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
@@ -2401,7 +2584,83 @@ export function HistoryView({
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
-  }, [historyTab, anniversaries, historyMemoryPhotoEntries]);
+  }, [historyTab, anniversaries, historyMemoryPhotoEntries, q ? 1 : 0]);
+
+  const archiveTextHas = (value, needle) => String(value || '').toLowerCase().includes(needle);
+  const archivePhotoMatchesSearch = (photo, needle) => [photo?.tags, photo?.caption, photo?.note, photo?.title, photo?.text, photo?.placeName, photo?.meetingDate]
+    .some(value => archiveTextHas(value, needle));
+  const visibleMemoryGroups = React.useMemo(() => {
+    if (!q) return travelMemoryGroups;
+    return travelMemoryGroups.filter(group => {
+      if (archiveTextHas(group.title, q)) return true;
+      if (archiveTextHas(group.startDate, q) || archiveTextHas(group.endDate, q)) return true;
+      if (archiveTextHas(formatHistoryDate(group.startDate), q) || archiveTextHas(formatHistoryDateRange(group.startDate, group.endDate), q)) return true;
+      return (group.photos || []).some(photo => archivePhotoMatchesSearch(photo, q));
+    });
+  }, [travelMemoryGroups, q]);
+  const visiblePersonChips = React.useMemo(() => {
+    if (!q) return personTagChips;
+    return personTagChips.filter(tag => {
+      const variants = getPersonNameVariants(tag.label).map(value => value.toLowerCase());
+      if (variants.some(value => value.includes(q) || (value.length > 1 && q.includes(value)))) return true;
+      const photos = personPhotosByLabel.get(tag.label) || [];
+      return photos.some(photo => archivePhotoMatchesSearch(photo, q));
+    });
+  }, [q, personTagChips, personPhotosByLabel]);
+  const visibleUnclassifiedPeople = React.useMemo(() => {
+    if (!q) return unclassifiedPeoplePhotos;
+    if (q === '분류' || '분류 필요'.includes(q) || '분류필요'.includes(q)) return unclassifiedPeoplePhotos;
+    return unclassifiedPeoplePhotos.filter(photo => archivePhotoMatchesSearch(photo, q));
+  }, [q, unclassifiedPeoplePhotos]);
+  const visiblePlacePhotoGroups = React.useMemo(() => {
+    if (!q) return placePhotoGroups;
+    const groups = (placePhotoGroups.groups || []).filter(group => {
+      const place = group.place || {};
+      if (archiveTextHas(place.alias, q) || archiveTextHas(place.name, q) || archiveTextHas(place.address, q)) return true;
+      if (archiveTextHas(group.lastDate, q) || archiveTextHas(formatHistoryDate(group.lastDate), q)) return true;
+      return (group.photos || []).some(photo => archivePhotoMatchesSearch(photo, q));
+    });
+    const unclassified = (placePhotoGroups.unclassified || []).map(bucket => {
+      const dateHit = archiveTextHas(bucket.date, q) || archiveTextHas(formatHistoryDate(bucket.date), q);
+      const photos = dateHit ? bucket.photos : (bucket.photos || []).filter(photo => archivePhotoMatchesSearch(photo, q));
+      return photos.length ? { ...bucket, photos } : null;
+    }).filter(Boolean);
+    return {
+      groups,
+      unclassified,
+      unclassifiedCount: unclassified.reduce((sum, bucket) => sum + bucket.photos.length, 0)
+    };
+  }, [q, placePhotoGroups]);
+  const archiveSearchPending = Boolean(q)
+    && usesCanonicalPhotoIndex
+    && !indexedPhotoComplete
+    && indexedPhotoStatus !== 'error'
+    && indexedPhotoStatus !== 'fallback'
+    && archiveIndexScan !== 'error'
+    && typeof onIndexedPhotoLoadAll === 'function';
+  const archiveSearchMissLabel = archiveSearchPending ? '전체 기록에서 검색하는 중...' : '검색 결과가 없습니다.';
+  const autoJumpArchiveNeedleRef = React.useRef('');
+  React.useEffect(() => {
+    if (!q) {
+      autoJumpArchiveNeedleRef.current = '';
+      return;
+    }
+    if (archiveSearchPending) return;
+    const counts = {
+      memories: visibleMemoryGroups.length,
+      people: visiblePersonChips.length + (visibleUnclassifiedPeople.length > 0 ? 1 : 0),
+      places: visiblePlacePhotoGroups.groups.length + (visiblePlacePhotoGroups.unclassifiedCount > 0 ? 1 : 0),
+      meetings: confirmedDates.length
+    };
+    if ((counts[historyTab] || 0) > 0) {
+      autoJumpArchiveNeedleRef.current = q;
+      return;
+    }
+    if (autoJumpArchiveNeedleRef.current === q) return;
+    const firstHit = ['memories', 'people', 'places', 'meetings'].find(key => (counts[key] || 0) > 0);
+    autoJumpArchiveNeedleRef.current = q;
+    if (firstHit && firstHit !== historyTab) changeHistoryTab(firstHit);
+  }, [q, archiveSearchPending, historyTab, visibleMemoryGroups, visiblePersonChips, visibleUnclassifiedPeople, visiblePlacePhotoGroups, confirmedDates]);
 
     const handleExcludeMemoryGroups = async () => {
     const ids = Array.from(selectedMemoryGroupIds);
@@ -2496,7 +2755,7 @@ export function HistoryView({
   }, "취소");
   const groupedMemorySections = React.useMemo(() => {
     const groups = new Map();
-    (travelMemoryGroups || []).forEach(group => {
+    (visibleMemoryGroups || []).forEach(group => {
       const key = String(group.startDate || '').slice(0, 10) || '__unknown__';
       const list = groups.get(key) || [];
       list.push(group);
@@ -2513,7 +2772,7 @@ export function HistoryView({
         label: dateKey === '__unknown__' ? '날짜 미상' : (formatHistoryDate(dateKey) || dateKey),
         items
       }));
-  }, [travelMemoryGroups]);
+  }, [visibleMemoryGroups]);
   const toggleMemoryDate = dateKey => {
     setCollapsedMemoryDates(prev => {
       const next = new Set(prev);
@@ -2557,7 +2816,7 @@ export function HistoryView({
           display: 'flex', flexDirection: 'column', gap: '1px'
         }
       },
-        /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, group.title),
+        /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, typeof highlightKeyword === 'function' ? highlightKeyword(group.title, searchQuery) : group.title),
         /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.startDate))
       ),
       isMemoryListEditMode && (EditSelectCheckbox
@@ -2594,7 +2853,7 @@ export function HistoryView({
         /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, '최근 사진을 불러오는 중입니다')
       );
     }
-    if (travelMemoryGroups.length === 0) {
+    if (visibleMemoryGroups.length === 0) {
       return /*#__PURE__*/React.createElement("div", {
         style: {
           flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -2602,11 +2861,11 @@ export function HistoryView({
         }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 추억이 없습니다"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일을 등록하면, 그 날짜(구간)에 올라온 사진을 여기 모아 보여줘요.")
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, q ? archiveSearchMissLabel : "등록된 추억이 없습니다"),
+        !q && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일을 등록하면, 그 날짜(구간)에 올라온 사진을 여기 모아 보여줘요.")
       );
     }
-    if (memoryViewMode !== 'date') return renderMemoryGroupGrid(travelMemoryGroups);
+    if (memoryViewMode !== 'date') return renderMemoryGroupGrid(visibleMemoryGroups);
     return groupedMemorySections.map(section => {
       const isCollapsed = collapsedMemoryDates.has(section.dateKey);
       return /*#__PURE__*/React.createElement("section", {
@@ -2718,9 +2977,9 @@ export function HistoryView({
       }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
     )
   ),
-  isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+  isSearchOpen && !v2SearchControlled && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
-    placeholder: "날짜·참여자·메모·장소 검색...",
+    placeholder: "추억·인물·장소·날짜·태그 검색...",
     onChange: e => setSearchQuery(e.target.value),
     onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
   }),
@@ -2729,7 +2988,12 @@ export function HistoryView({
     value: historyTab,
     onChange: changeHistoryTab,
     activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
-    options: [
+    options: q ? [
+      { value: 'memories', label: '추억', badge: visibleMemoryGroups.length, faded: visibleMemoryGroups.length === 0 },
+      { value: 'people', label: '인물', badge: visiblePersonChips.length + (visibleUnclassifiedPeople.length > 0 ? 1 : 0), faded: visiblePersonChips.length === 0 && visibleUnclassifiedPeople.length === 0 },
+      { value: 'places', label: '장소', badge: visiblePlacePhotoGroups.groups.length + (visiblePlacePhotoGroups.unclassifiedCount > 0 ? 1 : 0), faded: visiblePlacePhotoGroups.groups.length === 0 && !visiblePlacePhotoGroups.unclassifiedCount },
+      { value: 'meetings', label: '지난모임', badge: confirmedDates.length, faded: confirmedDates.length === 0 }
+    ] : [
       { value: 'memories', label: '추억', badge: historyTab === 'memories' ? travelMemoryGroups.length : null },
       { value: 'people', label: '인물', badge: personTagChips.length },
       { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : (placeCount || null) },
@@ -2737,6 +3001,20 @@ export function HistoryView({
     ]
   })
   );
+
+  const openMemoryGroupId = selectedMemoryGroupId && visibleMemoryGroups.some(group => group.id === selectedMemoryGroupId)
+    ? selectedMemoryGroupId
+    : null;
+  const openPersonTag = selectedPersonTag && (
+    selectedPersonTag === PERSON_UNCLASSIFIED_KEY
+      ? (!q || visibleUnclassifiedPeople.length > 0)
+      : visiblePersonChips.some(tag => tag.label === selectedPersonTag)
+  ) ? selectedPersonTag : null;
+  const openPlaceKey = selectedPlaceKey && (
+    selectedPlaceKey === PLACE_UNCLASSIFIED_KEY
+      ? (!q || visiblePlacePhotoGroups.unclassifiedCount > 0)
+      : visiblePlacePhotoGroups.groups.some(group => group.key === selectedPlaceKey)
+  ) ? selectedPlaceKey : null;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -2867,12 +3145,16 @@ export function HistoryView({
     // 추억 탭: 인물 탭과 동일하게, 초기화면은 여행별 벤또 그리드(칸마다 그 여행의 최신 등록
     // 사진을 배경으로, 딤 처리 위에 여행 타이틀). 칸을 누르면 그 여행 사진만 모아 보여주는
     // 상세 페이지로 들어간다.
-    historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'memories' && !openMemoryGroupId && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       incompleteArchiveNotice,
+      q && archiveSearchPending && /*#__PURE__*/React.createElement('p', {
+        role: 'status',
+        style: { margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }
+      }, '전체 기록에서 검색하는 중...'),
       /*#__PURE__*/React.createElement("div", {
         style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px', ...(v2Embed ? { padding: '4px 0 2px' } : {}) }
       },
@@ -2925,8 +3207,8 @@ export function HistoryView({
       ))
     )),
     // 추억 상세 페이지: 특정 여행 칸을 눌렀을 때 그 여행 사진만 모아 보여준다.
-    historyTab === 'memories' && !!selectedMemoryGroupId && (() => {
-      const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
+    historyTab === 'memories' && !!openMemoryGroupId && (() => {
+      const group = visibleMemoryGroups.find(g => g.id === openMemoryGroupId);
       if (!group) return null;
       const canBulkExclude = typeof onRemovePhotosFromMemory === 'function';
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -3017,12 +3299,16 @@ export function HistoryView({
     })(),
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
-    historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'people' && !openPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
       incompleteArchiveNotice,
+      q && archiveSearchPending && /*#__PURE__*/React.createElement('p', {
+        role: 'status',
+        style: { margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }
+      }, '전체 기록에서 검색하는 중...'),
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
       // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
@@ -3059,10 +3345,12 @@ export function HistoryView({
       /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
         "칸을 누르면 그 사람으로 태그된 사진을 모아 보여줘요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 그 이름을 추가하세요."
       ),
-      personTagChips.length === 0
+      personTagChips.length === 0 && !q
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 위에서 인물 태그를 추가해 보세요.")
+        : (visiblePersonChips.length === 0 && visibleUnclassifiedPeople.length === 0)
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, archiveSearchMissLabel)
         : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
-            personTagChips.map(tag => {
+            visiblePersonChips.map(tag => {
               const tagPhotos = getPhotosForTagLabel(tag.label);
               const cover = tagPhotos[0];
               return /*#__PURE__*/React.createElement("button", {
@@ -3096,19 +3384,19 @@ export function HistoryView({
                 )
               );
             }),
-            unclassifiedPeoplePhotos.length > 0 && /*#__PURE__*/React.createElement("button", {
+            visibleUnclassifiedPeople.length > 0 && /*#__PURE__*/React.createElement("button", {
               key: PERSON_UNCLASSIFIED_KEY,
               type: "button",
               onClick: () => setSelectedPersonTag(PERSON_UNCLASSIFIED_KEY),
-              "aria-label": `분류 필요 사진 ${unclassifiedPeoplePhotos.length}장`,
+              "aria-label": `분류 필요 사진 ${visibleUnclassifiedPeople.length}장`,
               className: 'archive-photo-cell',
               style: {
                 position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                 border: '1px dashed var(--border-subtle)', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-secondary, #F1F5F9)'
               }
             },
-              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(unclassifiedPeoplePhotos.length)),
-              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(unclassifiedPeoplePhotos) }),
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(visibleUnclassifiedPeople.length)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(visibleUnclassifiedPeople) }),
               /*#__PURE__*/React.createElement("div", {
                 style: {
                   position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
@@ -3123,7 +3411,7 @@ export function HistoryView({
           )
     )),
     // 인물 상세 페이지: 특정 인물 칸을 눌렀을 때 그 사람으로 태그된 사진만 모아 보여준다.
-    historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'people' && !!openPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
@@ -3249,19 +3537,26 @@ export function HistoryView({
     )),
 
     // 장소 목록: 등록된 장소마다 그 장소로 분류된 사진을 모은 칸(인물 탭과 같은 벤또 그리드).
-    historyTab === 'places' && !selectedPlaceKey && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'places' && !openPlaceKey && /*#__PURE__*/React.createElement("div", {
+      key: "archive-places-grid",
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-places-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
       incompleteArchiveNotice,
+      q && archiveSearchPending && /*#__PURE__*/React.createElement('p', {
+        role: 'status',
+        style: { margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }
+      }, '전체 기록에서 검색하는 중...'),
       /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
         "장소 탭에 등록한 장소별로 사진을 모아요. 사진 위치가 장소 근처이거나 #장소이름 태그가 있으면 그 장소로, 그날 방문한 장소가 한 곳뿐이면 그 장소로 분류돼요."
       ),
-      placePhotoGroups.groups.length === 0 && !placePhotoGroups.unclassifiedCount
+      placePhotoGroups.groups.length === 0 && !placePhotoGroups.unclassifiedCount && !q
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "아직 장소로 분류된 사진이 없어요. 장소 탭에 방문 날짜와 함께 장소를 등록해 보세요.")
+        : (visiblePlacePhotoGroups.groups.length === 0 && !visiblePlacePhotoGroups.unclassifiedCount)
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, archiveSearchMissLabel)
         : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
-            placePhotoGroups.groups.map(group => /*#__PURE__*/React.createElement("button", {
+            visiblePlacePhotoGroups.groups.map(group => /*#__PURE__*/React.createElement("button", {
               key: group.key,
               type: "button",
               onClick: () => setSelectedPlaceKey(group.key),
@@ -3285,19 +3580,19 @@ export function HistoryView({
                 /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.lastDate) || '방문일 미정')
               )
             )),
-            placePhotoGroups.unclassifiedCount > 0 && /*#__PURE__*/React.createElement("button", {
+            visiblePlacePhotoGroups.unclassifiedCount > 0 && /*#__PURE__*/React.createElement("button", {
               key: PLACE_UNCLASSIFIED_KEY,
               type: "button",
               onClick: () => setSelectedPlaceKey(PLACE_UNCLASSIFIED_KEY),
-              "aria-label": `분류 필요 사진 ${placePhotoGroups.unclassifiedCount}장`,
+              "aria-label": `분류 필요 사진 ${visiblePlacePhotoGroups.unclassifiedCount}장`,
               className: 'archive-photo-cell',
               style: {
                 position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                 border: '1px dashed var(--border-subtle)', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-secondary, #F1F5F9)'
               }
             },
-              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(placePhotoGroups.unclassifiedCount)),
-              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(placePhotoGroups.unclassified.flatMap(bucket => bucket.photos)) }),
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(visiblePlacePhotoGroups.unclassifiedCount)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(visiblePlacePhotoGroups.unclassified.flatMap(bucket => bucket.photos)) }),
               /*#__PURE__*/React.createElement("div", {
                 style: {
                   position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
@@ -3312,7 +3607,8 @@ export function HistoryView({
           )
     )),
     // 장소 상세: 한 장소의 사진 모음, 또는 "분류 필요"(날짜별 후보 장소와 함께).
-    historyTab === 'places' && !!selectedPlaceKey && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'places' && !!openPlaceKey && /*#__PURE__*/React.createElement("div", {
+      key: "archive-places-detail",
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
@@ -3337,8 +3633,8 @@ export function HistoryView({
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px' } },
               /*#__PURE__*/React.createElement("div", { style: { flex: 1, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
                 placeSelectMode
-                  ? "옮길 사진을 고른 뒤 아래에서 장소를 누르세요. 그 장소 이름 태그가 붙어요."
-                  : "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. '여러 장 선택'으로 한 번에 장소를 지정하거나, 사진을 열고 #장소이름 태그를 달아 주세요."),
+                  ? "옮길 사진을 고른 뒤 아래에서 장소를 누르거나 ‘제거’를 누르세요. 제거해도 사진 파일은 지우지 않아요."
+                  : "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 장소가 아니면 ‘여러 장 선택’ 후 제거하세요. 맞으면 장소를 지정하거나, 사진을 열고 #장소이름 태그를 달아 주세요."),
               typeof onSaveImageTags === 'function' && /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 className: "v2-archive-place-select-toggle",
@@ -3351,7 +3647,7 @@ export function HistoryView({
                 }
               }, placeSelectMode ? '선택 취소' : '여러 장 선택')
             ),
-            placePhotoGroups.unclassified.map(bucket => {
+            visiblePlacePhotoGroups.unclassified.map(bucket => {
               const bucketKeys = bucket.photos.map((photo, idx) => archivePhotoSelectKey(photo, idx));
               const allSelected = bucketKeys.length > 0 && bucketKeys.every(key => placeSelectedKeys.has(key));
               return /*#__PURE__*/React.createElement("div", {
@@ -3370,8 +3666,11 @@ export function HistoryView({
                     style: { border: 'none', background: 'transparent', color: 'var(--brand, #7C3AED)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', padding: '4px 0' }
                   }, allSelected ? '이 날 선택 해제' : '이 날 전체 선택')
                 ),
-                /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-                  `후보: ${bucket.candidates.map(place => `#${placeTagToken(place)}`).join(' ')}`),
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+                  /*#__PURE__*/React.createElement("span", null, "후보"),
+                  bucket.candidates.map(place => /*#__PURE__*/React.createElement("span", { key: place.id || place.name }, `#${placeTagToken(place)}`)),
+                  /*#__PURE__*/React.createElement("span", null, "· 장소가 아니면 아래에서 제거")
+                ),
                 renderArchivePhotoGrid(bucket.photos, `unclassified_${bucket.date}`,
                   placeSelectMode ? { keys: placeSelectedKeys, onToggle: togglePlaceSelectedKey } : null)
               );
@@ -3388,9 +3687,24 @@ export function HistoryView({
             },
               /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: 'var(--text-main)' } },
                 placeAssignProgress
-                  ? `#${placeAssignProgress.label}(으)로 옮기는 중… ${placeAssignProgress.current}/${placeAssignProgress.total}`
-                  : placeSelectedKeys.size ? `${placeSelectedKeys.size}장 선택 · 어느 장소 사진인가요?` : '사진을 골라 주세요'),
+                  ? (placeAssignProgress.label === '제거'
+                    ? `분류에서 빼는 중… ${placeAssignProgress.current}/${placeAssignProgress.total}`
+                    : `#${placeAssignProgress.label}(으)로 옮기는 중… ${placeAssignProgress.current}/${placeAssignProgress.total}`)
+                  : placeSelectedKeys.size ? `${placeSelectedKeys.size}장 선택 · 장소를 고르거나 제거하세요` : '사진을 골라 주세요'),
               !placeAssignProgress && placeSelectedKeys.size > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => {
+                    const run = () => { void dismissSelectedPhotosFromPlaces(); };
+                    if (typeof onRequestConfirm === 'function') onRequestConfirm('분류에서 제거', `선택한 ${placeSelectedKeys.size}장을 분류 필요에서 제거할까요? 스크린샷처럼 장소 사진이 아니면 여기서 빼세요. 사진 파일은 지우지 않아요.`, run);
+                    else run();
+                  },
+                  style: {
+                    minHeight: '32px', padding: '0 12px', borderRadius: '999px', cursor: 'pointer',
+                    border: '1px solid var(--text-main, #1e1b2e)', background: 'var(--bg-card, #fff)',
+                    color: 'var(--text-main)', fontSize: 'var(--font-size-xs)', fontWeight: 800
+                  }
+                }, "제거"),
                 selectedCandidatePlaces.map(place => /*#__PURE__*/React.createElement("button", {
                   key: place.id || place.name,
                   type: "button",
@@ -3455,10 +3769,14 @@ export function HistoryView({
       calendar,
       onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
       extraItems: [{
-        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); },
+        onClick: () => {
+          setIsMenuOpen(false);
+          if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+          else setIsSearchOpen(true);
+        },
         icon: SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍",
         title: "보관함 검색",
-        desc: "지난모임 날짜·참여자·메모·장소 검색"
+        desc: "추억·인물·장소·지난모임 전체 검색"
       }],
       navBlockProps: {
         onClose: () => setIsMenuOpen(false),
@@ -3477,6 +3795,7 @@ export function HistoryView({
 export function ContentView({
   calendar, onBack, onChangeView, onOpenAppSettings,
   v2Embed = false, onOpenShare = null,
+  v2SearchQuery, onV2SearchQuery = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -3515,6 +3834,11 @@ export function ContentView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const v2SearchControlled = typeof onV2SearchQuery === 'function';
+  React.useEffect(() => {
+    if (!v2SearchControlled) return;
+    setSearchQuery(v2SearchQuery || '');
+  }, [v2SearchControlled, v2SearchQuery]);
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const [editingContentItem, setEditingContentItem] = React.useState(null);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
@@ -3676,14 +4000,17 @@ export function ContentView({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSearchOpen(v => !v),
+      search: () => {
+        if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(v => !v);
+      },
       register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); },
       openRegion: () => setIsRegionFilterOpen(true),
       setGridCols: persistGridCols,
       gridCols
     });
     return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions, gridCols]);
+  }, [onRegisterMenuActions, gridCols, v2SearchControlled]);
   const handleUseCurrentLocation = () => {
     if (isLocating) return;
     setIsLocating(true);
@@ -3953,7 +4280,7 @@ export function ContentView({
         }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
       )
     ),
-    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    !v2SearchControlled && isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
       value: searchQuery,
       placeholder: "제목으로 검색...",
       onChange: e => setSearchQuery(e.target.value),

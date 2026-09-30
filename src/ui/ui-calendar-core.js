@@ -686,15 +686,20 @@ export function CalendarGrid({
       position: 'relative'
     }
   }, isLoading && /*#__PURE__*/React.createElement("div", {
-    className: "calendar-loading-overlay",
+    className: "calendar-loading-overlay bp-cal-skel",
     role: "status",
-    "aria-live": "polite"
+    "aria-live": "polite",
+    "aria-label": "캘린더를 불러오는 중"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "calendar-loading-pill"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "calendar-spinner",
+    className: "bp-cal-skel-nav",
     "aria-hidden": "true"
-  }), /*#__PURE__*/React.createElement("span", null, "Firebase에서 캘린더 데이터를 불러오는 중입니다."))), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bp-cal-skel-grid",
+    "aria-hidden": "true"
+  }, Array.from({ length: 35 }, (_, index) => /*#__PURE__*/React.createElement("span", {
+    key: index,
+    className: "bp-cal-skel-cell"
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav",
     style: compact ? { flexWrap: 'nowrap' } : undefined
   }, /*#__PURE__*/React.createElement("div", {

@@ -3205,7 +3205,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSettlementSearchOpen(true),
+      search: () => {
+        if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSettlementSearchOpen(true);
+      },
       create: handleOpenCreateSettlement,
       list: () => setIsSettlementListOpen(true),
     });
@@ -3397,7 +3400,22 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     if (aClosed !== bClosed) return aClosed ? 1 : -1;
     return getSettlementCardTime(b) - getSettlementCardTime(a);
   });
-  const visibleSettlementCards = sortedSettlementCards.filter(card => card?.status !== 'closed');
+  const visibleSettlementCards = sortedSettlementCards.filter(card => {
+    if (card?.status === 'closed') return false;
+    if (!settlementSearchNeedle) return true;
+    const blob = [
+      card?.title,
+      card?.bankName,
+      card?.otherBankName,
+      card?.accountNumber,
+      card?.depositorName,
+      card?.note,
+      card?.memo,
+      ...(Array.isArray(card?.participants) ? card.participants : []),
+      ...(Array.isArray(card?.participantRows) ? card.participantRows.flatMap(row => [row?.participantId, row?.name, row?.memo]) : []),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return blob.includes(settlementSearchNeedle);
+  });
   const overallBalance = allTimeIncome - allTimeExpense;
 
   const targetPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
@@ -3667,7 +3685,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))
   )),
 
-  isSettlementSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+  typeof renderV2 !== 'function' && isSettlementSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
     fixed: true,
     value: settlementSearchQuery,
     placeholder: "정산 항목, 날짜 또는 카테고리 검색...",
@@ -3786,7 +3804,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   color: isClosed ? '#FFFFFF' : '#5B4BEB'
                 }
               }, isClosed ? "마감됨" : "진행중"),
-              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 900, lineHeight: 1.25, textAlign: 'left' } }, card.title || "1/N 간편 송금"),
+              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 900, lineHeight: 1.25, textAlign: 'left' } }, highlightSettlement(card.title || "1/N 간편 송금")),
 
               /* Account info remains one copyable left-aligned row; only the account number is a capsule. */
               bankInfoText && React.createElement("span", {
@@ -4174,7 +4192,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => { setIsSettlementMenuOpen(false); setIsSettlementSearchOpen(true); }
+        onClick: () => {
+          setIsSettlementMenuOpen(false);
+          if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+          else setIsSettlementSearchOpen(true);
+        }
       },
         React.createElement("span", { className: "admin-side-menu-item-icon" }, React.createElement(SearchIcon, { size: 20 })),
         React.createElement("span", { className: "admin-side-menu-item-copy" },
@@ -4461,7 +4483,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         legacyView,
         calendar,
         onBack,
-        onSearch: () => setIsSettlementSearchOpen(value => !value),
+        searchQuery: settlementSearchQuery,
+        onSearchQuery: (value) => setSettlementSearchQuery(typeof value === 'string' ? value : ''),
+        searchPlaceholder: '정산 항목, 날짜 또는 카테고리 검색',
         onShare: onOpenShare,
         onMenu: () => setIsSettlementMenuOpen(true),
         onOpenCreate: handleOpenCreateSettlement,

@@ -5,7 +5,7 @@
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
 import { useChatTypingPresence } from '../core/chat-typing-presence.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
-import { PanelResizeHandle } from './ui-widgets.js';
+import { launchClipboardConfetti } from './celebrate-confetti.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -490,15 +490,79 @@ export function ChatRoomView({
     }
   }, [visibleChatMessages, isMemoViewReady]);
 
+  // Live chat is a short window. A query must scan the whole message collection or
+  // anything older than that window looks like it was never said.
+  const [chatSearchArchive, setChatSearchArchive] = React.useState({ calId: '', status: 'idle', messages: null });
+  const chatSearchArchiveRef = React.useRef(chatSearchArchive);
+  chatSearchArchiveRef.current = chatSearchArchive;
+  const chatSearchRequestRef = React.useRef(0);
+  const chatSearchActive = Boolean(String(searchQuery || '').trim());
+  React.useEffect(() => {
+    const calId = calendar?.id || '';
+    if (!chatSearchActive || !calId) return undefined;
+    const current = chatSearchArchiveRef.current;
+    if (current.calId === calId && (current.status === 'ready' || current.status === 'loading')) return undefined;
+    const requestId = chatSearchRequestRef.current + 1;
+    chatSearchRequestRef.current = requestId;
+    const next = { calId, status: 'loading', messages: null };
+    chatSearchArchiveRef.current = next;
+    setChatSearchArchive(next);
+    const fetchIndex = (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.fetchCalendarSearchIndex) || null;
+    const run = typeof fetchIndex === 'function' ? fetchIndex(calId) : Promise.reject(new Error('search index unavailable'));
+    Promise.resolve(run).then(index => {
+      if (chatSearchRequestRef.current !== requestId) return;
+      const ready = {
+        calId,
+        status: 'ready',
+        messages: Array.isArray(index?.chatMessages) ? index.chatMessages : []
+      };
+      chatSearchArchiveRef.current = ready;
+      setChatSearchArchive(ready);
+    }).catch(err => {
+      console.warn('full chat search failed', err);
+      if (chatSearchRequestRef.current !== requestId) return;
+      const failed = { calId, status: 'error', messages: null };
+      chatSearchArchiveRef.current = failed;
+      setChatSearchArchive(failed);
+    });
+    return undefined;
+  }, [chatSearchActive, calendar?.id]);
+
+  const chatFeedMessages = React.useMemo(() => {
+    const query = String(searchQuery || '').trim().toLowerCase();
+    if (!query) return visibleChatMessages;
+    const calId = calendar?.id || '';
+    const archive = chatSearchArchive.calId === calId && Array.isArray(chatSearchArchive.messages)
+      ? chatSearchArchive.messages
+      : null;
+    if (!archive) return visibleChatMessages;
+    const blocked = (msg) => !msg
+      || msg.uploadSource === 'meeting'
+      || msg.uploadSource === 'gallery'
+      || (msg.id && meetingPhotoMessageIds && typeof meetingPhotoMessageIds.has === 'function' && meetingPhotoMessageIds.has(msg.id));
+    const byId = new Map();
+    visibleChatMessages.forEach((msg, index) => {
+      if (!msg) return;
+      byId.set(msg.id || `live-${index}`, msg);
+    });
+    archive.forEach(msg => {
+      if (blocked(msg) || !msg.id || byId.has(msg.id)) return;
+      if (!String(msg.text || '').toLowerCase().includes(query)) return;
+      byId.set(msg.id, msg);
+    });
+    return Array.from(byId.values()).sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+  }, [visibleChatMessages, searchQuery, chatSearchArchive, calendar?.id, meetingPhotoMessageIds]);
+  const chatSearchPending = chatSearchActive && chatSearchArchive.status !== 'ready' && chatSearchArchive.status !== 'error';
+
   // Ordered list of message IDs matching the current search query (for ▲▼ navigation)
   const searchMatchIds = React.useMemo(() => {
-    if (!searchQuery) return [];
-    const q = searchQuery.toLowerCase();
-    return visibleChatMessages
-      .filter(m => m.text && m.text.toLowerCase().includes(q))
+    const q = String(searchQuery || '').trim().toLowerCase();
+    if (!q) return [];
+    return chatFeedMessages
+      .filter(m => m.text && String(m.text).toLowerCase().includes(q))
       .map(m => m.id)
       .filter(id => !!id);
-  }, [visibleChatMessages, searchQuery]);
+  }, [chatFeedMessages, searchQuery]);
 
   const clampedFocusIdx = searchMatchIds.length > 0
     ? Math.max(0, Math.min(searchFocusIndex, searchMatchIds.length - 1))
@@ -526,7 +590,10 @@ export function ChatRoomView({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSearchOpen(true),
+      search: () => {
+        if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(true);
+      },
       notice: () => {
         if (pinnedNotices.length > 0) {
           setNoticePanelMode('list');
@@ -638,6 +705,40 @@ export function ChatRoomView({
       }
     });
   }, [visibleChatMessages.length]);
+  // '축하' fires when that bubble is actually on screen, including for someone who opens
+  // the room later and scrolls onto the message. Once per message per visit.
+  const celebratedChatIdsRef = React.useRef(new Set());
+  React.useEffect(() => {
+    const root = chatMessagesContainerRef?.current;
+    if (!root || typeof IntersectionObserver !== 'function') return undefined;
+    let queued = false;
+    const observer = new IntersectionObserver(entries => {
+      let hit = false;
+      entries.forEach(entry => {
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.2) return;
+        const id = entry.target.getAttribute('data-msg-row-id') || '';
+        if (!id || celebratedChatIdsRef.current.has(id)) return;
+        celebratedChatIdsRef.current.add(id);
+        hit = true;
+      });
+      if (!hit || queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        launchClipboardConfetti();
+      });
+    }, { root, threshold: [0.2, 0.5] });
+    const watch = () => {
+      root.querySelectorAll('[data-celebrate="1"]').forEach(node => observer.observe(node));
+    };
+    watch();
+    const changes = new MutationObserver(watch);
+    changes.observe(root, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      changes.disconnect();
+    };
+  }, [visibleChatMessages, chatMessagesContainerRef]);
   const handleScrollCombined = (e) => {
     if (handleChatScroll) handleChatScroll(e);
     const el = e.target;
@@ -1124,7 +1225,7 @@ export function ChatRoomView({
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
-  visibleChatMessages.forEach((msg, idx) => {
+  chatFeedMessages.forEach((msg, idx) => {
     // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
     // 문서로 저장되긴 하지만(태그 편집·삭제·갤러리 정렬 번호 매기기가 이 문서를 가리킴),
     // 채팅 피드에는 노출되지 않아야 함 -- 갤러리/일정 레이어팝업 사진탭에서만 보여야 함.
@@ -1225,7 +1326,8 @@ export function ChatRoomView({
       : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
     const isEmojiOnlyMessage = !isMemoShareMessage && isEmojiOnlyChatText(msg.text) && !msgHasImages && !msgHasFiles;
     const rowId = msg.id || `msg-${idx}`;
-    const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchNeedle = String(searchQuery || '').trim().toLowerCase();
+    const isSearchMatch = searchNeedle && msg.text && String(msg.text).toLowerCase().includes(searchNeedle);
     // Focused either by in-chat text search (isSearchMatch + arrow-key navigation) or by an
     // external jump-to-message request (Lightbox source link, admin/global search, ?msg= deep
     // link -- see focusChatMessage in app-main.js) -- both render identically, the same purple
@@ -1259,6 +1361,7 @@ export function ChatRoomView({
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}${showOwnNamePill ? ' msg-row-own-with-pill' : ''}`,
       'data-msg-row-id': rowId,
+      'data-celebrate': String(msg.text || msg.content || '').includes('축하') ? '1' : undefined,
       style: {
         display: 'flex',
         alignItems: 'flex-start',
@@ -1542,7 +1645,7 @@ export function ChatRoomView({
   });
   return renderedMessages;
   // participantsMap is rebuilt from calendar.participants every render; key on the source.
-  }, [visibleChatMessages, calendar, chatParticipantId, priorReadTimestamp, revealedMsgId, searchQuery, focusedMsgId, externalFocusMessageId, stickyVideoKey, chatRowCallbacks, showToast, onRequestConfirm]);
+  }, [chatFeedMessages, calendar, chatParticipantId, priorReadTimestamp, revealedMsgId, searchQuery, focusedMsgId, externalFocusMessageId, stickyVideoKey, chatRowCallbacks, showToast, onRequestConfirm]);
   const __chatLegacyTree = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
     style: {
@@ -1705,7 +1808,14 @@ export function ChatRoomView({
     style: PAGE_HEADER_ACTIONS_WRAP_STYLE
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => { setIsSearchOpen(true); setSearchQuery(''); },
+    onClick: () => {
+      if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) {
+        window.__gatherOpenPageSearch();
+        return;
+      }
+      setIsSearchOpen(true);
+      setSearchQuery('');
+    },
     title: "대화 검색",
     "aria-label": "대화 검색",
     style: PAGE_HEADER_ICON_BTN_STYLE
@@ -1737,18 +1847,15 @@ export function ChatRoomView({
       // bubbles slide underneath the sheet when thumbnails or the keyboard are expanded.
       paddingBottom: `calc(${Math.max(152, composerHeight + 24) + viewportBottom}px + var(--emoji-sheet-h, 0px) + 16px)`
     }
-  }, !visibleChatMessages.length && loadingOlderChat && /*#__PURE__*/React.createElement("div", {
+  }, !visibleChatMessages.length && (loadingOlderChat || calendar?.title === '캘린더 불러오는 중...') && /*#__PURE__*/React.createElement("div", {
     className: "bp-skel-list",
     role: "status",
     "aria-label": "대화 불러오는 중"
-  }, [0, 1, 2, 3].map(index => /*#__PURE__*/React.createElement("div", {
+  }, [0, 1, 2, 3, 4].map(index => /*#__PURE__*/React.createElement("div", {
     key: index,
-    className: "bp-skel-row",
+    className: `bp-skel-bubble ${index % 2 ? 'is-self' : 'is-other'}`,
     "aria-hidden": "true"
-  }, /*#__PURE__*/React.createElement("span", { className: "bp-skel-avatar" }), /*#__PURE__*/React.createElement("span", { className: "bp-skel-copy" },
-    /*#__PURE__*/React.createElement("span", { className: "bp-skel-line" }),
-    /*#__PURE__*/React.createElement("span", { className: "bp-skel-line is-short" })
-  )))), (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
+  }))), (loadingOlderChat || hasMoreOlderChat) && !( !visibleChatMessages.length && (loadingOlderChat || calendar?.title === '캘린더 불러오는 중...') ) && /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', padding: '8px 0 12px' }
   }, loadingOlderChat ? '이전 대화를 불러오는 중…' : (
     !visibleChatMessages.length && typeof onLoadOlderChat === 'function'
@@ -2423,7 +2530,14 @@ export function ChatRoomView({
   isChatSideMenuOpen && /*#__PURE__*/React.createElement(ChatSideMenu, {
     weatherLocation: calendar && calendar.weatherLocation,
     onClose: () => setIsChatSideMenuOpen(false),
-    onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
+    onOpenSearch: () => {
+      if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) {
+        window.__gatherOpenPageSearch();
+        return;
+      }
+      setIsSearchOpen(true);
+      setSearchQuery('');
+    },
     onOpenNoticeSettings: () => {
       if (pinnedNotices.length > 0) { setNoticePanelMode('list'); } else { setNoticeInput(''); setNoticePanelMode('add'); }
     },
@@ -2451,6 +2565,7 @@ export function ChatRoomView({
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,
+    calendar: calendar,
     onClose: () => setIsChatGalleryOpen(false),
     setActiveLightbox: setActiveLightbox,
     onDeletePhoto: onDeletePhoto,
@@ -2459,7 +2574,7 @@ export function ChatRoomView({
     onLoadOlderChat: onLoadOlderChat,
     totalGalleryCount: 0
   }),
-  isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+  typeof renderV2 !== 'function' && isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     fixed: true,
     value: searchQuery,
     placeholder: "검색할 메시지를 입력하세요...",
@@ -2470,7 +2585,11 @@ export function ChatRoomView({
           fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', flexShrink: 0,
           minWidth: '36px', textAlign: 'center', fontVariantNumeric: 'tabular-nums'
         }
-      }, searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0'),
+      }, chatSearchArchive.status === 'error' && searchMatchIds.length === 0
+        ? '검색 실패'
+        : chatSearchPending
+          ? '검색 중'
+          : (searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0')),
       /*#__PURE__*/React.createElement("button", {
         type: "button", disabled: searchMatchIds.length === 0,
         onClick: () => setSearchFocusIndex(i => {
@@ -2571,15 +2690,58 @@ export function ChatRoomView({
       })
     : null;
   if (typeof renderV2 === 'function') {
+    const searchNavStyle = {
+      border: 'none', background: 'none',
+      cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
+      color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
+      padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0,
+      opacity: searchMatchIds.length > 0 ? 1 : 0.4
+    };
+    const searchNavBtn = (label, path, step) => /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: searchMatchIds.length === 0,
+      title: label,
+      "aria-label": label,
+      onClick: () => setSearchFocusIndex(i => {
+        const len = searchMatchIds.length;
+        if (!len) return 0;
+        const currentIdx = i >= len ? len - 1 : i;
+        const next = currentIdx + step;
+        if (next < 0) return len - 1;
+        if (next >= len) return 0;
+        return next;
+      }),
+      style: searchNavStyle
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
+      viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+      strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true
+    }, /*#__PURE__*/React.createElement("path", { d: path })));
     return /*#__PURE__*/React.createElement(React.Fragment, null, renderV2({
       legacyView: __chatLegacyTree,
       calendar,
       onBack,
       onMenu: () => setIsChatSideMenuOpen(true),
-      onSearch: () => {
-        setIsSearchOpen(open => !open);
-        setSearchQuery('');
+      searchQuery,
+      onSearchQuery: (value) => {
+        setSearchQuery(typeof value === 'string' ? value : '');
+        setSearchFocusIndex(Number.MAX_SAFE_INTEGER);
       },
+      onSearchClose: () => setSearchFocusIndex(0),
+      searchTrailing: /*#__PURE__*/React.createElement(React.Fragment, null,
+        searchQuery && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', flexShrink: 0,
+            minWidth: '36px', textAlign: 'center', fontVariantNumeric: 'tabular-nums'
+          }
+        }, chatSearchArchive.status === 'error' && searchMatchIds.length === 0
+          ? '검색 실패'
+          : chatSearchPending
+            ? '검색 중'
+            : (searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0')),
+        searchNavBtn('이전 결과', 'm18 15-6-6-6 6', -1),
+        searchNavBtn('다음 결과', 'm6 9 6 6 6-6', 1)
+      ),
       onOpenGallery,
       onOpenNotice: () => {
         if (pinnedNotices.length > 0) setNoticePanelMode('list');

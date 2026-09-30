@@ -3,7 +3,7 @@
  */
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
-import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
+import { launchClipboardConfetti } from './celebrate-confetti.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -382,6 +382,11 @@ export function DateModal({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [editingDateMemo, setEditingDateMemo] = React.useState(null);
   const [dateMemoOverrides, setDateMemoOverrides] = React.useState({});
+  React.useEffect(() => {
+    if (!dateStr || !isDateConfirmedMeeting(calendar, dateStr)) return undefined;
+    launchClipboardConfetti();
+    return undefined;
+  }, [dateStr]);
   React.useEffect(() => {
     const nextTab = searchFocus?.tab || initialTab;
     if (nextTab) setActiveTab(nextTab);
@@ -2648,8 +2653,12 @@ export function DateModal({
           e.preventDefault();
           e.stopPropagation();
           if (isSubmitting) return;
+          const confirming = !isConfirmed;
           setIsSubmitting(true);
-          try { await Promise.resolve(onConfirmMeeting(dateStr, '')); }
+          try {
+            await Promise.resolve(onConfirmMeeting(dateStr, ''));
+            if (confirming) launchClipboardConfetti();
+          }
           finally { setIsSubmitting(false); }
         },
         style: {

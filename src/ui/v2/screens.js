@@ -19,6 +19,14 @@ import {
 const h = (...args) => window.React.createElement(...args);
 const MEMO_PAGE_SIZE = 20;
 
+// One search chrome for every destination header. Side menus open it through this
+// event instead of mounting a second, page-specific bar.
+export function requestPageSearch() {
+  if (typeof document === 'undefined') return;
+  document.dispatchEvent(new CustomEvent('v2-page-search-open'));
+}
+if (typeof window !== 'undefined') window.__gatherOpenPageSearch = requestPageSearch;
+
 function MemoPagination(props) {
   const Pagination = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommonPagination;
   if (typeof Pagination !== 'function') return null;
@@ -312,13 +320,71 @@ function primeHeaderHeight(header, hiding) {
   if (hiding) void header.offsetHeight;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, forcedHidden = null, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, forcedHidden = null, searchQuery, onSearchQuery, searchPlaceholder, searchTrailing, searchForceOpen = false, onSearchClose, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
   const suppressUntilRef = React.useRef(0);
+  const lastScrollTopRef = React.useRef(0);
   const [hidden, setHidden] = React.useState(false);
   const hiddenRef = React.useRef(false);
+  const unifiedSearch = typeof onSearchQuery === 'function';
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const searchOpenRef = React.useRef(false);
   const headerControlled = typeof forcedHidden === 'boolean';
+  const revealHeader = React.useCallback(() => {
+    lastScrollTopRef.current = 0;
+    suppressUntilRef.current = Date.now() + 700;
+    hiddenRef.current = false;
+    setHidden(false);
+    const header = headerRef.current;
+    if (header) header.style.removeProperty('--v2-header-h');
+  }, []);
+  const closeUnifiedSearch = React.useCallback(() => {
+    searchOpenRef.current = false;
+    setSearchOpen(false);
+    if (typeof onSearchQuery === 'function') onSearchQuery('');
+    if (typeof onSearchClose === 'function') onSearchClose();
+  }, [onSearchQuery, onSearchClose]);
+  const toggleUnifiedSearch = React.useCallback(() => {
+    const next = !searchOpenRef.current;
+    searchOpenRef.current = next;
+    setSearchOpen(next);
+    if (!next) {
+      if (typeof onSearchQuery === 'function') onSearchQuery('');
+      if (typeof onSearchClose === 'function') onSearchClose();
+    }
+  }, [onSearchQuery, onSearchClose]);
+  React.useEffect(() => {
+    if (!unifiedSearch) return undefined;
+    const open = () => {
+      searchOpenRef.current = true;
+      setSearchOpen(true);
+      revealHeader();
+    };
+    document.addEventListener('v2-page-search-open', open);
+    return () => document.removeEventListener('v2-page-search-open', open);
+  }, [unifiedSearch, revealHeader]);
+  React.useEffect(() => {
+    if (!searchForceOpen) return;
+    searchOpenRef.current = true;
+    setSearchOpen(true);
+  }, [searchForceOpen]);
+  const userIntentUntilRef = React.useRef(0);
+  const markUserScrollIntent = React.useCallback(() => {
+    userIntentUntilRef.current = Date.now() + 800;
+  }, []);
+  React.useEffect(() => {
+    const show = () => revealHeader();
+    document.addEventListener('v2-page-header-show', show);
+    return () => document.removeEventListener('v2-page-header-show', show);
+  }, [revealHeader]);
+  // A stale --v2-header-h (measured on the title row alone) caps max-height and
+  // clips a search bar that opens later. Drop the cap whenever the header is shown.
+  React.useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header || header.classList.contains('is-scroll-hidden')) return;
+    header.style.removeProperty('--v2-header-h');
+  });
   React.useEffect(() => {
     const header = headerRef.current;
     if (!header) return undefined;
@@ -333,14 +399,25 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     return () => header.removeEventListener('transitionend', onEnd);
   }, []);
   React.useEffect(() => {
-    if (!hideOnScroll || headerControlled) {
+    if (!hideOnScroll || headerControlled || searchOpen) {
       if (!headerControlled) { hiddenRef.current = false; setHidden(false); }
       return undefined;
     }
     const header = headerRef.current;
     if (!header) return undefined;
     const root = header.closest('section') || header.parentElement;
-    let lastTop = 0;
+    const markIntentFromPointer = (event) => {
+      const target = event.target;
+      if (!target || typeof target.closest !== 'function') return;
+      if (!root || !root.contains(target) || header.contains(target)) return;
+      // A tap on a card, chip, or back button is navigation, not a scroll.
+      if (target.closest('button, a, input, textarea, select, label, [role="tab"]')) return;
+      markUserScrollIntent();
+    };
+    const markIntentFromKey = (event) => {
+      if (!root || !event || !['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) return;
+      markUserScrollIntent();
+    };
     const onScroll = (event) => {
       const target = event.target;
       if (!target || target === document || target === window || typeof target.closest !== 'function') return;
@@ -348,27 +425,31 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       if (target.closest('.modal-overlay, .bottom-sheet-overlay, .bp-side-nav, textarea, input')) return;
       const top = target.scrollTop;
       if (typeof top !== 'number') return;
+      // At the top the header always comes back, including right after a drill-in
+      // resets the scroller. A suppress window must not swallow that.
+      if (top < 8) {
+        lastScrollTopRef.current = top;
+        if (hiddenRef.current) {
+          hiddenRef.current = false;
+          setHidden(false);
+          header.style.removeProperty('--v2-header-h');
+        }
+        return;
+      }
       if (Date.now() < suppressUntilRef.current) {
-        lastTop = top;
+        lastScrollTopRef.current = top;
         return;
       }
-      const delta = top - lastTop;
+      const delta = top - lastScrollTopRef.current;
+      lastScrollTopRef.current = top;
       if (Math.abs(delta) < 6) return;
-      // Opening a long list jumps scrollTop from 0 to the bottom in one
-      // assignment. That is not a user gesture and must not collapse the header.
-      if (lastTop === 0 && delta > 240) {
-        lastTop = top;
-        return;
-      }
+      // Opening a long list, swapping a drill-in, or images loading can move
+      // scrollTop without a gesture. Only a real wheel, drag, or key scroll hides.
+      if (Date.now() > userIntentUntilRef.current) return;
+      if (delta > 240 && top - delta < 8) return;
       const max = Math.max(0, (target.scrollHeight || 0) - (target.clientHeight || 0));
-      lastTop = top;
-      // Collapsing the header gives its box back to the list. Only do it when the
-      // scroller still has room, otherwise the shrink clamps scrollTop and snaps back.
-      // The layout change itself fires another scroll; ignore that echo or the
-      // header hides and shows on every frame.
       let next = null;
-      if (top < 8) next = false;
-      else if (delta > 0 && top > 40 && max > 140) next = true;
+      if (delta > 0 && top > 40 && max > 140) next = true;
       else if (delta < 0) next = false;
       if (next == null) return;
       if (next !== hiddenRef.current) primeHeaderHeight(header, next);
@@ -379,10 +460,21 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         return next;
       });
     };
+    const intentOpts = { capture: true, passive: true };
+    document.addEventListener('wheel', markUserScrollIntent, intentOpts);
+    document.addEventListener('touchmove', markUserScrollIntent, intentOpts);
+    document.addEventListener('pointerdown', markIntentFromPointer, true);
+    document.addEventListener('keydown', markIntentFromKey, true);
     document.addEventListener('scroll', onScroll, true);
-    return () => document.removeEventListener('scroll', onScroll, true);
-  }, [hideOnScroll, headerControlled]);
-  const shown = headerControlled ? !forcedHidden : (!hideOnScroll || !hidden);
+    return () => {
+      document.removeEventListener('wheel', markUserScrollIntent, intentOpts);
+      document.removeEventListener('touchmove', markUserScrollIntent, intentOpts);
+      document.removeEventListener('pointerdown', markIntentFromPointer, true);
+      document.removeEventListener('keydown', markIntentFromKey, true);
+      document.removeEventListener('scroll', onScroll, true);
+    };
+  }, [hideOnScroll, headerControlled, searchOpen, markUserScrollIntent]);
+  const shown = (unifiedSearch && searchOpen) || (headerControlled ? !forcedHidden : (!hideOnScroll || !hidden));
   // Stays mounted while the page has a back action so it can fade/scale in and out with the
   // header instead of popping; hidden from touch and assistive tech while the header shows.
   const floatingBack = typeof onBack === 'function'
@@ -439,15 +531,22 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         h(
           'div',
           { className: 'bp-header-actions' },
-          typeof onSearch === 'function' && h(IconButton, {
+          (unifiedSearch || typeof onSearch === 'function') && h(IconButton, {
             label: searchLabel || `${title} 검색`,
             icon: 'search',
-            onClick: onSearch,
+            onClick: unifiedSearch ? toggleUnifiedSearch : onSearch,
           }),
           extra,
           showMenu && onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
         )
       ),
+      unifiedSearch && searchOpen && h(ContainedSearchBar, {
+        value: searchQuery || '',
+        onChange: onSearchQuery,
+        onClose: closeUnifiedSearch,
+        placeholder: searchPlaceholder || searchLabel || `${title} 검색`,
+        trailing: searchTrailing,
+      }),
       children
     ),
     floatingBackNode
@@ -460,13 +559,39 @@ function Search({ value, onChange, placeholder }) {
     { className: 'bp-search-row' },
     h(DesignIcon, { name: 'search', size: 14 }),
     h('input', {
-      type: 'search',
+      type: 'text',
       className: 'bp-search-input',
       placeholder,
       'aria-label': placeholder,
       value,
       onChange: event => onChange(event.target.value),
     })
+  );
+}
+
+// Same bar gallery uses (pill + 닫기), but never position:fixed. Memo used to
+// portal a viewport-fixed copy that covered the side nav as soon as a query
+// was typed.
+function ContainedSearchBar({ value, onChange, onClose, placeholder, trailing }) {
+  const Bar = typeof window !== 'undefined'
+    && window.GATHER_UI_COMPONENTS
+    && window.GATHER_UI_COMPONENTS.InlineSearchBar;
+  if (typeof Bar === 'function') {
+    return h(Bar, {
+      fixed: false,
+      value: value || '',
+      placeholder,
+      autoFocus: true,
+      trailing,
+      onChange: event => onChange(event && event.target ? event.target.value : ''),
+      onClose,
+    });
+  }
+  return h(
+    'div',
+    { className: 'inline-search-bar memo-page-search' },
+    h(Search, { value, onChange, placeholder }),
+    h('button', { type: 'button', className: 'memo-page-search-close', onClick: onClose }, '닫기')
   );
 }
 
@@ -517,12 +642,14 @@ function wrapLegacy(legacyView, className) {
 export function MemoScreen(p) {
   // Tag cloud under search removed (V2-MOBILE-IA-PLAN): tags still filter via card taps / search.
   const useDedicatedCards = typeof p.renderCard === 'function' && Array.isArray(p.memos);
-  // Search starts closed — the header search icon (PageHeader's onSearch) toggles the input row
-  // into view instead of it sitting open by default on every page load.
-  const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
-  const toggleSearch = () => setIsSearchOpen(v => !v);
-  // A tag tap filters the list; keep the field open so the active tag is visible.
-  const searchShown = isSearchOpen || Boolean(p.selectedTag);
+  const memoHeaderSearch = {
+    searchLabel: '메모 검색',
+    searchQuery: p.searchQuery || '',
+    onSearchQuery: typeof p.onSearch === 'function' ? p.onSearch : (() => {}),
+    searchPlaceholder: '메모 제목, 내용, 해시태그 검색...',
+    searchForceOpen: Boolean(p.selectedTag),
+    onSearchClose: () => { if (typeof p.onSelectTag === 'function') p.onSelectTag(''); },
+  };
   // `memoFocus` or `memo` is written by deep links, share URLs, or V2 home card
   // before local tab handoff.
   const focusIdFromLocation = typeof window !== 'undefined'
@@ -643,17 +770,11 @@ export function MemoScreen(p) {
               subtitle: p.subtitle || pageSubtitle(p.calendar),
               brand: pageBrand(p.calendar),
               onBack: p.onBack,
-              onSearch: toggleSearch,
-              searchLabel: '메모 검색',
+              ...memoHeaderSearch,
               onShare: p.onShare,
               onMenu: p.onMenu,
               extra: memoHeaderExtra,
-            },
-            searchShown && h(Search, {
-              value: p.searchQuery || '',
-              onChange: p.onSearch || (() => {}),
-              placeholder: '메모 검색',
-            })
+            }
           ),
           h('div', { className: 'v2-dest-body v2-memo-body' }, slots.body),
           h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
@@ -674,17 +795,11 @@ export function MemoScreen(p) {
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             brand: pageBrand(p.calendar),
             onBack: p.onBack,
-            onSearch: toggleSearch,
-            searchLabel: '메모 검색',
+            ...memoHeaderSearch,
             onShare: p.onShare,
             onMenu: p.onMenu,
             extra: memoHeaderExtra,
-          },
-          searchShown && h(Search, {
-            value: p.searchQuery || '',
-            onChange: p.onSearch || (() => {}),
-            placeholder: '메모 검색',
-          })
+          }
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
         h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
@@ -705,17 +820,11 @@ export function MemoScreen(p) {
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           brand: pageBrand(p.calendar),
           onBack: p.onBack,
-          onSearch: toggleSearch,
-          searchLabel: '메모 검색',
+          ...memoHeaderSearch,
           onShare: p.onShare,
           onMenu: p.onMenu,
           extra: memoHeaderExtra,
-        },
-        searchShown && h(Search, {
-          value: p.searchQuery,
-          onChange: p.onSearch,
-          placeholder: '메모 검색',
-        })
+        }
       ),
       // screens.css's flex/overflow chain for .v2-memo only makes .v2-dest-body /
       // .v2-memo-body scrollable (the rest of the pane is overflow:hidden by design, matching
@@ -766,8 +875,8 @@ export function MemoScreen(p) {
             );
           })
         ),
-        !pageMemos.length && !memoPageLoading && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
-        memoPageLoading && h(Empty, null, '메모를 불러오는 중...'),
+        !pageMemos.length && !memoPageLoading && !p.searchPending && h(Empty, null, memoFiltering ? '검색 조건에 맞는 메모가 없습니다.' : '등록된 메모가 없습니다.'),
+        (memoPageLoading || p.searchPending) && h(Empty, null, p.searchPending ? '전체 메모를 검색하는 중...' : '메모를 불러오는 중...'),
         h(MemoPagination, {
           currentPage: memoSafePage,
           pageCount: memoPageCount,
@@ -789,9 +898,12 @@ export function MemoScreen(p) {
 export function PlacesScreen(p) {
   // The map starts closed (gray 지도보기 icon); the toggle opens it (purple) and closes it again.
   const [mapOpen, setMapOpen] = window.React.useState(p.mapOpenDefault === true);
-  // Search starts closed — the header search icon toggles the input row into view.
-  const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
-  const toggleSearch = () => setIsSearchOpen(v => !v);
+  const placesHeaderSearch = {
+    searchLabel: '장소 검색',
+    searchQuery: p.searchQuery || '',
+    onSearchQuery: typeof p.onSearch === 'function' ? p.onSearch : (() => {}),
+    searchPlaceholder: '장소명, 주소, 방문 메모 검색',
+  };
   const select = place => {
     setMapOpen(true);
     if (p.onSelect) p.onSelect(place);
@@ -829,17 +941,11 @@ export function PlacesScreen(p) {
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             brand: pageBrand(p.calendar),
             onBack: p.onBack,
-            onSearch: toggleSearch,
-            searchLabel: '장소 검색',
+            ...placesHeaderSearch,
             onShare: p.onShare,
             onMenu: p.onMenu,
             extra: placeHeaderExtra,
-          },
-          isSearchOpen && h(Search, {
-            value: p.searchQuery || '',
-            onChange: p.onSearch || (() => {}),
-            placeholder: '장소 검색',
-          })
+          }
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-places-legacy'),
         h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
@@ -860,17 +966,11 @@ export function PlacesScreen(p) {
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           brand: pageBrand(p.calendar),
           onBack: p.onBack,
-          onSearch: toggleSearch,
-          searchLabel: '장소 검색',
+          ...placesHeaderSearch,
           onShare: p.onShare,
           onMenu: p.onMenu,
           extra: placeHeaderExtra,
-        },
-        isSearchOpen && h(Search, {
-          value: p.searchQuery,
-          onChange: p.onSearch,
-          placeholder: '장소 검색',
-        })
+        }
       ),
       // Filters are body content. They share the page gutter and scroll with the list;
       // the header itself remains only the back/action chrome.
@@ -990,6 +1090,14 @@ function settlementRows(card, calendar, fallbackExpense) {
 const won = amount => `${Math.abs(Number(amount) || 0).toLocaleString('ko-KR')}원`;
 
 export function SettlementScreen(p) {
+  const settlementHeaderSearch = typeof p.onSearchQuery === 'function'
+    ? {
+        searchLabel: '정산 검색',
+        searchQuery: p.searchQuery || '',
+        onSearchQuery: p.onSearchQuery,
+        searchPlaceholder: p.searchPlaceholder || '정산 항목, 날짜 또는 카테고리 검색',
+      }
+    : { onSearch: p.onSearch, searchLabel: '정산 검색' };
   const settlementHeaderExtra = headerExtra([
     typeof p.onOpenCreate === 'function' && h(IconButton, { label: '정산 생성', icon: 'cashPlus', onClick: p.onOpenCreate }),
     typeof p.onOpenList === 'function' && h(IconButton, { label: '정산 목록', icon: 'receipt', onClick: p.onOpenList }),
@@ -1035,12 +1143,11 @@ export function SettlementScreen(p) {
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             brand: pageBrand(p.calendar),
             onBack: p.onBack,
-            onSearch: p.onSearch,
-            searchLabel: '정산 검색',
+            ...settlementHeaderSearch,
             onShare: p.onShare,
             onMenu: p.onMenu,
             extra: settlementHeaderExtra,
-          }, slots.search || null, flushTabs),
+          }, flushTabs),
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
         ),
@@ -1058,8 +1165,7 @@ export function SettlementScreen(p) {
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           brand: pageBrand(p.calendar),
           onBack: p.onBack,
-          onSearch: p.onSearch,
-          searchLabel: '정산 검색',
+          ...settlementHeaderSearch,
           onShare: p.onShare,
           onMenu: p.onMenu,
           extra: settlementHeaderExtra,
@@ -1086,8 +1192,7 @@ export function SettlementScreen(p) {
         subtitle: p.subtitle || pageSubtitle(p.calendar),
         brand: pageBrand(p.calendar),
       onBack: p.onBack,
-      onSearch: p.onSearch,
-      searchLabel: '정산 검색',
+      ...settlementHeaderSearch,
       onShare: p.onShare,
         onMenu: p.onMenu,
         extra: settlementHeaderExtra,
@@ -1316,7 +1421,15 @@ export function ChatScreen(p) {
     subtitle,
     brand: pageBrand(p.calendar),
     onBack: p.onBack,
-    onSearch: p.onSearch,
+    ...(typeof p.onSearchQuery === 'function'
+      ? {
+          searchQuery: p.searchQuery || '',
+          onSearchQuery: p.onSearchQuery,
+          searchPlaceholder: '검색할 메시지를 입력하세요...',
+          searchTrailing: p.searchTrailing,
+          onSearchClose: p.onSearchClose,
+        }
+      : { onSearch: p.onSearch }),
     searchLabel: '대화 검색',
     onMenu: p.onMenu,
     // Menu is the shared purple FAB, same as every other destination.
@@ -1640,7 +1753,13 @@ export function GalleryScreen(p) {
       searchLabel: '갤러리 검색',
       onBack: p.onBack,
       onMenu: p.onMenu,
-      onSearch: p.onSearch,
+      ...(typeof p.onSearchQuery === 'function'
+        ? {
+            searchQuery: p.searchQuery || '',
+            onSearchQuery: p.onSearchQuery,
+            searchPlaceholder: p.searchPlaceholder || '사진·링크·파일 통합 검색 (태그, 텍스트, URL)',
+          }
+        : { onSearch: p.onSearch }),
       extra: headerExtra([
         typeof p.onUploadFiles === 'function' && h(IconButton, { label: '파일 업로드', icon: 'fileUpload', onClick: p.onUploadFiles }),
         typeof p.onUploadLink === 'function' && h(IconButton, { label: '링크 업로드', icon: 'link', onClick: p.onUploadLink }),
@@ -1679,7 +1798,13 @@ function makeTabbedScreen(name, title) {
         title,
         onBack: p.onBack,
         onMenu: p.onMenu,
-        onSearch: p.onSearch,
+        ...(typeof p.onSearchQuery === 'function'
+          ? {
+              searchQuery: p.searchQuery || '',
+              onSearchQuery: p.onSearchQuery,
+              searchPlaceholder: p.searchPlaceholder || `${title} 검색`,
+            }
+          : { onSearch: p.onSearch }),
         searchLabel: p.searchLabel || `${title} 검색`,
         extra,
       },

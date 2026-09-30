@@ -666,10 +666,10 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3 {
 /* Tabs: Edge-to-edge flush underline tabs (matching '일반 | 정산' tab style) */
 .renewal-shell.v2-design .modal-overlay .v2-responsive-modal .underline-tabs,
 .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .underline-tabs,
-.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"],
-.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"],
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"]:not(.weather-detail-days-strip),
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"]:not(.weather-detail-days-strip),
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] {
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) {
   flex-shrink: 0 !important;
   display: flex !important;
   width: 100% !important;
@@ -680,10 +680,10 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] {
 
 .renewal-shell.v2-design .modal-overlay .v2-responsive-modal .underline-tabs button,
 .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .underline-tabs button,
-.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"] button,
-.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"] button,
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"]:not(.weather-detail-days-strip) button,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"]:not(.weather-detail-days-strip) button,
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] button {
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) button {
   flex: 1 1 0% !important;
   /* No fixed height here -- the tab row's own height (screens.css min-height:50px,
      dest-chrome-late.css box-sizing:content-box) is the single source of truth. A
@@ -713,10 +713,10 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] button {
 
 .renewal-shell.v2-design .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"],
 .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"],
-.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"] button[aria-selected="true"],
-.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"] button[aria-selected="true"],
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"]:not(.weather-detail-days-strip) button[aria-selected="true"],
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"]:not(.weather-detail-days-strip) button[aria-selected="true"],
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button[aria-selected="true"],
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] button[aria-selected="true"] {
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) button[aria-selected="true"] {
   color: var(--brand, #7C2FE5) !important;
   border-bottom: 2px solid var(--brand, #7C2FE5) !important;
 }

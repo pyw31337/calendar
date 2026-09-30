@@ -6039,7 +6039,7 @@ const { ChatParticipantSheet, AppSettingsModal, NotificationOnboardingModal, Not
 // bakes that call's zIndex into it permanently -- later calls with a different zIndex are
 // ignored since the canvas is reused, not recreated. So every call site must pass this same
 // value, or an earlier low-zIndex call (e.g. a chat send burst) locks the canvas behind modals.
-const CONFETTI_Z_INDEX = 999999;
+const CONFETTI_Z_INDEX = 2147483646;
 
 
 const { DateModal } = uiWrapperAliases;

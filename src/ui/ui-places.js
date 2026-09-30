@@ -11,6 +11,28 @@ function highlightKeyword(...args) {
   const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
   return typeof f === 'function' ? f(...args) : args[0];
 }
+
+function placeFieldsMatchQuery(place, queryLower) {
+  if (!queryLower) return true;
+  return [place && place.name, place && place.alias, place && place.address, place && place.memo]
+    .some(value => value && String(value).toLowerCase().includes(queryLower));
+}
+
+// Matching visit rows move to the front so the yellow mark is on screen without
+// opening "N개 장소 더보기" first. Non-matches stay behind that toggle.
+function orderVisitEntriesForSearch(entries, query) {
+  const q = String(query || '').trim().toLowerCase();
+  const list = entries || [];
+  if (!q) return { ordered: list, matches: [] };
+  const matches = [];
+  const rest = [];
+  list.forEach(entry => {
+    const blob = `${(entry && entry.date) || ''} ${(entry && entry.note) || ''}`.toLowerCase();
+    if (blob.includes(q)) matches.push(entry);
+    else rest.push(entry);
+  });
+  return { ordered: matches.concat(rest), matches };
+}
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -820,8 +842,11 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     // internals inside their own stacking context so the button's z-index actually applies.
     style: { width: '100%', height: '100%', backgroundColor: 'var(--border-subtle)', position: 'relative', zIndex: 1 }
   }, !ready && /*#__PURE__*/React.createElement("div", {
-    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-md)' }
-  }, "지도를 불러오는 중..."));
+    className: "bp-skel-fill",
+    role: "status",
+    "aria-label": "지도를 불러오는 중",
+    style: { position: 'absolute', inset: 0 }
+  }));
 }
 
 export function PlacesView({
@@ -924,7 +949,10 @@ export function PlacesView({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSearchOpen(true),
+      search: () => {
+        if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(true);
+      },
       register: () => { setEditingPlace(null); setIsRegisterOpen(true); },
     });
     return () => onRegisterMenuActions(null);
@@ -953,7 +981,8 @@ export function PlacesView({
   React.useEffect(() => {
     if (placesInitialQuery) {
       setListSearchQuery(placesInitialQuery);
-      setIsSearchOpen(true);
+      if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+      else setIsSearchOpen(true);
       setCategoryFilter('all');
       setPlacesInitialQuery('');
     }
@@ -1361,15 +1390,8 @@ export function PlacesView({
       } else if (visitFilter === 'visited' && place.visitStatus === 'planned') {
         setVisitFilter('all');
       }
-      if (listSearchQuery.trim()) {
-        const queryLower = listSearchQuery.toLowerCase().trim();
-        const matchName = place.name && place.name.toLowerCase().includes(queryLower);
-        const matchAlias = place.alias && place.alias.toLowerCase().includes(queryLower);
-        const matchAddress = place.address && place.address.toLowerCase().includes(queryLower);
-        const matchMemo = place.memo && place.memo.toLowerCase().includes(queryLower);
-        if (!matchName && !matchAlias && !matchAddress && !matchMemo) {
-          setListSearchQuery('');
-        }
+      if (listSearchQuery.trim() && !placeFieldsMatchQuery(place, listSearchQuery.toLowerCase().trim())) {
+        setListSearchQuery('');
       }
     }
 
@@ -1443,12 +1465,7 @@ export function PlacesView({
       if (visitFilter === 'visited' && isPlanned) return false;
       if (visitFilter === 'planned' && !isPlanned) return false;
       if (!listSearchQuery.trim()) return true;
-      const queryLower = listSearchQuery.toLowerCase().trim();
-      const matchName = p.name && p.name.toLowerCase().includes(queryLower);
-      const matchAlias = p.alias && p.alias.toLowerCase().includes(queryLower);
-      const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
-      const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
-      return matchName || matchAlias || matchAddress || matchMemo;
+      return placeFieldsMatchQuery(p, listSearchQuery.toLowerCase().trim());
     });
   }, [places, listSearchQuery, visitFilter]);
 
@@ -1466,11 +1483,7 @@ export function PlacesView({
     if (visitFilter === 'visited' && isPlanned) return false;
     if (visitFilter === 'planned' && !isPlanned) return false;
     if (listSearchQuery.trim()) {
-      const queryLower = listSearchQuery.toLowerCase().trim();
-      const matchName = p.name && p.name.toLowerCase().includes(queryLower);
-      const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
-      const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
-      return matchName || matchAddress || matchMemo;
+      return placeFieldsMatchQuery(p, listSearchQuery.toLowerCase().trim());
     }
     return true;
   });
@@ -1884,8 +1897,12 @@ export function PlacesView({
                 displayVisitEntries.length > 0
               ? (() => {
                   const isMemoExpanded = expandedPlaceMemoIds.has(place.id);
-                  const visibleVisitEntries = isMemoExpanded ? displayVisitEntries : displayVisitEntries.slice(0, 1);
-                  const hiddenCount = displayVisitEntries.length - visibleVisitEntries.length;
+                  const { ordered: orderedVisitEntries, matches: matchedVisitEntries } = orderVisitEntriesForSearch(displayVisitEntries, listSearchQuery);
+                  const visibleVisitEntries = isMemoExpanded
+                    ? orderedVisitEntries
+                    : (matchedVisitEntries.length ? matchedVisitEntries : orderedVisitEntries.slice(0, 1));
+                  const hiddenCount = orderedVisitEntries.length - visibleVisitEntries.length;
+                  const highlightVisitText = (text) => highlightKeyword(text, listSearchQuery);
                   return /*#__PURE__*/React.createElement("div", {
                   className: "place-memo-stack",
                   style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' },
@@ -1898,7 +1915,7 @@ export function PlacesView({
                       key: idx,
                       style: { display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }
                     },
-                      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)' } }, highlightVisitText(formatPlaceBadgeDate(entry.date) || entry.date)),
                       /*#__PURE__*/React.createElement("input", {
                         type: "text",
                         value: editingMemoEntryText,
@@ -1955,7 +1972,7 @@ export function PlacesView({
                       /*#__PURE__*/React.createElement("div", {
                         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }
                       },
-                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)' } }, highlightVisitText(formatPlaceBadgeDate(entry.date) || entry.date)),
                         /*#__PURE__*/React.createElement("div", {
                           style: { display: 'flex', alignItems: 'center', gap: '8px' }
                         },
@@ -1968,7 +1985,7 @@ export function PlacesView({
                       /* Line 2: Memo note full width below */
                       entry.note && /*#__PURE__*/React.createElement("div", {
                         style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word', lineHeight: 1.45, width: '100%' }
-                      }, entry.note)
+                      }, entry.note ? highlightVisitText(entry.note) : null)
                     );
                   }
 
@@ -1983,8 +2000,8 @@ export function PlacesView({
                     className: "place-visit-entry-row-desktop",
                     style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', cursor: 'pointer' }
                   },
-                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
-                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, highlightVisitText(formatPlaceBadgeDate(entry.date) || entry.date)),
+                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note ? highlightVisitText(entry.note) : null),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
@@ -2003,7 +2020,7 @@ export function PlacesView({
                   xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
                   fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
                 }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))),
-                isMemoExpanded && displayVisitEntries.length > 1 && /*#__PURE__*/React.createElement("button", {
+                isMemoExpanded && orderedVisitEntries.length > 1 && /*#__PURE__*/React.createElement("button", {
                   type: "button",
                   onClick: e => { e.stopPropagation(); togglePlaceMemoExpanded(place.id); },
                   style: {
@@ -2018,7 +2035,7 @@ export function PlacesView({
                 }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
                 );
                 })()
-              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, listSearchQuery.trim() ? highlightKeyword(memoWithoutDate, listSearchQuery) : renderTextWithUrlBadge(memoWithoutDate))
           );
         })
     ),
@@ -2062,7 +2079,11 @@ export function PlacesView({
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-side-menu-item",
-          onClick: () => { setIsPlacesMenuOpen(false); setIsSearchOpen(true); }
+          onClick: () => {
+            setIsPlacesMenuOpen(false);
+            if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+            else setIsSearchOpen(true);
+          }
         },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(SearchIcon, null)),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },

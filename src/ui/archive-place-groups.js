@@ -24,6 +24,9 @@ const MIN_PARTIAL_MATCH_LENGTH = 2;
 // the place name is later expanded with an English spelling or a category suffix.
 const LEGACY_PLACE_TAG_MAX_LENGTH = 30;
 const AUTO_PLACE_TAG_MAX_LENGTH = 24;
+// A photo the reader removed from 분류 필요. It stays in the gallery; it just
+// is not a place photo, so date/GPS rules must not file it again.
+export const NOT_A_PLACE_TAG = '장소아님';
 
 // Same shape photo-metadata-tags.js compactHashtagToken gives a place-name tag: no spaces or
 // punctuation, lower-case for latin letters.
@@ -67,6 +70,27 @@ function photoTagTokens(photo) {
     .split(/[,\s#]+/)
     .map(compactPlaceToken)
     .filter(Boolean);
+}
+
+export function isDismissedFromPlaces(photo) {
+  return photoTagTokens(photo).includes(compactPlaceToken(NOT_A_PLACE_TAG));
+}
+
+// Puts 장소아님 in front so a photo already at the 20-tag cap still leaves 분류 필요.
+// The last existing tag is the one that yields, never the dismiss mark.
+export function withNotAPlaceTag(tagsText) {
+  const tokens = [];
+  const seen = new Set();
+  String(tagsText || '').split(/[,\s#]+/).forEach(raw => {
+    const token = String(raw || '').trim();
+    if (!token || seen.has(token)) return;
+    seen.add(token);
+    tokens.push(token);
+  });
+  const before = tokens.join(' ');
+  if (tokens.includes(NOT_A_PLACE_TAG)) return { status: 'already', tags: before, before };
+  const next = [NOT_A_PLACE_TAG, ...tokens].slice(0, 20);
+  return { status: 'add', tags: next.join(' '), before };
 }
 
 export function photoMatchesPlaceTag(photo, place) {
@@ -160,7 +184,7 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
   };
 
   (Array.isArray(photos) ? photos : []).forEach(photo => {
-    if (!photo) return;
+    if (!photo || isDismissedFromPlaces(photo)) return;
     const dates = Array.from(new Set((datesOf(photo) || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')))));
     const nearest = nearestPlaceForCoords(photo.latitude, photo.longitude, groups.map(group => ({ lat: group.place.lat, lng: group.place.lng, group })));
     if (nearest) {

@@ -2610,10 +2610,6 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     margin: 0 !important;
     border-radius: 20px !important;
   }
-  html:has(.renewal-shell.v2-design) .bp-event-sheet.is-sheet-moved,
-  html:has(.renewal-shell.v2-design) .v2-responsive-modal.is-sheet-moved {
-    position: fixed !important;
-  }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
@@ -2677,6 +2673,35 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     max-height: 92dvh !important;
     margin: 0 !important;
     border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+/* Dragged sheets keep the coordinates written by ResizableModalContainer.
+   These selectors outrank the centering locks above (left/top: auto !important),
+   which were snapping the dialog back to center on pointerup. */
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container.is-sheet-moved,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal.is-sheet-moved,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal.is-sheet-moved,
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet.is-sheet-moved,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet.is-sheet-moved {
+    position: fixed !important;
+    left: var(--sheet-left) !important;
+    top: var(--sheet-top) !important;
+    right: auto !important;
+    bottom: auto !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+}
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container.is-sheet-resized,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal.is-sheet-resized,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal.is-sheet-resized,
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet.is-sheet-resized,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet.is-sheet-resized {
+    height: var(--sheet-height) !important;
+    max-height: none !important;
   }
 }
 
@@ -2887,7 +2912,7 @@ html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"],
 html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"],
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs > button,
 html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs > button,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) > button,
 html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs > button,
 html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"],
 html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"],
@@ -2896,7 +2921,7 @@ html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"][aria
 html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"][aria-selected="true"],
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs > button[aria-selected="true"],
 html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs > button[aria-selected="true"],
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) > button[aria-selected="true"],
 html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs > button[aria-selected="true"] {
   position: relative !important;
   margin: 0 !important;
@@ -2913,7 +2938,7 @@ html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"]::aft
 html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"]::after,
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button::after,
 html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs button::after,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) > button::after,
 html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after {
   content: "" !important;
   position: absolute !important;
@@ -2933,7 +2958,7 @@ html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"][aria
 html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"][aria-selected="true"]::after,
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button[aria-selected="true"]::after,
 html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"]::after,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) > button[aria-selected="true"]::after,
 html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-selected="true"]::after {
   background: var(--brand, #7C2FE5) !important;
 }
@@ -4257,14 +4282,9 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-modal-cont
   box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.6) !important;
 }
 
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-highlight-card {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.18) 100%) !important;
-  border-color: rgba(59, 130, 246, 0.35) !important;
-}
-
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-highlight-card > div:first-child > div:first-child {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-  color: #60A5FA !important;
+  background-color: transparent !important;
+  color: inherit !important;
 }
 
 /* Weather detail — designed as a compact planning surface: place context first,
@@ -4407,18 +4427,16 @@ html:has(.renewal-shell.v2-design) .weather-detail-date-eyebrow {
 html:has(.renewal-shell.v2-design) .weather-detail-days-strip {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 2px;
   min-width: 0;
-  padding: 10px var(--weather-detail-space);
+  padding: 8px var(--weather-detail-space) 10px;
   overflow-x: auto;
   overflow-y: hidden;
-  border-radius: 0 !important;
-  border-top: 0 !important;
-  border-left: 0 !important;
-  border-right: 0 !important;
-  border-bottom: 1px solid var(--v2-line, #f0eef5) !important;
-  background: var(--bg-primary, #faf9fd);
-  background: color-mix(in srgb, var(--bg-primary, #faf9fd) 80%, transparent);
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--v2-line, #f0eef5);
+  background: transparent;
+  box-shadow: none;
   cursor: grab;
   scrollbar-width: none;
   touch-action: pan-x;
@@ -4441,30 +4459,31 @@ html:has(.renewal-shell.v2-design) .weather-detail-day-choice {
   flex: 0 0 auto;
   min-height: 32px;
   padding: 0 11px;
-  color: var(--v2-ink-2, var(--text-muted, #625b70));
-  border: 1px solid var(--v2-card-border, #eceaf5);
-  border-radius: var(--radius-full, 999px);
-  background: var(--bg-card);
+  color: var(--v2-ink-2, #8b849c);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
   font: inherit;
-  font-size: var(--v2-fs-xs, 0.75rem);
-  font-weight: 750;
+  font-size: var(--v2-fs-xs, 0.78rem);
+  font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition: color 160ms ease, background-color 160ms ease;
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice:hover,
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice:focus-visible {
   color: var(--v2-primary, #7c2fe5);
-  border-color: var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
+  background: transparent;
   outline: none;
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice.is-selected {
-  color: var(--on-brand);
-  border-color: var(--v2-primary, #7c2fe5);
+  color: #fff;
+  border: 0;
   background: var(--v2-primary, #7c2fe5);
-  box-shadow: var(--v2-primary-glow-sm, 0 3px 10px rgba(124, 47, 229, 0.32));
+  box-shadow: 0 6px 14px rgba(124, 47, 229, 0.28);
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-card {
@@ -4472,60 +4491,348 @@ html:has(.renewal-shell.v2-design) .weather-highlight-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 8px;
   overflow: hidden;
-  padding: 20px 22px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.16), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  color: #ffffff;
+  min-height: 156px;
+  padding: 20px 8px 18px 22px;
+  border: 0;
+  border-radius: 28px;
+  color: #fff;
+  background: linear-gradient(115deg, #1d4ed8 0%, #0ea5e9 46%, #22d3ee 100%);
+  box-shadow: 0 18px 36px rgba(14, 165, 233, 0.34);
+  isolation: isolate;
 }
-
-html:has(.renewal-shell.v2-design) .weather-highlight-card::after {
-  display: none;
+html:has(.renewal-shell.v2-design) .weather-highlight-card:hover {
+  transform: translateY(-2px);
 }
-
-html:has(.renewal-shell.v2-design) .weather-highlight-summary,
-html:has(.renewal-shell.v2-design) .weather-highlight-copy,
-html:has(.renewal-shell.v2-design) .weather-highlight-temperatures {
-  position: relative;
-  z-index: 1;
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="clear"] {
+  background: linear-gradient(115deg, #2563eb 0%, #38bdf8 42%, #7dd3fc 100%);
+  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.38);
 }
-
-html:has(.renewal-shell.v2-design) .weather-highlight-summary {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 12px;
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="cloudy"] {
+  background: linear-gradient(115deg, #1d4ed8 0%, #3b82f6 48%, #60a5fa 100%);
+  box-shadow: 0 18px 36px rgba(29, 78, 216, 0.34);
 }
-
-html:has(.renewal-shell.v2-design) .weather-highlight-icon {
-  display: grid;
-  flex: 0 0 auto;
-  width: 52px;
-  height: 52px;
-  place-items: center;
-  color: var(--v2-primary, #7c2fe5);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: var(--v2-glass-light-shadow, 0 1px 3px rgba(30, 27, 46, 0.04));
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="overcast"] {
+  background: linear-gradient(115deg, #334155 0%, #475569 46%, #64748b 100%);
+  box-shadow: 0 18px 36px rgba(51, 65, 85, 0.32);
 }
-
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="fog"] {
+  background: linear-gradient(115deg, #475569 0%, #64748b 50%, #94a3b8 100%);
+  box-shadow: 0 18px 36px rgba(71, 85, 105, 0.3);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="rain"] {
+  background: linear-gradient(115deg, #0e7490 0%, #0891b2 42%, #22d3ee 100%);
+  box-shadow: 0 18px 40px rgba(8, 145, 178, 0.4);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="thunder"] {
+  background: linear-gradient(115deg, #312e81 0%, #6d28d9 48%, #a855f7 100%);
+  box-shadow: 0 18px 40px rgba(109, 40, 217, 0.42);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="snow"] {
+  background: linear-gradient(115deg, #1d4ed8 0%, #60a5fa 48%, #dbeafe 100%);
+  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.3);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night"],
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-cloud"] {
+  background: linear-gradient(115deg, #1e1b4b 0%, #4c1d95 52%, #7c3aed 100%);
+  box-shadow: 0 18px 40px rgba(76, 29, 149, 0.42);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-rain"] {
+  background: linear-gradient(115deg, #0f172a 0%, #0e7490 52%, #22d3ee 100%);
+  box-shadow: 0 18px 40px rgba(14, 116, 144, 0.4);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-thunder"] {
+  background: linear-gradient(115deg, #1e1b4b 0%, #6d28d9 58%, #f59e0b 150%);
+  box-shadow: 0 18px 40px rgba(76, 29, 149, 0.44);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-snow"] {
+  background: linear-gradient(115deg, #1e293b 0%, #6366f1 58%, #e0e7ff 100%);
+  box-shadow: 0 18px 36px rgba(99, 102, 241, 0.36);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card::after { display: none; }
 html:has(.renewal-shell.v2-design) .weather-highlight-copy {
-  display: grid;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
-  gap: 3px;
+  max-width: none;
+  color: #fff;
 }
-
 html:has(.renewal-shell.v2-design) .weather-highlight-condition {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-main {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-temp-big {
+  color: #fff;
+  font-size: 4.35rem;
+  font-weight: 720;
+  line-height: 0.86;
+  letter-spacing: -0.06em;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-degree {
+  align-self: flex-start;
+  margin-top: 8px;
+  margin-right: 10px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.7rem;
+  font-weight: 650;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.55);
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-date,
+html:has(.renewal-shell.v2-design) .weather-highlight-place {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 148px;
   overflow: hidden;
-  color: var(--v2-ink, var(--text-main, #171426));
-  font-size: var(--v2-fs-title, 1.2rem);
-  font-weight: 850;
-  letter-spacing: -0.035em;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+@media (max-width: 420px) {
+  html:has(.renewal-shell.v2-design) .weather-highlight-temp-big { font-size: 3.4rem; }
+  html:has(.renewal-shell.v2-design) .weather-highlight-card { min-height: 132px; padding: 16px 4px 14px 16px; }
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-range {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+html:has(.renewal-shell.v2-design) .weather-scene {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 168px;
+  width: 168px;
+  height: 148px;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+html:has(.renewal-shell.v2-design) .weather-scene::before {
+  content: "";
+  position: absolute;
+  right: 6px;
+  top: 18px;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0) 68%);
+}
+html:has(.renewal-shell.v2-design) .weather-sun {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 32%, #fff7c2 0%, #ffe14a 38%, #ff9f1c 78%);
+  box-shadow: 0 0 0 14px rgba(255, 226, 92, 0.28), 0 0 36px 8px rgba(255, 186, 40, 0.7);
+  animation: weather-sun-glow 3.2s ease-in-out infinite;
+}
+@media (max-width: 420px) {
+  html:has(.renewal-shell.v2-design) .weather-scene { flex-basis: 132px; width: 132px; height: 124px; }
+  html:has(.renewal-shell.v2-design) .weather-sun { width: 78px; height: 78px; }
+}
+html:has(.renewal-shell.v2-design) .weather-sun-rays {
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, transparent 0 12deg, rgba(255, 236, 150, 0.55) 12deg 18deg);
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 58%, #000 70%, transparent 74%);
+  mask: radial-gradient(circle, transparent 54%, #000 58%, #000 70%, transparent 74%);
+  animation: weather-spin 16s linear infinite;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="cloudy"] .weather-sun {
+  top: 10px;
+  right: 46px;
+  width: 64px;
+  height: 64px;
+}
+html:has(.renewal-shell.v2-design) .weather-moon {
+  position: absolute;
+  top: 22px;
+  right: 36px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #ffe38a;
+  box-shadow: 14px -8px 0 -6px #5b46c9, 0 0 24px rgba(255, 227, 138, 0.7);
+  animation: weather-moon-glow 3.8s ease-in-out infinite;
+}
+html:has(.renewal-shell.v2-design) .weather-cloud {
+  position: absolute;
+  right: 22px;
+  bottom: 34px;
+  width: 96px;
+  height: 34px;
+  border-radius: 40px;
+  background: #fff;
+  filter: drop-shadow(0 10px 10px rgba(15, 23, 42, 0.18));
+  animation: weather-cloud-drift 5.6s ease-in-out infinite;
+}
+html:has(.renewal-shell.v2-design) .weather-cloud::before,
+html:has(.renewal-shell.v2-design) .weather-cloud::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: inherit;
+}
+html:has(.renewal-shell.v2-design) .weather-cloud::before { width: 38px; height: 38px; left: 12px; top: -22px; }
+html:has(.renewal-shell.v2-design) .weather-cloud::after { width: 52px; height: 52px; right: 8px; top: -32px; }
+html:has(.renewal-shell.v2-design) .weather-cloud-b {
+  right: 54px;
+  bottom: 48px;
+  width: 54px;
+  transform: scale(0.82);
+  opacity: 0.92;
+  animation-delay: -2s;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="overcast"] .weather-cloud,
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="fog"] .weather-cloud,
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-cloud"] .weather-cloud {
+  background: rgba(255, 255, 255, 0.92);
+}
+html:has(.renewal-shell.v2-design) .weather-mist {
+  position: absolute;
+  right: 8px;
+  bottom: 18px;
+  width: 160px;
+  height: 46px;
+  border-radius: 40px;
+  background: rgba(255, 255, 255, 0.45);
+  filter: blur(8px);
+  animation: weather-cloud-drift 8s ease-in-out infinite;
+}
+html:has(.renewal-shell.v2-design) .weather-rain,
+html:has(.renewal-shell.v2-design) .weather-snow,
+html:has(.renewal-shell.v2-design) .weather-stars {
+  position: absolute;
+  inset: 0;
+}
+html:has(.renewal-shell.v2-design) .weather-drop,
+html:has(.renewal-shell.v2-design) .weather-flake,
+html:has(.renewal-shell.v2-design) .weather-star {
+  position: absolute;
+  display: block;
+}
+html:has(.renewal-shell.v2-design) .weather-drop {
+  top: 18px;
+  left: calc(28px + (var(--i) * 13px));
+  width: 3px;
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(#fff, rgba(255, 255, 255, 0.15));
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.65);
+  animation: weather-rain-fall 0.85s linear infinite;
+  animation-delay: calc(var(--i) * -0.12s);
+}
+html:has(.renewal-shell.v2-design) .weather-flake {
+  top: 28px;
+  left: calc(14px + (var(--i) * 18px));
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: weather-snow-fall 2.8s linear infinite;
+  animation-delay: calc(var(--i) * -0.35s);
+}
+html:has(.renewal-shell.v2-design) .weather-star {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fff;
+  animation: weather-twinkle 2.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.3s);
+}
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(1) { top: 14px; left: 18px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(2) { top: 28px; left: 70px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(3) { top: 12px; left: 112px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(4) { top: 46px; left: 40px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(5) { top: 58px; left: 96px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(6) { top: 22px; left: 150px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(7) { top: 70px; left: 24px; }
+html:has(.renewal-shell.v2-design) .weather-star:nth-child(8) { top: 36px; left: 128px; }
+html:has(.renewal-shell.v2-design) .weather-bolt {
+  position: absolute;
+  right: 46px;
+  bottom: 16px;
+  width: 26px;
+  height: 46px;
+  background: #ffe14a;
+  clip-path: polygon(58% 0, 0 58%, 40% 58%, 16% 100%, 100% 36%, 54% 36%);
+  filter: drop-shadow(0 0 10px rgba(255, 225, 74, 0.9));
+  animation: weather-flash 2.7s ease-in-out infinite;
+}
+@keyframes weather-sun-glow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes weather-spin { to { transform: rotate(360deg); } }
+@keyframes weather-cloud-drift {
+  0%, 100% { translate: 0 0; }
+  50% { translate: -8px 2px; }
+}
+@keyframes weather-rain-fall {
+  0% { transform: translateY(-8px); opacity: 0; }
+  18% { opacity: 1; }
+  100% { transform: translateY(96px); opacity: 0; }
+}
+@keyframes weather-snow-fall {
+  0% { transform: translate3d(0, -8px, 0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate3d(10px, 70px, 0); opacity: 0; }
+}
+@keyframes weather-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+@keyframes weather-moon-glow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
+}
+@keyframes weather-flash {
+  0%, 70%, 100% { opacity: 1; }
+  74% { opacity: 0.15; }
+  78% { opacity: 1; }
+  82% { opacity: 0.35; }
+  86% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.renewal-shell.v2-design) .weather-sun,
+  html:has(.renewal-shell.v2-design) .weather-sun-rays,
+  html:has(.renewal-shell.v2-design) .weather-cloud,
+  html:has(.renewal-shell.v2-design) .weather-mist,
+  html:has(.renewal-shell.v2-design) .weather-drop,
+  html:has(.renewal-shell.v2-design) .weather-flake,
+  html:has(.renewal-shell.v2-design) .weather-star,
+  html:has(.renewal-shell.v2-design) .weather-bolt,
+  html:has(.renewal-shell.v2-design) .weather-moon {
+    animation: none;
+  }
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-feels-like {
@@ -4629,13 +4936,6 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-note.is-accent { color
 html:has(.renewal-shell.v2-design) .weather-highlight-content-right {
   position: relative;
   z-index: 3;
-  background: rgba(0, 0, 0, 0.32) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  border-radius: 12px !important;
-  padding: 6px 12px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
 }
 
 html:has(.renewal-shell.v2-design) .weather-hourly-timeline {
@@ -4719,14 +5019,23 @@ html:has(.renewal-shell.v2-design) .weather-detail-primary-action {
 }
 
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-modal-container,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-footer {
   background: var(--bg-card, #1e1b2e);
 }
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice {
+  background: transparent;
+  color: var(--v2-ink-2, #c4bdd4);
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice.is-selected {
+  color: #fff;
+  background: var(--v2-primary, #7c2fe5);
+}
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-metric,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-days-strip,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-close-action {
   background: var(--bg-primary, #171426);
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-days-strip {
+  background: transparent;
 }
 
 /* Expanded D-day cards keep the closed capsule's glass, and each one
@@ -6092,14 +6401,14 @@ html:has(.renewal-shell.v2-design) .is-exit-ghost .bp-event-sheet.modal-containe
 /* Tab underline grows from the centre instead of switching on. */
 html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
 html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) > button::after,
 html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after {
   scale: .3 1;
   transition: scale 280ms var(--motion-ease-out, cubic-bezier(.16, 1, .3, 1)), background-color 180ms ease;
 }
 html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"]::after,
 html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"]::after,
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.weather-detail-days-strip) > button[aria-selected="true"]::after,
 html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-selected="true"]::after {
   scale: 1 1;
 }
@@ -6401,9 +6710,98 @@ html:has(.renewal-shell.v2-design) .v2-memo .bp-search-row {
   max-width: none !important;
   z-index: 6 !important;
 }
+/* Memo used to portal a viewport-fixed search bar. It covered the side nav and
+   shoved the page down as soon as a query was typed. Keep search inside the header. */
+body > .inline-search-bar {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-memo .inline-search-bar.is-fixed,
+html:has(.renewal-shell.v2-design) .v2-places .v2-page-header .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-places .v2-page-header .inline-search-bar.is-fixed {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 8px 0 0 !important;
+  transform: none !important;
+  z-index: 2 !important;
+  box-sizing: border-box !important;
+  align-self: stretch !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-bar.is-fixed {
+  margin: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-capsule {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+html:has(.renewal-shell.v2-design) mark.search-keyword-mark {
+  background: #FEF08A !important;
+  color: #1E293B !important;
+  padding: 0 2px !important;
+  border-radius: 2px !important;
+  font-weight: 800 !important;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header:has(.inline-search-bar, .bp-search-row).is-scroll-hidden {
+  max-height: none !important;
+  min-height: 56px !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+  border-bottom: 1px solid var(--border-subtle, #ebe8f3) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-search-input,
+html:has(.renewal-shell.v2-design) .v2-memo .inline-search-input {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  outline: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-search-input::-webkit-search-cancel-button,
+html:has(.renewal-shell.v2-design) .bp-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+html:has(.renewal-shell.v2-design) input.bp-search-input:focus-visible,
+html:has(.renewal-shell.v2-design) input.inline-search-input:focus-visible {
+  scale: 1 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .gallery-pagination {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin: 4px 0 28px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  grid-column: 1 / -1 !important;
+}
 html:has(.renewal-shell.v2-design) .v2-chat.v2-chat-search-open .v2-chat-scroll,
-html:has(.renewal-shell.v2-design) .v2-chat.v2-chat-search-open .chat-messages-scroll {
+html:has(.renewal-shell.v2-design) .v2-chat.v2-chat-search-open .chat-messages-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat:has(.v2-page-header .inline-search-bar) .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat:has(.v2-page-header .inline-search-bar) .chat-messages-scroll {
   padding-top: calc(112px + var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px))) !important;
+}
+/* Chat search is position:fixed inside the chat pane. Desktop sheets capped it at
+   960/1100px, which left an empty strip on the right of a wider pane. */
+html:has(.renewal-shell.v2-design) .v2-chat .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-chat .inline-search-bar.is-fixed {
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-sizing: border-box !important;
 }
 
 /* iOS draws the date picker's icon at the field's right edge. A full capsule
@@ -6464,111 +6862,267 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-input {
 
 /* Tiny motion: press, destructive head-shake, staggered lists, skeletons. */
 @keyframes bp-list-in {
-  from { opacity: 0; scale: 0.94; }
+  from { opacity: 0; scale: 0.92; }
   to { opacity: 1; scale: 1; }
 }
 @keyframes bp-list-out {
   from { opacity: 1; scale: 1; }
-  to { opacity: 0; scale: 0.94; }
+  to { opacity: 0; scale: 0.92; }
 }
 @keyframes bp-no-shake {
-  0%, 100% { translate: 0 0; }
-  18% { translate: -3px 0; }
-  36% { translate: 3px 0; }
-  54% { translate: -2px 0; }
-  72% { translate: 2px 0; }
-  86% { translate: -1px 0; }
+  0% { translate: 0 0; rotate: 0deg; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  16% { translate: -3.5px 0; rotate: -4deg; animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95); }
+  34% { translate: 3.5px 0; rotate: 4deg; animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95); }
+  52% { translate: -2.4px 0; rotate: -2.6deg; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  70% { translate: 1.8px 0; rotate: 2deg; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  86% { translate: -0.8px 0; rotate: -0.7deg; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  100% { translate: 0 0; rotate: 0deg; }
 }
 @keyframes bp-skel-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
-
-html:has(.renewal-shell.v2-design) :is(button, [role="button"]):not(.bp-btn-gamified-confirm):not(:disabled) {
-  transition: scale 90ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, opacity 160ms ease;
+@keyframes bp-soft-in {
+  from { opacity: 0; scale: 0.985; }
+  to { opacity: 1; scale: 1; }
 }
-html:has(.renewal-shell.v2-design) :is(button, [role="button"]):not(.bp-btn-gamified-confirm):not(:disabled):active {
-  scale: 0.96;
+
+html:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):not(:disabled) {
+  transition: scale 130ms var(--motion-ease-out), translate 180ms var(--motion-ease-soft), background-color 160ms var(--motion-ease-soft), border-color 160ms var(--motion-ease-soft), color 160ms var(--motion-ease-soft), opacity 160ms var(--motion-ease-soft), box-shadow 160ms var(--motion-ease-soft);
+}
+html:not([data-bp-spring="1"]):has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):not(.bp-btn-gamified-confirm):not(:disabled):active {
+  scale: 0.94 !important;
+  transition-duration: 70ms;
+  transition-timing-function: var(--motion-ease-in);
+}
+html:has(.renewal-shell.v2-design) :is(input, textarea, select):focus-visible {
+  scale: 1.012;
+  transition: scale 160ms var(--motion-ease-soft), border-color 160ms var(--motion-ease-soft), box-shadow 160ms var(--motion-ease-soft);
+}
+html:has(.renewal-shell.v2-design) :is(.bp-hero-zone, .v2-dest-page, .modal-container, .bottom-sheet, .calendar-card) {
+  animation: bp-soft-in 260ms var(--motion-ease-soft) both;
 }
 @media (hover: hover) and (pointer: fine) {
   html:has(.renewal-shell.v2-design) :is(
+    .bp-neg,
     button[aria-label*="삭제"],
     button[title*="삭제"],
     button[aria-label*="제거"],
     button[title*="제거"],
+    button[aria-label*="제외"],
     .btn-danger,
-    .content-thumb-delete-btn
+    .content-thumb-delete-btn,
+    .bp-attend-row-remove,
+    .bp-lightbox-tag-remove
   ):hover {
-    animation: bp-no-shake 0.42s ease;
+    animation: bp-no-shake 0.48s var(--motion-ease-in-out);
   }
-  .v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article):hover {
+  .v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article, .place-row, .summary-card, [role="tab"]):hover {
     translate: 0 -1px;
   }
 }
-.v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article) {
-  transition: translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+.v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article, .place-row, .summary-card, [role="tab"]) {
+  transition: translate 200ms var(--motion-ease-soft), scale 180ms var(--motion-ease-out);
 }
 
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list) > :is(article, button, a, li, div),
-.v2-design .chat-messages-scroll > [data-msg-row-id],
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :is(article, button, a, li, div) {
-  animation: bp-list-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+html:has(.renewal-shell.v2-design) :is(
+  .bp-memo-grid,
+  .bp-place-grid,
+  .places-list-body,
+  .history-meetings-grid,
+  .history-bento-grid,
+  .settlement-participant-list,
+  .date-modal-settlement-list,
+  .date-modal-memo-list,
+  .date-modal-places-list,
+  .memo-list-scroll,
+  .gallery-link-grid,
+  .gallery-file-grid,
+  .media-analysis-feed,
+  .chat-file-attachment-list,
+  .admin-side-menu-list,
+  .bp-motion-list
+) > :not([data-bp-leave]):not(.bp-skel-list):not(.bp-motion-leave-host),
+html:has(.renewal-shell.v2-design) .chat-messages-scroll > [data-msg-row-id]:not([data-bp-leave]) {
+  animation: bp-list-in 200ms var(--motion-ease-out) both;
+  animation-delay: calc(var(--bp-i, 0) * 28ms);
 }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(2),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(2) { animation-delay: 28ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(3),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(3) { animation-delay: 56ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(4),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(4) { animation-delay: 84ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(5),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(5) { animation-delay: 112ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(6),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(6) { animation-delay: 140ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(7),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(7) { animation-delay: 168ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(8),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(8) { animation-delay: 196ms; }
-.v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .chat-messages-scroll, .settlement-participant-list, .date-modal-settlement-list) > :nth-child(n+9),
-html:has(.renewal-shell.v2-design) :is(.date-modal-settlement-list, .settlement-participant-list) > :nth-child(n+9) { animation-delay: 224ms; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(2) { --bp-i: 1; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(3) { --bp-i: 2; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(4) { --bp-i: 3; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(5) { --bp-i: 4; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(6) { --bp-i: 5; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(7) { --bp-i: 6; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(8) { --bp-i: 7; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(9) { --bp-i: 8; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(10) { --bp-i: 9; }
+html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list, .date-modal-memo-list, .date-modal-places-list, .memo-list-scroll, .gallery-link-grid, .gallery-file-grid, .media-analysis-feed, .chat-file-attachment-list, .admin-side-menu-list, .bp-motion-list, .chat-messages-scroll) > :nth-child(n+11) { --bp-i: 10; }
 html:has(.renewal-shell.v2-design) .bp-motion-leave {
-  animation-name: bp-list-out;
-  animation-duration: 180ms;
-  animation-timing-function: ease;
-  animation-fill-mode: both;
+  animation: bp-list-out 160ms var(--motion-ease-in) both !important;
+  pointer-events: none;
+}
+html:has(.renewal-shell.v2-design) .bp-motion-leave-host {
   pointer-events: none;
 }
 
-.v2-design .bp-skel-page,
-.v2-design .renewal-shell-placeholder.is-loading {
+html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]) {
+  transition-property: translate, background-color, border-color, color, opacity, box-shadow;
+}
+html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(
+  .bp-memo-grid,
+  .bp-place-grid,
+  .places-list-body,
+  .history-meetings-grid,
+  .history-bento-grid,
+  .settlement-participant-list,
+  .date-modal-settlement-list,
+  .date-modal-memo-list,
+  .date-modal-places-list,
+  .memo-list-scroll,
+  .gallery-link-grid,
+  .gallery-file-grid,
+  .media-analysis-feed,
+  .chat-file-attachment-list,
+  .admin-side-menu-list,
+  .bp-motion-list
+) > :not([data-bp-sprung]):not([data-bp-leave]):not(.bp-skel-list):not(.bp-skel-row):not(.bp-motion-leave-host),
+html[data-bp-spring="1"]:has(.renewal-shell.v2-design) .chat-messages-scroll > [data-msg-row-id]:not([data-bp-sprung]):not([data-bp-leave]) {
+  opacity: 0;
+  scale: 0.9;
+}
+html[data-bp-spring="1"]:has(.renewal-shell.v2-design) :is(
+  .bp-memo-grid,
+  .bp-place-grid,
+  .places-list-body,
+  .history-meetings-grid,
+  .history-bento-grid,
+  .chat-messages-scroll,
+  .memo-list-scroll,
+  .bp-motion-list
+) > *,
+html[data-bp-spring="1"]:has(.renewal-shell.v2-design) .bp-motion-leave {
+  animation: none !important;
+}
+
+html:has(.renewal-shell.v2-design) .bp-skel-page,
+html:has(.renewal-shell.v2-design) .renewal-shell-placeholder.is-loading {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 18px 16px 28px;
+  min-height: 240px;
 }
-.v2-design :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar) {
+html:has(.renewal-shell.v2-design) :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar, .bp-skel-bubble, .bp-cal-skel-nav, .bp-cal-skel-cell, .bp-skel-thumb, .bp-skel-fill) {
   display: block;
   border-radius: 10px;
   background: linear-gradient(90deg, var(--v2-surface-2, #eceaf2) 0%, var(--bg-card, #f7f6fb) 48%, var(--v2-surface-2, #eceaf2) 100%);
   background-size: 200% 100%;
   animation: bp-skel-shimmer 1.15s ease-in-out infinite;
 }
-.v2-design .bp-skel-block.is-title { height: 22px; width: 42%; }
-.v2-design .bp-skel-block.is-card { height: 96px; width: 100%; border-radius: 16px; }
-.v2-design .bp-skel-list { display: flex; flex-direction: column; gap: 10px; }
-.v2-design .bp-skel-row { display: flex; align-items: center; gap: 10px; min-height: 52px; }
-.v2-design .bp-skel-avatar { width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto; }
-.v2-design .bp-skel-copy { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.v2-design .bp-skel-line { height: 10px; width: 72%; }
-.v2-design .bp-skel-line.is-short { width: 40%; }
+html:has(.renewal-shell.v2-design) .bp-skel-block.is-title { height: 22px; width: 42%; }
+html:has(.renewal-shell.v2-design) .bp-skel-block.is-card { height: 108px; width: 100%; border-radius: 18px; }
+html:has(.renewal-shell.v2-design) .bp-skel-block.is-search { height: 40px; width: 100%; border-radius: 999px; }
+html:has(.renewal-shell.v2-design) .bp-skel-block.is-tabs { height: 36px; width: 70%; border-radius: 999px; }
+html:has(.renewal-shell.v2-design) .bp-skel-block.is-hero { height: 132px; width: 100%; border-radius: 22px; }
+html:has(.renewal-shell.v2-design) .bp-skel-list { display: flex; flex-direction: column; gap: 10px; }
+html:has(.renewal-shell.v2-design) .bp-skel-row { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+html:has(.renewal-shell.v2-design) .bp-skel-avatar { width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto; }
+html:has(.renewal-shell.v2-design) .bp-skel-copy { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+html:has(.renewal-shell.v2-design) .bp-skel-line { height: 10px; width: 72%; }
+html:has(.renewal-shell.v2-design) .bp-skel-line.is-short { width: 40%; }
+html:has(.renewal-shell.v2-design) .bp-skel-bubble {
+  height: 46px;
+  border-radius: 16px;
+  width: 68%;
+}
+html:has(.renewal-shell.v2-design) .bp-skel-bubble.is-self { margin-left: auto; width: 52%; border-radius: 16px 16px 4px 16px; }
+html:has(.renewal-shell.v2-design) .bp-skel-bubble.is-other { border-radius: 16px 16px 16px 4px; }
+html:has(.renewal-shell.v2-design) .bp-skel-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 0 16px;
+}
+html:has(.renewal-shell.v2-design) .bp-skel-thumb { aspect-ratio: 1; border-radius: 12px; }
+html:has(.renewal-shell.v2-design) .calendar-loading-overlay.bp-cal-skel {
+  align-items: stretch;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 12px 16px;
+  background: var(--bg-card, #fff);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html:has(.renewal-shell.v2-design) .bp-cal-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+html:has(.renewal-shell.v2-design) .bp-cal-skel-nav { height: 28px; width: 38%; }
+html:has(.renewal-shell.v2-design) .bp-cal-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  flex: 1;
+}
+html:has(.renewal-shell.v2-design) .bp-cal-skel-cell { height: 42px; border-radius: 10px; }
+html:has(.renewal-shell.v2-design) .bp-skel-fill { width: 100%; height: 100%; border-radius: 0; }
+html:has(.renewal-shell.v2-design) .bp-skel-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+html:has(.renewal-shell.v2-design) .bp-skel-metrics .bp-skel-block { height: 64px; border-radius: 14px; }
 
 @media (prefers-reduced-motion: reduce) {
-  html:has(.renewal-shell.v2-design) :is(button, [role="button"]):active { scale: 1; }
-  .v2-design :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .history-meetings-grid, .history-bento-grid, .settlement-participant-list, .date-modal-settlement-list) > *,
-  .v2-design .chat-messages-scroll > [data-msg-row-id],
+  html:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):active { scale: 1; }
+  html:has(.renewal-shell.v2-design) :is(input, textarea, select):focus-visible { scale: 1; }
+  html:has(.renewal-shell.v2-design) :is(.bp-hero-zone, .v2-dest-page, .modal-container, .bottom-sheet, .calendar-card),
   html:has(.renewal-shell.v2-design) .bp-motion-leave,
-  html:has(.renewal-shell.v2-design) :is(button[aria-label*="삭제"], .btn-danger, .content-thumb-delete-btn):hover,
-  .v2-design :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar) {
+  html:has(.renewal-shell.v2-design) :is(.bp-neg, button[aria-label*="삭제"], .btn-danger, .content-thumb-delete-btn):hover,
+  html:has(.renewal-shell.v2-design) :is(.bp-memo-grid, .bp-place-grid, .places-list-body, .chat-messages-scroll, .memo-list-scroll) > *,
+  .v2-design :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar, .bp-skel-bubble, .bp-cal-skel-cell, .bp-skel-thumb, .bp-skel-fill),
+  html:has(.renewal-shell.v2-design) :is(.bp-skel-block, .bp-skel-line, .bp-skel-avatar, .bp-skel-bubble, .bp-cal-skel-cell, .bp-skel-thumb, .bp-skel-fill) {
     animation: none;
   }
 }
 
+/* Content grids paint every child as a card. The shared pager must stay a bare row. */
+html:has(.renewal-shell.v2-design) .culture-items-grid > .gallery-pagination,
+html:has(.renewal-shell.v2-design) .history-bento-grid > .gallery-pagination,
+html:has(.renewal-shell.v2-design) .gallery-pagination {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+/* Archive drill-in (분류 필요 / a place) must not paint its body over the page
+   header, and a visible header must not stay collapsed at max-height 0. */
+html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .v2-page-header:not(.is-scroll-hidden) {
+  display: block !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 56px !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  z-index: 40 !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell-main.is-records .v2-archive.v2-has-page-header > .places-view-container.v2-archive-legacy,
+html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view-container.v2-archive-legacy {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  z-index: 0 !important;
+}

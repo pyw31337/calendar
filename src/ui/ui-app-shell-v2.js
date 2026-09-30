@@ -1998,9 +1998,31 @@ function HomePlaceCard({ place, calendar, onOpen }) {
   );
 }
 
-/** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
-function HomeLoadingRows({ label, count = 3 }) {
+/** 데이터가 오기 전, 실제 목록과 비슷한 뼈대를 먼저 보여 준다. */
+function HomeLoadingRows({ label, count = 3, variant = 'row' }) {
   const React = window.React;
+  if (variant === 'card') {
+    return React.createElement('div', {
+      className: 'bp-skel-list',
+      role: 'status',
+      'aria-label': label,
+    }, Array.from({ length: count }, (_, index) => React.createElement('div', {
+      key: index,
+      className: 'bp-skel-block is-card',
+      'aria-hidden': 'true',
+    })));
+  }
+  if (variant === 'bubble') {
+    return React.createElement('div', {
+      className: 'bp-skel-list',
+      role: 'status',
+      'aria-label': label,
+    }, Array.from({ length: count }, (_, index) => React.createElement('div', {
+      key: index,
+      className: `bp-skel-bubble ${index % 2 ? 'is-self' : 'is-other'}`,
+      'aria-hidden': 'true',
+    })));
+  }
   return React.createElement('div', {
     className: 'bp-skel-list',
     role: 'status',
@@ -2198,7 +2220,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         ));
       }
       }) : (calendarContext?.isLoading
-        ? React.createElement(HomeLoadingRows, { label: '최근 대화 불러오는 중' })
+        ? React.createElement(HomeLoadingRows, { label: '최근 대화 불러오는 중', variant: 'bubble' })
         : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.'))
     ),
     React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
@@ -2243,7 +2265,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모')));
       }
       }) : (calendarContext?.isLoading
-        ? React.createElement(HomeLoadingRows, { label: '최근 메모 불러오는 중' })
+        ? React.createElement(HomeLoadingRows, { label: '최근 메모 불러오는 중', variant: 'card', count: 2 })
         : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.'))
     ),
     sharingMemo && MemoShareModal && ReactDOM?.createPortal
@@ -2437,7 +2459,7 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav,
     () => window.__gatherLoadChatUi?.(),
     () => chatContext.showToast?.('채팅 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'chat' });
   const { ChatRoomView, ShareModal } = bindUiComponentAliases(React);
   if (typeof ChatRoomView !== 'function') {
     return React.createElement(EmptyState, { title: '채팅 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -2547,7 +2569,7 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
     () => window.__gatherLoadEventUi?.(),
     () => settlementContext.showToast?.('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'settlement' });
   const { SettlementSummaryModal, ShareModal, CreateSettlementModal } = bindUiComponentAliases(React);
   if (typeof SettlementSummaryModal !== 'function') {
     return React.createElement(EmptyState, { title: '정산 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -2606,17 +2628,33 @@ function EmptyState({ icon, title, subtitle }) {
 
 const lazyUiReady = Object.create(null);
 
-function DestinationLoadingSurface() {
+function DestinationLoadingSurface({ shape = 'page' }) {
   const React = window.React;
+  const blocks = {
+    chat: ['is-search', 'bubble', 'bubble', 'bubble', 'bubble'],
+    memo: ['is-search', 'is-tabs', 'card', 'card', 'card'],
+    places: ['is-search', 'is-hero', 'row', 'row', 'row'],
+    gallery: ['is-tabs', 'photo', 'photo'],
+    settlement: ['is-tabs', 'is-hero', 'row', 'row', 'row'],
+    page: ['is-title', 'is-card', 'row', 'row', 'row', 'row'],
+  }[shape] || ['is-title', 'is-card', 'row', 'row', 'row', 'row'];
   return React.createElement('div', {
-    className: 'renewal-shell-loading-surface bp-skel-page',
+    className: `renewal-shell-loading-surface bp-skel-page is-${shape}`,
     'aria-busy': 'true',
     'aria-label': '화면 준비 중',
-  },
-    React.createElement('div', { className: 'bp-skel-block is-title', 'aria-hidden': 'true' }),
-    React.createElement('div', { className: 'bp-skel-block is-card', 'aria-hidden': 'true' }),
-    React.createElement(HomeLoadingRows, { label: '내용 불러오는 중', count: 4 })
-  );
+  }, blocks.map((kind, index) => {
+    if (kind === 'row') return React.createElement(HomeLoadingRows, { key: index, label: '내용 불러오는 중', count: 1 });
+    if (kind === 'bubble') {
+      return React.createElement('div', { key: index, className: `bp-skel-bubble ${index % 2 ? 'is-self' : 'is-other'}`, 'aria-hidden': 'true' });
+    }
+    if (kind === 'card') return React.createElement('div', { key: index, className: 'bp-skel-block is-card', 'aria-hidden': 'true' });
+    if (kind === 'photo') {
+      return React.createElement('div', { key: index, className: 'bp-skel-photo-grid', 'aria-hidden': 'true' },
+        Array.from({ length: 6 }, (_, cell) => React.createElement('span', { key: cell, className: 'bp-skel-thumb' }))
+      );
+    }
+    return React.createElement('div', { key: index, className: `bp-skel-block ${kind}`, 'aria-hidden': 'true' });
+  }));
 }
 
 function useLazyUi(key, isReadyFn, loadFn, onError) {
@@ -2806,6 +2844,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       indexedPhotoStatus: galleryPhotoIndex ? galleryPhotoIndex.status : undefined,
       indexedPhotoComplete: galleryPhotoIndex ? galleryPhotoIndex.complete : false,
       onIndexedPhotoPageChange: galleryPhotoIndex ? galleryPhotoIndex.loadPage : undefined,
+      onIndexedPhotoLoadAll: galleryPhotoIndex ? galleryPhotoIndex.loadAll : undefined,
       photoCommentCounts,
     },
     isHistoryShareOpen: !!isHistoryShareOpen,
@@ -2878,6 +2917,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
  */
 function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
+  const [gallerySearchQuery, setGallerySearchQuery] = React.useState('');
   const galleryActionsRef = React.useRef({});
   const registerGalleryActions = React.useCallback((actions) => {
     galleryActionsRef.current = actions || {};
@@ -2889,7 +2929,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     () => window.__gatherLoadChatUi?.(),
     () => recordsContext.showToast?.('갤러리 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'gallery' });
   const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
   if (typeof ChatGalleryModal !== 'function') {
     return React.createElement(EmptyState, { title: '갤러리 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -2900,6 +2940,8 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     onOpenShare: recordsContext.onOpenGalleryShare,
     onOpenAppSettings,
     v2Embed: true,
+    v2SearchQuery: gallerySearchQuery,
+    onV2SearchQuery: setGallerySearchQuery,
     onRegisterMenuActions: registerGalleryActions,
   });
   return React.createElement(React.Fragment, null,
@@ -2911,7 +2953,9 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
         onMenu: onOpenSideNav || onOpenAppSettings,
-        onSearch: () => galleryActionsRef.current.search?.(),
+        searchQuery: gallerySearchQuery,
+        onSearchQuery: setGallerySearchQuery,
+        searchPlaceholder: '사진·링크·파일 통합 검색 (태그, 텍스트, URL)',
         onUploadFiles: () => galleryActionsRef.current.uploadMixed?.(),
         onUploadLink: () => galleryActionsRef.current.uploadLink?.(),
         slots: {},
@@ -2930,6 +2974,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
   const React = window.React;
   const contentActionsRef = React.useRef({});
   const [contentGridCols, setContentGridCols] = React.useState('2');
+  const [contentSearchQuery, setContentSearchQuery] = React.useState('');
   const registerContentActions = React.useCallback((actions) => {
     contentActionsRef.current = actions || {};
     if (actions && (actions.gridCols === '1' || actions.gridCols === '2')) {
@@ -2943,6 +2988,8 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     onBack: () => onChangeView('calendar'),
     onOpenAppSettings,
     v2Embed: true,
+    v2SearchQuery: contentSearchQuery,
+    onV2SearchQuery: setContentSearchQuery,
     onRegisterMenuActions: registerContentActions,
   });
   return renderContentScreen({
@@ -2951,7 +2998,9 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     subtitle: calendarName || undefined,
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
-    onSearch: () => contentActionsRef.current.search?.(),
+    searchQuery: contentSearchQuery,
+    onSearchQuery: setContentSearchQuery,
+    searchPlaceholder: '제목으로 검색...',
     onOpenRegion: () => contentActionsRef.current.openRegion?.(),
     onOpenRegister: () => contentActionsRef.current.register?.(),
     onSetGridCols: (cols) => {
@@ -2977,6 +3026,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
 function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
+  const [archiveSearchQuery, setArchiveSearchQuery] = React.useState('');
   const historyActionsRef = React.useRef({});
   const registerHistoryActions = React.useCallback((actions) => {
     historyActionsRef.current = actions || {};
@@ -2990,6 +3040,8 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
     onOpenShare: recordsContext.onOpenHistoryShare,
     onOpenAppSettings,
     v2Embed: true,
+    v2SearchQuery: archiveSearchQuery,
+    onV2SearchQuery: setArchiveSearchQuery,
     onRegisterMenuActions: registerHistoryActions,
   });
   return React.createElement(React.Fragment, null,
@@ -3000,7 +3052,9 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
       onMenu: onOpenSideNav || onOpenAppSettings,
-      onSearch: () => historyActionsRef.current.search?.(),
+      searchQuery: archiveSearchQuery,
+      onSearchQuery: setArchiveSearchQuery,
+      searchPlaceholder: '추억·인물·장소·날짜·태그 검색...',
       slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
@@ -3042,7 +3096,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
     () => recordsContext.showToast?.('장소 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
   const [placeDateModalDate, setPlaceDateModalDate] = React.useState(null);
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'places' });
   const { PlacesView, ShareModal, DateModal } = bindUiComponentAliases(React);
   if (typeof PlacesView !== 'function') {
     return React.createElement(EmptyState, { title: '장소 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -3093,7 +3147,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideN
     () => window.__gatherLoadViewUi?.('memo'),
     () => recordsContext.showToast?.('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'memo' });
   const { MemoView, ShareModal } = bindUiComponentAliases(React);
   if (typeof MemoView !== 'function') {
     return React.createElement(EmptyState, { title: '메모 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });

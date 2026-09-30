@@ -1423,7 +1423,15 @@ async function fetchChatMessagesRest() {
   return [];
 }
 
-async function fetchAllChatMessagesRest() {
+async function fetchAllChatMessagesRest(calId) {
+  const key = String(calId || '');
+  const cachedIndex = key && calendarSearchIndexCache.get(key);
+  if (cachedIndex) {
+    try {
+      const index = await cachedIndex;
+      if (Array.isArray(index?.chatMessages)) return index.chatMessages;
+    } catch (_) { /* a failed index read should not block the direct message scan */ }
+  }
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchAllChatMessagesRest === 'function' && !svc.isScaffold) {
     return svc.fetchAllChatMessagesRest.apply(null, arguments);
@@ -1432,13 +1440,33 @@ async function fetchAllChatMessagesRest() {
   return [];
 }
 
-async function fetchCalendarSearchIndex() {
+const calendarSearchIndexCache = new Map();
+
+async function fetchCalendarSearchIndex(calId) {
   const svc = window.GATHER_FIREBASE_SERVICES;
-  if (svc && typeof svc.fetchCalendarSearchIndex === 'function' && !svc.isScaffold) {
-    return svc.fetchCalendarSearchIndex.apply(null, arguments);
+  if (!(svc && typeof svc.fetchCalendarSearchIndex === 'function' && !svc.isScaffold)) {
+    console.warn('fetchCalendarSearchIndex: GATHER_FIREBASE_SERVICES missing');
+    return { chatMessages: [], memos: [], customCultureItems: [] };
   }
-  console.warn('fetchCalendarSearchIndex: GATHER_FIREBASE_SERVICES missing');
-  return { chatMessages: [], memos: [], customCultureItems: [] };
+  const key = String(calId || '');
+  if (!key) return { chatMessages: [], memos: [], customCultureItems: [] };
+  const cached = calendarSearchIndexCache.get(key);
+  if (cached) return cached;
+  const pending = Promise.resolve()
+    .then(() => svc.fetchCalendarSearchIndex(key))
+    .then(index => {
+      const value = index && typeof index === 'object'
+        ? index
+        : { chatMessages: [], memos: [], customCultureItems: [] };
+      calendarSearchIndexCache.set(key, Promise.resolve(value));
+      return value;
+    })
+    .catch(err => {
+      calendarSearchIndexCache.delete(key);
+      throw err;
+    });
+  calendarSearchIndexCache.set(key, pending);
+  return pending;
 }
 
 async function fetchRecentChatMessages() {

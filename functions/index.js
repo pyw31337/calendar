@@ -110,14 +110,21 @@ function getDirectMediaTagKeyForIndex(url) {
 function getDirectImageEntriesForIndex(message) {
   const text = String(message?.text || message?.content || message?.body || '');
   const urls = text.match(/https?:\/\/[^\s<>"']+/gi) || [];
-  const imageExtensions = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|jfif|pjpeg|pjp|ico)(?:[?#].*)?$/i;
+  const imageExtensions = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|jfif|pjpeg|pjp|ico)$/i;
   const uploaded = new Set(getMessageImageEntriesForIndex(message)
     .flatMap(entry => [normalizePhotoAssetUrl(entry.imageUrl), normalizePhotoAssetUrl(entry.thumbUrl)]));
   const directTags = message?.directMediaTags && typeof message.directMediaTags === 'object' && !Array.isArray(message.directMediaTags)
     ? message.directMediaTags
     : {};
+  const pathIsImage = url => {
+    try {
+      return imageExtensions.test(decodeURIComponent(new URL(url).pathname || ''));
+    } catch (_) {
+      return imageExtensions.test(String(url || '').split(/[?#]/)[0]);
+    }
+  };
   return Array.from(new Set(urls.map(url => url.replace(/[),.;!?]+$/, ''))))
-    .filter(url => imageExtensions.test(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
+    .filter(url => pathIsImage(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
     .map((url, index) => {
       const tagKey = getDirectMediaTagKeyForIndex(url);
       const normalizedUrl = normalizePhotoAssetUrl(url);

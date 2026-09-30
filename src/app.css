@@ -392,6 +392,15 @@ body:has(.admin-login-gate) {
   }
 }
 
+canvas.bp-confetti-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 2147483646 !important;
+}
+
 /* Motion system ---------------------------------------------------------
    Inspired by GSAP/Motion/Anime.js principles: transform + opacity first,
    small interruptible movements, clear press feedback, and strict reduced-
@@ -401,9 +410,16 @@ body:has(.admin-login-gate) {
   --motion-fast: 140ms;
   --motion-base: 220ms;
   --motion-slow: 420ms;
+  /* Enter and release: fast start, long settle. */
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Exit and press-down: accelerates away. */
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Hover lift and focus: gentle both ends. */
   --motion-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Symmetric nod, used between shake keyframes. */
+  --motion-ease-in-out: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  /* Overshoot for sheets, toasts, and pops. */
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes motion-fade-up {
   from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.985); }
@@ -8417,28 +8433,13 @@ body .modal-overlay.region-filter-overlay .modal-header > h3 .region-setting-cur
   margin-left: 8px !important;
 }
 
-body .modal-overlay.weather-detail-modal-overlay .weather-detail-days-strip {
-  border-radius: 0 !important;
-  border-top: 0 !important;
-  border-left: 0 !important;
-  border-right: 0 !important;
-  border-bottom: 1px solid var(--v2-line, #f0eef5) !important;
-}
-
 body .modal-overlay.weather-detail-modal-overlay .weather-detail-header .weather-detail-location-copy > span {
   margin-top: -4px !important;
 }
 
 body .modal-overlay.weather-detail-modal-overlay .weather-highlight-content-right {
-  position: relative !important;
-  z-index: 3 !important;
-  background: rgba(0, 0, 0, 0.32) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  border-radius: 12px !important;
-  padding: 6px 12px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+  position: relative;
+  z-index: 3;
 }
 
 body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline {

@@ -1,5 +1,6 @@
 import './react-globals.js';
 import './app.css';
+import './ui/celebrate-confetti.js';
 import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
 import { installOverlayExitMotion } from './core/overlay-exit-motion.js';
 import { installFieldShape } from './core/field-shape.js';

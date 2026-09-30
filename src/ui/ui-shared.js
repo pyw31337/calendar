@@ -403,8 +403,23 @@ export function ResizableModalContainer({ className, style, children, ...props }
   const mergedStyle = {
     ...style,
     position: moved ? 'fixed' : 'relative',
-    ...(moved ? { left: `${moved.left}px`, top: `${moved.top}px`, right: 'auto', bottom: 'auto', margin: 0, transform: 'none' } : {}),
-    ...(dimensions ? { width: `${dimensions.width}px`, height: `${dimensions.height}px`, maxWidth: 'none', maxHeight: 'none' } : {})
+    ...(moved ? {
+      '--sheet-left': `${moved.left}px`,
+      '--sheet-top': `${moved.top}px`,
+      left: `${moved.left}px`,
+      top: `${moved.top}px`,
+      right: 'auto',
+      bottom: 'auto',
+      margin: 0,
+      transform: 'none'
+    } : {}),
+    ...(dimensions ? {
+      '--sheet-height': `${dimensions.height}px`,
+      width: `${dimensions.width}px`,
+      height: `${dimensions.height}px`,
+      maxWidth: 'none',
+      maxHeight: 'none'
+    } : {})
   };
 
   const hasOwnHandle = React.Children.toArray(children).some(child => {
@@ -418,7 +433,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
     // The class is inert in the legacy shell and lets the V2 stylesheet provide
     // one predictable PC-center/mobile-bottom-sheet contract without rewriting
     // each modal implementation.
-    className: ["modal-container", "v2-responsive-modal", moved ? "is-sheet-moved" : "", className].filter(Boolean).join(" "),
+    className: ["modal-container", "v2-responsive-modal", moved ? "is-sheet-moved" : "", dimensions ? "is-sheet-resized" : "", className].filter(Boolean).join(" "),
     style: mergedStyle,
     ...props
   },
@@ -765,6 +780,16 @@ export function CommonPagination({
   return React.createElement('nav', {
     className: `gallery-pagination${isMobile ? ' is-mobile' : ''}${className ? ` ${className}` : ''}`,
     'aria-label': `${label} 페이지`,
+    ref: (el) => {
+      if (!el) return;
+      // Card rules on grid children use background !important. Inline important
+      // is the one thing that still wins if a stale sheet paints the plate.
+      el.style.setProperty('background', 'transparent', 'important');
+      el.style.setProperty('background-color', 'transparent', 'important');
+      el.style.setProperty('border', '0', 'important');
+      el.style.setProperty('box-shadow', 'none', 'important');
+      el.style.setProperty('border-radius', '0', 'important');
+    },
     style
   },
     arrow('첫 페이지', 1, curr <= 1, doubleChevron('left')),

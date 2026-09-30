@@ -277,7 +277,44 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   };
   const autoGrowTextarea = __deps.autoGrowTextarea;
       const [searchQuery, setSearchQuery] = React.useState('');
+  const [memoListPage, setMemoListPage] = React.useState(1);
+  const [memoSearchArchive, setMemoSearchArchive] = React.useState({ calId: '', status: 'idle', memos: null });
+  const memoSearchArchiveRef = React.useRef(memoSearchArchive);
+  memoSearchArchiveRef.current = memoSearchArchive;
+  const memoSearchRequestRef = React.useRef(0);
+  const memoSearchActive = Boolean(String(searchQuery || '').trim());
+  React.useEffect(() => {
+    const calId = calendar?.id || '';
+    if (!memoSearchActive || !calId) return undefined;
+    const current = memoSearchArchiveRef.current;
+    if (current.calId === calId && (current.status === 'ready' || current.status === 'loading')) return undefined;
+    const requestId = memoSearchRequestRef.current + 1;
+    memoSearchRequestRef.current = requestId;
+    const next = { calId, status: 'loading', memos: null };
+    memoSearchArchiveRef.current = next;
+    setMemoSearchArchive(next);
+    const fetchIndex = (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.fetchCalendarSearchIndex) || null;
+    const run = typeof fetchIndex === 'function' ? fetchIndex(calId) : Promise.reject(new Error('search index unavailable'));
+    Promise.resolve(run).then(index => {
+      if (memoSearchRequestRef.current !== requestId) return;
+      const ready = {
+        calId,
+        status: 'ready',
+        memos: Array.isArray(index?.memos) ? index.memos : []
+      };
+      memoSearchArchiveRef.current = ready;
+      setMemoSearchArchive(ready);
+    }).catch(err => {
+      console.warn('full memo search failed', err);
+      if (memoSearchRequestRef.current !== requestId) return;
+      const failed = { calId, status: 'error', memos: null };
+      memoSearchArchiveRef.current = failed;
+      setMemoSearchArchive(failed);
+    });
+    return undefined;
+  }, [memoSearchActive, calendar?.id]);
   const [selectedTag, setSelectedTag] = React.useState('');
+  React.useEffect(() => { setMemoListPage(1); }, [searchQuery, selectedTag]);
   // A hashtag clicked on the main-screen memo preview (see MemoPreviewSection's onSelectTag in
   // app-main.js) carries the tag straight into this page's own filter instead of the unrelated
   // cross-content global search overlay.
@@ -343,7 +380,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   // v2 shell (PC): side-nav's per-tab submenu needs 메모 검색 -- otherwise local to this component.
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
+    onRegisterMenuActions({
+      search: () => {
+        if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(true);
+      }
+    });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions]);
   const [isComposerExpanded, setIsComposerExpanded] = React.useState(false);
@@ -1025,8 +1067,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     else if (editTagInputRef.current) { try { editTagInputRef.current.focus({ preventScroll: true }); } catch (_) { editTagInputRef.current.focus(); } }
   };
 
-  const filteredMemos = (memos || []).filter(memo => {
+  const filteredMemos = (() => {
     const query = searchQuery.trim().toLowerCase();
+    const archiveReady = query
+      && memoSearchArchive.calId === (calendar?.id || '')
+      && memoSearchArchive.status === 'ready'
+      && Array.isArray(memoSearchArchive.memos);
+    const source = archiveReady
+      ? (() => {
+          const byId = new Map();
+          memoSearchArchive.memos.forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+          (memos || []).forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+          return Array.from(byId.values());
+        })()
+      : (memos || []);
+    return source.filter(memo => {
     
     // Live Search Matcher
     let searchMatch = true;
@@ -1044,11 +1099,36 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       : true;
 
     return searchMatch && filterTagMatch;
-  });
+    });
+  })();
+  const memoSearchPending = Boolean(searchQuery.trim())
+    && memoSearchArchive.status !== 'ready'
+    && memoSearchArchive.status !== 'error';
 
   const pinnedMemos = filteredMemos.filter(m => m.isPinned);
   const recentActivityMemos = filteredMemos.filter(m => isMemoRecentlyActive(m));
   const otherMemos = filteredMemos.filter(m => !m.isPinned && !isMemoRecentlyActive(m));
+  const MEMO_UI_PAGE_SIZE = 20;
+  const orderedMemoCards = [...pinnedMemos, ...recentActivityMemos, ...otherMemos];
+  const memoUiTotal = (!String(searchQuery || '').trim() && Number(totalMemoCount) > orderedMemoCards.length)
+    ? Number(totalMemoCount)
+    : orderedMemoCards.length;
+  const memoUiPageCount = Math.max(1, Math.ceil(memoUiTotal / MEMO_UI_PAGE_SIZE) || 1);
+  const memoUiSafePage = Math.min(Math.max(1, memoListPage), memoUiPageCount);
+  const memoUiIds = new Set(orderedMemoCards.slice((memoUiSafePage - 1) * MEMO_UI_PAGE_SIZE, memoUiSafePage * MEMO_UI_PAGE_SIZE).map(memo => memo.id));
+  const visiblePinnedMemos = pinnedMemos.filter(memo => memoUiIds.has(memo.id));
+  const visibleRecentMemos = recentActivityMemos.filter(memo => memoUiIds.has(memo.id));
+  const visibleOtherMemos = otherMemos.filter(memo => memoUiIds.has(memo.id));
+  React.useEffect(() => {
+    if (memoListPage > memoUiPageCount) setMemoListPage(memoUiPageCount);
+  }, [memoListPage, memoUiPageCount]);
+  React.useEffect(() => {
+    if (String(searchQuery || '').trim() || typeof onLoadMoreMemos !== 'function' || !hasMoreMemos) return undefined;
+    const needed = memoUiSafePage * MEMO_UI_PAGE_SIZE;
+    if ((memos || []).length >= needed) return undefined;
+    onLoadMoreMemos(needed);
+    return undefined;
+  }, [searchQuery, memoUiSafePage, hasMoreMemos, memos, onLoadMoreMemos]);
 
   const composerPart = (calendar.participants || []).find(p => p.id === composerParticipantId);
   const editPart = (calendar.participants || []).find(p => p.id === editParticipantId);
@@ -1158,7 +1238,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     /* Search bar -- hidden by default, slides in below the header when the search button is
        tapped (same slot/z-index the chat room's own search bar uses). */
-    isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    typeof renderV2 !== 'function' && isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
       fixed: true,
       inputRef: memoSearchInputRef,
       value: searchQuery,
@@ -1217,7 +1297,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "admin-side-menu-item",
-          onClick: () => { setIsMemoMenuOpen(false); setIsSearchOpen(true); }
+          onClick: () => {
+            setIsMemoMenuOpen(false);
+            if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+            else setIsSearchOpen(true);
+          }
         },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
@@ -1606,7 +1690,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       /* MEMOS SECTIONS (Pinned / Recent Activity / Normal) */
 
       /* 1. Pinned Memos Section */
-      pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+      visiblePinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       },
         /* Label */
@@ -1620,7 +1704,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '12px'
           }
-        }, pinnedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        }, visiblePinnedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
           calendar: calendar,
@@ -1641,8 +1725,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       /* 2. Recent Activity Section -- memos with a comment in the last 6h, auto-pinned the same
          way as 고정됨 above (pin icon shows ON) but toggling it off just dismisses this one
          activity window locally instead of writing isPinned (see isMemoRecentlyActive). */
-      recentActivityMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: pinnedMemos.length > 0 ? '12px' : '0' }
+      visibleRecentMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: visiblePinnedMemos.length > 0 ? '12px' : '0' }
       },
         /* Label */
         /*#__PURE__*/React.createElement("div", {
@@ -1655,7 +1739,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '12px'
           }
-        }, recentActivityMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        }, visibleRecentMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
           calendar: calendar,
@@ -1674,11 +1758,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       ),
 
       /* 3. Other Memos Section */
-      otherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: (pinnedMemos.length > 0 || recentActivityMemos.length > 0) ? '12px' : '0' }
+      visibleOtherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: (visiblePinnedMemos.length > 0 || visibleRecentMemos.length > 0) ? '12px' : '0' }
       },
         /* Label */
-        (pinnedMemos.length > 0 || recentActivityMemos.length > 0) && /*#__PURE__*/React.createElement("div", {
+        (visiblePinnedMemos.length > 0 || visibleRecentMemos.length > 0) && /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "메모 목록"),
         /* Grid */
@@ -1688,7 +1772,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '12px'
           }
-        }, otherMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        }, visibleOtherMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
           calendar: calendar,
@@ -1710,28 +1794,25 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
          fetches the next page of older memos (mirrors chat room's "이전 채팅 더보기"). Pinned
          memos are always fully loaded regardless of this button, so pinning an old memo never
          depends on paging back to it first. */
-      hasMoreMemos && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onLoadMoreMemos,
-        style: {
-          width: '100%',
-          backgroundColor: 'var(--bg-primary)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '10px 0',
-          fontSize: 'var(--font-size-base)',
-          fontWeight: 'bold',
-          color: 'var(--text-main)',
-          cursor: 'pointer',
-          textAlign: 'center',
-          marginTop: '4px'
-        }
-      }, "메모 더 보기"),
+      memoUiPageCount > 1 && (() => {
+        const Pagination = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommonPagination) || null;
+        if (typeof Pagination !== 'function') return null;
+        return /*#__PURE__*/React.createElement(Pagination, {
+          currentPage: memoUiSafePage,
+          pageCount: memoUiPageCount,
+          onChange: setMemoListPage,
+          label: '메모'
+        });
+      })(),
 
       /* Empty State */
       filteredMemos.length === 0 && /*#__PURE__*/React.createElement("div", {
         style: { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
-      }, "등록된 메모가 없거나 검색 조건과 일치하는 메모가 없습니다. 📝")
+      }, memoSearchPending
+        ? "전체 메모를 검색하는 중..."
+        : (memoSearchArchive.status === 'error' && searchQuery.trim()
+          ? "전체 메모 검색에 실패했습니다. 잠시 후 다시 시도해 주세요."
+          : "등록된 메모가 없거나 검색 조건과 일치하는 메모가 없습니다. 📝"))
     ),
 
     /* Memo Editor Modal Overlay */
@@ -2148,6 +2229,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         return;
       }
       if (/memo-view-header|admin-side-menu-overlay|inline-search-bar/.test(cls)) return;
+      if (node.type === InlineSearchBar) return;
       if (node.type === 'button') return;
       lifted.push(node);
     });
@@ -2185,11 +2267,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         variant: 'v2-page',
       }),
       searchQuery,
+      searchPending: memoSearchPending,
       selectedTag,
       onBack,
       onShare: onOpenShare,
       onMenu: () => setIsMemoMenuOpen(true),
-      onSearch: (value) => { setSearchQuery(value); setIsSearchOpen(!!value || isSearchOpen); },
+      onSearch: (value) => {
+        const next = typeof value === 'string' ? value : '';
+        setSearchQuery(next);
+        if (typeof renderV2 !== 'function') setIsSearchOpen(Boolean(next) || isSearchOpen);
+      },
       onSelectTag: (tag) => { setSelectedTag(tag); if (tag) setIsSearchOpen(true); },
       onCompose: () => setIsComposerExpanded(true),
       isComposerExpanded,

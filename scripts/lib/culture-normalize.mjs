@@ -385,6 +385,7 @@ export function normalizeItem(raw) {
       ageRating: cleanInlineText(raw.ageRating),
       audienceCount: raw.audienceCount ?? raw.audience ?? '',
       bookingRate: raw.bookingRate ?? raw.reservationRate ?? '',
+      statsCollectedAt: String(raw.statsCollectedAt || '').trim(),
       runningTime: cleanInlineText(raw.runningTime),
       subGenre: cleanInlineText(raw.subGenre),
       originalTitle: cleanInlineText(raw.originalTitle),

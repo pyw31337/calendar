@@ -1,4 +1,5 @@
 import { saveBulkPhotoTagsRemote } from './bulk-photo-tags.js';
+import { archivePhotosShareIdentity } from './archive-photo-edits.js';
 
 export const MAX_MEDIA_TAGS = 20;
 export const MAX_MEDIA_TAG_TEXT_LENGTH = 640;
@@ -227,31 +228,36 @@ export function createBulkImageTagSaveHandler(context) {
     galleryPhotoIndex,
     invalidatePhotoIndexCache,
     rememberPhotoIndexTags,
-    schedulePhotoIndexTagReload,
   } = context;
   return async function saveBulkImageTags(changes) {
     const list = Array.isArray(changes) ? changes.filter(change => change?.photo && change?.assetKey) : [];
     if (!activeCalId || !projectId || !list.length) return { ok: false, changed: 0, reason: 'invalid' };
     const result = await saveBulkPhotoTagsRemote({ calendarId: activeCalId, projectId, changes: list });
-    const tagByAsset = new Map(list.map(change => [String(change.assetKey), String(change.tags || '')]));
     const probes = list.map(change => ({
       assetKey: change.assetKey,
-      mediaKey: change.assetKey,
-      refKey: change.assetKey,
+      mediaKey: change.photo?.mediaKey || change.assetKey,
+      refKey: change.photo?.refKey || change.assetKey,
+      full: change.photo?.full || change.photo?.imageUrl || '',
+      thumb: change.photo?.thumb || change.photo?.thumbUrl || '',
       messageId: change.photo?.messageId || change.photo?.sourceMessageId || '',
+      sourceMessageId: change.photo?.sourceMessageId || '',
       imageIndex: Number.isFinite(Number(change.photo?.imageIndex)) ? Number(change.photo.imageIndex) : 0,
+      sourceImageIndex: change.photo?.sourceImageIndex,
+      meetingDate: change.photo?.meetingDate || '',
+      photoId: change.photo?.photoId || '',
+      legacyKeys: change.photo?.legacyKeys,
       tags: change.tags,
     }));
     try {
       invalidatePhotoIndexCache(activeCalId);
       rememberPhotoIndexTags(activeCalId, probes);
       galleryPhotoIndex?.patchItems?.(items => (items || []).map(photo => {
-        const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || '');
-        return tagByAsset.has(assetKey) ? { ...photo, tags: tagByAsset.get(assetKey) } : photo;
+        const hit = list.find(change => archivePhotosShareIdentity(change.photo, photo)
+          || String(change.assetKey || '') === String(photo?.assetKey || photo?.mediaKey || photo?.refKey || ''));
+        return hit ? { ...photo, tags: String(hit.tags || ''), tagAuthoritative: true } : photo;
       }));
-      // One delayed refresh is enough for the entire batch. The session sticky overlay above
-      // holds the verified values until Cloud Functions has rebuilt the photoIndex projection.
-      schedulePhotoIndexTagReload(galleryPhotoIndex, activeCalId, probes[0], { maxAttempts: 3 });
+      // Do not force-reload page 1 here. That request replaced a fully loaded archive
+      // with a single stale page and put just-tagged photos back into 분류 필요.
     } catch (err) {
       console.warn('Bulk gallery tag index sync skipped:', err);
     }

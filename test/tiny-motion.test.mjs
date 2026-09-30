@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { itemIdentity, isMotionItem, planListExits } from '../src/ui/v2/tiny-motion.js';
+import { itemIdentity, isMotionItem, isNegativeControl, planListExits } from '../src/ui/v2/tiny-motion.js';
 
 function el(attrs = {}, text = '') {
   const attributes = new Map(Object.entries(attrs));
@@ -42,4 +42,19 @@ test('later leaves stagger and ghosts are ignored', () => {
   const ghost = el({ 'data-bp-leave': '1', 'data-memo-id': 'c' });
   const exits = planListExits([{ target: parent, removedNodes: [a, b, ghost], addedNodes: [] }]);
   assert.deepEqual(exits.map(item => item.delayMs), [0, 28]);
+});
+
+test('short delete labels are negative, long copy and plain buttons are not', () => {
+  const destroy = el({ tagName: 'BUTTON', className: 'btn btn-danger' }, '삭제');
+  destroy.tagName = 'BUTTON';
+  const labeled = el({ tagName: 'BUTTON', 'aria-label': '메모 삭제' }, '');
+  labeled.tagName = 'BUTTON';
+  const paragraph = el({ tagName: 'BUTTON' }, '이 일정에서 사진을 삭제하면 다시 복구할 수 없습니다');
+  paragraph.tagName = 'BUTTON';
+  const save = el({ tagName: 'BUTTON' }, '저장');
+  save.tagName = 'BUTTON';
+  assert.equal(isNegativeControl(destroy), true);
+  assert.equal(isNegativeControl(labeled), true);
+  assert.equal(isNegativeControl(paragraph), false);
+  assert.equal(isNegativeControl(save), false);
 });

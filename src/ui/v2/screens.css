@@ -1549,7 +1549,10 @@
    was never removed, it was rendering right under the header the same way Content/Archive's
    tabs were (see fix/v2-content-archive-header-overlap). */
 .v2-design .renewal-shell-main.is-records .v2-has-page-header > .places-view-container,
-.v2-design .renewal-shell-main.is-records .v2-has-page-header > .gallery-page-container {
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .gallery-page-container,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .v2-archive-legacy,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .v2-content-legacy,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .v2-gallery-legacy {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   position: relative !important;

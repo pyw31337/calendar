@@ -972,6 +972,26 @@ function WeatherRegionSettingsIcon({ size = 20 }) {
   /*#__PURE__*/React.createElement('path', { d: 'm6.34 17.66-1.41 1.41' }));
 }
 
+function MetricIconDroplet({ size = 16, color = '#06B6D4' }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: color,
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    className: 'lucide lucide-droplet preview-icon',
+    'aria-hidden': 'true',
+    style: { display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z' })
+  );
+}
+
 function MetricIconRain({ size = 16, color = '#3ba7ee' }) {
   const React = window.React;
   return /*#__PURE__*/React.createElement('svg', {
@@ -1064,123 +1084,54 @@ function MetricIconUvIndex({ size = 16, color = '#f2ae2e' }) {
   );
 }
 
-function getWeatherCardTheme(code, isNight = false) {
-  const React = window.React;
+function weatherSceneKind(code, isNight) {
+  const storm = code >= 95 && code <= 99;
+  const snow = (code >= 71 && code <= 77) || (code >= 85 && code <= 86);
+  const rain = (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
+  const fog = code === 45 || code === 48;
+  const overcast = code === 3;
+  const cloudy = code === 2;
   if (isNight) {
-    return {
-      gradient: 'linear-gradient(135deg, #312E81 0%, #4338CA 45%, #6366F1 80%, #7C3AED 100%)',
-      art: /*#__PURE__*/React.createElement('svg', {
-        className: 'weather-highlight-art-night',
-        viewBox: '0 0 140 140',
-        fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
-      },
-        /* Stars */
-        /*#__PURE__*/React.createElement('circle', { cx: '30', cy: '25', r: '1.5', fill: 'rgba(255,255,255,0.85)' }),
-        /*#__PURE__*/React.createElement('circle', { cx: '55', cy: '18', r: '2', fill: 'rgba(255,255,255,0.95)' }),
-        /*#__PURE__*/React.createElement('circle', { cx: '48', cy: '48', r: '1.5', fill: 'rgba(255,255,255,0.7)' }),
-        /* Crescent moon */
-        /*#__PURE__*/React.createElement('path', { d: 'M96 28 A24 24 0 1 0 116 60 A28 28 0 0 1 96 28 Z', fill: '#FBBF24' }),
-        /* Soft cloud */
-        /*#__PURE__*/React.createElement('path', {
-          d: 'M55 78 A18 18 0 0 1 78 62 A22 22 0 0 1 112 66 A18 18 0 0 1 125 82 A16 16 0 0 1 120 95 L55 95 A16 16 0 0 1 55 78 Z',
-          fill: 'rgba(255, 255, 255, 0.88)'
-        })
-      )
-    };
+    if (storm) return 'night-thunder';
+    if (snow) return 'night-snow';
+    if (rain) return 'night-rain';
+    if (fog || overcast || cloudy) return 'night-cloud';
+    return 'night';
   }
+  if (storm) return 'thunder';
+  if (snow) return 'snow';
+  if (rain) return 'rain';
+  if (fog) return 'fog';
+  if (overcast) return 'overcast';
+  if (cloudy) return 'cloudy';
+  return 'clear';
+}
 
-  // Rain / Shower / Thunderstorm
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99)) {
-    return {
-      gradient: 'linear-gradient(135deg, #0F766E 0%, #0D9488 40%, #06B6D4 75%, #3B82F6 100%)',
-      art: /*#__PURE__*/React.createElement('svg', {
-        className: 'weather-highlight-art-rain',
-        viewBox: '0 0 140 140',
-        fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
-      },
-        /* Cloud */
-        /*#__PURE__*/React.createElement('path', {
-          d: 'M45 56 A18 18 0 0 1 68 42 A22 22 0 0 1 104 46 A18 18 0 0 1 118 62 A15 15 0 0 1 112 76 L45 76 A15 15 0 0 1 45 56 Z',
-          fill: 'rgba(255, 255, 255, 0.92)'
-        }),
-        /* Lightning for storm */
-        (code >= 95) ? /*#__PURE__*/React.createElement('polygon', {
-          points: '76,74 68,88 75,88 70,102 84,84 78,84',
-          fill: '#FDE047'
-        }) : null,
-        /* Rain drops */
-        /*#__PURE__*/React.createElement('line', { x1: '52', y1: '82', x2: '47', y2: '94', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' }),
-        /*#__PURE__*/React.createElement('line', { x1: '64', y1: '86', x2: '59', y2: '98', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' }),
-        /*#__PURE__*/React.createElement('line', { x1: '88', y1: '82', x2: '83', y2: '94', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' }),
-        /*#__PURE__*/React.createElement('line', { x1: '100', y1: '84', x2: '95', y2: '96', stroke: 'rgba(255,255,255,0.85)', strokeWidth: '2.5', strokeLinecap: 'round' })
-      )
-    };
-  }
-
-  // Snow
-  if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
-    return {
-      gradient: 'linear-gradient(135deg, #1E293B 0%, #334155 45%, #475569 80%, #64748B 100%)',
-      art: /*#__PURE__*/React.createElement('svg', {
-        className: 'weather-highlight-art-snow',
-        viewBox: '0 0 140 140',
-        fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
-      },
-        /* Cloud */
-        /*#__PURE__*/React.createElement('path', {
-          d: 'M45 56 A18 18 0 0 1 68 42 A22 22 0 0 1 104 46 A18 18 0 0 1 118 62 A15 15 0 0 1 112 76 L45 76 A15 15 0 0 1 45 56 Z',
-          fill: 'rgba(255, 255, 255, 0.92)'
-        }),
-        /* Snow dots */
-        /*#__PURE__*/React.createElement('circle', { cx: '52', cy: '88', r: '3', fill: 'rgba(255,255,255,0.95)' }),
-        /*#__PURE__*/React.createElement('circle', { cx: '68', cy: '96', r: '2.5', fill: 'rgba(255,255,255,0.9)' }),
-        /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '86', r: '3.5', fill: 'rgba(255,255,255,0.95)' }),
-        /*#__PURE__*/React.createElement('circle', { cx: '104', cy: '92', r: '2.5', fill: 'rgba(255,255,255,0.9)' })
-      )
-    };
-  }
-
-  // Cloudy / Partly Cloudy (codes 2, 3, 45, 48)
-  if (code === 2 || code === 3 || code === 45 || code === 48) {
-    return {
-      gradient: 'linear-gradient(135deg, #1D4ED8 0%, #2563EB 40%, #60A5FA 75%, #93C5FD 100%)',
-      art: /*#__PURE__*/React.createElement('svg', {
-        className: 'weather-highlight-art-cloud',
-        viewBox: '0 0 140 140',
-        fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
-      },
-        /* Peeking sun */
-        /*#__PURE__*/React.createElement('circle', { cx: '66', cy: '44', r: '24', fill: '#FDE047', opacity: '0.95' }),
-        /* Main cloud */
-        /*#__PURE__*/React.createElement('path', {
-          d: 'M40 76 A18 18 0 0 1 65 58 A24 24 0 0 1 102 62 A18 18 0 0 1 118 78 A16 16 0 0 1 112 95 L38 95 A16 16 0 0 1 40 76 Z',
-          fill: 'rgba(255, 255, 255, 0.92)'
-        })
-      )
-    };
-  }
-
-  // Default: Sunny / Clear (code 0, 1)
-  return {
-    gradient: 'linear-gradient(135deg, #1E88E5 0%, #29B6F6 45%, #38BDF8 70%, #FBBF24 100%)',
-    art: /*#__PURE__*/React.createElement('svg', {
-      className: 'weather-highlight-art-sun',
-      viewBox: '0 0 140 140',
-      fill: 'none',
-      style: { position: 'absolute', right: '-12px', top: '-18px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
-    },
-      /* Outer soft aura */
-      /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '56', fill: 'rgba(254, 240, 138, 0.24)' }),
-      /* Mid aura */
-      /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '42', fill: 'rgba(253, 224, 71, 0.38)' }),
-      /* Sun disk */
-      /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '28', fill: '#FDE047' })
-    )
-  };
+function WeatherScene({ kind }) {
+  const React = window.React;
+  const night = String(kind).startsWith('night');
+  const sun = kind === 'clear' || kind === 'cloudy';
+  const moon = night;
+  const cloud = kind !== 'clear' && kind !== 'night';
+  const rain = kind === 'rain' || kind === 'thunder' || kind === 'night-rain' || kind === 'night-thunder';
+  const snow = kind === 'snow' || kind === 'night-snow';
+  const bolt = kind === 'thunder' || kind === 'night-thunder';
+  const marks = (className, count) => Array.from({ length: count }, (_, index) => React.createElement('i', {
+    key: `${className}-${index}`,
+    className,
+    style: { '--i': index }
+  }));
+  return React.createElement('div', { className: 'weather-scene', 'aria-hidden': 'true' },
+    night ? React.createElement('span', { className: 'weather-stars' }, marks('weather-star', 8)) : null,
+    sun ? React.createElement('span', { className: 'weather-sun' }, React.createElement('span', { className: 'weather-sun-rays' })) : null,
+    moon ? React.createElement('span', { className: 'weather-moon' }) : null,
+    cloud ? React.createElement('span', { className: 'weather-cloud weather-cloud-a' }) : null,
+    cloud && kind !== 'fog' ? React.createElement('span', { className: 'weather-cloud weather-cloud-b' }) : null,
+    kind === 'fog' ? React.createElement('span', { className: 'weather-mist' }) : null,
+    rain ? React.createElement('span', { className: 'weather-rain' }, marks('weather-drop', 9)) : null,
+    snow ? React.createElement('span', { className: 'weather-snow' }, marks('weather-flake', 9)) : null,
+    bolt ? React.createElement('span', { className: 'weather-bolt' }) : null
+  );
 }
 
 export function WeatherDetailModal({
@@ -1370,11 +1321,7 @@ export function WeatherDetailModal({
   const displayTemp = currentHourly?.temp != null
     ? Math.round(currentHourly.temp)
     : (maxTemp != null ? maxTemp : (hourlyList[0]?.temp != null ? Math.round(hourlyList[0].temp) : null));
-  const cardTheme = getWeatherCardTheme(weatherCode, isNight);
-  const dateParts = getWeatherDateParts(selectedDate);
-  const formattedDateText = dateParts
-    ? `${dateParts.monthDay} (${dateParts.weekday})`
-    : selectedDate;
+  const cardKind = weatherSceneKind(weatherCode, isNight);
 
   React.useEffect(() => {
     if (timelineRef.current && isToday) {
@@ -1410,26 +1357,32 @@ export function WeatherDetailModal({
       startScrollLeft: strip.scrollLeft,
       moved: false
     };
-    try { strip.setPointerCapture?.(event.pointerId); } catch (_) {}
   };
   const moveDayStripDrag = (event) => {
     const strip = dayStripRef.current;
     const drag = dayStripDragRef.current;
     if (!strip || !drag || drag.pointerId !== event.pointerId) return;
     const distance = event.clientX - drag.startX;
-    if (Math.abs(distance) > 4) {
+    if (Math.abs(distance) <= 6) return;
+    if (!drag.moved) {
       drag.moved = true;
       ignoreDayClickRef.current = true;
-      strip.scrollLeft = drag.startScrollLeft - distance;
-      if (event.cancelable) event.preventDefault();
+      try { strip.setPointerCapture?.(event.pointerId); } catch (_) {}
     }
+    strip.scrollLeft = drag.startScrollLeft - distance;
+    if (event.cancelable) event.preventDefault();
   };
   const endDayStripDrag = (event) => {
     const strip = dayStripRef.current;
     const drag = dayStripDragRef.current;
     if (!drag || (event && drag.pointerId !== event.pointerId)) return;
+    if (!drag.moved && event?.target) {
+      const button = event.target.closest?.('.weather-detail-day-choice');
+      const date = button?.getAttribute?.('data-date');
+      if (date) setSelectedDate(date);
+    }
     if (drag.moved) {
-      window.setTimeout(() => { ignoreDayClickRef.current = false; }, 0);
+      window.setTimeout(() => { ignoreDayClickRef.current = false; }, 40);
     }
     try { strip?.releasePointerCapture?.(drag.pointerId); } catch (_) {}
     dayStripDragRef.current = null;
@@ -1540,13 +1493,6 @@ export function WeatherDetailModal({
       ref: dayStripRef,
       role: "tablist",
       "aria-label": "날짜별 날씨 선택",
-      style: {
-        borderRadius: 0,
-        borderTop: 0,
-        borderLeft: 0,
-        borderRight: 0,
-        borderBottom: '1px solid var(--v2-line, #f0eef5)'
-      },
       onPointerDown: beginDayStripDrag,
       onPointerMove: moveDayStripDrag,
       onPointerUp: endDayStripDrag,
@@ -1560,6 +1506,7 @@ export function WeatherDetailModal({
           role: "tab",
           "aria-selected": isSelected,
           className: `weather-detail-day-choice${isSelected ? ' is-selected' : ''}`,
+          "data-date": d.dateStr,
           onClick: () => {
             if (!ignoreDayClickRef.current) setSelectedDate(d.dateStr);
           }
@@ -1582,19 +1529,15 @@ export function WeatherDetailModal({
       }
     },
       loading && /*#__PURE__*/React.createElement("div", {
-        style: {
-          padding: '40px 0',
-          textAlign: 'center',
-          color: 'var(--text-muted, #64748B)',
-          fontSize: 'var(--font-size-md, 0.9rem)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '10px'
-        }
+        className: "bp-skel-page",
+        role: "status",
+        "aria-label": "날씨를 불러오는 중",
+        style: { padding: '8px 0 12px' }
       },
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '1.6rem' } }, "⏳"),
-        /*#__PURE__*/React.createElement("span", null, "기상청 및 위성 예보 데이터를 불러오는 중입니다...")
+        /*#__PURE__*/React.createElement("div", { className: "bp-skel-block is-hero", "aria-hidden": "true" }),
+        /*#__PURE__*/React.createElement("div", { className: "bp-skel-metrics", "aria-hidden": "true" },
+          [0, 1, 2, 3].map(index => /*#__PURE__*/React.createElement("span", { key: index, className: "bp-skel-block" }))
+        )
       ),
 
       error && !loading && /*#__PURE__*/React.createElement("div", {
@@ -1612,114 +1555,22 @@ export function WeatherDetailModal({
         /* Primary Highlight Card */
         /*#__PURE__*/React.createElement("div", {
           className: "weather-highlight-card",
-          style: {
-            background: cardTheme.gradient,
-            borderRadius: '20px',
-            padding: '20px 22px',
-            color: '#FFFFFF',
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.16), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            minHeight: '124px'
-          }
+          "data-weather": cardKind
         },
-          /* Background Weather Art */
-          cardTheme.art,
-
-          /* Left: Condition, Big Temp, Feels like / High-Low */
-          /*#__PURE__*/React.createElement("div", {
-            className: "weather-highlight-content-left",
-            style: { position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: '2px' }
-          },
-            /* Weather Condition */
-            /*#__PURE__*/React.createElement("span", {
-              className: "weather-highlight-condition",
-              style: { fontSize: '1.05rem', fontWeight: 700, color: 'rgba(255, 255, 255, 0.95)', letterSpacing: '-0.02em' }
-            }, weatherDesc),
-            /* Prominent Temperature Typography */
-            /*#__PURE__*/React.createElement("div", {
-              className: "weather-highlight-temp-big",
-              style: {
-                fontSize: '3.2rem',
-                fontWeight: 850,
-                lineHeight: 1.05,
-                color: '#FFFFFF',
-                letterSpacing: '-0.035em',
-                fontVariantNumeric: 'tabular-nums'
-              }
-            }, `${displayTemp != null ? displayTemp : '--'}°`),
-            /* Sub details: feels-like & max/min */
-            /*#__PURE__*/React.createElement("div", {
-              style: {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.76rem',
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.85)',
-                marginTop: '4px'
-              }
-            },
-              apparentMax != null && /*#__PURE__*/React.createElement("span", null, `체감 ${apparentMax}°C`),
-              maxTemp != null && minTemp != null && /*#__PURE__*/React.createElement("span", null, `최고 ${maxTemp}° / 최저 ${minTemp}°`)
+          /*#__PURE__*/React.createElement("div", { className: "weather-highlight-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "weather-highlight-condition" }, weatherDesc),
+            /*#__PURE__*/React.createElement("div", { className: "weather-highlight-main" },
+              /*#__PURE__*/React.createElement("strong", { className: "weather-highlight-temp-big" }, displayTemp != null ? displayTemp : "--"),
+              /*#__PURE__*/React.createElement("span", { className: "weather-highlight-degree", "aria-hidden": "true" }, "°")
+            ),
+            /*#__PURE__*/React.createElement("span", { className: "weather-highlight-range" },
+              [
+                apparentMax != null ? `체감 ${apparentMax}°` : "",
+                maxTemp != null && minTemp != null ? `최고 ${maxTemp}° / 최저 ${minTemp}°` : ""
+              ].filter(Boolean).join("  ·  ")
             )
           ),
-
-          /* Right: Date & Location */
-          /*#__PURE__*/React.createElement("div", {
-            className: "weather-highlight-content-right",
-            style: {
-              position: 'relative',
-              zIndex: 3,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              justifyContent: 'center',
-              gap: '4px',
-              textAlign: 'right',
-              background: 'rgba(0, 0, 0, 0.32)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '12px',
-              padding: '6px 12px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16)'
-            }
-          },
-            /* Formatted Date */
-            /*#__PURE__*/React.createElement("span", {
-              style: {
-                fontSize: '0.84rem',
-                fontWeight: 800,
-                color: '#FFFFFF',
-                letterSpacing: '-0.01em',
-                textShadow: '0 1px 3px rgba(0,0,0,0.35)'
-              }
-            }, formattedDateText),
-            /* Location with pin icon */
-            /*#__PURE__*/React.createElement("span", {
-              style: {
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '0.75rem',
-                fontWeight: 650,
-                color: 'rgba(255, 255, 255, 0.95)',
-                textShadow: '0 1px 3px rgba(0,0,0,0.35)'
-              }
-            },
-              /*#__PURE__*/React.createElement("svg", {
-                width: 12, height: 12, viewBox: "0 0 24 24", fill: "currentColor"
-              },
-                /*#__PURE__*/React.createElement("path", { d: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" })
-              ),
-              locationAreaLabel || locationName
-            )
-          )
+          /*#__PURE__*/React.createElement(WeatherScene, { kind: cardKind })
         ),
 
         /* 4 Key Indicators Grid */
@@ -2169,7 +2020,7 @@ export function WeatherDetailModal({
                     /* Droplet icon */
                     /*#__PURE__*/React.createElement("div", {
                       style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-                    }, /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem' } }, "💧")),
+                    }, /*#__PURE__*/React.createElement(MetricIconDroplet, { size: 16, color: '#22D3EE' })),
                     /* Hour label */
                     /*#__PURE__*/React.createElement("span", {
                       style: {

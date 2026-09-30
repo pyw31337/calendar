@@ -481,6 +481,8 @@ export function ChatGalleryModal({
   calendar = null,
   asPage = false,
   v2Embed = false,
+  v2SearchQuery,
+  onV2SearchQuery = null,
   onClose,
   onUploadImages = null,
   onAddLink = null,
@@ -892,6 +894,47 @@ export function ChatGalleryModal({
   }, [saveAnalysisReview]);
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const v2SearchControlled = typeof onV2SearchQuery === 'function';
+  React.useEffect(() => {
+    if (!v2SearchControlled) return;
+    setSearchQuery(v2SearchQuery || '');
+  }, [v2SearchControlled, v2SearchQuery]);
+  const [gallerySearchCorpus, setGallerySearchCorpus] = React.useState({ calId: '', status: 'idle', messages: null, memos: null });
+  const gallerySearchCorpusRef = React.useRef(gallerySearchCorpus);
+  gallerySearchCorpusRef.current = gallerySearchCorpus;
+  const gallerySearchRequestRef = React.useRef(0);
+  const gallerySearchActive = Boolean(String(searchQuery || '').trim());
+  React.useEffect(() => {
+    const calId = calendar?.id || '';
+    if (!gallerySearchActive || !calId) return undefined;
+    const current = gallerySearchCorpusRef.current;
+    if (current.calId === calId && (current.status === 'ready' || current.status === 'loading')) return undefined;
+    const requestId = gallerySearchRequestRef.current + 1;
+    gallerySearchRequestRef.current = requestId;
+    const next = { calId, status: 'loading', messages: null, memos: null };
+    gallerySearchCorpusRef.current = next;
+    setGallerySearchCorpus(next);
+    const fetchIndex = (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.fetchCalendarSearchIndex) || null;
+    const run = typeof fetchIndex === 'function' ? fetchIndex(calId) : Promise.reject(new Error('search index unavailable'));
+    Promise.resolve(run).then(index => {
+      if (gallerySearchRequestRef.current !== requestId) return;
+      const ready = {
+        calId,
+        status: 'ready',
+        messages: Array.isArray(index?.chatMessages) ? index.chatMessages : [],
+        memos: Array.isArray(index?.memos) ? index.memos : []
+      };
+      gallerySearchCorpusRef.current = ready;
+      setGallerySearchCorpus(ready);
+    }).catch(err => {
+      console.warn('full gallery search failed', err);
+      if (gallerySearchRequestRef.current !== requestId) return;
+      const failed = { calId, status: 'error', messages: null, memos: null };
+      gallerySearchCorpusRef.current = failed;
+      setGallerySearchCorpus(failed);
+    });
+    return undefined;
+  }, [gallerySearchActive, calendar?.id]);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   // Tracked as real state with a matchMedia listener (same pattern/breakpoint as ui-places.js's
@@ -1036,6 +1079,24 @@ export function ChatGalleryModal({
     return () => window.removeEventListener('resize', onWin);
   }, [asPage, activeTab, v2Embed]);
 
+  const gallerySearchCorpusReady = gallerySearchActive
+    && gallerySearchCorpus.calId === (calendar?.id || '')
+    && gallerySearchCorpus.status === 'ready';
+  const sourceChatMessages = React.useMemo(() => {
+    if (!gallerySearchCorpusReady) return chatMessages;
+    const byId = new Map();
+    (gallerySearchCorpus.messages || []).forEach(msg => { if (msg?.id) byId.set(msg.id, msg); });
+    (chatMessages || []).forEach(msg => { if (msg?.id) byId.set(msg.id, msg); });
+    return Array.from(byId.values());
+  }, [gallerySearchCorpusReady, gallerySearchCorpus, chatMessages]);
+  const sourceMemos = React.useMemo(() => {
+    if (!gallerySearchCorpusReady) return memos;
+    const byId = new Map();
+    (gallerySearchCorpus.memos || []).forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+    (memos || []).forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+    return Array.from(byId.values());
+  }, [gallerySearchCorpusReady, gallerySearchCorpus, memos]);
+
   const sharedLinks = React.useMemo(() => {
     // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image
     // link grid, any mix of URLs typed/pasted together) only ever contributed its first one here,
@@ -1051,7 +1112,7 @@ export function ChatGalleryModal({
     // Internal service links (memos, calendar shares, app routes, self origin) are excluded.
     const list = [];
     const seen = new Set();
-    (chatMessages || []).forEach(msg => {
+    (sourceChatMessages || []).forEach(msg => {
       if (!msg.text) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(msg.text).forEach(info => {
@@ -1062,7 +1123,7 @@ export function ChatGalleryModal({
         firstUrlSeen = true;
       });
     });
-    (memos || []).forEach(memo => {
+    (sourceMemos || []).forEach(memo => {
       const body = memo?.text || memo?.content || memo?.body || '';
       if (!body) return;
       if (!body || isTombstone(memo)) return;
@@ -1090,9 +1151,11 @@ export function ChatGalleryModal({
       });
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages, memos, calendar]);
+  }, [sourceChatMessages, sourceMemos, calendar]);
 
   const sharedPhotos = React.useMemo(() => {
+    const chatMessages = sourceChatMessages;
+    const memos = sourceMemos;
     if (Array.isArray(indexedPhotos)) {
       return indexedPhotos
         .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
@@ -1217,7 +1280,7 @@ export function ChatGalleryModal({
         indexTags: String(photo.tags || '')
       })
     }));
-  }, [chatMessages, memos, calendar, indexedPhotos]);
+  }, [sourceChatMessages, sourceMemos, calendar, indexedPhotos]);
 
   const photoByAssetKey = React.useMemo(() => {
     const map = new Map();
@@ -1283,8 +1346,8 @@ export function ChatGalleryModal({
   const sharedFiles = React.useMemo(() => {
     const collect = collectChatFileAttachments;
     if (typeof collect !== 'function') return [];
-    return collect(chatMessages || [], memos || []);
-  }, [chatMessages, memos]);
+    return collect(sourceChatMessages || [], sourceMemos || []);
+  }, [sourceChatMessages, sourceMemos]);
 
   const filteredFiles = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedFiles;
@@ -1382,6 +1445,13 @@ export function ChatGalleryModal({
     [visiblePhotos, galleryListPage]
   );
   const usingPhotoIndex = Array.isArray(indexedPhotos);
+  const galleryFullScanPending = gallerySearchActive && (
+    (gallerySearchCorpus.status !== 'ready' && gallerySearchCorpus.status !== 'error')
+    || (usingPhotoIndex && !indexedPhotoComplete && (activeTab === 'photos' || galleryViewMode === 'date'))
+  );
+  const gallerySearchMissLabel = gallerySearchCorpus.status === 'error'
+    ? '전체 기록 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+    : (galleryFullScanPending ? '전체 기록을 검색하는 중...' : '검색 결과가 없습니다.');
   const renderedPhotos = React.useMemo(
     () => asPage && !usingPhotoIndex ? pagedFallbackPhotos.items : visiblePhotos,
     [asPage, visiblePhotos, pagedFallbackPhotos.items, usingPhotoIndex]
@@ -1987,14 +2057,20 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
+      search: () => {
+        if (v2SearchControlled && window.__gatherOpenPageSearch) {
+          window.__gatherOpenPageSearch();
+          return;
+        }
+        setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; });
+      },
       uploadMixed: () => handleUploadClick(),
       uploadImage: () => handleUploadClick(),
       uploadFile: () => handleUploadClick(),
       uploadLink: () => { setActiveTab('links'); setIsAddingLink(true); },
     });
     return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions]);
+  }, [onRegisterMenuActions, v2SearchControlled]);
   const handleSubmitLinkInput = async () => {
     if (typeof onAddLink !== 'function' || isSavingLink) return;
     const url = extractFirstUrl(linkUrlInput);
@@ -3842,7 +3918,14 @@ export function ChatGalleryModal({
               onClick: () => { if (typeof onIndexedPhotoPageChange === 'function') void onIndexedPhotoPageChange(indexedPhotoPage || 1, { force: true }); },
               style: { minHeight: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)', fontWeight: 800 }
             }, "사진 목록 다시 불러오기")
-          : "사진 목록을 불러오는 중…")
+          : /*#__PURE__*/React.createElement("div", {
+              className: "bp-skel-page",
+              role: "status",
+              "aria-label": "사진 목록을 불러오는 중"
+            }, /*#__PURE__*/React.createElement("div", { className: "bp-skel-block is-tabs", "aria-hidden": "true" }),
+              /*#__PURE__*/React.createElement("div", { className: "bp-skel-photo-grid", "aria-hidden": "true" },
+                Array.from({ length: 9 }, (_, index) => /*#__PURE__*/React.createElement("span", { key: index, className: "bp-skel-thumb" }))
+              )))
       );
     }
     if (galleryViewMode === 'date') {
@@ -3855,7 +3938,7 @@ export function ChatGalleryModal({
         groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery
-          ? "검색 결과가 없습니다."
+          ? gallerySearchMissLabel
           : (isLinkMode
             ? describeGalleryLinkEmptyState("이 달에 공유된 링크가 없습니다.")
             : (isFileMode ? "이 달에 업로드된 파일이 없습니다." : describeGalleryPhotoEmptyState("이 달에 등록된 사진이 없습니다."))))
@@ -3912,7 +3995,7 @@ export function ChatGalleryModal({
         renderFileListHeader(),
         sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : renderGalleryFileList(pagedFiles.items),
+        }, searchQuery ? gallerySearchMissLabel : "업로드된 파일이 없습니다.") : renderGalleryFileList(pagedFiles.items),
         renderGalleryPagination({
           currentPage: pagedFiles.currentPage,
           pageCount: pagedFiles.pageCount,
@@ -3929,7 +4012,7 @@ export function ChatGalleryModal({
         renderLinkListHeader(),
         sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(pagedLinks.items),
+        }, searchQuery ? gallerySearchMissLabel : "공유된 링크가 없습니다.") : renderGalleryLinkList(pagedLinks.items),
         renderGalleryPagination({
           currentPage: pagedLinks.currentPage,
           pageCount: pagedLinks.pageCount,
@@ -3947,7 +4030,7 @@ export function ChatGalleryModal({
       sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
       }, searchQuery
-        ? "검색 결과가 없습니다."
+        ? gallerySearchMissLabel
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedVisiblePhotos),
       usingPhotoIndex && !(searchQuery || '').trim()
@@ -4068,7 +4151,11 @@ export function ChatGalleryModal({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); }
+        onClick: () => {
+          setIsMenuOpen(false);
+          if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+          else setIsSearchOpen(true);
+        }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
@@ -4135,7 +4222,7 @@ export function ChatGalleryModal({
     })
   )), document.body)
     : null,
-  isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+  !v2SearchControlled && isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
     placeholder: "사진·링크·파일 통합 검색 (태그, 텍스트, URL)",
     onChange: e => setSearchQuery(e.target.value),
