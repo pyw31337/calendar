@@ -55,9 +55,26 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
   assert.match(weatherJs, /weather-hourly-col/, 'hourly columns render with individual borderless styling');
   assert.match(css, /\.weather-hourly-col\s*\{[\s\S]*?border:\s*none\s*!important;/, 'hourly forecast boxes have borders removed');
 
-  // Weather highlight card redesign
+  // Weather highlight card redesign & readability
   assert.match(weatherJs, /getWeatherCardTheme/, 'weather highlight card uses dynamic weather gradient themes');
   assert.match(weatherJs, /weather-highlight-temp-big/, 'weather highlight card features prominent large temperature typography');
+  assert.match(weatherJs, /weather-highlight-content-right/, 'weather highlight card renders right text block');
+  assert.match(weatherJs, /rgba\(0,\s*0,\s*0,\s*0\.32\)/, 'highlight card right block has frosted dark glass background for high readability');
+  assert.match(css, /\.weather-highlight-content-right/, 'CSS includes rules for highlight card right text block');
   assert.match(css, /\.weather-highlight-card\s*\{[\s\S]*?border-radius:\s*20px;/, 'weather highlight card uses 20px rounded card');
+
+  // Days strip border removal & radius 0
+  assert.match(weatherJs, /borderRadius:\s*0/, 'days strip has inline borderRadius 0');
+  assert.match(weatherJs, /borderTop:\s*0/, 'days strip has inline borderTop 0');
+  assert.match(css, /\.weather-detail-days-strip\s*\{[\s\S]*?border-left:\s*0\s*!important;/, 'days strip removes left border');
+  assert.match(css, /\.weather-detail-days-strip\s*\{[\s\S]*?border-right:\s*0\s*!important;/, 'days strip removes right border');
+
+  // Hourly forecast swipe drag & scrollbar hiding
+  assert.match(weatherJs, /beginTimelineDrag/, 'hourly timeline has beginTimelineDrag handler');
+  assert.match(weatherJs, /onPointerMove:\s*moveTimelineDrag/, 'hourly timeline attaches moveTimelineDrag handler');
+  assert.match(weatherJs, /scrollbarWidth:\s*'none'/, 'hourly timeline inlines scrollbarWidth none');
+  assert.match(css, /\.weather-hourly-timeline\s*\{[\s\S]*?scrollbar-width:\s*none\s*!important;/, 'hourly timeline CSS hides scrollbar');
+  assert.match(css, /\.weather-hourly-timeline\s*\{[\s\S]*?cursor:\s*grab;/, 'hourly timeline CSS sets grab cursor');
+  assert.match(css, /\.weather-hourly-timeline::-webkit-scrollbar\s*\{[\s\S]*?display:\s*none\s*!important;/, 'hourly timeline webkit scrollbar is hidden');
 });
 

@@ -1104,7 +1104,7 @@ function getWeatherCardTheme(code, isNight = false) {
         className: 'weather-highlight-art-night',
         viewBox: '0 0 140 140',
         fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
       },
         /* Stars */
         /*#__PURE__*/React.createElement('circle', { cx: '30', cy: '25', r: '1.5', fill: 'rgba(255,255,255,0.85)' }),
@@ -1129,7 +1129,7 @@ function getWeatherCardTheme(code, isNight = false) {
         className: 'weather-highlight-art-rain',
         viewBox: '0 0 140 140',
         fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
       },
         /* Cloud */
         /*#__PURE__*/React.createElement('path', {
@@ -1158,7 +1158,7 @@ function getWeatherCardTheme(code, isNight = false) {
         className: 'weather-highlight-art-snow',
         viewBox: '0 0 140 140',
         fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
       },
         /* Cloud */
         /*#__PURE__*/React.createElement('path', {
@@ -1182,7 +1182,7 @@ function getWeatherCardTheme(code, isNight = false) {
         className: 'weather-highlight-art-cloud',
         viewBox: '0 0 140 140',
         fill: 'none',
-        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+        style: { position: 'absolute', right: '-10px', top: '-10px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
       },
         /* Peeking sun */
         /*#__PURE__*/React.createElement('circle', { cx: '66', cy: '44', r: '24', fill: '#FDE047', opacity: '0.95' }),
@@ -1202,7 +1202,7 @@ function getWeatherCardTheme(code, isNight = false) {
       className: 'weather-highlight-art-sun',
       viewBox: '0 0 140 140',
       fill: 'none',
-      style: { position: 'absolute', right: '-12px', top: '-18px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1 }
+      style: { position: 'absolute', right: '-12px', top: '-18px', width: '136px', height: '136px', pointerEvents: 'none', zIndex: 1, opacity: 0.6 }
     },
       /* Outer soft aura */
       /*#__PURE__*/React.createElement('circle', { cx: '88', cy: '52', r: '56', fill: 'rgba(254, 240, 138, 0.24)' }),
@@ -1238,6 +1238,7 @@ export function WeatherDetailModal({
   const onSaveLocationRef = React.useRef(onSaveLocation);
   const [hourlyTab, setHourlyTab] = React.useState('weather');
   const timelineRef = React.useRef(null);
+  const timelineDragRef = React.useRef(null);
 
   React.useEffect(() => {
     onSaveLocationRef.current = onSaveLocation;
@@ -1465,6 +1466,36 @@ export function WeatherDetailModal({
     dayStripDragRef.current = null;
   };
 
+  const beginTimelineDrag = (event) => {
+    const el = timelineRef.current;
+    if (!el || !event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    timelineDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: el.scrollLeft,
+      moved: false
+    };
+    try { el.setPointerCapture?.(event.pointerId); } catch (_) {}
+  };
+  const moveTimelineDrag = (event) => {
+    const el = timelineRef.current;
+    const drag = timelineDragRef.current;
+    if (!el || !drag || drag.pointerId !== event.pointerId) return;
+    const distance = event.clientX - drag.startX;
+    if (Math.abs(distance) > 2) {
+      drag.moved = true;
+      el.scrollLeft = drag.startScrollLeft - distance;
+      if (event.cancelable) event.preventDefault();
+    }
+  };
+  const endTimelineDrag = (event) => {
+    const el = timelineRef.current;
+    const drag = timelineDragRef.current;
+    if (!drag || (event && drag.pointerId !== event.pointerId)) return;
+    try { el?.releasePointerCapture?.(drag.pointerId); } catch (_) {}
+    timelineDragRef.current = null;
+  };
+
   const modalNode = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay weather-detail-modal-overlay",
     onClick: onClose,
@@ -1540,6 +1571,13 @@ export function WeatherDetailModal({
       ref: dayStripRef,
       role: "tablist",
       "aria-label": "날짜별 날씨 선택",
+      style: {
+        borderRadius: 0,
+        borderTop: 0,
+        borderLeft: 0,
+        borderRight: 0,
+        borderBottom: '1px solid var(--v2-line, #f0eef5)'
+      },
       onPointerDown: beginDayStripDrag,
       onPointerMove: moveDayStripDrag,
       onPointerUp: endDayStripDrag,
@@ -1667,22 +1705,30 @@ export function WeatherDetailModal({
             className: "weather-highlight-content-right",
             style: {
               position: 'relative',
-              zIndex: 2,
+              zIndex: 3,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
               justifyContent: 'center',
               gap: '4px',
-              textAlign: 'right'
+              textAlign: 'right',
+              background: 'rgba(0, 0, 0, 0.32)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: '12px',
+              padding: '6px 12px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16)'
             }
           },
             /* Formatted Date */
             /*#__PURE__*/React.createElement("span", {
               style: {
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                color: 'rgba(255, 255, 255, 0.95)',
-                textShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                fontSize: '0.84rem',
+                fontWeight: 800,
+                color: '#FFFFFF',
+                letterSpacing: '-0.01em',
+                textShadow: '0 1px 3px rgba(0,0,0,0.35)'
               }
             }, formattedDateText),
             /* Location with pin icon */
@@ -1692,9 +1738,9 @@ export function WeatherDetailModal({
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '0.75rem',
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.85)',
-                textShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                fontWeight: 650,
+                color: 'rgba(255, 255, 255, 0.95)',
+                textShadow: '0 1px 3px rgba(0,0,0,0.35)'
               }
             },
               /*#__PURE__*/React.createElement("svg", {
@@ -1864,13 +1910,20 @@ export function WeatherDetailModal({
           /*#__PURE__*/React.createElement("div", {
             ref: timelineRef,
             className: "weather-hourly-timeline",
+            onPointerDown: beginTimelineDrag,
+            onPointerMove: moveTimelineDrag,
+            onPointerUp: endTimelineDrag,
+            onPointerCancel: endTimelineDrag,
             style: {
               display: 'flex',
               overflowX: 'auto',
               padding: '6px 2px 10px',
-              scrollbarWidth: 'thin',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
               touchAction: 'pan-x',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              cursor: 'grab',
+              userSelect: 'none'
             }
           },
             (() => {

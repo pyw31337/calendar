@@ -8422,9 +8422,39 @@ body .modal-overlay.weather-detail-modal-overlay .weather-detail-days-strip {
   border-top: 0 !important;
   border-left: 0 !important;
   border-right: 0 !important;
+  border-bottom: 1px solid var(--v2-line, #f0eef5) !important;
 }
 
 body .modal-overlay.weather-detail-modal-overlay .weather-detail-header .weather-detail-location-copy > span {
   margin-top: -4px !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-highlight-content-right {
+  position: relative !important;
+  z-index: 3 !important;
+  background: rgba(0, 0, 0, 0.32) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 6px 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  cursor: grab !important;
+  user-select: none !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline:active {
+  cursor: grabbing !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 

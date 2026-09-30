@@ -4597,9 +4597,33 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-note {
 }
 html:has(.renewal-shell.v2-design) .weather-detail-metric-note.is-accent { color: var(--status-info, #3b82f6); }
 
+html:has(.renewal-shell.v2-design) .weather-highlight-content-right {
+  position: relative;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.32) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 6px 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+}
+
 html:has(.renewal-shell.v2-design) .weather-hourly-timeline {
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  cursor: grab;
+  user-select: none;
+}
+html:has(.renewal-shell.v2-design) .weather-hourly-timeline:active {
+  cursor: grabbing;
+}
+html:has(.renewal-shell.v2-design) .weather-hourly-timeline::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 html:has(.renewal-shell.v2-design) .weather-hourly-timeline > * { scroll-snap-align: start; }
 html:has(.renewal-shell.v2-design) .weather-hourly-col {
