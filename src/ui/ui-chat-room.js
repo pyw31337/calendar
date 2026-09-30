@@ -581,14 +581,25 @@ export function ChatRoomView({
   // to scroll means the scroll event that would trigger onLoadOlderChat never fires, so "위로
   // 스크롤하면 이전 대화가 로드됩니다" sits there forever with no way to actually reach it. After
   // every render of the message list, top up automatically while there's still more history and
-  // the container isn't scrollable yet -- this also keeps paging in the (rarer) case where one
-  // page of older messages still doesn't fill the view.
+  // the container isn't scrollable yet.
+  // An empty window is usually photo docs filtered out of the transcript. Auto-walking that
+  // downloads the backlog and leaves "불러오는 중" beside the empty copy. Once real bubbles
+  // exist, fill at most a few short pages so a photo tail cannot page forever.
+  const autoOlderFillRef = React.useRef(0);
+  React.useEffect(() => {
+    autoOlderFillRef.current = 0;
+  }, [calendar?.id]);
   React.useEffect(() => {
     if (!hasMoreOlderChat || loadingOlderChat || typeof onLoadOlderChat !== 'function') return;
+    if (!visibleChatMessages.length || autoOlderFillRef.current >= 3) return;
     const el = chatMessagesContainerRef.current;
     if (!el) return;
     const raf = requestAnimationFrame(() => {
-      if (el.scrollHeight <= el.clientHeight + 1) onLoadOlderChat();
+      if (autoOlderFillRef.current >= 3) return;
+      if (el.scrollHeight <= el.clientHeight + 1) {
+        autoOlderFillRef.current += 1;
+        onLoadOlderChat();
+      }
     });
     return () => cancelAnimationFrame(raf);
   }, [visibleChatMessages, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat]);
@@ -1728,7 +1739,15 @@ export function ChatRoomView({
     }
   }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', padding: '8px 0 12px' }
-  }, loadingOlderChat ? '이전 대화를 불러오는 중…' : (hasMoreOlderChat ? '위로 스크롤하면 이전 대화가 로드됩니다' : '')), noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
+  }, loadingOlderChat ? '이전 대화를 불러오는 중…' : (
+    !visibleChatMessages.length && typeof onLoadOlderChat === 'function'
+      ? /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onLoadOlderChat(),
+        style: { border: 'none', background: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', textDecoration: 'underline', lineHeight: 1 }
+      }, "이전 대화 더 보기")
+      : (hasMoreOlderChat ? '위로 스크롤하면 이전 대화가 로드됩니다' : '')
+  )), noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
