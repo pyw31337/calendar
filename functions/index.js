@@ -72,6 +72,8 @@ function getMessageImageEntriesForIndex(message) {
     ? message.imageUrls : (message.imageUrl ? [message.imageUrl] : []);
   const thumbs = Array.isArray(message.thumbUrls) && message.thumbUrls.length
     ? message.thumbUrls : (message.thumbUrl ? [message.thumbUrl] : []);
+  const smalls = Array.isArray(message.smallThumbUrls) && message.smallThumbUrls.length
+    ? message.smallThumbUrls : (message.smallThumbUrl ? [message.smallThumbUrl] : []);
   const tags = Array.isArray(message.imageTags) ? message.imageTags : [];
   const tagMap = message?.imageTagMap && typeof message.imageTagMap === 'object' && !Array.isArray(message.imageTagMap)
     ? message.imageTagMap
@@ -80,6 +82,7 @@ function getMessageImageEntriesForIndex(message) {
   return Array.from({ length: count }, (_, index) => {
     const imageUrl = urls[index] || thumbs[index] || '';
     const thumbUrl = thumbs[index] || urls[index] || '';
+    const smallThumbUrl = smalls[index] || '';
     const assetKey = getPhotoAssetKey(imageUrl || thumbUrl);
     // imageTagMap is keyed by the immutable Storage asset, while imageTags is kept as a
     // legacy positional mirror. Prefer the former so a deleted sibling can never move a tag
@@ -90,6 +93,7 @@ function getMessageImageEntriesForIndex(message) {
       index,
       imageUrl,
       thumbUrl,
+      smallThumbUrl,
       tags: hasAssetTag ? (tagMap[assetKey] || '') : (hasEditableTags ? (tags[index] || '') : (message.tags || '')),
       tagAuthority: hasEditableTags ? 'editable' : ''
     };
@@ -183,6 +187,7 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
   const push = (photo, index, context = {}) => {
     const full = String(photo?.imageUrl || photo?.full || photo?.url || photo?.src || photo?.thumbUrl || photo?.thumb || '').trim();
     const thumb = String(photo?.thumbUrl || photo?.thumb || photo?.thumbnailUrl || full).trim();
+    const smallThumb = String(photo?.smallThumbUrl || photo?.smallThumb || '').trim();
     const assetKey = getPhotoAssetKey(full || thumb);
     if (!assetKey) return;
     const source = sourceType === 'message'
@@ -200,6 +205,7 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       assetKey,
       full,
       thumb,
+      ...(smallThumb ? { smallThumb } : {}),
       timestamp: Number(photo?.createdAt || photo?.updatedAt || data.timestamp || data.updatedAt || data.createdAt || data.confirmedAt || 0),
       tags: String(Object.prototype.hasOwnProperty.call(photo || {}, 'tags')
         ? (photo.tags || '')

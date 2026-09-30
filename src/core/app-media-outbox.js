@@ -11,10 +11,14 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
     thumbnail: '',
     originalBlob: image.originalBlob,
     thumbnailBlob: image.thumbnailBlob,
-    metadata: image.metadata || null
+    smallThumbBlob: image.smallThumbBlob || null,
+    metadata: image.metadata || null,
+    variantProfile: payload.variantProfile || (payload.uploadSource && payload.uploadSource !== 'chat' ? 'grid' : 'chat')
   }));
   if (compressed.length === 0) return false;
-  const chunks = chunkImages(await resolveImages(operation.calendarId, compressed));
+  const chunks = chunkImages(await resolveImages(operation.calendarId, compressed, null, {
+    profile: payload.variantProfile || (payload.uploadSource && payload.uploadSource !== 'chat' ? 'grid' : 'chat')
+  }));
   const tagOptions = todayUploadTagOptions(new Date(Number(payload.timestamp) || Date.now()));
   for (let i = 0; i < chunks.length; i += 1) {
     const images = chunks[i];
@@ -40,7 +44,7 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
   if (!payload?.memoData || !Array.isArray(payload.images) || typeof resolveImages !== 'function' || typeof writeMemo !== 'function') return false;
   const pending = payload.images.filter(image => !image.isExisting);
   const resolved = pending.length > 0
-    ? await resolveImages(operation.calendarId, pending.map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })))
+    ? await resolveImages(operation.calendarId, pending.map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null })))
     : [];
   let next = 0;
   const imageUrls = payload.images.map(image => image.isExisting ? image.original : resolved[next++]?.imageUrl).filter(Boolean);

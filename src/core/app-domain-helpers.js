@@ -2540,6 +2540,9 @@ function getMessageImageEntries(msg) {
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
     ? msg.thumbUrls
     : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
+  const smalls = Array.isArray(msg.smallThumbUrls) && msg.smallThumbUrls.length > 0
+    ? msg.smallThumbUrls
+    : (typeof msg.smallThumbUrl === 'string' && msg.smallThumbUrl ? [msg.smallThumbUrl] : []);
   const count = Math.max(urls.length, thumbs.length);
   if (count === 0) return [];
   const entries = [];
@@ -2552,6 +2555,8 @@ function getMessageImageEntries(msg) {
     // render its normal empty/failed-photo state when both variants are unusable.
     const full = isRenderableImageUrl(fullCandidate) ? fullCandidate.trim() : '';
     const thumb = isRenderableImageUrl(thumbCandidate) ? thumbCandidate.trim() : '';
+    const smallCandidate = typeof smalls[i] === 'string' ? smalls[i] : '';
+    const smallThumb = isRenderableImageUrl(smallCandidate) ? smallCandidate.trim() : '';
     if (!full && !thumb) continue;
     const keys = getMediaIdentityKeys({
       messageId: msg.id,
@@ -2562,6 +2567,7 @@ function getMessageImageEntries(msg) {
     entries.push(stampPhotoAssetIdentity({
       full: full || thumb,
       thumb: thumb || full,
+      smallThumb,
       imageIndex: i,
       messageId: msg.id,
       timestamp: msg.timestamp,

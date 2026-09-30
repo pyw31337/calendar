@@ -30,6 +30,7 @@ import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
 import { fetchLinkPreview, useLinkPreview, shouldFetchLinkPreviewForChatUrl } from './app-link-preview.js';
 import { isExternalServiceUrl } from './memo-share-link.js';
+import { isChatImageUpload } from './image-variants.js';
 import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from './app-chat-render.js';
 import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCategoryMarkerContent, buildPlaceMarkerHtml, panMapToFitMarkerPopup, centerMapOnMarkerAndPopup } from './app-place-map.js';
 import {
@@ -2811,7 +2812,7 @@ function CalendarApp() {
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, metadata: image.metadata || null })),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
@@ -3032,7 +3033,8 @@ function CalendarApp() {
           payload: {
             participantId: fallbackParticipantId,
             text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
-            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, metadata: image.metadata || null }))
+            variantProfile: 'grid',
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null }))
           }
         });
         if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');
@@ -3045,7 +3047,7 @@ function CalendarApp() {
           ...progress,
           label: '갤러리 사진 업로드 중...'
         });
-      });
+      }, { profile: 'grid' });
       if (resolvedImages.duplicateIndexes?.length) {
         showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
       }
@@ -3433,7 +3435,8 @@ function CalendarApp() {
       // result still doesn't fit in one document (inline base64 fallback with many images),
       // the edited message keeps the first chunk and any remainder is appended as new messages
       // right after it, same as the compose flow -- quality is never degraded to force a fit.
-      const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null);
+      const editProfile = isChatImageUpload({ uploadSource: editingMessage.uploadSource, channel: 'message' }) ? 'chat' : 'grid';
+      const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null, { profile: editProfile });
       const chunks = resolvedImages.length > 0 ? chunkResolvedImagesForMessages(resolvedImages) : [[]];
       const firstChunk = chunks[0];
       const extraChunks = chunks.slice(1);
@@ -4477,7 +4480,7 @@ function CalendarApp() {
     try {
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
-      }, { requireStorage: true, continueOnError: true });
+      }, { requireStorage: true, continueOnError: true, profile: 'grid' });
       const failedCount = (resolvedImages.failed || []).length;
       const failedFiles = (resolvedImages.failed || []).map(({ file, index }) => file || Array.from(files || [])[index]).filter(Boolean);
       const successfulImages = resolvedImages.filter(Boolean);

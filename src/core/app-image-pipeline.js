@@ -6,6 +6,7 @@ import {
 import { reverseGeocodeCoords } from './app-place-search.js';
 import { firebaseConfig, isStorageDisabled, ensureFirebaseStorageReady, checkFirebaseStorageHealth, writeCollectionDocumentWithFallback, fetchMessageRest } from './app-firebase-data.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
+import { CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY, SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY } from './image-variants.js';
 
 // Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
 // global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
@@ -458,16 +459,13 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     });
   };
 
-  const getHighQualityThumbBlob = () => {
+  const encodeScaledWebpBlob = (maxEdge, quality) => {
     if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
-      // 512px WebP: sharp on retina/high-DPI grids and chat bubbles, while cutting
-      // transfer size and decode latency by 60~75% compared to JPEG/PNG.
-      const maxDimThumb = 512;
-      if (w > maxDimThumb || h > maxDimThumb) {
-        if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
-        else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
+      if (w > maxEdge || h > maxEdge) {
+        if (w > h) { h = Math.round(h * maxEdge / w); w = maxEdge; }
+        else { w = Math.round(w * maxEdge / h); h = maxEdge; }
       }
       const canvas = document.createElement('canvas');
       canvas.width = w;
@@ -483,13 +481,16 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
           } else {
             canvas.toBlob(jpgBlob => res(jpgBlob), 'image/jpeg', 0.82);
           }
-        }, 'image/webp', 0.80);
+        }, 'image/webp', quality);
       } catch (_) {
         if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
         else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.82);
       }
     });
   };
+  // 512px stays the chat-bubble thumb. Grids use the 160px sibling instead.
+  const getHighQualityThumbBlob = () => encodeScaledWebpBlob(CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY);
+  const getSmallThumbBlob = () => encodeScaledWebpBlob(SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY);
 
   let originalMeta = null;
   let thumbnailMeta = null;
@@ -500,10 +501,11 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 
   const highQualityBlob = await getHighQualityBlob();
   const highQualityThumbBlob = await getHighQualityThumbBlob();
+  const highQualitySmallBlob = await getSmallThumbBlob();
 
   return new Promise((resolve) => {
     const objectUrls = [];
-    const finish = (origBlob, thumbBlob) => {
+    const finish = (origBlob, thumbBlob, smallBlob) => {
       let originalStr = originalMeta ? originalMeta.base64 : null;
       let thumbnailStr = thumbnailMeta ? thumbnailMeta.base64 : null;
       if (preferStorage) {
@@ -523,6 +525,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
         thumbnail: thumbnailStr,
         originalBlob: origBlob,
         thumbnailBlob: thumbBlob,
+        smallThumbBlob: smallBlob || null,
         needsBase64Fallback: preferStorage,
         metadata,
         // Persisted beside the eventual URL in the message/memo record.  Tags and comments are
@@ -543,7 +546,11 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       else if (thumbnailMeta && thumbnailMeta.canvas) thumbnailMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnailMeta.quality);
       else getOrig(cb);
     };
-    getOrig(origBlob => getThumb(thumbBlob => finish(origBlob, thumbBlob)));
+    const getSmall = (cb) => {
+      if (highQualitySmallBlob) cb(highQualitySmallBlob);
+      else cb(null);
+    };
+    getOrig(origBlob => getThumb(thumbBlob => getSmall(smallBlob => finish(origBlob, thumbBlob, smallBlob))));
   });
 }
 
@@ -1108,60 +1115,68 @@ function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
 // if Storage isn't available/the upload fails -- callers should fall back to the base64 data
 // URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
 // total)` is called as each upload progresses so a caller can aggregate progress across a batch.
-function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+
+function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, profile) {
   return new Promise((resolve) => {
     const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+    const grid = profile === 'grid';
+    const originalBlob = compressed?.originalBlob || null;
+    const chatBlob = compressed?.thumbnailBlob || null;
+    const smallBlob = compressed?.smallThumbBlob || null;
+    const smallSource = smallBlob || (grid ? chatBlob : null);
+    if (!storage || !originalBlob || (grid ? !smallSource : !chatBlob)) {
       resolve(null);
       return;
     }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
-    // The byte size is embedded in the filename itself (parsed back out by
-    // getStorageUrlFileSize) so the Lightbox info panel can show it without any extra network
-    // request -- Firebase Storage's download endpoint doesn't send a CORS header by default, so
-    // a plain fetch() to read Content-Length from a different origin (like this app's GitHub
-    // Pages host) is silently blocked by the browser and would never work.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, compressed.originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, 'webp');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
-    // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
-    // whole send/edit flow would hang forever with no way for the user to recover. Time out and
-    // fall back to inline base64 for that image instead.
+    const stampJobs = [];
+    const originalMeta = getUploadImageBlobMeta(originalBlob, originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
+    const originalRef = storage.ref(`${basePath}_original_${originalBlob.size}b.${originalMeta.ext}`);
+    stampJobs.push({ blob: originalBlob, ref: originalRef, key: `${index}-orig`, contentType: originalMeta.contentType, role: 'original' });
+    if (!grid) {
+      const thumbMeta = getUploadImageBlobMeta(chatBlob, 'webp');
+      const thumbRef = storage.ref(`${basePath}_thumb_${chatBlob.size}b.${thumbMeta.ext}`);
+      stampJobs.push({ blob: chatBlob, ref: thumbRef, key: `${index}-thumb`, contentType: thumbMeta.contentType, role: 'chatThumb' });
+    }
+    if (smallSource) {
+      const smallMeta = getUploadImageBlobMeta(smallSource, 'webp');
+      const smallRef = storage.ref(`${basePath}_small.webp`);
+      stampJobs.push({
+        blob: smallSource,
+        ref: smallRef,
+        key: `${index}-small`,
+        contentType: smallMeta.contentType || 'image/webp',
+        role: 'small'
+      });
+    }
     const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
       ref, blob, contentType, taskKey, onBytes, timeoutMs
     });
-    // One retry before giving up -- a single failed/timed-out attempt (a brief mobile network
-    // hiccup) used to permanently drop that photo to the low-quality ~600px/48KB base64 fallback
-    // with no second chance, which is exactly what produced reports of meeting/gallery photos
-    // saved at 600x450 / ~33KB. Same fix pattern as loadScriptWithRetry in main.jsx.
     const runUpload = async (blob, ref, taskKey, contentType) => {
       const first = await runUploadOnce(blob, ref, taskKey, contentType);
       if (first) return first;
       return runUploadOnce(blob, ref, taskKey, contentType);
     };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        // Treat the pair as one atomic asset: if either upload fails, remove the successful
-        // half so an orphaned original/thumbnail cannot accumulate in Storage.
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Chat image Storage upload failed (no base64 fallback)');
-        resolve(null);
+    Promise.all(stampJobs.map(job => runUpload(job.blob, job.ref, job.key, job.contentType))).then(async (urls) => {
+      if (urls.every(Boolean)) {
+        const byRole = {};
+        stampJobs.forEach((job, jobIndex) => { byRole[job.role] = urls[jobIndex]; });
+        if (grid) resolve({ imageUrl: byRole.original, thumbUrl: byRole.small, smallThumbUrl: byRole.small });
+        else resolve({ imageUrl: byRole.original, thumbUrl: byRole.chatThumb, smallThumbUrl: byRole.small || '' });
+        return;
       }
+      await Promise.allSettled(stampJobs.map(job => job.ref.delete().catch(() => {})));
+      console.warn('Image Storage upload failed', profile, basePath);
+      resolve(null);
     });
   });
+}
+
+function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const profile = compressed?.variantProfile === 'grid' ? 'grid' : 'chat';
+  const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, profile);
 }
 
 async function dataUrlToBlob(dataUrl) {
@@ -1362,13 +1377,13 @@ const IMAGE_UPLOAD_REUSE_WINDOW_MS = 30 * 60 * 1000;
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
   const reusable = compressed?.uploadedUrls;
   if (reusable && Date.now() - reusable.uploadedAt < IMAGE_UPLOAD_REUSE_WINDOW_MS) {
-    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
+    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, smallThumbUrl: reusable.smallThumbUrl || '', metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
   }
   try {
     const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
       if (compressed && typeof compressed === 'object') {
-        compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, uploadedAt: Date.now() };
+        compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, smallThumbUrl: uploaded.smallThumbUrl || '', uploadedAt: Date.now() };
       }
       revokeCompressedObjectUrls(compressed);
       return { ...uploaded, metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
@@ -1511,7 +1526,13 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
 }
 
 async function resolveChatImageBatch(calendarId, compressedList, onProgress, options = {}) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadChatImageAssets, options);
+  const profile = options?.profile === 'grid' ? 'grid' : 'chat';
+  const tagged = Array.from(compressedList || []).map(item => (
+    item && typeof item === 'object' && !item.variantProfile
+      ? { ...item, variantProfile: profile }
+      : item
+  ));
+  return resolveImageBatch(calendarId, tagged, onProgress, uploadChatImageAssets, options);
 }
 
 async function resolveMemoImageBatch(calendarId, compressedList, onProgress) {
@@ -1544,96 +1565,24 @@ function deleteAllChatImagesFromStorage(msg) {
   if (msg.thumbUrl) urls.add(msg.thumbUrl);
   if (Array.isArray(msg.imageUrls)) msg.imageUrls.forEach(u => u && urls.add(u));
   if (Array.isArray(msg.thumbUrls)) msg.thumbUrls.forEach(u => u && urls.add(u));
+  if (msg.smallThumbUrl) urls.add(msg.smallThumbUrl);
+  if (Array.isArray(msg.smallThumbUrls)) msg.smallThumbUrls.forEach(u => u && urls.add(u));
   urls.forEach(url => deleteChatImageFromStorage(url));
 }
 
 // REST fallback helper for uploading memo image assets to Firebase Storage
 function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
-      resolve(null);
-      return;
-    }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
-    // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, compressed.originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, 'webp');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
-      ref, blob, contentType, taskKey, onBytes, timeoutMs
-    });
-    // One retry before giving up -- see the matching comment in uploadChatImageAssets.
-    const runUpload = async (blob, ref, taskKey, contentType) => {
-      const first = await runUploadOnce(blob, ref, taskKey, contentType);
-      if (first) return first;
-      return runUploadOnce(blob, ref, taskKey, contentType);
-    };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        // Keep memo media atomic as well; a partial pair must never be considered reusable.
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Memo image Storage upload failed');
-        resolve(null);
-      }
-    });
-  });
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
 }
 
-// Same shape/behavior as uploadMemoImageAssets, just its own Storage path -- anniversary photos
-// are a distinct content type from memo attachments even though the upload mechanics are
-// identical.
 function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
-      resolve(null);
-      return;
-    }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, compressed.originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, 'webp');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
-      ref, blob, contentType, taskKey, onBytes, timeoutMs
-    });
-    const runUpload = async (blob, ref, taskKey, contentType) => {
-      const first = await runUploadOnce(blob, ref, taskKey, contentType);
-      if (first) return first;
-      return runUploadOnce(blob, ref, taskKey, contentType);
-    };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Anniversary image Storage upload failed');
-        resolve(null);
-      }
-    });
-  });
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
 }
 
 async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgress) {

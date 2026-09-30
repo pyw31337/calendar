@@ -18,6 +18,7 @@
 import { createActivityLog, getClientAuditContext, getConfirmedMeetings, getMessageImageEntries, isValidDateString, queueServerAuditEvent, reconcileMessageImageTagMap, sanitizeMemoForFirestore, sanitizeMessageForFirestore, withTimeout } from './app-domain-helpers.js';
 import { fetchGalleryPhotoOrdinal, fetchMessageOrdinal, fetchMessageRest, firebaseConfig, firestoreDocumentToJs, writeCollectionDocumentWithFallback } from './app-firebase-data.js';
 import { deleteChatImageFromStorage, resolveChatImageBatch } from './app-image-pipeline.js';
+import { isChatImageUpload } from './image-variants.js';
 import { cloneConfirmedMeetings } from './confirmed-meeting-coordinator.js';
 import { filterDeletedPhotoFromIndexItems } from './gallery-bulk-delete.js';
 import { findImageSlotByAsset, listOtherAssetReferences, removeAssetFromMeetings, replaceAssetInMeetings } from './media-reference-integrity.js';
@@ -189,7 +190,7 @@ export function createCalendarPhotoActions({
     try {
       const [resolved] = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
-      });
+      }, { profile: 'grid' });
       if (!resolved) throw new Error('Replacement upload returned no result');
       const prevImageUrl = targetPhoto.imageUrl;
       const prevThumbUrl = targetPhoto.thumbUrl;
@@ -515,7 +516,7 @@ export function createCalendarPhotoActions({
     try {
       const [resolved] = await resolveChatImageBatch(activeCalId, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
-      });
+      }, { profile: isChatImageUpload({ uploadSource: sourceMessage.uploadSource, channel: 'message' }) ? 'chat' : 'grid' });
       if (!resolved) throw new Error('Replacement upload returned no result');
       const rawUrls = Array.isArray(sourceMessage.imageUrls) && sourceMessage.imageUrls.length
         ? sourceMessage.imageUrls.slice()
@@ -726,7 +727,7 @@ export function createCalendarPhotoActions({
     try {
       const [resolved] = await resolveChatImageBatch(activeCalId, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
-      });
+      }, { profile: 'grid' });
       if (!resolved) throw new Error('Replacement upload returned no result');
       const removedUrl = urls[imageIndex];
       const removedThumb = thumbs[imageIndex] || removedUrl;
