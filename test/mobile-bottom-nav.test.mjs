@@ -60,9 +60,13 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
   assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-chat\s*\{\s*transform:\s*translate\(6px\)\s*!important;\s*\}/);
   assert.match(css, /\.v2-design \.bp-mobile-bottom-nav-item\.bp-item-more\s*\{\s*transform:\s*translate\(-6px\)\s*!important;\s*\}/);
 
-  // 9. When virtual keyboard is open, hide bottom nav and zero out nav clearance
-  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\{\s*--mobile-bottom-nav-total:\s*0px\s*!important;\s*\}/);
-  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*none\s*!important;\s*\}/);
+  // 9. When the virtual keyboard is open, the phone menu follows it
+  //    (sits on the visual-viewport edge). Do not zero nav clearance:
+  //    the chat composer is positioned with --mobile-bottom-nav-total and
+  //    would slide under a still-visible bar.
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*flex\s*!important;\s*bottom:\s*var\(--app-vv-keyboard-inset,\s*0px\)\s*!important;\s*\}/);
+  assert.doesNotMatch(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\{\s*--mobile-bottom-nav-total:\s*0px\s*!important;\s*\}/);
+  assert.doesNotMatch(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*none\s*!important;\s*\}/);
 
   // 10. v2-chat-root is pinned to top: 0 and bottom: 0 so it never lifts upward on keyboard open
   assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\s*\.v2-chat\s*\.v2-chat-root\s*\{[\s\S]*top:\s*0\s*!important;[\s\S]*bottom:\s*0\s*!important;/);
