@@ -17,6 +17,13 @@ import {
 } from './shell-nav.js';
 
 const h = (...args) => window.React.createElement(...args);
+const MEMO_PAGE_SIZE = 20;
+
+function MemoPagination(props) {
+  const Pagination = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommonPagination;
+  if (typeof Pagination !== 'function') return null;
+  return h(Pagination, props);
+}
 
 // Reference CSS is loaded when its matching destination is first rendered. Shared destination
 // chrome is statically imported above, so it is never requested a second time dynamically.
@@ -524,6 +531,12 @@ export function MemoScreen(p) {
       || ''
     : '';
   const focusedMemoId = p.focusedMemo?.id || focusIdFromLocation;
+  const [memoPage, setMemoPage] = window.React.useState(1);
+  const memoFilterKey = `${p.searchQuery || ''}\n${p.selectedTag || ''}`;
+  window.React.useEffect(() => { setMemoPage(1); }, [memoFilterKey]);
+  window.React.useEffect(() => {
+    if (focusedMemoId) setMemoPage(1);
+  }, [focusedMemoId]);
   // A home-card click or deep link should land the reader on the matching card, not merely
   // switch tabs.  The target can be an older shared memo outside the current
   // page window, so add it once when necessary before scrolling to it.
@@ -534,6 +547,41 @@ export function MemoScreen(p) {
     if (!p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)) return rows;
     return [p.focusedMemo, ...rows];
   }, [p.memos, p.focusedMemo, p.searchQuery, p.selectedTag]);
+  const memoFiltering = Boolean(String(p.searchQuery || '').trim() || p.selectedTag);
+  const countedMemos = typeof p.totalMemoCount === 'number' && p.totalMemoCount >= 0 ? p.totalMemoCount : null;
+  const memoTotal = memoFiltering || !p.hasMoreMemos
+    ? visibleMemos.length
+    : Math.max(
+      visibleMemos.length + 1,
+      countedMemos != null && countedMemos > visibleMemos.length ? countedMemos : visibleMemos.length + MEMO_PAGE_SIZE
+    );
+  const memoPageCount = Math.max(1, Math.ceil(memoTotal / MEMO_PAGE_SIZE) || 1);
+  const memoSafePage = Math.min(Math.max(1, memoPage), memoPageCount);
+  const memoPageStart = (memoSafePage - 1) * MEMO_PAGE_SIZE;
+  const pageMemos = visibleMemos.slice(memoPageStart, memoPageStart + MEMO_PAGE_SIZE);
+  const memoPageLoading = !memoFiltering && pageMemos.length === 0 && !!p.hasMoreMemos && memoPageStart >= visibleMemos.length;
+  window.React.useEffect(() => {
+    if (memoPage > memoPageCount) setMemoPage(memoPageCount);
+  }, [memoPage, memoPageCount]);
+  window.React.useEffect(() => {
+    if (memoFiltering || typeof p.onLoadMoreMemos !== 'function') return undefined;
+    const needed = memoSafePage * MEMO_PAGE_SIZE;
+    if (visibleMemos.length >= needed || !p.hasMoreMemos) return undefined;
+    p.onLoadMoreMemos(needed);
+    return undefined;
+  }, [memoFiltering, memoSafePage, visibleMemos.length, p.hasMoreMemos, p.onLoadMoreMemos]);
+  const memoPageScrollRef = window.React.useRef(false);
+  window.React.useEffect(() => {
+    if (!memoPageScrollRef.current) {
+      memoPageScrollRef.current = true;
+      return undefined;
+    }
+    const scroller = typeof document !== 'undefined'
+      ? document.querySelector('.v2-memo .v2-memo-body, .v2-memo .v2-dest-body')
+      : null;
+    if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+    return undefined;
+  }, [memoSafePage]);
   window.React.useEffect(() => {
     if (!focusedMemoId || typeof document === 'undefined') return undefined;
     const focusTarget = () => {
@@ -554,7 +602,7 @@ export function MemoScreen(p) {
     }, 100);
     const timeout = setTimeout(() => clearInterval(timer), 3500);
     return () => { clearInterval(timer); clearTimeout(timeout); };
-  }, [focusedMemoId, visibleMemos]);
+  }, [focusedMemoId, visibleMemos, memoSafePage]);
   // Dedicated-cards mode still receives the real MemoView's full legacy tree via p.legacyView
   // (only used for slot extraction here, never rendered directly) -- pull the "새로운 메모를
   // 남겨보세요..." composer card out of it the same way the legacyView+slots.body branch below
@@ -690,7 +738,7 @@ export function MemoScreen(p) {
         h(
           'div',
           { className: 'bp-memo-grid' },
-          visibleMemos.map(memo => {
+          pageMemos.map(memo => {
             const author = authorFor(memo, p.calendar.participants);
             const metaMs = memo.updatedAt ?? memo.createdAt;
             let meta = '';
@@ -718,9 +766,14 @@ export function MemoScreen(p) {
             );
           })
         ),
-        !visibleMemos.length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
-        p.hasMoreMemos &&
-          h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기')
+        !pageMemos.length && !memoPageLoading && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
+        memoPageLoading && h(Empty, null, '메모를 불러오는 중...'),
+        h(MemoPagination, {
+          currentPage: memoSafePage,
+          pageCount: memoPageCount,
+          onChange: setMemoPage,
+          label: '메모',
+        })
       ),
       h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
     ),

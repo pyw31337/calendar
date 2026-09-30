@@ -1799,14 +1799,25 @@
 .v2-design .v2-archive .history-bento-grid {
   gap: 8px !important;
 }
-.v2-design .v2-content .culture-items-grid > * {
+.v2-design .v2-content .culture-items-grid > *:not(.gallery-pagination) {
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;
   background: var(--bg-card) !important;
 }
-.v2-design .v2-archive .history-bento-grid > * {
+/* Shared pager (CommonPagination / .gallery-pagination). Card rules must not
+   paint a plate behind it on any page. */
+.v2-design .gallery-pagination,
+html:has(.renewal-shell.v2-design) .gallery-pagination {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+.v2-design .v2-archive .history-bento-grid > *:not(.gallery-pagination) {
   border-radius: 12px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;

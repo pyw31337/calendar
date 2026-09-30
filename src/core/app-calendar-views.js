@@ -177,7 +177,11 @@ export function renderCalendarViews({
         memos: memos,
         hasMoreMemos: hasMoreMemos,
         totalMemoCount: totalMemoCount,
-        onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
+        onLoadMoreMemos: (needed) => setMemosLimit(prev => {
+          const floor = Number(needed);
+          if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));
+          return prev + MEMOS_PAGE_SIZE;
+        }),
         onBack: () => changeView('calendar'),
         showToast: showToast,
         isDarkTheme: isDarkTheme,
@@ -254,7 +258,11 @@ export function renderCalendarViews({
         loadingOlderChat: loadingOlderChat,
         onLoadOlderChat: loadOlderChatMessages,
         hasMoreMemos: hasMoreMemos,
-        onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
+        onLoadMoreMemos: (needed) => setMemosLimit(prev => {
+          const floor = Number(needed);
+          if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));
+          return prev + MEMOS_PAGE_SIZE;
+        }),
         isDarkTheme: isDarkTheme,
         onToggleTheme: toggleTheme,
         fontScalePercent: fontScalePercent,
