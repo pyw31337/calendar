@@ -5,6 +5,7 @@
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
 import { useChatTypingPresence } from '../core/chat-typing-presence.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
+import { PanelResizeHandle } from './ui-widgets.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
