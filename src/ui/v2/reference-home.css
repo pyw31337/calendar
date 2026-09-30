@@ -212,7 +212,7 @@
       position: absolute; top: 4px; right: 4px; background: rgba(20,15,35,0.62); color: #fff; font-size:0.75rem; font-weight: 800;
       padding: 1px 6px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 2px;
     }
-    .v2-design .bp-gallery-comment-heartbeat { animation: bp-gallery-comment-heartbeat 2.8s ease-in-out infinite; will-change: transform; }
+    .v2-design .bp-gallery-comment-heartbeat { animation: bp-gallery-comment-heartbeat 2.8s ease-in-out infinite; }
     .v2-design .bp-gallery-comment-heartbeat::before, .v2-design .bp-gallery-comment-heartbeat::after {
       content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
       animation-duration: 2.8s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-delay: inherit;

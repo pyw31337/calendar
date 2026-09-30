@@ -357,8 +357,8 @@
   background:
     linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
     linear-gradient(-45deg, #12CDF0 0%, #3604FD 42%, #8019E0 76%, #3604FD 100%) !important;
-  background-size: auto, 300% 300% !important;
-  animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
+  background-size: auto, 100% 100% !important;
+  animation: none !important;
   isolation: isolate;
   /* Home shell sits flush at the very top of .renewal-shell.v2-design (padding:0), so in iOS
    * "Add to Home Screen" standalone mode (status-bar-style black-translucent draws content
@@ -380,8 +380,9 @@
   background-repeat: no-repeat !important;
   mix-blend-mode: normal !important;
   opacity: 0.9 !important;
-  animation: bp-hero-aurora-drift-a 10s ease-in-out infinite alternate !important;
-  will-change: transform, opacity;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
 }
 .v2-design .bp-hero-zone::after {
   content: "" !important;
@@ -397,8 +398,9 @@
   background-repeat: no-repeat !important;
   mix-blend-mode: soft-light !important;
   opacity: 0.85 !important;
-  animation: bp-hero-aurora-drift-b 13s ease-in-out infinite alternate !important;
-  will-change: transform, opacity;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
   position: absolute !important;
@@ -409,8 +411,9 @@
     radial-gradient(ellipse 88% 70% at 50% 8%, rgba(192, 132, 252, 0.45) 0%, transparent 58%),
     linear-gradient(180deg, transparent 50%, rgba(24, 8, 48, 0.26) 80%, rgba(15, 5, 40, 0.5) 100%) !important;
   opacity: 0.95 !important;
-  animation: bp-hero-aurora-pulse 8s ease-in-out infinite alternate !important;
-  will-change: opacity, transform;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
 @keyframes bp-hero-mesh-shift {

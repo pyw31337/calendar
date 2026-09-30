@@ -7,38 +7,48 @@
     /* Mirrored back left-to-right: cyan now blooms from the opposite edge while the
        glass controls and all foreground content stay fixed. */
     linear-gradient(90deg, #8019E0 0%, #3604FD 44%, #12CDF0 100%) !important;
-  background-size: auto, 300% 300% !important;
-  animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
+  background-size: auto, 100% 100% !important;
+  background-position: 0 0, 50% 50% !important;
+  /* Same still frame as phones. The mesh shift was a permanent desktop repaint. */
+  animation: none !important;
 }
 .v2-design .bp-hero-zone::before {
-  inset: -85%;
-  filter: blur(46px);
-  will-change: auto;
+  inset: 0 !important;
+  filter: blur(24px);
+  transform: none !important;
+  animation: none !important;
+  will-change: auto !important;
+  mix-blend-mode: normal;
   background:
     radial-gradient(ellipse 85% 78% at 20% 30%, rgba(128, 25, 224, 0.92) 0%, transparent 58%),
     radial-gradient(ellipse 80% 72% at 78% 18%, rgba(18, 205, 240, 0.9) 0%, transparent 55%),
     radial-gradient(ellipse 74% 80% at 42% 88%, rgba(54, 4, 253, 0.92) 0%, transparent 60%) !important;
 }
 .v2-design .bp-hero-zone::after {
-  inset: -85%;
-  filter: blur(46px);
-  will-change: auto;
+  inset: 0 !important;
+  filter: blur(24px);
+  transform: none !important;
+  animation: none !important;
+  will-change: auto !important;
+  mix-blend-mode: normal;
   background:
     radial-gradient(ellipse 82% 74% at 76% 74%, rgba(18, 205, 240, 0.86) 0%, transparent 56%),
     radial-gradient(ellipse 28% 26% at 12% 70%, rgba(128, 25, 224, 0.58) 0%, transparent 48%),
     radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
-  inset: -85% !important;
-  filter: blur(58px);
+  inset: 0 !important;
+  filter: blur(24px);
+  transform: none !important;
+  animation: none !important;
   will-change: auto !important;
-  opacity: 0.92 !important;
+  opacity: 0.62 !important;
   background:
     radial-gradient(ellipse 58% 42% at 18% 72%, rgba(128, 25, 224, 0.9) 0%, transparent 64%),
     radial-gradient(ellipse 52% 46% at 82% 24%, rgba(18, 205, 240, 0.92) 0%, transparent 62%),
     radial-gradient(ellipse 40% 38% at 56% 54%, rgba(54, 4, 253, 0.8) 0%, transparent 68%) !important;
-  mix-blend-mode: screen;
-  animation: bp-reactbits-aurora-flow 6.1s ease-in-out infinite alternate !important;
+  mix-blend-mode: normal;
+  animation: none !important;
   /* No will-change here (unlike the ::before/::after drift layers) -- transform/opacity already
      get their own compositing layer once animated, and pairing `will-change: transform` with
      `mix-blend-mode: screen` on this specific layer produces a hard, non-looping vertical seam
@@ -138,6 +148,9 @@
     background: rgba(61, 20, 155, 0.82) !important;
   }
 }
+
+.v2-design .bp-hero-zone::before,
+.v2-design .bp-hero-zone::after { opacity: .78 !important; }
 
 /* Mobile performance/containment guard. Large animated, blurred layers are
  * expensive to repaint on narrow devices and their negative inset can escape
@@ -871,8 +884,8 @@
     height: 64px;
     box-sizing: border-box;
     padding: 12px 16px 12px !important;
-    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
-    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 100% 100%;
+    animation: none;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
     width: 40px;
@@ -884,8 +897,8 @@
     /* Use the same vivid aurora palette as the calendar hero card so the
      * collapsed brand tile remains a true continuation of the main canvas. */
     background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%);
-    background-size: 300% 300%;
-    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
+    background-size: 100% 100%;
+    animation: none;
     color: #fff;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,

@@ -426,7 +426,22 @@
       });
     });
   };
-  new MutationObserver(watch).observe(document.body, { childList: true, subtree: true });
+  // Chat, gallery, and archive commit thousands of nodes. Measuring lightbox
+  // slots on every one of those mutations forced layout even when no lightbox
+  // was open.
+  const lightboxMutationRelevant = (record) => {
+    const target = record.target;
+    if (target instanceof Element && target.closest('.lightbox-overlay')) return true;
+    const nodes = [...(record.addedNodes || []), ...(record.removedNodes || [])];
+    return nodes.some(node => node instanceof Element && (
+      node.classList?.contains('lightbox-overlay')
+      || node.classList?.contains('lightbox-stage')
+      || !!node.querySelector?.('.lightbox-overlay, .lightbox-stage')
+    ));
+  };
+  new MutationObserver(records => {
+    if (records.some(lightboxMutationRelevant)) watch();
+  }).observe(document.body, { childList: true, subtree: true });
   window.addEventListener('resize', scan);
   window.visualViewport?.addEventListener('resize', scan);
 })();
