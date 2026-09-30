@@ -4708,6 +4708,47 @@ function todayIsoLocal() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+// Keep in step with MOVIE_THEATRICAL_DAYS in scripts/lib/culture-normalize.mjs. Snapshots
+// written before that change have no endDate and isOpenEnded:true, so the list cannot trust
+// those fields — a release older than this window is not still 상영중.
+const MOVIE_THEATRICAL_DAYS = 28;
+function addDaysIsoLocal(iso, days) {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function movieScreeningEnd(item) {
+  const release = cultureItemDay(item);
+  if (!release) return '';
+  const end = String(item?.endDate || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(end) && end !== release) return end;
+  return addDaysIsoLocal(release, MOVIE_THEATRICAL_DAYS);
+}
+function movieStillShowing(item, today) {
+  const release = cultureItemDay(item);
+  if (!release || release > today) return false;
+  const end = movieScreeningEnd(item);
+  return !!end && end >= today;
+}
+
+// Korean fixtures are titled "원정 vs 홈" while homeTeam is the actual home side. The poster
+// must follow the title left-to-right, otherwise the logos look swapped.
+function sportsMatchSides(item) {
+  const home = { name: String(item?.homeTeam || '').trim(), logo: String(item?.homeTeamLogo || '').trim() };
+  const away = { name: String(item?.awayTeam || '').trim(), logo: String(item?.awayTeamLogo || '').trim() };
+  if (!home.name || !away.name) return null;
+  const title = String(item?.title || '').replace(/\s+/g, ' ').trim();
+  const leads = (name) => {
+    const compact = name.replace(/\s+/g, '');
+    const head = title.replace(/\s+/g, '');
+    return compact && head.startsWith(compact);
+  };
+  if (leads(away.name) && !leads(home.name)) return [away, home];
+  if (leads(home.name) && !leads(away.name)) return [home, away];
+  return [away, home];
+}
+
 
 // Pull the first http(s) URL out of free text. Custom festival cards often store the homepage
 // only in description, so link/website are empty while a blue URL still shows in the sheet.
@@ -4931,7 +4972,9 @@ function filterAndSortCultureItems(items, category) {
   // (포털·개별등록·캘린더 연동 orphan 동일). 데이터 자체는 지우지 않는다 -- 개별등록/연동은
   // Firestore·cultureSnapshot에 남아 일정 뱃지→백드롭 deep-link(mergedItems focus)로 열린다.
   // 서비스 JSON 풀의 비연동 항목은 sync가 종료+30일 뒤 스냅샷에서 정리한다.
-  // movie: 개봉일이 오늘 이전인데 상영중이 아닌 항목만 숨긴다 (예정·상영중은 유지).
+  // movie: 개봉 예정은 유지. 개봉일이 Theatrical window(28일)보다 오래된 작품은
+  // 종료일이 비어 있어도 상영중이 아니다. 스냅샷이 영화를 전부 open-ended로 넣던 시절의
+  // JSON도 같은 규칙으로 걸러진다.
   if (category !== 'festival' && category !== 'event' && category !== 'sports' && category !== 'movie') {
     return items;
   }
@@ -4940,9 +4983,8 @@ function filterAndSortCultureItems(items, category) {
     if (category === 'movie') {
       const day = cultureItemDay(item);
       if (!day) return true;
-      if (day >= today) return true; // 예정(오늘 포함)
-      // 개봉일 지남: 상영중 배지와 동일 조건(종료일 없거나 오늘 이상)만 유지
-      return !item.endDate || item.endDate >= today;
+      if (day > today) return true;
+      return movieStillShowing(item, today);
     }
     const end = cultureItemEndDay(item);
     if (!end) return true;
@@ -4976,11 +5018,7 @@ function filterAndSortCultureItems(items, category) {
   // movie: 「상영중」 first, then by release/start date ascending so future releases sink.
   // sports (and any other non-festival/event caller): keep near-today proximity sort.
   if (category === 'movie') {
-    const isNowShowing = (item) => {
-      const day = cultureItemDay(item);
-      if (!day || day > today) return false;
-      return !item.endDate || item.endDate >= today;
-    };
+    const isNowShowing = (item) => movieStillShowing(item, today);
     return visible.sort((a, b) => {
       const aNow = isNowShowing(a) ? 0 : 1;
       const bNow = isNowShowing(b) ? 0 : 1;
@@ -6278,10 +6316,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
-        const isMovieNowShowing = isMovieCard
-          && cultureItemDay(item)
-          && cultureItemDay(item) <= todayIsoLocal()
-          && (!item.endDate || item.endDate >= todayIsoLocal());
+        const isMovieNowShowing = isMovieCard && movieStillShowing(item, todayIsoLocal());
         const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
         const posterUrl = culturePosterUrl(item);
         const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
@@ -6361,32 +6396,53 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
               },
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
-                  item.homeTeamLogo && /*#__PURE__*/React.createElement("img", {
-                    src: item.homeTeamLogo, alt: item.homeTeam, loading: 'lazy', decoding: 'async',
-                    style: { width: '100%', maxWidth: '112px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
-                    onError: e => { e.currentTarget.style.display = 'none'; }
-                  }),
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
-                  }, item.homeTeam)
-                ),
-                /*#__PURE__*/React.createElement("span", {
-                  style: {
-                    fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 10px'
+                (sportsMatchSides(item) || []).flatMap((side, index) => {
+                  const column = /*#__PURE__*/React.createElement("div", {
+                    key: `${side.name}-${index}`,
+                    style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 }
+                  },
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { position: 'relative', width: '100%', maxWidth: '112px', aspectRatio: '1 / 1' }
+                    },
+                      side.logo && /*#__PURE__*/React.createElement("img", {
+                        src: side.logo,
+                        alt: side.name,
+                        loading: 'lazy',
+                        decoding: 'async',
+                        referrerPolicy: 'no-referrer',
+                        style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
+                        onError: e => {
+                          const img = e.currentTarget;
+                          if (img) img.style.display = 'none';
+                          const fallback = img && img.nextElementSibling;
+                          if (fallback) fallback.style.display = 'flex';
+                        }
+                      }),
+                      /*#__PURE__*/React.createElement("span", {
+                        "aria-hidden": "true",
+                        style: {
+                          display: side.logo ? 'none' : 'flex',
+                          position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center',
+                          borderRadius: '50%', background: 'rgba(255,255,255,0.16)',
+                          fontSize: '1.4rem', fontWeight: 800
+                        }
+                      }, (side.name || '?').slice(0, 1))
+                    ),
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                    }, side.name)
+                  );
+                  if (index === 0) {
+                    return [column, /*#__PURE__*/React.createElement("span", {
+                      key: 'vs',
+                      style: {
+                        fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 10px'
+                      }
+                    }, "vs")];
                   }
-                }, "vs"),
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
-                  item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
-                    src: item.awayTeamLogo, alt: item.awayTeam, loading: 'lazy', decoding: 'async',
-                    style: { width: '100%', maxWidth: '112px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
-                    onError: e => { e.currentTarget.style.display = 'none'; }
-                  }),
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
-                  }, item.awayTeam)
-                )
+                  return [column];
+                })
               ),
               /*#__PURE__*/React.createElement("div", {
                 style: {

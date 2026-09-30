@@ -2702,10 +2702,34 @@ export function GlobalSearchModal({
       fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
     )).then(payloads => {
       const feedKinds = ['performance', 'festival', 'sports', 'movie'];
+      const today = (() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      })();
+      const addDays = (iso, days) => {
+        const d = new Date(`${iso}T00:00:00`);
+        d.setDate(d.getDate() + days);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      const stillListed = (item, kind) => {
+        if (kind === 'movie' || item.genre === 'movie') {
+          const release = /^\d{4}-\d{2}-\d{2}$/.test(String(item.releaseDate || item.startDate || '')) ? String(item.releaseDate || item.startDate) : '';
+          if (!release || release > today) return true;
+          const end = /^\d{4}-\d{2}-\d{2}$/.test(String(item.endDate || '')) && item.endDate !== release
+            ? item.endDate
+            : addDays(release, 28);
+          return end >= today;
+        }
+        const end = item.endDate || item.startDate || '';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(end))) return true;
+        return end >= today;
+      };
       const byId = new Map();
       payloads.forEach((payload, index) => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
         if (!item?.id || byId.has(item.id)) return;
-        byId.set(item.id, { ...item, searchKind: item.kind || feedKinds[index] });
+        const kind = item.kind || feedKinds[index];
+        if (!stillListed(item, kind)) return;
+        byId.set(item.id, { ...item, searchKind: kind });
       }));
       setCatalogContent(Array.from(byId.values()));
     });

@@ -51,9 +51,10 @@ const FEEDS = [
   { file: 'culture-performances.json', sources: PERFORMANCE_SOURCES, label: 'performances', dedupe: true },
   { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals', dedupe: true },
   { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' },
-  // requiredFields: announced films with no release date yet ship date "" -- still worth listing
-  // (sorted last as 개봉 미정), so movies only need a title and a link.
-  { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', keepHistorical: true, requiredFields: ['title', 'link'] }
+  // Dated films are visible only through their theatrical window (see movieTheatricalEnd).
+  // Undated announcements stay via openEnded. keepHistorical used to pin every past release
+  // in the movie tab as 상영중.
+  { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', requiredFields: ['title', 'link'] }
 ];
 
 

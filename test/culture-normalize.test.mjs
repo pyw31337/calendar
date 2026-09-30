@@ -8,6 +8,7 @@ import {
   inferRegion,
   isVisible,
   mergeDuplicates,
+  movieTheatricalEnd,
   normalizeItem,
   normalizeTitleForMatch,
   parseDateRange,
@@ -108,4 +109,17 @@ test('undated films are kept and labeled 개봉 미정', () => {
   assert.equal(openEnded, true);
   assert.equal(item.dateLabel, '개봉 미정');
   assert.equal(item.address, '');
+  assert.equal(item.isOpenEnded, true);
+});
+
+test('a released film is not open-ended past its theatrical window', () => {
+  const { item, openEnded } = normalizeItem({
+    id: 'movie_zombie', title: '우리 아빠 좀비', date: '2026.07.05 (일)', link: 'https://example.com', genre: 'movie', source: 'movie'
+  });
+  assert.equal(openEnded, false);
+  assert.equal(item.isOpenEnded, false);
+  assert.equal(item.releaseDate, '2026-07-05');
+  assert.equal(item.endDate, movieTheatricalEnd('2026-07-05'));
+  assert.equal(item.endDate, '2026-08-02');
+  assert.ok(!isVisible(item.endDate, item.startDate, '2026-09-30'));
 });

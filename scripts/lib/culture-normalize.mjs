@@ -39,6 +39,14 @@ export function addDaysIso(iso, days) {
 // cultureSnapshot orphans (see filterAndSortCultureItems in src/ui/ui-summary-gallery.js).
 export const POST_END_GRACE_DAYS = 30;
 
+// A film with only a release day is not an open run. Wide releases leave theaters in about a
+// month; without this, every crawled movie stays 「상영중」 until Culture Flow drops the row.
+export const MOVIE_THEATRICAL_DAYS = 28;
+
+export function movieTheatricalEnd(releaseIso) {
+  return addDaysIso(releaseIso, MOVIE_THEATRICAL_DAYS);
+}
+
 export function isVisible(endDate, startDate, todayIso, { openEnded = false } = {}) {
   // Open-ended / OPEN RUN listings have no parseable end date by design -- keep them while
   // upstream still publishes them (Culture Flow collect is the lifecycle owner for those).
@@ -335,12 +343,17 @@ export function compactItem(item) {
 }
 
 export function normalizeItem(raw) {
-  const openRun = isOpenRunDate(raw.date);
-  const { startDate, endDate } = parseDateRange(raw.date);
   const movie = raw.genre === 'movie';
-  const openEnded = movie || openRun;
-  const normalizedStartDate = openRun ? null : startDate;
-  const normalizedEndDate = openEnded ? null : endDate;
+  const openRun = !movie && isOpenRunDate(raw.date);
+  const { startDate, endDate } = parseDateRange(raw.date);
+  // Dated films get a theatrical window. A real ranged end (different from the release day)
+  // is kept. Undated announcements stay open-ended and render as 개봉 미정.
+  const movieRanged = movie && startDate && endDate && endDate !== startDate;
+  const openEnded = movie ? !startDate : openRun;
+  const normalizedStartDate = openEnded ? null : startDate;
+  const normalizedEndDate = openEnded
+    ? null
+    : (movie ? (movieRanged ? endDate : movieTheatricalEnd(startDate)) : endDate);
   const venue = cleanInlineText(raw.venue || raw.venueKey || '');
   const address = cleanAddress(raw.address);
   const cast = Array.isArray(raw.cast)
