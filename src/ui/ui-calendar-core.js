@@ -2001,13 +2001,14 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             }
           },
             urlVideoOpen ? [
-              /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }),
-              " 영상 닫기"
+              /*#__PURE__*/React.createElement(SmallXIcon, { key: 'close', size: 13 }),
+              /*#__PURE__*/React.createElement("span", { key: 'label' }, "영상 닫기")
             ] : [
               /*#__PURE__*/React.createElement("svg", {
+                key: 'play',
                 viewBox: "0 0 24 24", width: "13", height: "13", fill: "currentColor"
               }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
-              " 영상 바로보기"
+              /*#__PURE__*/React.createElement("span", { key: 'label' }, "영상 바로보기")
             ]
           ),
           urlIsVideo && urlVideoOpen && /*#__PURE__*/React.createElement("div", {
