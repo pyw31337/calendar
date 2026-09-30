@@ -1974,8 +1974,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
 
   const mobileImageStageStyle = isDesktop
     ? {
-        width: '100vw',
-        maxWidth: '100vw',
+        width: '100%',
+        maxWidth: '100%',
         height: `calc(100dvh - ${reservedBottomPx}px)`,
         maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
         overflow: 'hidden',
@@ -1983,8 +1983,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
       }
     : {
-        width: '100vw',
-        maxWidth: '100vw',
+        width: '100%',
+        maxWidth: '100%',
         height: `${mobileStageHeightPx}px`,
         maxHeight: `${mobileStageHeightPx}px`,
         overflow: 'hidden',

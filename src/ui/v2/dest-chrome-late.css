@@ -891,7 +891,6 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
 .v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
 .v2-design .bp-side-nav-item-meta.chat-name-pill,
 .v2-design .bp-side-nav-item-badge,
-.v2-design .bp-hero-quick-nav-badge,
 .v2-design .bp-settlement-card-badge,
 .v2-design .bp-side-nav-cal-badge,
 .v2-design .participant-badge,
@@ -2979,12 +2978,9 @@ html:has(.renewal-shell.v2-design) {
   }
 }
 
-html:has(.renewal-shell.v2-design)[data-v2-keyboard] {
-  --mobile-bottom-nav-total: 0px !important;
-}
-
 html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
-  display: none !important;
+  display: flex !important;
+  bottom: var(--app-vv-keyboard-inset, 0px) !important;
 }
 
 .v2-design .bp-mobile-bottom-nav-item {
@@ -4815,8 +4811,9 @@ html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-text {
 
 /* Phone home: the purple hero stays put. The calendar and the cards below
    scroll up and paint over it, instead of the whole page moving as one. */
-@media (max-width: 767px) {
+@media (max-width: 1199px) {
   html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-hero-zone {
+    position: -webkit-sticky !important;
     position: sticky !important;
     top: 0 !important;
     z-index: 1 !important;
@@ -5320,7 +5317,6 @@ html:has(.renewal-shell.v2-design) :where(
   .url-capsule-badge:not(.is-multiline),
   .calendar-loading-pill,
   .bp-side-nav-item-badge,
-  .bp-hero-quick-nav-badge,
   .bp-comment-badge,
   .confirmed-meeting-label-badge
 ) {
@@ -5334,8 +5330,6 @@ html:has(.renewal-shell.v2-design) :where(
   .bp-renewal-shell-header-icon-btn,
   .bp-ghost-btn,
   .bp-dday-collapse-btn,
-  .bp-hero-quick-nav-item,
-  .bp-hero-quick-nav-icon,
   .underline-tabs [role="tab"],
   .bp-more-link,
   .bp-cal-nav-btn,
@@ -6245,4 +6239,116 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-he
       var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-sheet-top-gap, 12px) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px)) - 120px
     ) !important;
   }
+}
+
+/* Shared inset for the four list cards the user reads as one family:
+   memo page, place list, settlement ledger, past meetings.
+   Wider than the old 8–16px insets so type and media don't sit on the stroke. */
+html:has(.renewal-shell.v2-design) {
+  --v2-list-card-pad: 24px;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid > .v2-memo-card-wrap .v2-memo-card-contract,
+html:has(.renewal-shell.v2-design) .v2-places .places-list-body > .place-card-row,
+html:has(.renewal-shell.v2-design) .v2-settlement .settlement-ledger-row,
+html:has(.renewal-shell.v2-design) .v2-archive .history-meetings-grid > .date-item-btn {
+  padding: var(--v2-list-card-pad) !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-pin-btn {
+  top: 18px !important;
+  right: 18px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-share-btn {
+  top: 18px !important;
+  right: 42px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .v2-memo-card-title {
+  padding-right: 58px !important;
+}
+
+/* In-page search sits in the header (or directly under it) and must stay visible.
+   Legacy bars were display:none or translated off-screen, so the header icon
+   looked like it did nothing. */
+html:has(.renewal-shell.v2-design) .v2-page-header:has(.bp-search-row, .inline-search-bar) {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-search-row,
+html:has(.renewal-shell.v2-design) .v2-page-header .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-gallery .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-content .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-archive .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-settlement .inline-search-bar,
+html:has(.renewal-shell.v2-design) .v2-places .bp-search-row,
+html:has(.renewal-shell.v2-design) .v2-memo .bp-search-row {
+  display: flex !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  z-index: 6 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.v2-chat-search-open .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat.v2-chat-search-open .chat-messages-scroll {
+  padding-top: calc(112px + var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px))) !important;
+}
+
+/* iOS draws the date picker's icon at the field's right edge. A full capsule
+   radius clips it. Keep a short radius and the native indicator. */
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay
+) input[type="date"],
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay
+) input[type="time"],
+html:has(.renewal-shell.v2-design) :is(
+  .renewal-shell.v2-design,
+  .modal-overlay,
+  .bottom-sheet-overlay
+) input[type="datetime-local"] {
+  border-radius: 12px !important;
+  padding-inline-end: 6px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  -webkit-appearance: auto !important;
+  appearance: auto !important;
+}
+html:has(.renewal-shell.v2-design) input[type="date"]::-webkit-calendar-picker-indicator,
+html:has(.renewal-shell.v2-design) input[type="time"]::-webkit-calendar-picker-indicator,
+html:has(.renewal-shell.v2-design) input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  margin: 0 !important;
+  opacity: 1 !important;
+}
+
+/* Expanded D-day: backdrop-filter plus overflow:hidden blanks the card in WebKit. */
+html:has(.renewal-shell.v2-design) .bp-dday-reveal .bp-dday-expanded,
+html:has(.renewal-shell.v2-design) .bp-dday-chip-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Dark mode: search fields and the back control follow the theme, not a light plate. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .bp-floating-back-btn,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-page-header .bp-back-btn {
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-subtle) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-bar,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .bp-search-row,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-capsule,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .bp-search-input,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-input {
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-subtle) !important;
 }

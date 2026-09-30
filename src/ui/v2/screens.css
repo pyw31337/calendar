@@ -222,8 +222,8 @@
 .v2-design .v2-chat-scroll > div:first-child { padding: 4px 14px !important; }
 .v2-design .v2-chat-search-open .v2-chat-scroll > div:first-child { padding-top: 62px !important; }
 .v2-design .v2-chat .inline-search-bar {
-  left: 50% !important; right: auto !important; transform: translateX(-50%);
-  width: 100%; max-width: 480px;
+  left: 0 !important; right: 0 !important; transform: none;
+  width: 100%; max-width: none;
 }
 .v2-design .v2-chat-composer { position: relative; bottom: auto; left: auto; right: auto; z-index: 35; background: var(--bg-card); width: 100%; flex: 0 0 auto; padding: 10px 12px; }
 .v2-design .v2-chat-compose-row { display: flex; align-items: center; gap: 8px; }
@@ -540,23 +540,7 @@
   margin-bottom: 8px !important;
 }
 
-/* Gallery / records hub under ?shell=v2 — keep upload/share/lightbox handlers */
-.v2-design .v2-records-overview.renewal-records-overview,
-.v2-design .renewal-records-overview.v2-records-overview {
-  padding: 16px 14px 24px;
-}
-.v2-design .v2-records-overview .renewal-records-overview-card {
-  border-radius: 16px;
-  border-color: var(--v2-card-border, #eceaf5);
-  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03));
-  background: var(--bg-card);
-}
-.v2-design .v2-records-overview .renewal-records-overview-icon {
-  background: var(--v2-tint-soft, #f3eeff);
-}
-.v2-design .v2-records-overview .renewal-records-overview-card-count {
-  color: var(--brand, #7C2FE5);
-}
+/* Gallery / records destinations under ?shell=v2 — keep upload/share/lightbox handlers */
 .v2-design .renewal-shell-subtab-item.is-active {
   background: var(--v2-tint-soft, #f3eeff) !important;
   border-color: var(--brand, #7C2FE5) !important;

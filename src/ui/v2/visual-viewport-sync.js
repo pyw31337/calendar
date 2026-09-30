@@ -81,11 +81,11 @@
     // keyboard keeps visualViewport.scale at 1; an auto/manual zoom does not.
     const viewportScale = Number(vv?.scale || 1);
     const chromeShrink = layoutH - vvH - rawTop;
-    const keyboard = viewportScale <= 1.01 && chromeShrink > 120;
-    // Address and tool bars cover less than a keyboard. Size the shell to the
-    // visible viewport so the last cards are not stuck under the bar. Leave
-    // offsetTop at 0: copying it back is what makes the chat header jump.
-    const browserChrome = !keyboard && viewportScale <= 1.01 && chromeShrink > 24;
+    // A real keyboard is most of the screen. Samsung/Safari toolbars can shrink
+    // ~140px; treating that as a keyboard jumps the shell. Address bars under
+    // ~8px are noise (scrollbar, rounding).
+    const keyboard = viewportScale <= 1.01 && chromeShrink > 180;
+    const browserChrome = !keyboard && viewportScale <= 1.01 && chromeShrink > 8;
     const height = keyboard || browserChrome
       ? vvH
       : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH));
@@ -138,8 +138,9 @@
 
     // Keep portaled lightbox overlays inside the visual viewport.
     document.body.querySelectorAll(':scope > .lightbox-overlay').forEach(overlay => {
-      overlay.style.setProperty('width', '100vw', 'important');
-      overlay.style.setProperty('max-width', 'none', 'important');
+      const overlayW = Math.max(1, Math.round(vv?.width || window.innerWidth || 0));
+      overlay.style.setProperty('width', `${overlayW}px`, 'important');
+      overlay.style.setProperty('max-width', `${overlayW}px`, 'important');
       overlay.style.setProperty('height', `${keyboard ? vvH : height}px`, 'important');
       overlay.style.setProperty('min-height', `${keyboard ? vvH : height}px`, 'important');
       overlay.style.setProperty('top', `${rawTop}px`, 'important');

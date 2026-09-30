@@ -2600,46 +2600,11 @@ function PlaceholderPane({ tabId, calendarName }) {
   });
 }
 
-/** 기록 > 전체: 이미 로드된 데이터만 사용하는 빠른 요약 허브. */
-function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab, onChangeView }) {
-  const React = window.React;
-  const memoCount = Array.isArray(recordsContext?.memoProps?.memos) ? recordsContext.memoProps.memos.length : 0;
-  const mediaCount = Array.isArray(recordsContext?.mediaProps?.indexedPhotos) ? recordsContext.mediaProps.indexedPhotos.length : 0;
-  const placeCount = Array.isArray(recordsContext?.placesProps?.calendar?.places) ? recordsContext.placesProps.calendar.places.length : 0;
-  const cards = [
-    { id: 'memo', label: '메모', count: memoCount, icon: '📝', hint: '날짜와 태그로 정리된 메모', firstClass: true },
-    { id: 'media', label: '사진·영상', count: mediaCount, icon: '🖼️', hint: '모임과 대화에 연결된 미디어' },
-    { id: 'places', label: '장소', count: placeCount, icon: '📍', hint: '저장한 장소와 방문 기록', firstClass: true },
-    { id: 'archive', label: '보관함', count: Array.isArray(recordsContext?.historyProps?.anniversaries) ? recordsContext.historyProps.anniversaries.length : 0, icon: '🗂️', hint: '기념일과 추억 모음' },
-  ];
-  const openCard = (card) => {
-    if (card.firstClass && typeof onChangeView === 'function') onChangeView(card.id);
-    else onSelectSubTab(card.id);
-  };
-  return React.createElement('section', { className: 'renewal-records-overview v2-records-overview', 'aria-label': '기록 요약' },
-    React.createElement('div', { className: 'renewal-shell-section-title' }, calendarName ? `${calendarName} 기록` : '기록 요약'),
-    React.createElement('p', { className: 'renewal-records-overview-subtitle' }, '메모·장소는 독립 페이지, 사진·보관함은 기록 허브에서 이어집니다.'),
-    React.createElement('div', { className: 'renewal-records-overview-grid' }, cards.map(card =>
-      React.createElement('button', { key: card.id, type: 'button', className: 'renewal-records-overview-card', onClick: () => openCard(card) },
-        React.createElement('span', { className: 'renewal-records-overview-icon', 'aria-hidden': 'true' }, card.icon),
-        React.createElement('span', { className: 'renewal-records-overview-card-main' },
-          React.createElement('span', { className: 'renewal-records-overview-card-label' }, card.label),
-          React.createElement('span', { className: 'renewal-records-overview-card-count' }, `${card.count}개`),
-          React.createElement('span', { className: 'renewal-records-overview-card-hint' }, card.hint)
-        ),
-        React.createElement('span', { className: 'renewal-records-overview-arrow', 'aria-hidden': 'true' }, React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 16, direction: 'right' }))
-      )
-    ))
-  );
-}
+/** 기록 > 전체 is not a destination. Bare ?tab=records / sub=all is rewritten to the calendar. */
 
 /**
- * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
- * EmptyState, keyed by sub-tab so switching filters visibly changes something even before WP-06
- * wires real data in. This is the one tab with a second level of navigation because it alone
- * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
- */
-/**
+ * 기록 tab body: gallery, archive, and content. The old "전체" overview is gone;
+ * a bare records URL is rewritten to the calendar before this pane stays up.
  * Builds the 기록 tab's real ingredients (WP-06 continuation, 사진·영상 + 보관함 + 장소 + 메모
  * subtabs). Straight pass-through of the same values/handlers `app-main.js`'s own
  * `activeView === 'gallery'` / `activeView === 'history'` / `activeView === 'places'` /
@@ -3081,36 +3046,17 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
     if (subTab === 'memo') onChangeView('memo');
     else if (subTab === 'places') onChangeView('places');
   }, [subTab]);
-  // Gallery/Content/Archive are selected from the side-nav — the records subtab strip
-  // (전체/사진·영상/보관함/콘텐츠) is redundant IA when those destinations are already active.
-  // Keep the strip only for the 전체 hub overview.
-  const hideSubtabStrip = subTab === 'media' || subTab === 'content' || subTab === 'archive';
-  return React.createElement('div', { className: `v2-records-frame${hideSubtabStrip ? ' v2-records-no-subtab' : ''}`.trim() },
-    hideSubtabStrip
-      ? null
-      : React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
-          RECORDS_SUBTABS.map(t => React.createElement('button', {
-            key: t.id,
-            type: 'button',
-            role: 'tab',
-            'aria-selected': subTab === t.id,
-            className: `renewal-shell-subtab-item ${subTab === t.id ? 'is-active' : ''}`.trim(),
-            onClick: () => onSelectSubTab(t.id),
-          }, t.label))
-        ),
+  // Gallery, content, and archive are their own side-nav destinations. The records
+  // "전체" hub is not a page — bare ?tab=records is rewritten to the calendar.
+  return React.createElement('div', { className: 'v2-records-frame v2-records-no-subtab' },
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
       : subTab === 'content'
       ? React.createElement(ContentPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
-      : subTab === 'all'
-      ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab, onChangeView })
       : subTab === 'archive'
       ? React.createElement(HistoryPane, { recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions })
-      : React.createElement(EmptyState, {
-        title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
-        subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
-      })
+      : null
     )
   );
 }
