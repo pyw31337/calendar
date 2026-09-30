@@ -141,6 +141,17 @@ async function auditCalendar(calendarId) {
       if (report.samples.orphanComments.length < 10) report.samples.orphanComments.push(`${c.id} (${c.comments.length})`);
     }
   });
+  // Classification only. This script never writes, and it must not: photoIndex is
+  // server-owned (firestore.rules write: false), Storage originals that 404 are already
+  // gone, and copying an empty message tag slot onto a meeting album would wipe the tags
+  // the album and the index still have. Orphan comments stay; deleting them drops text.
+  report.handling = {
+    hide: report.deadIndexRows + report.sourceRefsToMissingFiles,
+    reconnect: report.staleIndexOwners,
+    reviewTags: report.copiesWithDifferentTags,
+    keepComments: report.orphanCommentThreads,
+    originalsDeleted: 0
+  };
   return report;
 }
 
