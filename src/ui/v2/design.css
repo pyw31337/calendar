@@ -558,6 +558,12 @@
   min-width: 0;
   will-change: transform, opacity;
 }
+/* Thumbs and place rows are buttons. Their own touch-action must stay pan-y
+   so a sideways finger pages the card instead of being eaten as a tap. */
+.v2-design .home-summary-pager-content :is(button, a, img) {
+  touch-action: pan-y;
+  -webkit-user-drag: none;
+}
 .v2-design .home-summary-pager-content.is-dragging {
   transition: none;
 }

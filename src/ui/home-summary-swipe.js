@@ -15,6 +15,12 @@ export const HOME_SUMMARY_SWIPE_DRAG_RATIO = 0.24;
 export const HOME_SUMMARY_SWIPE_EXIT_MS = 140;
 export const HOME_SUMMARY_SWIPE_ENTER_MS = 200;
 export const HOME_SUMMARY_SWIPE_CLICK_SUPPRESS_MS = 320;
+// Gallery thumbs and place cards are buttons that fill the page. Ignoring every
+// button (and every link) made those sections impossible to swipe, while chat
+// and memo worked because their cards are plain divs. Pager arrows live in
+// .home-summary-pager-nav, which stops the gesture itself. A finished swipe
+// still suppresses the click that would open the photo or the place.
+export const HOME_SUMMARY_SWIPE_IGNORE = '.home-summary-pager-nav, input, textarea, select, [contenteditable="true"]';
 
 export function getHomeSummarySwipeAxis(deltaX, deltaY) {
   const absX = Math.abs(Number(deltaX) || 0);
@@ -143,20 +149,24 @@ export function useHomeSummarySwipe({ pageCount = 0, pageIndex = 0, onPageChange
   };
 
   const supportsPointerEvents = typeof window !== 'undefined' && typeof window.PointerEvent === 'function';
+  const isIgnoredTarget = target => typeof target?.closest === 'function' && !!target.closest(HOME_SUMMARY_SWIPE_IGNORE);
   const surfaceProps = supportsPointerEvents
     ? {
         onPointerDown: event => {
           if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
-          if (event.target?.closest?.('.home-summary-pager-nav, button, a, input, textarea')) return;
+          if (isIgnoredTarget(event.target)) return;
           beginGesture({ clientX: event.clientX, clientY: event.clientY, currentTarget: event.currentTarget }, event.pointerId);
         },
-        onPointerMove: event => moveGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
+        onPointerMove: event => {
+          moveGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId);
+          if (gestureRef.current?.axis === 'horizontal' && event.cancelable) event.preventDefault();
+        },
         onPointerUp: event => endGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
         onPointerCancel: cancelGesture
       }
     : {
         onTouchStart: event => {
-          if (event.target?.closest?.('.home-summary-pager-nav, button, a, input, textarea')) return;
+          if (isIgnoredTarget(event.target)) return;
           const touch = event.touches?.[0];
           if (touch) beginGesture({ clientX: touch.clientX, clientY: touch.clientY, currentTarget: event.currentTarget }, touch.identifier);
         },
@@ -164,6 +174,7 @@ export function useHomeSummarySwipe({ pageCount = 0, pageIndex = 0, onPageChange
           const gesture = gestureRef.current;
           const touch = Array.from(event.touches || []).find(item => item.identifier === gesture?.pointerId);
           if (touch) moveGesture({ clientX: touch.clientX, clientY: touch.clientY }, touch.identifier);
+          if (gestureRef.current?.axis === 'horizontal' && event.cancelable) event.preventDefault();
         },
         onTouchEnd: event => {
           const gesture = gestureRef.current;

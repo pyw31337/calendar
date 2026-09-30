@@ -26,8 +26,20 @@ test('home summary pager nav prevents swipe capture and allows arrow clicks', as
   const fs = await import('node:fs/promises');
   const swipeSource = await fs.readFile(new URL('../src/ui/home-summary-swipe.js', import.meta.url), 'utf8');
   assert.ok(
-    swipeSource.includes("event.target?.closest?.('.home-summary-pager-nav, button, a, input, textarea')"),
-    'gesture capture must ignore clicks on pager nav and buttons'
+    swipeSource.includes("export const HOME_SUMMARY_SWIPE_IGNORE = '.home-summary-pager-nav, input, textarea, select, [contenteditable=\"true\"]'"),
+    'gesture capture must ignore pager nav and text fields'
+  );
+  assert.equal(
+    swipeSource.includes("'.home-summary-pager-nav, button, a, input, textarea'"),
+    false,
+    'content buttons and links must still start a swipe (gallery thumbs, place cards)'
+  );
+
+  const designSource = await fs.readFile(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
+  assert.match(
+    designSource,
+    /\.home-summary-pager-content :is\(button, a, img\) \{[^}]*touch-action:\s*pan-y/,
+    'gallery and place controls must yield horizontal pans to the pager'
   );
 
   const shellSource = await fs.readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
