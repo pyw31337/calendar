@@ -7,6 +7,7 @@
 import { GATHER_APP_UTILS } from './app-utils.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { bindAppServiceWorker } from './service-worker-registration.js';
 import { normalizePushChannelPreferences } from './push-channel-preferences.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -1434,35 +1435,10 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
   return body;
 }
 
-// Registers sw.js, which caches static assets (icons/manifests/hashed chunks) and uploaded Storage media
-// -- never index.html itself, since this app deliberately serves its HTML as no-cache (see sw.js). Safe to
-// register unconditionally: browsers without service worker support simply skip this.
-if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const appBasePath = window.location.pathname.includes('/calendar/') ? '/calendar/' : '/';
-    navigator.serviceWorker.register(`${appBasePath}sw.js`).then(reg => {
-      try { reg.update(); } catch (_) {}
-    }).catch(e => console.warn('Service worker registration failed:', e));
-  });
-
-  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(reg => {
-          try { reg.update(); } catch (_) {}
-        }).catch(() => {});
-      }
-    });
-  }
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    // Never reload an active editing session automatically. UpdateAvailableToast compares the
-    // deployed build SHA and lets the user choose when to activate the new page safely.
-    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-      window.dispatchEvent(new CustomEvent('moyeora:service-worker-updated'));
-    }
-  });
-}
+// Registers sw.js. Path resolution, a preflight so a missing worker never becomes
+// "Script sw.js load failed", and swallowed update() rejections live in
+// service-worker-registration.js. Browsers without service worker support skip this.
+bindAppServiceWorker(typeof window !== 'undefined' ? window : null);
 
 function getContrastTextColor(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getContrastTextColor;

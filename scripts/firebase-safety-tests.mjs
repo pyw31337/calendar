@@ -810,7 +810,10 @@ assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
-assert(/controllerchange[\s\S]{0,400}moyeora:service-worker-updated/.test(domainHelpersScript)
+const serviceWorkerRegistration = fs.readFileSync('src/core/service-worker-registration.js', 'utf8');
+assert(/controllerchange[\s\S]{0,400}moyeora:service-worker-updated/.test(serviceWorkerRegistration)
+  && !/controllerchange[\s\S]{0,500}location\.reload/.test(serviceWorkerRegistration)
+  && /bindAppServiceWorker/.test(domainHelpersScript)
   && !/controllerchange[\s\S]{0,400}location\.reload/.test(domainHelpersScript),
   'service worker controller changes must notify without automatically reloading an active session');
 const miscUiScript = fs.readFileSync('src/ui/ui-misc.js', 'utf8');
@@ -989,7 +992,7 @@ assert(!/await\s+subscription\.unsubscribe\(/.test(script), 'calendar-level noti
 assert(/if \(thumbs\.length === 1\)[\s\S]{0,260}src: displayUrls\[0\] \|\| thumbs\[0\][\s\S]{0,420}objectFit: 'contain'/.test(script), 'single chat image must render the full media without cropping');
 assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script), 'multi-image chat grid should keep cropped square thumbnails');
 const domainHelpers = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
-assert(/const appBasePath = window\.location\.pathname\.includes\('\/calendar\/'\) \? '\/calendar\/' : '\/'[\s\S]{0,180}serviceWorker\.register\(`\$\{appBasePath\}sw\.js`\)/.test(domainHelpers), 'service worker registration must resolve from the app base path on share URLs');
+assert(/bindAppServiceWorker\(typeof window !== 'undefined' \? window : null\)/.test(domainHelpers) && /resolveServiceWorkerTarget/.test(fs.readFileSync('src/core/service-worker-registration.js', 'utf8')), 'service worker registration must resolve from the app base path and recover a missing sw.js');
 const sharedUi = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
 const overlaysUi = fs.readFileSync('src/ui/ui-overlays.js', 'utf8');
 assert(domainHelpers.includes('const isRenderableImageUrl = GATHER_APP_UTILS.isRenderableImageUrl') && fs.readFileSync('src/core/app-utils.js', 'utf8').includes('function isRenderableImageUrl'), 'chat image entries must reject malformed/non-http image URLs');
