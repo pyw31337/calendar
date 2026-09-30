@@ -226,6 +226,7 @@
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary,
   .v2-design .festival-bar-desktop .bp-day-anniversary {
+    background: var(--bg-card) !important;
     background: color-mix(in srgb, var(--anniversary-color, #a855f7) 16%, var(--bg-card)) !important;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
