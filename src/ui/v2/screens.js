@@ -320,7 +320,7 @@ function primeHeaderHeight(header, hiding) {
   if (hiding) void header.offsetHeight;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, forcedHidden = null, searchQuery, onSearchQuery, searchPlaceholder, searchTrailing, searchForceOpen = false, onSearchClose, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, forcedHidden = null, searchQuery, onSearchQuery, searchPlaceholder, placeholder, searchTrailing, searchForceOpen = false, onSearchClose, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
   const suppressUntilRef = React.useRef(0);
@@ -544,7 +544,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         value: searchQuery || '',
         onChange: onSearchQuery,
         onClose: closeUnifiedSearch,
-        placeholder: searchPlaceholder || searchLabel || `${title} 검색`,
+        placeholder: placeholder || searchPlaceholder || searchLabel || `${title} 검색`,
         trailing: searchTrailing,
       }),
       children
@@ -902,7 +902,7 @@ export function PlacesScreen(p) {
     searchLabel: '장소 검색',
     searchQuery: p.searchQuery || '',
     onSearchQuery: typeof p.onSearch === 'function' ? p.onSearch : (() => {}),
-    searchPlaceholder: '장소명, 주소, 방문 메모 검색',
+    placeholder: '장소 검색',
   };
   const select = place => {
     setMapOpen(true);

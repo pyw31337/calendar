@@ -1493,6 +1493,13 @@ export function WeatherDetailModal({
       ref: dayStripRef,
       role: "tablist",
       "aria-label": "날짜별 날씨 선택",
+      style: {
+        borderRadius: 0,
+        borderTop: 0,
+        borderLeft: 0,
+        borderRight: 0,
+        borderBottom: '1px solid var(--v2-line, #f0eef5)'
+      },
       onPointerDown: beginDayStripDrag,
       onPointerMove: moveDayStripDrag,
       onPointerUp: endDayStripDrag,

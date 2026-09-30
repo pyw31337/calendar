@@ -223,9 +223,11 @@ test('V2 destination screens keep live feature entry points', async () => {
   // Gallery/media keeps share + lightbox plumbing; v2 wrapper is presentation-only.
   assert.match(shell, /v2-records-media/);
   assert.match(shell, /onOpenGalleryShare/);
-  assert.match(shell, /galleryActionsRef\.current\.search/);
-  assert.match(shell, /contentActionsRef\.current\.search/);
-  assert.match(shell, /historyActionsRef\.current\.search/);
+  // Shared header search owns the query. The old onSearch -> ref.search indirection is gone;
+  // each records pane still passes a live query into its screen.
+  assert.match(shell, /onSearchQuery: setGallerySearchQuery/);
+  assert.match(shell, /onSearchQuery: setContentSearchQuery/);
+  assert.match(shell, /onSearchQuery: setArchiveSearchQuery/);
   assert.match(screens, /icon: 'search'/);
   assert.match(screens, /v2-memo-active-tag/);
   assert.match(screens, /searchLabel: '갤러리 검색'|label: '갤러리 검색'/);
