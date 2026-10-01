@@ -19,9 +19,6 @@ concurrency:
 jobs:
   report:
     runs-on: ubuntu-latest
-    env:
-      # Firestore REST reads sign in anonymously (scripts/lib/firestore-anon-auth.mjs), same as backup.
-      NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -37,4 +34,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Read-only use: serverAuditLogs (client_error events) is not client-readable.
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
         run: npm run ops:daily-report -- --publish

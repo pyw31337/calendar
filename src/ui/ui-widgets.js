@@ -58,15 +58,18 @@ export function SearchResultLogRow({ kindLabel, kindColor, badgeName, badgeColor
     ),
     hasTitle && /*#__PURE__*/React.createElement("div", {
       className: "global-search-result-title",
-      style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' }
+      style: {
+        fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)',
+        lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap'
+      }
     }, title),
     children ? /*#__PURE__*/React.createElement("div", {
       className: "global-search-result-meta",
       style: {
         fontSize: hasTitle ? 'var(--font-size-sm)' : 'var(--font-size-base)',
         color: hasTitle ? 'var(--text-muted)' : 'var(--text-main)',
-        lineHeight: 1.45, wordBreak: 'break-word',
-        marginTop: hasTitle ? '4px' : 0
+        lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap',
+        marginTop: hasTitle ? '6px' : 0
       }
     }, children) : null,
     timeStr && /*#__PURE__*/React.createElement("div", {
@@ -356,6 +359,9 @@ export function DateCapsuleBadge({ date, style = null }) {
 export function PanelResizeHandle({
   label = '높이 조절',
   className = '',
+  value = 0,
+  min = 0,
+  max = 100,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -368,6 +374,9 @@ export function PanelResizeHandle({
     role: "separator",
     "aria-label": label,
     "aria-orientation": "horizontal",
+    "aria-valuemin": min,
+    "aria-valuenow": value,
+    "aria-valuemax": max,
     tabIndex: 0,
     onPointerDown,
     onPointerMove,

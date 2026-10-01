@@ -14,6 +14,7 @@ const base = `http://${host}/v1/projects/${project}/databases/(default)/document
 const str = v => ({ stringValue: v });
 const num = v => (Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v });
 const geo = (lat, lng) => ({ mapValue: { fields: { lat: num(lat), lng: num(lng) } } });
+const arr = values => ({ arrayValue: { values } });
 
 async function createMessage(id, extraFields = {}) {
   return fetch(`${base}?documentId=${id}`, {
@@ -35,6 +36,16 @@ test('a client can add imageGeoMap to its message right after saving it', async 
 
 test('a message may also be created with imageGeoMap', async () => {
   const res = await createMessage('geo2', { imageGeoMap: { mapValue: { fields: { 'asset:v1:def': geo(37.5, 127.1) } } } });
+  assert.equal(res.status, 200, await res.text());
+});
+
+test('a message may include content fingerprints alongside its image slots', async () => {
+  const res = await createMessage('fingerprint1', {
+    imageUrls: arr([str('https://example.test/full.jpg')]),
+    thumbUrls: arr([str('https://example.test/thumb.jpg')]),
+    imageFingerprints: arr([str('sha256:0123456789abcdef')]),
+    imageTags: arr([str('#260615')]),
+  });
   assert.equal(res.status, 200, await res.text());
 });
 

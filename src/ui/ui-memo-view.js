@@ -4,6 +4,7 @@
 
 import { enqueueWriteOperation } from '../core/app-write-queue.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -41,6 +42,8 @@ function withMemoFirestoreTimeout(promise, timeoutMs = 12000) {
 // or the user pages back to it. Fixing that would need a denormalized lastCommentAt field (a
 // firestore.rules change, deployed separately from the app) rather than a client-only change.
 const RECENT_MEMO_ACTIVITY_WINDOW_MS = 6 * 60 * 60 * 1000;
+const MAX_MEMO_IMAGE_ATTACHMENTS = 200;
+const MAX_MEMO_TAGS = 20;
 
 function getLatestMemoCommentTimestamp(memo) {
   const comments = memo?.comments || [];
@@ -56,42 +59,11 @@ function getMemoRecentActivityDismissalStorageKey(calendarId) {
   return `gather_memo_recent_activity_dismissed_${calendarId || 'default'}`;
 }
 
-function parseMemoShareUrl(value) {
-  const text = String(value || '').trim();
-  if (!text) return null;
-  let url;
-  try {
-    url = new URL(text);
-  } catch (_) {
-    return null;
-  }
-
-  // Only accept this app's public share route. This prevents arbitrary URLs
-  // pasted into a memo from becoming a cross-origin data fetch primitive.
-  const allowedHosts = new Set([
-    window.location.host,
-    'pyw31337.github.io'
-  ].filter(Boolean));
-  if (!allowedHosts.has(url.host)) return null;
-
-  const parts = url.pathname.split('/').filter(Boolean);
-  const shareIndex = parts.indexOf('share');
-  if (shareIndex < 0 || parts[shareIndex + 2] !== 'memo' || !parts[shareIndex + 3]) return null;
-  const calendarId = decodeURIComponent(parts[shareIndex + 1] || '');
-  const memoId = decodeURIComponent(parts[shareIndex + 3] || '');
-  const publicCalendarIds = GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS || [];
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId) || !/^[A-Za-z0-9_-]{1,128}$/.test(memoId)) return null;
-  if (publicCalendarIds.length > 0 && !publicCalendarIds.includes(calendarId)) return null;
-  return { calendarId, memoId, url: url.toString() };
-}
-
 function getMemoShareUrlFromText(value) {
-  const text = String(value || '').trim();
-  const match = text.match(/https?:\/\/[^\s]+/i);
-  if (!match) return null;
-  const candidate = match[0].replace(/[),.;!?]+$/, '');
-  const parsed = parseMemoShareUrl(candidate);
-  return parsed && text === candidate ? parsed : null;
+  const found = findMemoShareUrlInText(value, {
+    publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS || []
+  });
+  return found?.isOnlyUrl ? found : null;
 }
 
 async function fetchMemoForClone(share) {
@@ -241,7 +213,7 @@ function enqueueMemoMediaSave(...args) {
   const f = __gatherUiDeps().enqueueMemoMediaSave || GATHER_APP_UTILS.enqueueMemoMediaSave;
   return typeof f === 'function' ? f(...args) : enqueueWriteOperation(...args);
 }
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2, onRegisterMenuActions = null }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2, onRegisterMenuActions = null, editorOnly = false, initialEditingMemo = null, onEditorClosed = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -305,7 +277,44 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   };
   const autoGrowTextarea = __deps.autoGrowTextarea;
       const [searchQuery, setSearchQuery] = React.useState('');
+  const [memoListPage, setMemoListPage] = React.useState(1);
+  const [memoSearchArchive, setMemoSearchArchive] = React.useState({ calId: '', status: 'idle', memos: null });
+  const memoSearchArchiveRef = React.useRef(memoSearchArchive);
+  memoSearchArchiveRef.current = memoSearchArchive;
+  const memoSearchRequestRef = React.useRef(0);
+  const memoSearchActive = Boolean(String(searchQuery || '').trim());
+  React.useEffect(() => {
+    const calId = calendar?.id || '';
+    if (!memoSearchActive || !calId) return undefined;
+    const current = memoSearchArchiveRef.current;
+    if (current.calId === calId && (current.status === 'ready' || current.status === 'loading')) return undefined;
+    const requestId = memoSearchRequestRef.current + 1;
+    memoSearchRequestRef.current = requestId;
+    const next = { calId, status: 'loading', memos: null };
+    memoSearchArchiveRef.current = next;
+    setMemoSearchArchive(next);
+    const fetchIndex = (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.fetchCalendarSearchIndex) || null;
+    const run = typeof fetchIndex === 'function' ? fetchIndex(calId) : Promise.reject(new Error('search index unavailable'));
+    Promise.resolve(run).then(index => {
+      if (memoSearchRequestRef.current !== requestId) return;
+      const ready = {
+        calId,
+        status: 'ready',
+        memos: Array.isArray(index?.memos) ? index.memos : []
+      };
+      memoSearchArchiveRef.current = ready;
+      setMemoSearchArchive(ready);
+    }).catch(err => {
+      console.warn('full memo search failed', err);
+      if (memoSearchRequestRef.current !== requestId) return;
+      const failed = { calId, status: 'error', memos: null };
+      memoSearchArchiveRef.current = failed;
+      setMemoSearchArchive(failed);
+    });
+    return undefined;
+  }, [memoSearchActive, calendar?.id]);
   const [selectedTag, setSelectedTag] = React.useState('');
+  React.useEffect(() => { setMemoListPage(1); }, [searchQuery, selectedTag]);
   // A hashtag clicked on the main-screen memo preview (see MemoPreviewSection's onSelectTag in
   // app-main.js) carries the tag straight into this page's own filter instead of the unrelated
   // cross-content global search overlay.
@@ -371,7 +380,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   // v2 shell (PC): side-nav's per-tab submenu needs 메모 검색 -- otherwise local to this component.
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
+    onRegisterMenuActions({
+      search: () => {
+        if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(true);
+      }
+    });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions]);
   const [isComposerExpanded, setIsComposerExpanded] = React.useState(false);
@@ -395,6 +409,36 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   // Editing Memo State
   const [editingMemo, setEditingMemo] = React.useState(null);
+  // Overlay ref: reposition the overlay into the visible viewport when the mobile
+  // software keyboard reduces available height (visualViewport resize/scroll).
+  const memoEditOverlayRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!editingMemo) return undefined;
+    const el = memoEditOverlayRef.current;
+    if (!el) return undefined;
+    const apply = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const top = Math.max(0, vv.offsetTop);
+      const height = vv.height;
+      el.style.top = top + 'px';
+      el.style.height = height + 'px';
+      el.style.bottom = 'auto';
+    };
+    apply();
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', apply);
+      vv.addEventListener('scroll', apply);
+    }
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', apply);
+        vv.removeEventListener('scroll', apply);
+      }
+      if (el) { el.style.top = ''; el.style.height = ''; el.style.bottom = ''; }
+    };
+  }, [editingMemo]);
   const [editTitle, setEditTitle] = React.useState('');
   const [editText, setEditText] = React.useState('');
   const editMemoTextareaRef = React.useRef(null);
@@ -417,6 +461,41 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isComposerPartOpen, setIsComposerPartOpen] = React.useState(false);
   const [editParticipantId, setEditParticipantId] = React.useState('');
   const [isEditPartOpen, setIsEditPartOpen] = React.useState(false);
+  // The chat and date-detail surfaces reuse this proven editor instead of maintaining a
+  // second, incomplete edit form. `editorOnly` renders just the portalled editor/share UI,
+  // preserving the caller's current page behind it.
+  const openMemoEditor = React.useCallback((memo) => {
+    if (!memo) return;
+    setEditingMemo(memo);
+    setEditTitle(memo.title || '');
+    setEditText(memo.text || '');
+    setEditColor(memo.color || 'var(--bg-card)');
+    setEditIsPinned(!!memo.isPinned);
+    const rawTags = Array.isArray(memo.tags) ? memo.tags : (memo.tags ? [memo.tags] : []);
+    setEditTags(rawTags.map(tag => String(tag || '').startsWith('#') ? String(tag).slice(1).trim() : String(tag || '').trim()).filter(Boolean));
+    setEditTagInput('');
+    setEditImages((Array.isArray(memo.imageUrls) ? memo.imageUrls : []).map((url, idx) => ({
+      original: url,
+      thumbnail: memo.thumbUrls?.[idx] || url,
+      fingerprint: memo.imageFingerprints?.[idx] || '',
+      isExisting: true
+    })));
+    setEditParticipantId(memo.participantId || '');
+  }, []);
+  const closeMemoEditor = React.useCallback(() => {
+    setEditingMemo(null);
+    if (editorOnly && typeof onEditorClosed === 'function') onEditorClosed();
+  }, [editorOnly, onEditorClosed]);
+  React.useEffect(() => {
+    if (!editorOnly) return;
+    if (!initialEditingMemo?.id) {
+      if (editingMemo) setEditingMemo(null);
+      return;
+    }
+    const incomingStamp = Number(initialEditingMemo.updatedAt || initialEditingMemo.createdAt || 0);
+    const activeStamp = Number(editingMemo?.updatedAt || editingMemo?.createdAt || 0);
+    if (editingMemo?.id !== initialEditingMemo.id || incomingStamp !== activeStamp) openMemoEditor(initialEditingMemo);
+  }, [editorOnly, initialEditingMemo, editingMemo, openMemoEditor]);
   const memoEditorDirtySnapshot = () => JSON.stringify([
     editTitle,
     editText,
@@ -431,7 +510,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   // current memo id as a baseline reset key to keep dirty tracking scoped to the memo being
   // edited rather than the page's surrounding composer/search state.
   const memoEditorDirtyGuard = useModalDirtyGuard(
-    () => setEditingMemo(null),
+    closeMemoEditor,
     onRequestConfirm,
     undefined,
     !!editingMemo,
@@ -468,14 +547,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const attachComposerFiles = async (files) => {
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - newImages.length;
+      const remainingSlots = MAX_MEMO_IMAGE_ATTACHMENTS - newImages.length;
       if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
+        if (showToast) showToast(`사진 최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장`, 'error');
         return;
       }
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
       if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+        showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장)`, 'info');
       }
 
       setImageProcessingNew({ current: 0, total: filesToProcess.length });
@@ -511,14 +590,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const attachEditFiles = async (files) => {
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - editImages.length;
+      const remainingSlots = MAX_MEMO_IMAGE_ATTACHMENTS - editImages.length;
       if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
+        if (showToast) showToast(`사진 최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장`, 'error');
         return;
       }
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
       if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+        showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_MEMO_IMAGE_ATTACHMENTS}장)`, 'info');
       }
 
       setImageProcessingEdit({ current: 0, total: filesToProcess.length });
@@ -577,7 +656,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         .map(tag => String(tag || '').trim())
         .filter(Boolean)
         .map(tag => tag.startsWith('#') ? tag : '#' + tag)
-        .slice(0, 10);
+        .slice(0, MAX_MEMO_TAGS);
       if (!title && !text && newImages.length === 0) {
         showToast('복제할 제목이나 내용이 없는 메모입니다.', 'error');
         return;
@@ -596,7 +675,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           payload: {
             memoId,
             memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: sourceMemo?.imageUrls || [], thumbUrls: sourceMemo?.thumbUrls || [], color: sourceMemo?.color || newColor, isPinned: sourceMemo?.isPinned ?? newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp, ...((() => { const p = buildMemoLinkPreviews(text, sourceMemo); return { linkPreview: p.linkPreview, linkPreviews: p.linkPreviews }; })()) }),
-            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null }))
           }
         });
         if (queued) {
@@ -610,11 +689,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       // exactly the same module chat uses -- see resolveMemoImageBatch/resolveImageBatch)
       let uploadedUrls = Array.isArray(sourceMemo?.imageUrls) ? sourceMemo.imageUrls.slice() : [];
       let uploadedThumbs = Array.isArray(sourceMemo?.thumbUrls) ? sourceMemo.thumbUrls.slice() : [];
+      let uploadedFingerprints = Array.isArray(sourceMemo?.imageFingerprints) ? sourceMemo.imageFingerprints.slice() : [];
       if (newImages.length > 0) {
         setNewUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, newImages, setNewUploadProgress);
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
+        uploadedFingerprints = resolved.map(r => r.fingerprint || '');
       }
 
       // Link previews are hydrated in the background; a third-party scraper must not delay save.
@@ -628,6 +709,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         text,
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
+        imageFingerprints: uploadedFingerprints,
         color: sourceMemo?.color || newColor,
         isPinned: sourceMemo?.isPinned ?? newIsPinned,
         tags: tagsArray,
@@ -697,12 +779,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           payload: {
             memoId: editingMemo.id,
             memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews }),
-            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null }))
           }
         });
         if (queued) {
           showToast('오프라인입니다. 연결되면 메모 수정을 자동 저장합니다.', 'info', 5000);
-          setEditingMemo(null);
+          closeMemoEditor();
           return;
         }
       }
@@ -711,11 +793,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       // module chat's edit flow uses (see resolveMemoImageBatch/resolveImageBatch).
       let uploadedUrls = [];
       let uploadedThumbs = [];
+      let uploadedFingerprints = [];
       if (editImages.length > 0) {
         setEditUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, editImages, setEditUploadProgress);
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
+        uploadedFingerprints = resolved.map(r => r.fingerprint || '');
       }
 
       // Save tags formatted back to database (prepend '#' prefix if needed)
@@ -733,6 +817,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         text: editText.trim(),
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
+        imageFingerprints: uploadedFingerprints,
         color: editColor,
         isPinned: editIsPinned,
         tags: tagsArray,
@@ -767,7 +852,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       }
 
       showToast('메모가 수정되었습니다.', 'success');
-      setEditingMemo(null);
+      closeMemoEditor();
     } catch (err) {
       console.error('Failed to update memo:', err);
       if (typeof onUpsertMemo === 'function') onUpsertMemo(editingMemo);
@@ -821,7 +906,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               };
               await pushSingleCloudCalendar(nextCal, restoreStamp, 4, null, 'settings', [restoreActivityLog]);
             }
-            setEditingMemo(null);
+            closeMemoEditor();
             showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (err) {
             console.error('Failed to restore deleted memo:', err);
@@ -829,7 +914,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             showToast('메모 복원 실패', 'error', 4000);
           }
         });
-        setEditingMemo(null);
+        closeMemoEditor();
       } catch (err) {
         console.error('Failed to delete memo:', err);
         if (typeof onUpsertMemo === 'function') onUpsertMemo(memoSnapshot);
@@ -842,29 +927,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     }
   };
 
-  const handleOpenEdit = (memo) => {
-    setEditingMemo(memo);
-    setEditTitle(memo.title || '');
-    setEditText(memo.text || '');
-    setEditColor(memo.color || 'var(--bg-card)');
-    setEditIsPinned(!!memo.isPinned);
-    
-    // Parse tag tokens (strip '#' prefix for local state management)
-    const rawTags = memo.tags || [];
-    const cleanTags = rawTags.map(t => t.startsWith('#') ? t.slice(1).trim() : t).filter(Boolean);
-    setEditTags(cleanTags);
-    setEditTagInput('');
-
-    // Reconstruct list of images for editing (same { original, thumbnail, isExisting }
-    // shape chat's edit flow uses, so resolveMemoImageBatch passes these through untouched)
-    const currentImgs = (memo.imageUrls || []).map((url, idx) => ({
-      original: url,
-      thumbnail: memo.thumbUrls?.[idx] || url,
-      isExisting: true
-    }));
-    setEditImages(currentImgs);
-    setEditParticipantId(memo.participantId || '');
-  };
+  const handleOpenEdit = openMemoEditor;
 
   // A memo counts as auto-pinned by recent activity only when it isn't ALSO manually pinned
   // (manual pin already puts it in 고정됨, so 최근 활동 would be a redundant, confusing second
@@ -952,8 +1015,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       showToast('이미 등록된 태그입니다.', 'error');
       return;
     }
-    if (newTags.length >= 10) {
-      showToast('태그는 최대 10개까지 등록 가능합니다.', 'error');
+    if (newTags.length >= MAX_MEMO_TAGS) {
+      showToast(`태그는 최대 ${MAX_MEMO_TAGS}개까지 등록 가능합니다.`, 'error');
       return;
     }
     setNewTags(prev => [...prev, cleanTag]);
@@ -974,8 +1037,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       showToast('이미 등록된 태그입니다.', 'error');
       return;
     }
-    if (editTags.length >= 10) {
-      showToast('태그는 최대 10개까지 등록 가능합니다.', 'error');
+    if (editTags.length >= MAX_MEMO_TAGS) {
+      showToast(`태그는 최대 ${MAX_MEMO_TAGS}개까지 등록 가능합니다.`, 'error');
       return;
     }
     
@@ -1004,8 +1067,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     else if (editTagInputRef.current) { try { editTagInputRef.current.focus({ preventScroll: true }); } catch (_) { editTagInputRef.current.focus(); } }
   };
 
-  const filteredMemos = (memos || []).filter(memo => {
+  const filteredMemos = (() => {
     const query = searchQuery.trim().toLowerCase();
+    const archiveReady = query
+      && memoSearchArchive.calId === (calendar?.id || '')
+      && memoSearchArchive.status === 'ready'
+      && Array.isArray(memoSearchArchive.memos);
+    const source = archiveReady
+      ? (() => {
+          const byId = new Map();
+          memoSearchArchive.memos.forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+          (memos || []).forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+          return Array.from(byId.values());
+        })()
+      : (memos || []);
+    return source.filter(memo => {
     
     // Live Search Matcher
     let searchMatch = true;
@@ -1016,15 +1092,43 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       searchMatch = titleMatch || textMatch || tagsMatch;
     }
 
-    // Filter by Tag Clicked Matcher
-    const filterTagMatch = selectedTag ? (memo.tags || []).includes(selectedTag) : true;
+    // Filter by Tag Clicked Matcher. Stored tags keep a leading '#'; a tap may pass either form.
+    const normalizeMemoTag = (tag) => String(tag || '').replace(/^#+/, '').trim().toLowerCase();
+    const filterTagMatch = selectedTag
+      ? (memo.tags || []).some(tag => normalizeMemoTag(tag) === normalizeMemoTag(selectedTag))
+      : true;
 
     return searchMatch && filterTagMatch;
-  });
+    });
+  })();
+  const memoSearchPending = Boolean(searchQuery.trim())
+    && memoSearchArchive.status !== 'ready'
+    && memoSearchArchive.status !== 'error';
 
   const pinnedMemos = filteredMemos.filter(m => m.isPinned);
   const recentActivityMemos = filteredMemos.filter(m => isMemoRecentlyActive(m));
   const otherMemos = filteredMemos.filter(m => !m.isPinned && !isMemoRecentlyActive(m));
+  const MEMO_UI_PAGE_SIZE = 20;
+  const orderedMemoCards = [...pinnedMemos, ...recentActivityMemos, ...otherMemos];
+  const memoUiTotal = (!String(searchQuery || '').trim() && Number(totalMemoCount) > orderedMemoCards.length)
+    ? Number(totalMemoCount)
+    : orderedMemoCards.length;
+  const memoUiPageCount = Math.max(1, Math.ceil(memoUiTotal / MEMO_UI_PAGE_SIZE) || 1);
+  const memoUiSafePage = Math.min(Math.max(1, memoListPage), memoUiPageCount);
+  const memoUiIds = new Set(orderedMemoCards.slice((memoUiSafePage - 1) * MEMO_UI_PAGE_SIZE, memoUiSafePage * MEMO_UI_PAGE_SIZE).map(memo => memo.id));
+  const visiblePinnedMemos = pinnedMemos.filter(memo => memoUiIds.has(memo.id));
+  const visibleRecentMemos = recentActivityMemos.filter(memo => memoUiIds.has(memo.id));
+  const visibleOtherMemos = otherMemos.filter(memo => memoUiIds.has(memo.id));
+  React.useEffect(() => {
+    if (memoListPage > memoUiPageCount) setMemoListPage(memoUiPageCount);
+  }, [memoListPage, memoUiPageCount]);
+  React.useEffect(() => {
+    if (String(searchQuery || '').trim() || typeof onLoadMoreMemos !== 'function' || !hasMoreMemos) return undefined;
+    const needed = memoUiSafePage * MEMO_UI_PAGE_SIZE;
+    if ((memos || []).length >= needed) return undefined;
+    onLoadMoreMemos(needed);
+    return undefined;
+  }, [searchQuery, memoUiSafePage, hasMoreMemos, memos, onLoadMoreMemos]);
 
   const composerPart = (calendar.participants || []).find(p => p.id === composerParticipantId);
   const editPart = (calendar.participants || []).find(p => p.id === editParticipantId);
@@ -1134,7 +1238,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     /* Search bar -- hidden by default, slides in below the header when the search button is
        tapped (same slot/z-index the chat room's own search bar uses). */
-    isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    typeof renderV2 !== 'function' && isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
       fixed: true,
       inputRef: memoSearchInputRef,
       value: searchQuery,
@@ -1193,7 +1297,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "admin-side-menu-item",
-          onClick: () => { setIsMemoMenuOpen(false); setIsSearchOpen(true); }
+          onClick: () => {
+            setIsMemoMenuOpen(false);
+            if (typeof renderV2 === 'function' && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+            else setIsSearchOpen(true);
+          }
         },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
@@ -1331,24 +1439,25 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             },
               /* Title input - Styled precisely as user requested */
               /*#__PURE__*/React.createElement("input", {
+                className: "memo-edit-title-input form-input",
                 type: "text",
                 ref: newTitleInputRef,
                 placeholder: "제목",
                 value: newTitle,
                 onChange: e => setNewTitle(e.target.value),
                 style: {
-                  padding: '8px 8px',
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  padding: '0 16px',
                   background: 'transparent',
-                  borderWidth: 'medium',
-                  borderStyle: 'none',
-                  borderColor: 'currentcolor',
-                  borderImage: 'none',
+                  border: '1px solid var(--v2-card-border, var(--border-subtle))',
+                  borderRadius: 'var(--field-radius-single-line)',
                   outline: 'none',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
                   color: 'var(--text-main)',
                   width: '100%',
-                  borderBottom: '1px solid var(--border-subtle)',
+                  minHeight: 'var(--field-single-line-height)',
                   boxSizing: 'border-box'
                 }
               }),
@@ -1483,7 +1592,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 type: "text",
                 ref: newTagInputRef,
                 enterKeyHint: "enter",
-                placeholder: newTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${newTags.length}/10)`,
+                placeholder: newTags.length >= MAX_MEMO_TAGS ? `태그 최대 ${MAX_MEMO_TAGS}개 도달` : `태그 입력 (${newTags.length}/${MAX_MEMO_TAGS})`,
                 value: newTagInput,
                 onChange: e => setNewTagInput(e.target.value),
                 onKeyDown: e => {
@@ -1503,12 +1612,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: handleAddNewTag,
-                disabled: newTags.length >= 10,
+                disabled: newTags.length >= MAX_MEMO_TAGS,
                 style: {
                   flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
                   color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-                  opacity: newTags.length >= 10 ? 0.45 : 1
+                  opacity: newTags.length >= MAX_MEMO_TAGS ? 0.45 : 1
                 }
               }, "저장")
             ),
@@ -1581,7 +1690,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       /* MEMOS SECTIONS (Pinned / Recent Activity / Normal) */
 
       /* 1. Pinned Memos Section */
-      pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+      visiblePinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       },
         /* Label */
@@ -1595,7 +1704,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '12px'
           }
-        }, pinnedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        }, visiblePinnedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
           calendar: calendar,
@@ -1616,8 +1725,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       /* 2. Recent Activity Section -- memos with a comment in the last 6h, auto-pinned the same
          way as 고정됨 above (pin icon shows ON) but toggling it off just dismisses this one
          activity window locally instead of writing isPinned (see isMemoRecentlyActive). */
-      recentActivityMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: pinnedMemos.length > 0 ? '12px' : '0' }
+      visibleRecentMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: visiblePinnedMemos.length > 0 ? '12px' : '0' }
       },
         /* Label */
         /*#__PURE__*/React.createElement("div", {
@@ -1630,7 +1739,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '12px'
           }
-        }, recentActivityMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        }, visibleRecentMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
           calendar: calendar,
@@ -1649,11 +1758,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       ),
 
       /* 3. Other Memos Section */
-      otherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: (pinnedMemos.length > 0 || recentActivityMemos.length > 0) ? '12px' : '0' }
+      visibleOtherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: (visiblePinnedMemos.length > 0 || visibleRecentMemos.length > 0) ? '12px' : '0' }
       },
         /* Label */
-        (pinnedMemos.length > 0 || recentActivityMemos.length > 0) && /*#__PURE__*/React.createElement("div", {
+        (visiblePinnedMemos.length > 0 || visibleRecentMemos.length > 0) && /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "메모 목록"),
         /* Grid */
@@ -1663,7 +1772,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '12px'
           }
-        }, otherMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        }, visibleOtherMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
           calendar: calendar,
@@ -1685,32 +1794,30 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
          fetches the next page of older memos (mirrors chat room's "이전 채팅 더보기"). Pinned
          memos are always fully loaded regardless of this button, so pinning an old memo never
          depends on paging back to it first. */
-      hasMoreMemos && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onLoadMoreMemos,
-        style: {
-          width: '100%',
-          backgroundColor: 'var(--bg-primary)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '10px 0',
-          fontSize: 'var(--font-size-base)',
-          fontWeight: 'bold',
-          color: 'var(--text-main)',
-          cursor: 'pointer',
-          textAlign: 'center',
-          marginTop: '4px'
-        }
-      }, "메모 더 보기"),
+      memoUiPageCount > 1 && (() => {
+        const Pagination = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommonPagination) || null;
+        if (typeof Pagination !== 'function') return null;
+        return /*#__PURE__*/React.createElement(Pagination, {
+          currentPage: memoUiSafePage,
+          pageCount: memoUiPageCount,
+          onChange: setMemoListPage,
+          label: '메모'
+        });
+      })(),
 
       /* Empty State */
       filteredMemos.length === 0 && /*#__PURE__*/React.createElement("div", {
         style: { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
-      }, "등록된 메모가 없거나 검색 조건과 일치하는 메모가 없습니다. 📝")
+      }, memoSearchPending
+        ? "전체 메모를 검색하는 중..."
+        : (memoSearchArchive.status === 'error' && searchQuery.trim()
+          ? "전체 메모 검색에 실패했습니다. 잠시 후 다시 시도해 주세요."
+          : "등록된 메모가 없거나 검색 조건과 일치하는 메모가 없습니다. 📝"))
     ),
 
     /* Memo Editor Modal Overlay */
     editingMemo && /*#__PURE__*/React.createElement("div", {
+      ref: memoEditOverlayRef,
       onClick: memoEditorDirtyGuard.overlayOnClick,
       style: {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -1739,23 +1846,24 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         },
           /* Title input - Styled precisely as user requested */
           /*#__PURE__*/React.createElement("input", {
+            className: "memo-edit-title-input form-input",
             type: "text",
             placeholder: "제목",
             value: editTitle,
             onChange: e => setEditTitle(e.target.value),
             style: {
-              padding: '8px 8px',
+              flex: '1 1 auto',
+              minWidth: 0,
+              padding: '0 16px',
               background: 'transparent',
-              borderWidth: 'medium',
-              borderStyle: 'none',
-              borderColor: 'currentcolor',
-              borderImage: 'none',
+              border: '1px solid var(--v2-card-border, var(--border-subtle))',
+              borderRadius: 'var(--field-radius-single-line)',
               outline: 'none',
               fontSize: '0.95rem',
               fontWeight: 'bold',
               color: 'var(--text-main)',
               width: '100%',
-              borderBottom: '1px solid var(--border-subtle)',
+              minHeight: 'var(--field-single-line-height)',
               boxSizing: 'border-box'
             }
           }),
@@ -1906,7 +2014,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }),
           /*#__PURE__*/React.createElement("input", {
             type: "text",
-            placeholder: editTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${editTags.length}/10)`,
+            placeholder: editTags.length >= MAX_MEMO_TAGS ? `태그 최대 ${MAX_MEMO_TAGS}개 도달` : `태그 입력 (${editTags.length}/${MAX_MEMO_TAGS})`,
             value: editTagInput,
             onChange: e => setEditTagInput(e.target.value),
             onKeyDown: e => {
@@ -1926,12 +2034,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: handleAddEditTag,
-            disabled: editTags.length >= 10,
+            disabled: editTags.length >= MAX_MEMO_TAGS,
             style: {
               flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
               color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-              opacity: editTags.length >= 10 ? 0.45 : 1
+              opacity: editTags.length >= MAX_MEMO_TAGS ? 0.45 : 1
             }
           }, "저장")
         )),
@@ -2120,7 +2228,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         });
         return;
       }
-      if (/memo-view-header|admin-side-menu-overlay/.test(cls)) return;
+      if (/memo-view-header|admin-side-menu-overlay|inline-search-bar/.test(cls)) return;
+      if (node.type === InlineSearchBar) return;
       if (node.type === 'button') return;
       lifted.push(node);
     });
@@ -2134,10 +2243,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       legacyView: __memoLegacyTree,
       calendar,
       allMemos: memos || [],
-      memos: memos || [],
-      // The V2 screen renders "메모 더 보기" from these; without them the list stopped at the
-      // first page (20) and older memos were unreachable from the memo page.
+      memos: orderedMemoCards,
+      // The V2 screen pages this list. Without the window size and the loader, the
+      // memo page stopped at the first server page and older memos were unreachable.
       hasMoreMemos: !!hasMoreMemos,
+      totalMemoCount,
       onLoadMoreMemos,
       focusedMemo: sharedMemo || null,
       renderCard: (memo) => /*#__PURE__*/React.createElement(MemoCard, {
@@ -2157,11 +2267,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         variant: 'v2-page',
       }),
       searchQuery,
+      searchPending: memoSearchPending,
       selectedTag,
       onBack,
       onShare: onOpenShare,
       onMenu: () => setIsMemoMenuOpen(true),
-      onSearch: (value) => { setSearchQuery(value); setIsSearchOpen(!!value || isSearchOpen); },
+      onSearch: (value) => {
+        const next = typeof value === 'string' ? value : '';
+        setSearchQuery(next);
+        if (typeof renderV2 !== 'function') setIsSearchOpen(Boolean(next) || isSearchOpen);
+      },
       onSelectTag: (tag) => { setSelectedTag(tag); if (tag) setIsSearchOpen(true); },
       onCompose: () => setIsComposerExpanded(true),
       isComposerExpanded,

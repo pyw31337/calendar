@@ -8,10 +8,15 @@ import {
   inferRegion,
   isVisible,
   mergeDuplicates,
+  movieTheatricalEnd,
   normalizeItem,
   normalizeTitleForMatch,
   parseDateRange,
-  venuesMatch
+  venuesMatch,
+  isUsefulPosterUrl,
+  timeTicketPosterFromHtml,
+  timeTicketPosterNeedsCanonical,
+  timeTicketProductUrl
 } from '../scripts/lib/culture-normalize.mjs';
 
 test('titles from ticket portals and KOPIS normalize to the same key', () => {
@@ -108,4 +113,65 @@ test('undated films are kept and labeled 개봉 미정', () => {
   assert.equal(openEnded, true);
   assert.equal(item.dateLabel, '개봉 미정');
   assert.equal(item.address, '');
+  assert.equal(item.isOpenEnded, true);
+});
+
+test('a released film is not open-ended past its theatrical window', () => {
+  const { item, openEnded } = normalizeItem({
+    id: 'movie_zombie', title: '우리 아빠 좀비', date: '2026.07.05 (일)', link: 'https://example.com', genre: 'movie', source: 'movie'
+  });
+  assert.equal(openEnded, false);
+  assert.equal(item.isOpenEnded, false);
+  assert.equal(item.releaseDate, '2026-07-05');
+  assert.equal(item.endDate, movieTheatricalEnd('2026-07-05'));
+  assert.equal(item.endDate, '2026-08-02');
+  assert.ok(!isVisible(item.endDate, item.startDate, '2026-09-30'));
+});
+
+test('timeticket posters come from og:image, not a retired list thumb or a made-up path', () => {
+  const page = `<!DOCTYPE html><html><head>
+    <meta property="og:image" content="https://timeticket.co.kr/wys2/file_attach_thumb/6000/6800/6816/6816-01-260811c2-700x700.jpg">
+  </head><body></body></html>`;
+  assert.equal(
+    timeTicketPosterFromHtml(page, 'https://timeticket.co.kr/product/6816'),
+    'https://timeticket.co.kr/wys2/file_attach_thumb/6000/6800/6816/6816-01-260811c2-700x700.jpg'
+  );
+  const swapped = `<meta content="https://timeticket.co.kr/wys2/file_attach/poster.jpg" property="og:image">`;
+  assert.equal(timeTicketPosterFromHtml(swapped), 'https://timeticket.co.kr/wys2/file_attach/poster.jpg');
+  const relative = `<meta property="og:image" content="/wys2/file_attach_thumb/1/1-01-700x700.jpg">`;
+  assert.equal(
+    timeTicketPosterFromHtml(relative, 'https://timeticket.co.kr/product/1'),
+    'https://timeticket.co.kr/wys2/file_attach_thumb/1/1-01-700x700.jpg'
+  );
+  assert.equal(timeTicketPosterFromHtml('<html></html>'), '', 'no poster in the document stays empty');
+  assert.equal(timeTicketPosterFromHtml('<meta property="og:image" content="https://timeticket.co.kr/logo.png">'), '');
+  assert.equal(isUsefulPosterUrl(''), false);
+});
+
+test('timeticket img fallback reads lazy src and srcset when og:image is absent', () => {
+  const html = `<img class="tt-thumb" src="/images/blank.gif" data-src="/wys2/file_attach/real.jpg" srcset="/wys2/file_attach/real-2x.jpg 2x">`;
+  assert.equal(
+    timeTicketPosterFromHtml(html, 'https://timeticket.co.kr/product/9'),
+    'https://timeticket.co.kr/wys2/file_attach/real.jpg'
+  );
+  const srcsetOnly = `<img srcset="/wys2/file_attach/from-set.jpg 255w, /wys2/file_attach/from-set-lg.jpg 700w">`;
+  assert.equal(
+    timeTicketPosterFromHtml(srcsetOnly, 'https://timeticket.co.kr/product/9'),
+    'https://timeticket.co.kr/wys2/file_attach/from-set.jpg'
+  );
+});
+
+test('only a timeticket product whose image is missing or still on timeticket is refreshed', () => {
+  assert.equal(timeTicketProductUrl({ link: 'https://timeticket.co.kr/product/6816?from=list' }), 'https://timeticket.co.kr/product/6816');
+  assert.equal(timeTicketProductUrl({ link: 'https://tickets.interpark.com/goods/1' }), '');
+  assert.equal(timeTicketPosterNeedsCanonical({ link: 'https://timeticket.co.kr/product/1', image: '' }), true);
+  assert.equal(timeTicketPosterNeedsCanonical({
+    link: 'https://timeticket.co.kr/product/1',
+    image: 'https://timeticket.co.kr/wys2/file_attach_thumb/1/1-00-255x357.jpg'
+  }), true);
+  assert.equal(timeTicketPosterNeedsCanonical({
+    link: 'https://timeticket.co.kr/product/1',
+    source: 'timeticket+interpark',
+    image: 'https://ticketimage.interpark.com/poster.jpg'
+  }), false);
 });

@@ -2,6 +2,12 @@ import { spawnSync } from 'node:child_process';
 
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
+// This is an end-to-end production write test (including recursive cleanup).  Requiring an
+// explicit opt-in keeps ordinary verification and automated agents from generating Firestore
+// traffic just by invoking the convenient npm alias.
+if (process.env.ALLOW_PRODUCTION_FIREBASE_WRITES !== '1') {
+  throw new Error('Refusing billable production CRUD test. Re-run only for a planned rehearsal with ALLOW_PRODUCTION_FIREBASE_WRITES=1.');
+}
 const stamp = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 const calendarId = `test_full_${stamp}`;
 const isolationCalendarId = `test_isolation_${stamp}`;

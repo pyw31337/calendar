@@ -1,13 +1,37 @@
 // Keep every existing trigger on Cloud Functions 1st gen while using the current SDK.
 const functions = require('firebase-functions/v1');
-const { defineString } = require('firebase-functions/params');
+const { defineString, defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
+const nodemailer = require('nodemailer');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
+const { buildKakaoLocationTags, appendLocationTags } = require('./photo-location-tags');
+const { MAX_BATCH_ITEMS, MAX_TAGS, sanitizeAnalysisItem, stableAnalysisId, summarize } = require('./media-analysis');
+const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
+const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
+const {
+  decideMemoNotification,
+  decideChatNotification,
+  buildPushTargetUrl,
+  decidePollNotifications,
+  decideScheduleNotification,
+  selectDeliverableSubscriptions
+} = require('./push-notify-policy');
+
+// A long-lived local worker needs a credential that is independent from the short admin PIN.
+// It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
+const MEDIA_WORKER_TOKEN = defineSecret('MOYEORA_MEDIA_WORKER_TOKEN');
+// These remain Secret Manager values: an address by itself cannot deliver mail, and the API
+// credential must never appear in the browser bundle, Git history, or a launchd plist.
+const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
+const MEDIA_BRIEF_FROM = defineSecret('MEDIA_BRIEF_FROM');
+const NAVER_SMTP_APP_PASSWORD = defineSecret('NAVER_SMTP_APP_PASSWORD');
+const MEDIA_BRIEF_RECIPIENT = 'pyw213@naver.com';
+const NAVER_SMTP_ACCOUNT = 'pyw213@naver.com';
 
 admin.initializeApp();
 
@@ -49,6 +73,8 @@ function getMessageImageEntriesForIndex(message) {
     ? message.imageUrls : (message.imageUrl ? [message.imageUrl] : []);
   const thumbs = Array.isArray(message.thumbUrls) && message.thumbUrls.length
     ? message.thumbUrls : (message.thumbUrl ? [message.thumbUrl] : []);
+  const smalls = Array.isArray(message.smallThumbUrls) && message.smallThumbUrls.length
+    ? message.smallThumbUrls : (message.smallThumbUrl ? [message.smallThumbUrl] : []);
   const tags = Array.isArray(message.imageTags) ? message.imageTags : [];
   const tagMap = message?.imageTagMap && typeof message.imageTagMap === 'object' && !Array.isArray(message.imageTagMap)
     ? message.imageTagMap
@@ -57,6 +83,7 @@ function getMessageImageEntriesForIndex(message) {
   return Array.from({ length: count }, (_, index) => {
     const imageUrl = urls[index] || thumbs[index] || '';
     const thumbUrl = thumbs[index] || urls[index] || '';
+    const smallThumbUrl = smalls[index] || '';
     const assetKey = getPhotoAssetKey(imageUrl || thumbUrl);
     // imageTagMap is keyed by the immutable Storage asset, while imageTags is kept as a
     // legacy positional mirror. Prefer the former so a deleted sibling can never move a tag
@@ -67,6 +94,7 @@ function getMessageImageEntriesForIndex(message) {
       index,
       imageUrl,
       thumbUrl,
+      smallThumbUrl,
       tags: hasAssetTag ? (tagMap[assetKey] || '') : (hasEditableTags ? (tags[index] || '') : (message.tags || '')),
       tagAuthority: hasEditableTags ? 'editable' : ''
     };
@@ -87,14 +115,21 @@ function getDirectMediaTagKeyForIndex(url) {
 function getDirectImageEntriesForIndex(message) {
   const text = String(message?.text || message?.content || message?.body || '');
   const urls = text.match(/https?:\/\/[^\s<>"']+/gi) || [];
-  const imageExtensions = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|jfif|pjpeg|pjp|ico)(?:[?#].*)?$/i;
+  const imageExtensions = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|jfif|pjpeg|pjp|ico)$/i;
   const uploaded = new Set(getMessageImageEntriesForIndex(message)
     .flatMap(entry => [normalizePhotoAssetUrl(entry.imageUrl), normalizePhotoAssetUrl(entry.thumbUrl)]));
   const directTags = message?.directMediaTags && typeof message.directMediaTags === 'object' && !Array.isArray(message.directMediaTags)
     ? message.directMediaTags
     : {};
+  const pathIsImage = url => {
+    try {
+      return imageExtensions.test(decodeURIComponent(new URL(url).pathname || ''));
+    } catch (_) {
+      return imageExtensions.test(String(url || '').split(/[?#]/)[0]);
+    }
+  };
   return Array.from(new Set(urls.map(url => url.replace(/[),.;!?]+$/, ''))))
-    .filter(url => imageExtensions.test(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
+    .filter(url => pathIsImage(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
     .map((url, index) => {
       const tagKey = getDirectMediaTagKeyForIndex(url);
       const normalizedUrl = normalizePhotoAssetUrl(url);
@@ -153,6 +188,7 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
   const push = (photo, index, context = {}) => {
     const full = String(photo?.imageUrl || photo?.full || photo?.url || photo?.src || photo?.thumbUrl || photo?.thumb || '').trim();
     const thumb = String(photo?.thumbUrl || photo?.thumb || photo?.thumbnailUrl || full).trim();
+    const smallThumb = String(photo?.smallThumbUrl || photo?.smallThumb || '').trim();
     const assetKey = getPhotoAssetKey(full || thumb);
     if (!assetKey) return;
     const source = sourceType === 'message'
@@ -170,6 +206,7 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       assetKey,
       full,
       thumb,
+      ...(smallThumb ? { smallThumb } : {}),
       timestamp: Number(photo?.createdAt || photo?.updatedAt || data.timestamp || data.updatedAt || data.createdAt || data.confirmedAt || 0),
       tags: String(Object.prototype.hasOwnProperty.call(photo || {}, 'tags')
         ? (photo.tags || '')
@@ -182,6 +219,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       source,
       messageId,
       imageIndex,
+      // A date remains the legacy document key, but the graph carries a stable meetingId so
+      // photos/expenses/memos can keep their relationship when the scheduled date is edited.
+      meetingId: String(context.meetingId || data.meetingId || photo?.meetingId || ''),
       meetingDate: String(context.meetingDate || photo?.meetingDate || ''),
       photoId: String(photo?.id || photo?.photoId || ''),
       sourceMessageId: String(photo?.sourceMessageId || ''),
@@ -204,7 +244,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     getMessageImageEntriesForIndex(data).forEach((photo, index) => push(photo, index));
     getDirectImageEntriesForIndex(data).forEach((photo, index) => push(photo, index, { directMediaUrl: photo.directMediaUrl }));
   } else if (sourceType === 'meeting') {
-    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index, { meetingDate: data.date || sourceId, text: `${data.date || sourceId} 일정 사진` }));
+    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index, {
+      meetingId: data.meetingId || '', meetingDate: data.date || sourceId, text: `${data.date || sourceId} 일정 사진`
+    }));
   } else if (sourceType === 'anniversary') {
     // Content posters (movie/sports anniversaries) stay on the calendar/컨텐츠 surfaces.
     // Keep returning [] so sync/rebuild strip any legacy anniversary-owned photoIndex rows.
@@ -227,7 +269,7 @@ function reconcileImageTagMapForIndex(message, tagMap = null) {
     const legacyTags = Array.isArray(message?.imageTags) ? message.imageTags : [];
     const hasLegacyTag = Object.prototype.hasOwnProperty.call(legacyTags, entry.index);
     if (!hasAssetTag && !hasLegacyTag) return;
-    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 100);
+    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 640);
   });
   return next;
 }
@@ -253,6 +295,48 @@ function selectPhotoIndexOwner(owners) {
     || Number(b.timestamp || 0) - Number(a.timestamp || 0))[0] || null;
 }
 
+// The client checks this tiny, server-only summary before accepting an IndexedDB photo-index
+// cache entry.  Increment once per changed source document (rather than once per photo row), so
+// a 200-photo upload produces four source-record bumps, not hundreds of contested writes.
+async function bumpPhotoIndexRevision(calendarDocId) {
+  if (!calendarDocId) return;
+  const summaryRef = admin.firestore()
+    .collection('calendars').doc(calendarDocId)
+    .collection('photoIndexMeta').doc('summary');
+  await summaryRef.set({
+    revision: admin.firestore.FieldValue.increment(1),
+    updatedAt: Date.now()
+  }, { merge: true });
+}
+
+// The migration runs in dual-write mode: the legacy document remains compatible with every
+// installed client, while future writes continuously refresh the normalized Asset/edge graph.
+// It is a projection today; its immutable asset key and owner edge are what let us later switch
+// reads without another positional-tag migration.
+async function syncAssetGraphProjection(calendarDocId, assetKeys) {
+  const keys = Array.from(new Set(Array.from(assetKeys || []).filter(Boolean))).slice(0, 80);
+  if (!calendarDocId || !keys.length) return;
+  const db = admin.firestore();
+  const root = db.collection('calendars').doc(calendarDocId);
+  const rows = await db.getAll(...keys.map(key => root.collection('photoIndex').doc(key)));
+  const calendarId = calendarDocId.startsWith('cal_') ? calendarDocId.slice(4) : calendarDocId;
+  const writes = [];
+  rows.forEach(snapshot => {
+    if (!snapshot.exists) return;
+    const row = { assetKey: snapshot.id, ...(snapshot.data() || {}) };
+    const asset = assetProjection(row, { calendarId });
+    writes.push({ ref: root.collection('assets').doc(asset.assetId), data: { ...asset, updatedAt: Date.now() } });
+    assetEdges(row).slice(0, 12).forEach(edge => {
+      writes.push({ ref: root.collection('assetEdges').doc(edge.id), data: edge });
+    });
+  });
+  for (let offset = 0; offset < writes.length; offset += 350) {
+    const batch = db.batch();
+    writes.slice(offset, offset + 350).forEach(write => batch.set(write.ref, write.data, { merge: true }));
+    await batch.commit();
+  }
+}
+
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const db = admin.firestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
@@ -268,7 +352,10 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
     getPhotoIndexEntries(sourceType, idField ? String(doc.data()?.[idField] || doc.id) : doc.id, doc.data() || {}).forEach(entry => {
       const owners = ownersByAsset.get(entry.assetKey) || [];
       if (!owners.some(owner => owner.sourceOwner === entry.sourceOwner)) owners.push(entry);
-      ownersByAsset.set(entry.assetKey, owners.slice(0, 12));
+      // Keep the complete set while rebuilding. The persisted row keeps a bounded owner preview,
+      // but its completeness marker lets mutation commands avoid reading unrelated meetings.
+      // Older rows without this marker deliberately retain the safe full-scan behaviour.
+      ownersByAsset.set(entry.assetKey, owners);
     });
   });
   addOwners('message', byName.messages);
@@ -279,21 +366,28 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const rows = [];
   let dataUrlBytes = 0;
   let dataUrlRows = 0;
-  ownersByAsset.forEach((owners, assetKey) => {
-    const selected = selectPhotoIndexOwner(owners);
+  ownersByAsset.forEach((allOwners, assetKey) => {
+    const owners = allOwners.slice().sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b)
+      || Number(b.timestamp || 0) - Number(a.timestamp || 0));
+    const ownerCount = owners.length;
+    const ownerListComplete = ownerCount <= 12;
+    const persistedOwners = owners.slice(0, 12);
+    const selected = selectPhotoIndexOwner(persistedOwners);
     if (!selected) return;
-    const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
+    const legacyKeys = Array.from(new Set(persistedOwners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
     const commentCount = Math.max(0, ...[assetKey, ...legacyKeys].map(key => Number(commentCounts.get(key) || 0)));
     if (String(selected.full || '').startsWith('data:') || String(selected.thumb || '').startsWith('data:')) {
       dataUrlRows += 1;
       dataUrlBytes += String(selected.full || '').length + String(selected.thumb || '').length;
     }
-    const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
+    const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
     rows.push({
       ...selected,
       assetKey,
       legacyKeys,
-      owners,
+      owners: persistedOwners,
+      ownerCount,
+      ownerListComplete,
       commentCount,
       tags: tagState.tags,
       tagCacheVersion: 2,
@@ -319,6 +413,7 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       });
       await batch.commit();
     }
+    if (operations.length) await bumpPhotoIndexRevision(`cal_${calendarId}`);
   }
   const bySource = rows.reduce((acc, row) => {
     const key = String(row?.source || 'unknown');
@@ -356,6 +451,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
   // owners inside the canonical row prevents deleting one source from erasing the remaining
   // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
+  if (!touchedKeys.size) return false;
   await Promise.all(Array.from(touchedKeys).map(assetKey => db.runTransaction(async transaction => {
     const ref = indexRef.doc(assetKey);
     const snapshot = await transaction.get(ref);
@@ -365,29 +461,37 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       ? await transaction.get(db.collection('calendars').doc(context.params.calendarDocId).collection('photoComments').doc(assetKey))
       : null;
     let owners = Array.isArray(existing.owners) ? existing.owners.filter(owner => owner && typeof owner === 'object') : [];
+    // A missing marker means this is a pre-completeness row. Never guess that its bounded owner
+    // preview is exhaustive: media mutations retain their correctness-first full meeting scan
+    // until the nightly/admin rebuild stamps a complete projection.
+    const ownerListWasComplete = !snapshot.exists || existing.ownerListComplete === true;
     if (!owners.length && existing.sourceOwner && existing.full) owners = [{ ...existing }];
     owners = owners.filter(owner => !String(owner.sourceOwner || '').startsWith(ownerRoot));
     if (replacement) owners.push(replacement);
     owners = owners
       .filter((owner, index, list) => list.findIndex(candidate => candidate.sourceOwner === owner.sourceOwner) === index)
-      .sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0))
-      .slice(0, 12);
+      .sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0));
     if (!owners.length) {
       transaction.delete(ref);
       return;
     }
-    const selected = owners[0];
-    const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
+    const ownerCount = ownerListWasComplete ? owners.length : Math.max(Number(existing.ownerCount) || 0, owners.length);
+    const ownerListComplete = ownerListWasComplete && ownerCount <= 12;
+    const persistedOwners = owners.slice(0, 12);
+    const selected = persistedOwners[0];
+    const legacyKeys = Array.from(new Set(persistedOwners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
     const existingComments = commentSnapshot?.exists && Array.isArray(commentSnapshot.data()?.comments)
       ? commentSnapshot.data().comments.length : 0;
-    const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
-    const geo = pickPhotoIndexGeo(owners, existing);
+    const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
+    const geo = pickPhotoIndexGeo(persistedOwners, existing);
     transaction.set(ref, {
       ...selected,
       ...geo,
       assetKey,
       legacyKeys,
-      owners,
+      owners: persistedOwners,
+      ownerCount,
+      ownerListComplete,
       commentCount: Math.max(0, Number(existing.commentCount || 0), existingComments),
       tags: tagState.tags,
       tagCacheVersion: 2,
@@ -396,6 +500,11 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       updatedAt: Date.now()
     });
   })));
+  await bumpPhotoIndexRevision(context.params.calendarDocId);
+  // Never wait for client reads to regenerate this graph; the canonical source trigger owns
+  // the dual-write so tag/photo edits stay tied to the same immutable asset key.
+  await syncAssetGraphProjection(context.params.calendarDocId, touchedKeys);
+  return true;
 }
 
 exports.onMessagePhotoIndexWrite = functions.firestore
@@ -409,6 +518,17 @@ exports.onMemoPhotoIndexWrite = functions.firestore
 exports.onMeetingPhotoIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
+
+// Existing meeting document ids are dates for backwards compatibility. Give each record a
+// stable opaque identity once, without rewriting the date or any legacy field. The guard avoids
+// a trigger loop and makes the migration safe to run alongside old installed clients.
+exports.ensureMeetingIdentity = functions.firestore
+  .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
+  .onWrite(async change => {
+    if (!change.after.exists || String(change.after.data()?.meetingId || '')) return null;
+    await change.after.ref.set({ meetingId: `meeting:${crypto.randomUUID()}`, meetingIdentityVersion: 1 }, { merge: true });
+    return null;
+  });
 
 exports.onAnniversaryPhotoIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/anniversaries/{anniversaryId}')
@@ -514,6 +634,28 @@ function ensureVapidConfigured() {
 }
 
 
+
+// One successful claim per visible revision. A second trigger delivery (Functions
+// are at-least-once) or a maintenance rewrite of the same content must not send
+// again. Fail closed: a claim outage skips the push instead of repeating a storm.
+async function claimPushDelivery(calendarDocId, claimKey) {
+  if (!calendarDocId || !claimKey) return false;
+  const ref = admin.firestore()
+    .collection('calendars').doc(calendarDocId)
+    .collection('push_delivery_claims').doc(String(claimKey));
+  try {
+    return await admin.firestore().runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (snap.exists) return false;
+      tx.set(ref, { createdAt: Date.now(), claimKey: String(claimKey) });
+      return true;
+    });
+  } catch (err) {
+    console.error('claimPushDelivery failed; skipping push to avoid a duplicate storm', claimKey, err);
+    return false;
+  }
+}
+
 /** Shared push broadcast for a calendar's push_subscriptions */
 async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   ensureVapidConfigured();
@@ -529,29 +671,58 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   }
   const payload = JSON.stringify(payloadObj);
   const promises = [];
-  let skipped = 0;
+  const result = {
+    total: subSnap.size,
+    sent: 0,
+    skippedSender: 0,
+    skippedChannel: 0,
+    skippedInvalid: 0,
+    skippedDuplicate: 0,
+    failed: 0
+  };
+  const candidates = [];
   subSnap.forEach(doc => {
     const data = doc.data() || {};
     if (skipParticipantId && data.participantId === skipParticipantId) {
-      skipped += 1;
+      result.skippedSender += 1;
       return;
     }
     // Channel filter: legacy docs without channels → chat only
     const ch = data.channels;
     if (ch && typeof ch === 'object') {
-      if (ch[channel] === false) { skipped += 1; return; }
+      if (ch[channel] === false) { result.skippedChannel += 1; return; }
     } else if (channel !== 'chat') {
-      skipped += 1;
+      result.skippedChannel += 1;
       return;
     }
-    const pushSubscription = {
+    if (!data.endpoint || !data.keys?.auth || !data.keys?.p256dh) {
+      result.skippedInvalid += 1;
+      console.warn('Push subscription missing endpoint or keys', doc.id, channel);
+      return;
+    }
+    candidates.push({
+      doc,
       endpoint: data.endpoint,
-      keys: { auth: data.keys && data.keys.auth, p256dh: data.keys && data.keys.p256dh }
+      deviceId: data.deviceId,
+      lastSeenAt: data.lastSeenAt,
+      updatedAt: data.updatedAt,
+      createdAt: data.createdAt,
+      keys: data.keys
+    });
+  });
+  const selected = selectDeliverableSubscriptions(candidates);
+  result.skippedDuplicate = candidates.length - selected.length;
+  selected.forEach(entry => {
+    const doc = entry.doc;
+    const pushSubscription = {
+      endpoint: entry.endpoint,
+      keys: { auth: entry.keys && entry.keys.auth, p256dh: entry.keys && entry.keys.p256dh }
     };
     const sentAt = Date.now();
     const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
       .then(() => {
         console.log('Push ok', doc.id, channel);
+        result.sent += 1;
         return doc.ref.set({
           lastPushAt: sentAt,
           lastPushStatus: 'sent',
@@ -561,6 +732,7 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
       })
       .catch(err => {
         console.error('Push fail', doc.id, err && err.statusCode);
+        result.failed += 1;
         const status = err && err.statusCode ? `http-${err.statusCode}` : 'send-failed';
         const record = doc.ref.set({
           lastPushAt: sentAt,
@@ -576,7 +748,8 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
     promises.push(p);
   });
   await Promise.all(promises);
-  return { sent: promises.length, skipped };
+  console.log('Push broadcast result', JSON.stringify({ calendarDocId, channel, ...result }));
+  return result;
 }
 
 
@@ -590,8 +763,14 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     // 일정 레이어팝업 사진탭('meeting')/갤러리 페이지('gallery')에서 올린 사진은 메시지
     // 문서에 저장되더라도 채팅 활동으로 취급하지 않는다. 채팅방 노출과 채팅 푸시는
     // 모두 uploadSource 기준으로 제외한다.
-    if (message.uploadSource === 'meeting' || message.uploadSource === 'gallery') {
-      console.log('Skipping push for non-chat photo upload:', message.uploadSource);
+    const decision = decideChatNotification(message, { messageId: context.params.messageId });
+    if (!decision) {
+      console.log('Skipping push for non-chat or empty message:', message && message.uploadSource);
+      return;
+    }
+    const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+    if (!claimed) {
+      console.log('Skipping duplicate chat push', decision.claimKey);
       return;
     }
 
@@ -613,12 +792,19 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     const senderName = sender.name;
     
     const bodyText = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : '새 메시지가 도착했습니다'));
-    await broadcastCalendarPush(calendarDocId, {
-      title: `${calendarTitle} · ${senderName}`,
+    const delivery = await broadcastCalendarPush(calendarDocId, {
+      title: senderName || calendarTitle,
       body: bodyText,
-      url: `./?id=${calendarDocId.replace('cal_', '')}&view=chat`,
-      tag: `chat-${calendarDocId}`
-    }, { skipParticipantId: senderId, channel: 'chat' });
+      url: buildPushTargetUrl(calendarDocId, { view: 'chat', msg: context.params.messageId }),
+      tag: `chat-${calendarDocId}-${context.params.messageId}`,
+      renotify: false
+    }, { skipParticipantId: decision.skipParticipantId || senderId, channel: 'chat' });
+    console.log('Chat push dispatch', JSON.stringify({
+      calendarDocId,
+      messageId: context.params.messageId,
+      senderId,
+      ...delivery
+    }));
   });
 
 // Mirrors the client's getAnniversariesForDate matching logic (index.html) so a lunar birthday
@@ -681,21 +867,41 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const memo = change.after.data() || {};
-    if (before && JSON.stringify(before) === JSON.stringify(memo)) return;
+    // Notify only when title/text/photos/comments actually change. Tag, GPS, link
+    // preview, asset-graph and updatedAt maintenance must not page anyone, and the
+    // same revision is claimed once so a retried trigger cannot send it again.
+    const decision = decideMemoNotification(before, memo, { memoId: context.params.memoId });
+    if (!decision) return;
     const calendarDocId = context.params.calendarDocId;
+    const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+    if (!claimed) {
+      console.log('Skipping duplicate memo push', decision.claimKey);
+      return;
+    }
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
-    const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
-    const author = memo.authorName || memo.participantName || '참여자';
-    const body = (memo.text || memo.title || '새 메모').toString().trim().slice(0, 120) || '새 메모가 등록되었습니다';
+    const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
+    const named = participants.find(person => person && person.id === decision.skipParticipantId);
+    const author = decision.authorName || (named && named.name) || '참여자';
+    const title = decision.kind === 'comment'
+      ? `${author}의 메모 댓글`
+      : decision.kind === 'images'
+        ? `${author}의 메모 사진`
+        : decision.kind === 'edit'
+          ? `${author}의 메모 수정`
+          : `${author}의 새 메모`;
     await broadcastCalendarPush(calendarDocId, {
-      title: `${calendarTitle} · 메모`,
-      body: `${author}: ${body}`,
-      url: `./?id=${calendarDocId.replace('cal_', '')}&view=memo`,
-      tag: `memo-${calendarDocId}-${context.params.memoId}`
-    }, { skipParticipantId: memo.participantId || memo.authorId || null, channel: 'memo' });
+      title,
+      body: decision.body,
+      url: buildPushTargetUrl(calendarDocId, {
+        view: 'memo',
+        memo: context.params.memoId,
+        comment: decision.kind === 'comment' ? decision.commentId : ''
+      }),
+      tag: `memo-${calendarDocId}-${decision.tag}`,
+      renotify: false
+    }, { skipParticipantId: decision.skipParticipantId, channel: 'memo' });
   });
 
 // Meeting confirmed (the 확정 button, not a settlement/participant edit) → schedule channel.
@@ -712,31 +918,36 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const after = change.after.data() || {};
-    if (before && JSON.stringify(before) === JSON.stringify(after)) return;
-    const wasConfirmed = !!before && before.confirmed !== false;
-    const isConfirmed = after.confirmed !== false;
-    if (!isConfirmed || wasConfirmed) return;
     const calendarDocId = context.params.calendarDocId;
-    const db = admin.firestore();
-    const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
-    if (!calendarSnap.exists) return;
-    const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     const dateLabel = context.params.dateId || after.date || '';
     const meetingDateKey = normalizeMeetingDateKey(dateLabel);
     // Historical confirmedMeeting documents can be rewritten during migration,
     // reconciliation, or a late-arriving offline save. Never turn that maintenance
     // write into a fresh notification for a meeting that has already passed.
-    if (meetingDateKey && meetingDateKey < getKstDateKey()) {
-      console.log('Skipping stale confirmed meeting notification:', meetingDateKey);
+    const stale = Boolean(meetingDateKey && meetingDateKey < getKstDateKey());
+    const decision = decideScheduleNotification(before, after, {
+      dateId: dateLabel,
+      stale
+    });
+    if (!decision) {
+      if (stale) console.log('Skipping stale confirmed meeting notification:', meetingDateKey);
       return;
     }
+    const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+    if (!claimed) {
+      console.log('Skipping duplicate schedule push', decision.claimKey);
+      return;
+    }
+    const db = admin.firestore();
+    const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+    if (!calendarSnap.exists) return;
     await broadcastCalendarPush(calendarDocId, {
-      title: `${calendarTitle} · 모임 확정`,
+      title: '모임 확정',
       body: dateLabel ? `${dateLabel} 모임이 확정되었습니다` : '모임이 확정되었습니다',
       url: `./?id=${calendarDocId.replace('cal_', '')}`,
-      tag: `schedule-${calendarDocId}-${dateLabel}`
-    }, { channel: 'schedule' });
+      tag: `schedule-${calendarDocId}-${decision.tag}`,
+      renotify: false
+    }, { skipParticipantId: decision.skipParticipantId, channel: 'schedule' });
   });
 
 // Calendar document write → detect new polls
@@ -747,18 +958,23 @@ exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] 
     const afterCal = (change.after.data() || {}).calendar || {};
     const beforePolls = Array.isArray(beforeCal.polls) ? beforeCal.polls : [];
     const afterPolls = Array.isArray(afterCal.polls) ? afterCal.polls : [];
-    const beforeIds = new Set(beforePolls.map(p => p && p.id).filter(Boolean));
-    const newPolls = afterPolls.filter(p => p && p.id && !beforeIds.has(p.id));
-    if (newPolls.length === 0) return;
+    const decisions = decidePollNotifications(beforePolls, afterPolls);
+    if (decisions.length === 0) return;
     const calendarDocId = context.params.calendarDocId;
-    const calendarTitle = afterCal.title || '모여라 캘린더';
-    for (const poll of newPolls) {
+    for (const decision of decisions) {
+      const poll = decision.poll;
+      const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
+      if (!claimed) {
+        console.log('Skipping duplicate poll push', decision.claimKey);
+        continue;
+      }
       await broadcastCalendarPush(calendarDocId, {
-        title: `${calendarTitle} · 투표`,
-        body: poll.title ? `새 투표: ${poll.title}` : '새 투표가 등록되었습니다',
+        title: poll.title ? `새 투표: ${poll.title}` : '새 투표',
+        body: poll.title ? `${poll.title} 투표가 등록되었습니다` : '새 투표가 등록되었습니다',
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
-        tag: `poll-${calendarDocId}-${poll.id}`
-      }, { channel: 'poll' });
+        tag: `poll-${calendarDocId}-${decision.tag}`,
+        renotify: false
+      }, { skipParticipantId: decision.skipParticipantId, channel: 'poll' });
     }
   });
 
@@ -793,15 +1009,13 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   for (const [calendarDocId, entry] of byCalendar) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-    const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
 
     const subSnap = await entry.ref.collection('push_subscriptions').get();
     if (subSnap.empty) continue;
 
     entry.anniversaries.forEach(ann => {
       const payload = JSON.stringify({
-        title: `${calendarTitle} · 오늘의 기념일`,
+        title: '오늘의 기념일',
         body: `🎉 ${ann.title || '기념일'}`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `anniversary-${calendarDocId}-${ann.id}`
@@ -866,11 +1080,9 @@ exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   for (const [calendarDocId, entry] of meetingsByCal.entries()) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-    const calendarData = (calendarSnap.data() || {}).calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     for (const dateLabel of entry.dates) {
       promises.push(broadcastCalendarPush(calendarDocId, {
-        title: `${calendarTitle} · 모임 알림`,
+        title: '모임 알림',
         body: `내일(${dateLabel}) 확정 모임이 있습니다`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `schedule-eve-${calendarDocId}-${dateLabel}`
@@ -894,12 +1106,10 @@ exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   for (const [calendarDocId, entry] of repeatsByCal.entries()) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-    const calendarData = (calendarSnap.data() || {}).calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
     for (const ann of entry.anns) {
       const title = ann.title || ann.patternLabel || '반복 일정';
       promises.push(broadcastCalendarPush(calendarDocId, {
-        title: `${calendarTitle} · 일정 알림`,
+        title: '일정 알림',
         body: `내일(${tomorrowKey}) ${title}`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
         tag: `repeat-eve-${calendarDocId}-${ann.id}-${tomorrowKey}`
@@ -1391,6 +1601,111 @@ exports.kakaoLocalSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIM
     res.status(502).json({ ok: false, message: isCoord ? 'Kakao coord2address request failed' : 'Kakao local search request failed' });
   }
 });
+
+function photoGeoSignature(geo) {
+  const lat = Number(geo?.latitude);
+  const lng = Number(geo?.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(5)},${lng.toFixed(5)}` : '';
+}
+
+async function fetchKakaoCoordinateTags(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return [];
+  const cacheKey = `coord-tags:${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const cached = await readExternalCache('kakaoCoordTags', cacheKey);
+  if (Array.isArray(cached?.tags)) return cached.tags;
+  if (!KAKAO_REST_API_KEY) {
+    console.error('Photo location tagging skipped: KAKAO_REST_API_KEY is not configured.');
+    return [];
+  }
+  const kakaoUrl = `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${encodeURIComponent(String(lng))}&y=${encodeURIComponent(String(lat))}`;
+  const response = await fetch(kakaoUrl, { headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` } });
+  await incrementKakaoLocalSearchStat();
+  if (!response.ok) throw new Error(`Kakao photo reverse geocode failed: ${response.status}`);
+  const payload = await response.json();
+  const tags = buildKakaoLocationTags(payload?.documents?.[0]);
+  // Cache even an empty Korean result so a coordinate outside Kakao's coverage cannot repeatedly
+  // consume quota on future edits of the same message.
+  await writeExternalCache('kakaoCoordTags', cacheKey, { tags }, 24 * 60 * 60 * 1000);
+  return tags;
+}
+
+async function mapWithConcurrency(items, mapper, concurrency = 4) {
+  const source = Array.isArray(items) ? items : [];
+  const workers = Array.from({ length: Math.min(Math.max(1, concurrency), source.length) }, async (_, workerIndex) => {
+    for (let index = workerIndex; index < source.length; index += concurrency) await mapper(source[index]);
+  });
+  await Promise.all(workers);
+}
+
+// Browser reverse geocoding is intentionally optional: a network interruption must not hold up an
+// image upload. When EXIF GPS did arrive, this trusted server-side backstop completes only the
+// missing administrative tags. It runs only for a newly-added coordinate, so a later user tag
+// deletion is respected and never reintroduced by an unrelated message edit.
+exports.completePhotoLocationTags = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'] })
+  .firestore.document('calendars/{calendarDocId}/messages/{messageId}')
+  .onWrite(async change => {
+    if (!change.after.exists) return null;
+    const after = change.after.data() || {};
+    const before = change.before.exists ? (change.before.data() || {}) : {};
+    const previousGeoByAsset = new Map(getMessageImageEntriesForIndex(before).map(entry => [
+      getPhotoAssetKey(entry.imageUrl || entry.thumbUrl),
+      photoGeoSignature(readImageGeo(before, getPhotoAssetKey(entry.imageUrl || entry.thumbUrl)))
+    ]));
+    const newGeoEntries = getMessageImageEntriesForIndex(after)
+      .map(entry => ({ ...entry, assetKey: getPhotoAssetKey(entry.imageUrl || entry.thumbUrl) }))
+      .map(entry => ({ ...entry, geo: readImageGeo(after, entry.assetKey) }))
+      .filter(entry => entry.assetKey && entry.geo && photoGeoSignature(entry.geo) !== previousGeoByAsset.get(entry.assetKey));
+    if (!newGeoEntries.length) return null;
+
+    const geoByCoordinate = new Map();
+    newGeoEntries.forEach(entry => {
+      const coordinate = photoGeoSignature(entry.geo);
+      if (!geoByCoordinate.has(coordinate)) geoByCoordinate.set(coordinate, entry.geo);
+    });
+    const tagsByCoordinate = new Map();
+    await mapWithConcurrency(Array.from(geoByCoordinate.entries()), async ([coordinate, geo]) => {
+      tagsByCoordinate.set(coordinate, await fetchKakaoCoordinateTags(geo.latitude, geo.longitude));
+    });
+    const locationTagsByAsset = new Map();
+    await mapWithConcurrency(newGeoEntries, async entry => {
+      const coordinate = photoGeoSignature(entry.geo);
+      const tags = tagsByCoordinate.get(coordinate);
+      if (tags?.length) locationTagsByAsset.set(entry.assetKey, tags);
+    });
+    if (!locationTagsByAsset.size) return null;
+
+    await admin.firestore().runTransaction(async transaction => {
+      const snapshot = await transaction.get(change.after.ref);
+      if (!snapshot.exists) return;
+      const latest = snapshot.data() || {};
+      const imageTags = Array.isArray(latest.imageTags) ? latest.imageTags.slice() : [];
+      const imageTagMap = latest.imageTagMap && typeof latest.imageTagMap === 'object' && !Array.isArray(latest.imageTagMap)
+        ? { ...latest.imageTagMap }
+        : {};
+      let changed = false;
+      getMessageImageEntriesForIndex(latest).forEach(entry => {
+        const assetKey = getPhotoAssetKey(entry.imageUrl || entry.thumbUrl);
+        const locationTags = locationTagsByAsset.get(assetKey);
+        if (!locationTags?.length) return;
+        const current = String(Object.prototype.hasOwnProperty.call(imageTagMap, assetKey) ? imageTagMap[assetKey] : (imageTags[entry.index] || ''));
+        const next = appendLocationTags(current, locationTags);
+        if (next === current) return;
+        while (imageTags.length <= entry.index) imageTags.push('');
+        imageTags[entry.index] = next;
+        imageTagMap[assetKey] = next;
+        changed = true;
+      });
+      if (!changed) return;
+      transaction.update(change.after.ref, {
+        imageTags,
+        imageTagMap: reconcileImageTagMapForIndex({ ...latest, imageTags, imageTagMap }, imageTagMap)
+      });
+    });
+    return null;
+  });
 
 // Overseas 장소 검색 폴백 -- Kakao Local is Korea-only, so PlaceRegisterModal.handleSearch only
 // calls this when a Kakao search comes back empty (see assets/app-main.js), which in practice
@@ -1893,6 +2208,12 @@ exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
     };
     if (!doc.thumbUrl && !doc.fullUrl) { res.status(400).json({ ok: false, message: 'thumbUrl or fullUrl required' }); return; }
     await ref.set(doc);
+    try {
+      await admin.firestore().collection('memePool').doc('_metadata').set({
+        updatedAt: now,
+        version: 1
+      }, { merge: true });
+    } catch (_) {}
     res.status(200).json({ ok: true, id });
   } catch (err) {
     console.error('memePoolUpsert failed:', err);
@@ -1914,6 +2235,12 @@ exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
     await admin.firestore().collection('memePool').doc(id).delete();
+    try {
+      await admin.firestore().collection('memePool').doc('_metadata').set({
+        updatedAt: Date.now(),
+        version: 1
+      }, { merge: true });
+    } catch (_) {}
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('memePoolDelete failed:', err);
@@ -2078,7 +2405,7 @@ async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
   if (!match) return { ok: false, reason: 'unroutable' };
   const [, sourceType, sourceId, imageIndexStr] = match;
   const imageIndex = Number(imageIndexStr);
-  const cleanTags = String(tags || '').trim().slice(0, 160);
+  const cleanTags = String(tags || '').trim().slice(0, 640);
 
   if (sourceType === 'meeting') {
     const meetingRef = db.collection('calendars').doc(calendarDocId).collection('confirmedMeetings').doc(sourceId);
@@ -2329,16 +2656,27 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
 // P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
-const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset']);
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets']);
 exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
-  const { calendarId, op, asset, tags } = req.body || {};
+  const { calendarId, op, asset, tags, items } = req.body || {};
   if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !MEDIA_COMMAND_OPS.has(op)) { res.status(400).json({ ok: false, reason: 'invalid' }); return; }
+  const isHttpUrl = value => /^https?:\/\//i.test(String(value || ''));
+  const isStorageUrl = value => /^https:\/\/firebasestorage\.googleapis\.com\//i.test(String(value || ''));
+  if (op === 'bulkTagAssets') {
+    if (!Array.isArray(items) || !items.length || items.length > mediaCommands.MAX_BULK_TAG_ITEMS
+      || items.some(item => !isHttpUrl(item?.imageUrl || item?.full || item?.thumbUrl || item?.thumb))) {
+      res.status(400).json({ ok: false, reason: 'invalid-items' }); return;
+    }
+  }
   const imageUrl = String(asset?.imageUrl || '');
   const thumbUrl = String(asset?.thumbUrl || '');
-  if (![imageUrl, thumbUrl].some(value => /^https:\/\/firebasestorage\.googleapis\.com\//.test(value))) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  // Keep the established mutation surface for the original one-photo commands. Only the
+  // new batch command supports externally hosted direct-media URLs, and it still resolves the
+  // owner from its canonical photoIndex row before writing (media-commands.js).
+  if (op !== 'bulkTagAssets' && ![imageUrl, thumbUrl].some(isStorageUrl)) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
   if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
   const db = admin.firestore();
   const calendarDocId = `cal_${calendarId}`;
@@ -2352,12 +2690,408 @@ exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }
   try {
     const result = op === 'deleteAsset'
       ? await mediaCommands.deleteAsset({ db, calendarDocId, asset: cleanAsset })
-      : await mediaCommands.tagAsset({ db, calendarDocId, asset: cleanAsset, tags: String(tags || '') });
+      : (op === 'tagAsset'
+        ? await mediaCommands.tagAsset({ db, calendarDocId, asset: cleanAsset, tags: String(tags || '') })
+        : await mediaCommands.bulkTagAssets({
+          db,
+          calendarDocId,
+          items: items.map(item => ({
+            imageUrl: String(item?.imageUrl || item?.full || ''),
+            thumbUrl: String(item?.thumbUrl || item?.thumb || ''),
+            messageId: typeof item?.messageId === 'string' ? item.messageId.slice(0, 200) : '',
+            memoId: typeof item?.memoId === 'string' ? item.memoId.slice(0, 200) : '',
+            directMediaUrl: typeof item?.directMediaUrl === 'string' ? item.directMediaUrl.slice(0, 2048) : '',
+            tags: String(item?.tags || '').slice(0, 640),
+          }))
+        }));
     res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
     console.error(`mediaCommand ${op} failed:`, err);
     res.status(500).json({ ok: false, reason: 'error' });
   }
+});
+
+function hasValidMediaWorkerToken(req) {
+  const header = String(req.get('authorization') || '');
+  const supplied = header.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || '';
+  const expected = String(process.env.MOYEORA_MEDIA_WORKER_TOKEN || MEDIA_WORKER_TOKEN.value() || '').trim();
+  if (!supplied || !expected) return false;
+  const left = Buffer.from(supplied, 'utf8');
+  const right = Buffer.from(expected, 'utf8');
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+// Receives metadata generated by the opted-in macOS worker.  It deliberately accepts no image
+// bytes or arbitrary URLs: originals remain in Firebase Storage, and a result can only reference
+// an existing canonical asset key.  Existing user tags are never changed by this endpoint.
+exports.ingestMediaAnalysis = functions.runWith({
+  timeoutSeconds: 60,
+  memory: '256MB',
+  secrets: [MEDIA_WORKER_TOKEN]
+}).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  if (!hasValidMediaWorkerToken(req)) { res.status(401).json({ ok: false, message: 'Worker authorization failed' }); return; }
+  const calendarId = String(req.body?.calendarId || '');
+  const rawItems = req.body?.items;
+  if (!CALENDAR_ID_RE.test(calendarId) || !Array.isArray(rawItems) || rawItems.length > MAX_BATCH_ITEMS) {
+    res.status(400).json({ ok: false, message: 'Invalid analysis batch' });
+    return;
+  }
+  if (!(await checkProxyRateLimit('mediaAnalysisIngest', req.ip, 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many requests' });
+    return;
+  }
+  const now = Date.now();
+  const items = rawItems.map(item => sanitizeAnalysisItem(item, now)).filter(Boolean);
+  if (rawItems.length > 0 && !items.length) { res.status(400).json({ ok: false, message: 'No valid analysis items' }); return; }
+  const db = admin.firestore();
+  const calendarRef = db.collection('calendars').doc(`cal_${calendarId}`);
+  try {
+    if (!(await calendarRef.get()).exists) { res.status(404).json({ ok: false, message: 'Calendar not found' }); return; }
+    // The worker can only write a recommendation for an asset that is still in the canonical
+    // server photo index.  This keeps a delayed local retry from resurrecting a deleted photo and
+    // makes the "asset key only" contract above enforceable instead of documentary.
+    const sourceRefs = items.map(item => calendarRef.collection('photoIndex').doc(item.assetKey));
+    const sourceSnaps = sourceRefs.length ? await db.getAll(...sourceRefs) : [];
+    const liveKeys = new Set(sourceSnaps.filter(snapshot => snapshot.exists).map(snapshot => snapshot.id));
+    const acceptedItems = items.filter(item => liveKeys.has(item.assetKey));
+    if (items.length && !acceptedItems.length) { res.status(409).json({ ok: false, message: 'Source photos no longer exist' }); return; }
+    const runId = String(req.body?.runId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96) || crypto.randomUUID();
+    const workerId = String(req.body?.workerId || 'macos-local').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'macos-local';
+    const status = String(req.body?.status || (items.length ? 'completed' : 'idle')).replace(/[^a-z-]/g, '').slice(0, 24) || 'idle';
+    const batch = admin.firestore().batch();
+    for (const item of acceptedItems) {
+      const target = calendarRef.collection('mediaAnalysis').doc(item.id);
+      batch.set(target, {
+        ...item,
+        workerId,
+        lastReceivedAt: now
+      }, { merge: true });
+    }
+    const summary = summarize(acceptedItems);
+    const workerState = {
+      workerId,
+      status,
+      lastHeartbeatAt: now,
+      lastError: String(req.body?.error || '').slice(0, 500),
+      latestRunId: runId,
+      latestSummary: summary
+    };
+    // Do not erase the last known-good run when a later heartbeat reports a failure.  The
+    // watchdog uses the two timestamps together to distinguish a fresh failure from a stale
+    // worker, and preserving this value makes recovery auditable.
+    if (status === 'completed' || status === 'idle') workerState.lastSuccessAt = now;
+    batch.set(calendarRef.collection('mediaAnalysisWorkerState').doc(workerId), workerState, { merge: true });
+    batch.set(calendarRef.collection('mediaAnalysisRuns').doc(runId), {
+      calendarId,
+      runId,
+      workerId,
+      receivedAt: now,
+      status,
+      summary,
+      window: String(req.body?.window || '').slice(0, 32),
+      workerVersion: String(req.body?.workerVersion || '').slice(0, 40)
+    }, { merge: true });
+    await batch.commit();
+    res.status(200).json({ ok: true, runId, accepted: acceptedItems.length, skippedDeleted: items.length - acceptedItems.length, summary });
+  } catch (error) {
+    console.error('ingestMediaAnalysis failed:', error);
+    res.status(500).json({ ok: false, message: 'Analysis upload failed' });
+  }
+});
+
+const MEDIA_ANALYSIS_REVIEW_DECISIONS = new Set(['applied', 'edited', 'rejected']);
+function sanitizeMediaAnalysisFeedbackTags(value) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from(new Set(source
+    .map(item => String(item || '').replace(/^#+/, '').replace(/\s+/g, ' ').trim().slice(0, 80))
+    .filter(Boolean))).slice(0, MAX_TAGS);
+}
+
+// A review is an explicit user action, never a worker write. It remains beside the analysis
+// result for cross-device visibility and is also recorded as a compact calibration signal for a
+// future local-only personalized model. It cannot touch the original photo, tags, or comments.
+exports.recordMediaAnalysisFeedback = functions.runWith({
+  timeoutSeconds: 30,
+  memory: '256MB'
+}).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const calendarId = String(req.body?.calendarId || '');
+  const assetKey = String(req.body?.assetKey || '');
+  const decision = String(req.body?.decision || '');
+  if (!CALENDAR_ID_RE.test(calendarId) || !PHOTO_ASSET_KEY_RE.test(assetKey) || !MEDIA_ANALYSIS_REVIEW_DECISIONS.has(decision)) {
+    res.status(400).json({ ok: false, message: 'Invalid analysis feedback' });
+    return;
+  }
+  if (!(await checkProxyRateLimit('mediaAnalysisFeedback', req.ip, 60 * 1000, 40))) {
+    res.status(429).json({ ok: false, message: 'Too many review requests' });
+    return;
+  }
+  const proposedTags = sanitizeMediaAnalysisFeedbackTags(req.body?.proposedTags);
+  const acceptedTags = decision === 'rejected' ? [] : sanitizeMediaAnalysisFeedbackTags(req.body?.acceptedTags);
+  const finalTags = decision === 'rejected' ? [] : sanitizeMediaAnalysisFeedbackTags(req.body?.finalTags);
+  const now = Date.now();
+  const analysisId = stableAnalysisId(assetKey);
+  const calendarRef = admin.firestore().collection('calendars').doc(`cal_${calendarId}`);
+  const photoRef = calendarRef.collection('photoIndex').doc(assetKey);
+  const analysisRef = calendarRef.collection('mediaAnalysis').doc(analysisId);
+  try {
+    const [photoSnap, analysisSnap] = await admin.firestore().getAll(photoRef, analysisRef);
+    if (!photoSnap.exists) { res.status(404).json({ ok: false, message: 'Source photo no longer exists' }); return; }
+    if (!analysisSnap.exists) { res.status(404).json({ ok: false, message: 'Analysis result no longer exists' }); return; }
+    const previousReview = analysisSnap.data()?.review || {};
+    const review = {
+      decision,
+      proposedTags,
+      acceptedTags,
+      finalTags,
+      reviewedAt: now,
+      reviewCount: Math.max(0, Number(previousReview.reviewCount) || 0) + 1
+    };
+    const batch = admin.firestore().batch();
+    batch.set(analysisRef, { review }, { merge: true });
+    batch.set(calendarRef.collection('mediaAnalysisFeedback').doc(analysisId), {
+      assetKey,
+      analysisId,
+      decision,
+      proposedTags,
+      acceptedTags,
+      finalTags,
+      labels: Array.isArray(analysisSnap.data()?.labels)
+        ? analysisSnap.data().labels.map(label => String(label?.name || '')).filter(Boolean).slice(0, 16)
+        : [],
+      analysisVersion: Math.max(1, Number(analysisSnap.data()?.analysisVersion) || 1),
+      lastReviewedAt: now,
+      reviewCount: admin.firestore.FieldValue.increment(1)
+    }, { merge: true });
+    await batch.commit();
+    res.status(200).json({ ok: true, review });
+  } catch (error) {
+    console.error('recordMediaAnalysisFeedback failed:', error);
+    res.status(500).json({ ok: false, message: 'Analysis feedback save failed' });
+  }
+});
+
+// The local Mac receives only compact, user-reviewed calibration signals. The same worker secret
+// used for ingestion is required; no browser can enumerate this private feedback collection.
+exports.getMediaAnalysisCalibration = functions.runWith({
+  timeoutSeconds: 30,
+  memory: '256MB',
+  secrets: [MEDIA_WORKER_TOKEN]
+}).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  if (!hasValidMediaWorkerToken(req)) { res.status(401).json({ ok: false, message: 'Worker authorization failed' }); return; }
+  const calendarId = String(req.body?.calendarId || '');
+  if (!CALENDAR_ID_RE.test(calendarId)) { res.status(400).json({ ok: false, message: 'Invalid calendar' }); return; }
+  if (!(await checkProxyRateLimit('mediaAnalysisCalibration', req.ip, 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many calibration requests' });
+    return;
+  }
+  try {
+    const snapshot = await admin.firestore().collection('calendars').doc(`cal_${calendarId}`)
+      .collection('mediaAnalysisFeedback').orderBy('lastReviewedAt', 'desc').limit(300).get();
+    const signals = snapshot.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        decision: String(data.decision || ''),
+        labels: sanitizeMediaAnalysisFeedbackTags(data.labels).slice(0, 16),
+        proposedTags: sanitizeMediaAnalysisFeedbackTags(data.proposedTags),
+        acceptedTags: sanitizeMediaAnalysisFeedbackTags(data.acceptedTags),
+        reviewedAt: Math.max(0, Number(data.lastReviewedAt) || 0)
+      };
+    }).filter(signal => signal.labels.length && MEDIA_ANALYSIS_REVIEW_DECISIONS.has(signal.decision));
+    res.status(200).json({ ok: true, calendarId, signals, generatedAt: Date.now() });
+  } catch (error) {
+    console.error('getMediaAnalysisCalibration failed:', error);
+    res.status(500).json({ ok: false, message: 'Calibration read failed' });
+  }
+});
+
+function formatBriefDate(date = new Date()) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+  }).format(date);
+}
+
+function mediaWorkerIsStale(workerState, now = Date.now()) {
+  const heartbeat = Number(workerState?.lastHeartbeatAt || 0);
+  // The local worker finishes its weekday window just before 08:00. A 40-minute tolerance
+  // leaves room for sleep/wake timing while still making an interrupted LaunchAgent visible.
+  return !heartbeat || now - heartbeat > 40 * 60 * 1000;
+}
+
+async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
+  const calendarSnap = await db.collection('calendars').select('calendar').get();
+  const reports = await Promise.all(calendarSnap.docs.map(async calendarDoc => {
+    const calendarId = calendarDoc.id.startsWith('cal_') ? calendarDoc.id.slice(4) : calendarDoc.id;
+    if (!CALENDAR_ID_RE.test(calendarId)) return null;
+    const [workerSnap, runSnap] = await Promise.all([
+      calendarDoc.ref.collection('mediaAnalysisWorkerState').doc('macos-vision-m2').get(),
+      calendarDoc.ref.collection('mediaAnalysisRuns').doc(`macos_${calendarId}_${dateKey.replace(/-/g, '')}`).get()
+    ]);
+    // The service digest includes every calendar where the opted-in worker wrote a heartbeat or
+    // run. Other shared/test calendars never leak into the recipient's morning email.
+    if (!workerSnap.exists && !runSnap.exists) return null;
+    const worker = workerSnap.data() || {};
+    const run = runSnap.data() || {};
+    const calendar = calendarDoc.data()?.calendar || {};
+    const stale = mediaWorkerIsStale(worker, now);
+    const healthLabel = stale ? '생존 신호 확인' : worker.status === 'idle' ? '대기' : '정상';
+    return {
+      id: calendarId,
+      name: String(calendar.title || calendar.name || calendarId),
+      summary: run.summary || worker.latestSummary || {},
+      stale,
+      healthLabel
+    };
+  }));
+  return reports.filter(Boolean);
+}
+
+async function sendResendMail({ apiKey, from, subject, html, text, idempotencyKey }) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey
+    },
+    body: JSON.stringify({ from, to: [MEDIA_BRIEF_RECIPIENT], subject, html, text })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.id) throw new Error(String(payload?.message || `Email provider failed (${response.status})`).slice(0, 500));
+  return String(payload.id);
+}
+
+async function sendNaverSmtpMail({ account, appPassword, subject, html, text, dateKey }) {
+  const transport = nodemailer.createTransport({
+    host: 'smtp.naver.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user: account, pass: appPassword },
+    connectionTimeout: 20_000,
+    greetingTimeout: 20_000,
+    socketTimeout: 60_000,
+    tls: { minVersion: 'TLSv1.2' }
+  });
+  try {
+    const info = await transport.sendMail({
+      from: `모여라 캘린더 <${account}>`,
+      to: [MEDIA_BRIEF_RECIPIENT],
+      subject,
+      html,
+      text,
+      // SMTP has no provider-level idempotency API. A deterministic Message-ID allows mail
+      // clients and gateways to coalesce a retry caused by an interrupted response.
+      messageId: `<moyeora-media-brief-${String(dateKey).replace(/[^0-9]/g, '')}@moyeora-calendar.local>`,
+      headers: { 'X-Moyeora-Brief': String(dateKey) }
+    });
+    return String(info.messageId || info.response || 'smtp-accepted');
+  } finally {
+    transport.close();
+  }
+}
+
+// Four scheduled opportunities during the weekday 08:00 hour. Resend accepts the deterministic
+// idempotency key; SMTP receives a stable Message-ID, while Firestore records each state for
+// recovery and prevents all later scheduled slots after a confirmed send.
+exports.sendDailyMediaAnalysisBrief = functions.runWith({
+  timeoutSeconds: 120,
+  memory: '256MB',
+  secrets: [RESEND_API_KEY, MEDIA_BRIEF_FROM, NAVER_SMTP_APP_PASSWORD]
+}).pubsub.schedule('0,15,30,45 8 * * 1-5').timeZone('Asia/Seoul').onRun(async () => {
+  const now = Date.now();
+  const dateKey = getKstDateKey(new Date(now));
+  const db = admin.firestore();
+  const reportRef = db.collection('operationsMediaBriefs').doc(`media-analysis-${dateKey}`);
+  const existing = await reportRef.get();
+  if (existing.data()?.deliveryStatus === 'sent') return null;
+  const calendars = await collectMediaBriefCalendars(db, dateKey, now);
+  const brief = buildBrief({ dateLabel: formatBriefDate(new Date(now)), calendars });
+  const apiKey = String(process.env.RESEND_API_KEY || RESEND_API_KEY.value() || '').trim();
+  const from = String(process.env.MEDIA_BRIEF_FROM || MEDIA_BRIEF_FROM.value() || '').trim();
+  const naverAppPassword = String(process.env.NAVER_SMTP_APP_PASSWORD || NAVER_SMTP_APP_PASSWORD.value() || '').trim();
+  const delivery = isEmailDeliveryConfigured({ apiKey, from })
+    ? { provider: 'resend' }
+    : isNaverSmtpConfigured({ account: NAVER_SMTP_ACCOUNT, appPassword: naverAppPassword })
+      ? { provider: 'naver-smtp' }
+      : null;
+  // Keep producing an auditable server report while an email sender is awaiting configuration.
+  // The next scheduled slot automatically resumes delivery once secrets are configured; this
+  // path deliberately makes no outbound request and does not throw.
+  if (!delivery) {
+    await reportRef.set({
+      kind: 'media-analysis-brief',
+      dateKey,
+      recipient: MEDIA_BRIEF_RECIPIENT,
+      deliveryStatus: 'not-configured',
+      emailConfigured: false,
+      lastCheckedAt: now,
+      generatedAt: now,
+      calendarCount: calendars.length,
+      summary: brief.total,
+      staleCount: brief.staleCount
+    }, { merge: true });
+    return null;
+  }
+  const attempt = Math.max(0, Number(existing.data()?.attempts || 0)) + 1;
+  await reportRef.set({
+    kind: 'media-analysis-brief',
+    dateKey,
+    recipient: MEDIA_BRIEF_RECIPIENT,
+    attempts: attempt,
+    deliveryStatus: 'sending',
+    emailConfigured: true,
+    lastAttemptAt: now,
+    generatedAt: now,
+    calendarCount: calendars.length,
+    summary: brief.total,
+    staleCount: brief.staleCount,
+    provider: delivery.provider
+  }, { merge: true });
+  try {
+    const providerMessageId = delivery.provider === 'resend'
+      ? await sendResendMail({
+        apiKey,
+        from,
+        subject: brief.subject,
+        html: brief.html,
+        text: brief.text,
+        idempotencyKey: `moyeora-media-brief-${dateKey}`
+      })
+      : await sendNaverSmtpMail({
+        account: NAVER_SMTP_ACCOUNT,
+        appPassword: naverAppPassword,
+        subject: brief.subject,
+        html: brief.html,
+        text: brief.text,
+        dateKey
+      });
+    await reportRef.set({
+      deliveryStatus: 'sent',
+      sentAt: Date.now(),
+      provider: delivery.provider,
+      providerMessageId,
+      lastError: admin.firestore.FieldValue.delete()
+    }, { merge: true });
+  } catch (error) {
+    const message = String(error?.message || error).slice(0, 500);
+    await reportRef.set({
+      deliveryStatus: 'failed',
+      lastError: message,
+      lastFailureAt: Date.now()
+    }, { merge: true });
+    // Keep the platform retry path in addition to the three scheduled retry slots.
+    throw error;
+  }
+  return null;
 });
 
 // Nightly reconciliation (invariant I6): rebuild every calendar's photoIndex from its source
@@ -2400,6 +3134,162 @@ exports.rebuildPhotoIndex = functions.runWith({ timeoutSeconds: 300, memory: '1G
     res.status(200).json({ ok: true, ...report });
   } catch (error) {
     console.error('rebuildPhotoIndex failed:', error);
+    res.status(500).json({ ok: false, message: String(error?.message || error) });
+  }
+});
+
+// Non-destructive integrity and graph migration. This is intentionally separate from
+// rebuildPhotoIndex: rebuilding a projection must never be interpreted as permission to remove
+// a Storage object or legacy comment.  Every detected issue is written to an admin review queue
+// together with a compact source snapshot, so a bad automatic decision can be reversed.
+async function checkCanonicalAssetStorage(bucket, row) {
+  const paths = [mediaGraphStoragePath(row?.full), mediaGraphStoragePath(row?.thumb)].filter(Boolean);
+  if (!paths.length) return false;
+  try {
+    const exists = await Promise.all(paths.map(async path => {
+      try { return Boolean((await bucket.file(path).exists())[0]); } catch (_) { return true; }
+    }));
+    return !exists.some(Boolean);
+  } catch (_) {
+    // A failed metadata request is not proof of data loss.
+    return false;
+  }
+}
+
+function sourceAssetIds(data = {}) {
+  const entries = getMessageImageEntriesForIndex(data);
+  return Array.from(new Set(entries.map(entry => getPhotoAssetKey(entry.imageUrl || entry.thumbUrl)).filter(Boolean)));
+}
+
+async function prepareMediaIntegrityReview({ calendarId, apply = false, materializeGraph = false, migrateLegacyComments = false } = {}) {
+  const db = admin.firestore();
+  const root = db.collection('calendars').doc(`cal_${calendarId}`);
+  const names = ['photoIndex', 'messages', 'memos', 'confirmedMeetings', 'photoComments'];
+  const snapshots = await Promise.all(names.map(name => root.collection(name).get()));
+  const byName = Object.fromEntries(names.map((name, index) => [name, snapshots[index]]));
+  const rows = byName.photoIndex.docs.map(doc => ({ id: doc.id, assetKey: doc.id, ...(doc.data() || {}) }));
+  const missingAssetKeys = new Set();
+  // Metadata checks are deliberately bounded. No image bytes are downloaded, and a transient
+  // Storage failure is treated as unknown/alive rather than as a missing photo.
+  const bucket = admin.storage().bucket();
+  const queue = rows.slice();
+  await Promise.all(Array.from({ length: 12 }, async () => {
+    while (queue.length) {
+      const row = queue.pop();
+      if (row && await checkCanonicalAssetStorage(bucket, row)) missingAssetKeys.add(row.assetKey);
+    }
+  }));
+  const report = buildIntegrityReview({
+    calendarId,
+    indexRows: rows,
+    messages: byName.messages.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    memos: byName.memos.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    meetings: byName.confirmedMeetings.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    comments: byName.photoComments.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })),
+    missingAssetKeys
+  });
+  const counts = report.findings.reduce((acc, item) => {
+    acc[item.kind] = (acc[item.kind] || 0) + 1;
+    return acc;
+  }, {});
+  const summary = {
+    calendarId, generatedAt: report.generatedAt, mode: apply ? 'applied' : 'dry-run',
+    sourceDocuments: Object.fromEntries(names.map(name => [name, byName[name].size])),
+    counts, findings: report.findings.length, assets: report.assets.length, edges: report.edges.length,
+    missingAssets: missingAssetKeys.size,
+    migratableComments: report.findings.filter(item => item.kind === 'legacy_comment_migratable').length,
+    unresolvedComments: report.findings.filter(item => item.kind === 'legacy_comment_unresolved').length
+  };
+  if (!apply) return summary;
+
+  const runId = `integrity_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+  const now = Date.now();
+  const writes = [];
+  writes.push({ ref: root.collection('integrityRuns').doc(runId), data: {
+    ...summary, runId, status: 'review_required', createdAt: now,
+    safeguards: ['no_auto_delete', 'source_snapshot_backup', 'restore_reupload_hide_only']
+  } });
+  report.findings.forEach(item => {
+    const review = { ...item, calendarId, runId, createdAt: now, updatedAt: now };
+    writes.push({ ref: root.collection('integrityReview').doc(item.id), data: review });
+    // Snapshot documents are intentionally append-only per run. The queue itself can be updated
+    // by later audits, while this copy remains a recovery reference.
+    writes.push({ ref: root.collection('integrityRuns').doc(runId).collection('backup').doc(item.id), data: {
+      kind: item.kind, assetKey: item.assetKey || '', sourceSnapshot: item.snapshot || {}, backedUpAt: now
+    } });
+  });
+  if (materializeGraph) {
+    report.assets.forEach(asset => writes.push({ ref: root.collection('assets').doc(asset.assetId), data: { ...asset, materializedAt: now } }));
+    report.edges.forEach(edge => writes.push({ ref: root.collection('assetEdges').doc(edge.id), data: { ...edge, materializedAt: now } }));
+    byName.messages.docs.forEach(doc => writes.push({ ref: doc.ref, data: { assetIds: sourceAssetIds(doc.data() || {}), assetGraphVersion: 1 } }));
+    byName.memos.docs.forEach(doc => writes.push({ ref: doc.ref, data: { assetIds: sourceAssetIds(doc.data() || {}), assetGraphVersion: 1 } }));
+    byName.confirmedMeetings.docs.forEach(doc => {
+      const data = doc.data() || {};
+      const albumAssetIds = (Array.isArray(data.photos) ? data.photos : [])
+        .map(photo => getPhotoAssetKey(photo?.imageUrl || photo?.full || photo?.url || photo?.thumbUrl || photo?.thumb || '')).filter(Boolean);
+      writes.push({ ref: doc.ref, data: {
+        meetingId: String(data.meetingId || `meeting:${crypto.randomUUID()}`),
+        albumAssetIds: Array.from(new Set(albumAssetIds)), assetGraphVersion: 1
+      } });
+    });
+  }
+  // Firestore batch limit is 500. Keep a margin for future schema fields.
+  for (let offset = 0; offset < writes.length; offset += 350) {
+    const batch = db.batch();
+    writes.slice(offset, offset + 350).forEach(write => batch.set(write.ref, write.data, { merge: true }));
+    await batch.commit();
+  }
+  let migratedComments = 0;
+  if (migrateLegacyComments) {
+    const migrations = report.findings.filter(item => item.kind === 'legacy_comment_migratable' && item.assetKey);
+    for (const item of migrations) {
+      const legacyKey = String(item.snapshot?.legacyKey || '');
+      const legacyRef = root.collection('photoComments').doc(legacyKey);
+      const targetRef = root.collection('photoComments').doc(item.assetKey);
+      await db.runTransaction(async tx => {
+        const [legacy, target] = await Promise.all([tx.get(legacyRef), tx.get(targetRef)]);
+        if (!legacy.exists) return;
+        const legacyComments = Array.isArray(legacy.data()?.comments) ? legacy.data().comments : [];
+        const targetComments = Array.isArray(target.data()?.comments) ? target.data().comments : [];
+        const unique = new Map();
+        [...targetComments, ...legacyComments].forEach(comment => {
+          const id = String(comment?.id || `${comment?.timestamp || 0}:${comment?.text || ''}`);
+          if (!unique.has(id)) unique.set(id, comment);
+        });
+        const comments = Array.from(unique.values()).sort((a, b) => Number(a?.timestamp || 0) - Number(b?.timestamp || 0)).slice(0, 200);
+        tx.set(targetRef, { comments, migratedFrom: admin.firestore.FieldValue.arrayUnion(legacyKey), updatedAt: now }, { merge: true });
+        // Preserve the old thread for undo/audit; it is only marked as copied, never deleted.
+        tx.set(legacyRef, { migration: { status: 'copied', assetKey: item.assetKey, runId, copiedAt: now } }, { merge: true });
+      });
+      migratedComments += 1;
+    }
+  }
+  return { ...summary, runId, migratedComments, graphMaterialized: Boolean(materializeGraph) };
+}
+
+// Administrator entry point: dry-run is the default. `apply` only creates review records and
+// optional dual-write graph records; it does not delete legacy documents or Storage objects.
+exports.prepareMediaIntegrityReview = functions.runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const { password, calendarId, apply, materializeGraph, migrateLegacyComments } = req.body || {};
+  if (typeof password !== 'string' || !password.trim() || !CALENDAR_ID_RE.test(String(calendarId || ''))) {
+    res.status(400).json({ ok: false, message: 'Invalid request' }); return;
+  }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false, message: 'Too many requests' }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' }); return; }
+  try {
+    const report = await prepareMediaIntegrityReview({
+      calendarId: String(calendarId), apply: apply === true,
+      materializeGraph: materializeGraph === true, migrateLegacyComments: migrateLegacyComments === true
+    });
+    res.status(200).json({ ok: true, ...report });
+  } catch (error) {
+    console.error('prepareMediaIntegrityReview failed:', error);
     res.status(500).json({ ok: false, message: String(error?.message || error) });
   }
 });

@@ -1,5 +1,6 @@
 import './react-globals.js';
 import './app.css';
+import './ui/celebrate-confetti.js';
 import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
 import { installOverlayExitMotion } from './core/overlay-exit-motion.js';
 import { installFieldShape } from './core/field-shape.js';
@@ -35,7 +36,39 @@ function resolveFirebaseSdkUrl(src) {
   return absolute.toString();
 }
 
+function dismissSplashScreen() {
+  const splash = document.getElementById('app-splash');
+  if (!splash) return;
+  // If PC / desktop, dismiss and remove immediately without 1s splash delay to avoid flickering
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+    (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isPC = !isMobile ||
+    (typeof document !== 'undefined' && document.documentElement.classList.contains('is-pc-device')) ||
+    (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches);
+  const isSplashDemo = typeof window !== 'undefined' && (window.location.search.includes('splash') || window.location.search.includes('demo'));
+  if (isPC && !isSplashDemo) {
+    try { splash.remove(); } catch (_) {}
+    return;
+  }
+  // Cinematic VFX splash timing (~1s for shockwave, glint flare, shimmer title, and warp dismiss)
+  const MIN_SPLASH_MS = 1050;
+  const startTime = (typeof window !== 'undefined' && window.__GATHER_SPLASH_START__) || Date.now();
+  const elapsed = Date.now() - startTime;
+  const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+  setTimeout(() => {
+    splash.classList.add('is-hidden');
+    setTimeout(() => {
+      try { splash.remove(); } catch (_) {}
+    }, 580);
+  }, remaining);
+}
+
 function showBootStatus(msg) {
+  const splash = document.getElementById('app-splash');
+  if (splash) {
+    try { splash.remove(); } catch (_) {}
+  }
   const root = document.getElementById('root');
   if (!root || root.dataset.booted === '1') return;
   root.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:0.88rem;">${msg}</div>`;
@@ -370,9 +403,14 @@ async function boot() {
     const root = document.getElementById('root');
     if (root) root.dataset.booted = '1';
     window.__GATHER_BOOT_READY__ = true;
+    dismissSplashScreen();
     try { sessionStorage.removeItem(BOOT_RETRY_KEY); } catch (_) {}
   } catch (err) {
     console.error('[P6] boot failed', err);
+    const splash = document.getElementById('app-splash');
+    if (splash) {
+      try { splash.remove(); } catch (_) {}
+    }
     // The most common real cause here is a stale cached index.html (from before this tab was
     // backgrounded) still pointing at content-hashed chunk files a newer deploy has since
     // replaced -- every deploy fully replaces the site, so those old chunk URLs 404 and the

@@ -39,7 +39,11 @@ const chunkGroups = [
   { name: 'vendor-react', test: id => id.includes('node_modules') && id.includes('react'), priority: 40 },
   { name: 'ui-admin', test: /[\\/]ui[\\/]ui-admin-/, priority: 35 },
   { name: 'ui-calendar-core', test: /[\\/]ui[\\/]ui-calendar-core/, priority: 35 },
-  { name: 'ui-chat-room', test: /[\\/]ui[\\/]ui-chat-room/, priority: 35 },
+  // chat-typing-presence is imported only by ui-chat-room. Leaving it outside this group
+  // made Rolldown emit a facade chunk that both re-exported ChatRoomView and owned the
+  // hook, while the room chunk imported the hook back. Opening chat then threw
+  // "Cannot access 'mn' before initialization" from that cycle. Keep them in one chunk.
+  { name: 'ui-chat-room', test: /(?:[\\/]ui[\\/]ui-chat-room|[\\/]core[\\/]chat-typing-presence)/, priority: 35 },
   { name: 'ui-places', test: /[\\/]ui[\\/]ui-places/, priority: 35 },
   { name: 'ui-memo-view', test: /[\\/]ui[\\/]ui-memo-view/, priority: 35 },
   { name: 'ui-event-modals', test: /[\\/]ui[\\/]ui-event-modals/, priority: 35 },

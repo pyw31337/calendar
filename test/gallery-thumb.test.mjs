@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import {
   isGalleryThumbUrl,
   collectGalleryThumbCandidates,
@@ -67,7 +69,8 @@ test('selectGalleryPreviewPhotos skips meme pool + missing URLs and still fills 
   });
   assert.deepEqual(picked.map((p) => p.id), ['ok1', 'ok2', 'ok3']);
   assert.equal(picked[0].__thumbResolved.state, 'ready');
-  assert.equal(picked[0].thumb, ok(1));
+  assert.equal(picked[0].thumb, 'https://firebasestorage.googleapis.com/v0/b/x/o/chatImages%2Fcw%2F1f_small.webp?alt=media');
+  assert.equal(picked[0].full, ok('1f'));
 });
 
 test('selectGalleryPreviewPhotos oversamples past a 404 so a 3x3 never keeps a grey hole', () => {
@@ -106,4 +109,14 @@ test('resolveHomeGalleryStripState shows loading until photoIndex is ready', () 
   assert.equal(ready.photos.length, 1);
   const empty = resolveHomeGalleryStripState({ status: 'ready', items: [{ id: 'x', thumb: '' }] });
   assert.equal(empty.state, 'empty');
+});
+
+test('home gallery columns stay within the 160px thumb instead of a fixed 3-up grid', () => {
+  const aurora = readFileSync(new URL('../src/ui/v2/aurora-theme.css', import.meta.url), 'utf8');
+  const late = readFileSync(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8');
+  const design = readFileSync(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
+  assert.match(aurora, /bp-renewal-home-photo-strip\.bp-thumb-grid[\s\S]*repeat\(auto-fill, minmax\(64px, 1fr\)\)/);
+  assert.match(late, /bp-renewal-home-photo-strip\.bp-thumb-grid[\s\S]*max-width: 160px/);
+  assert.match(design, /bp-thumb-grid:not\(\.bp-renewal-home-photo-strip\)/);
+  assert.doesNotMatch(aurora, /home gallery preview is a fixed 3/);
 });

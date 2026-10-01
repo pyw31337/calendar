@@ -1,4 +1,5 @@
 import './visual-viewport-sync.js';
+import './tiny-motion.js';
 /**
  * Shared ChatFull-style bubble modules for V2 chat + memo presentation.
  * Presentation only — callers keep real data/handlers.

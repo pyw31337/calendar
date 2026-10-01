@@ -4,6 +4,7 @@
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
+import { launchClipboardConfetti } from './celebrate-confetti.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -294,6 +295,7 @@ export function DateModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const MemoCard = __comp.MemoCard || __deps.MemoCard;
+  const MemoView = __comp.MemoView || __deps.MemoView;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
@@ -363,7 +365,6 @@ export function DateModal({
     const label = encodeURIComponent(place.alias || place.name || '장소');
     return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
   };
-    const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
       const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
     const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
@@ -380,6 +381,13 @@ export function DateModal({
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [editingDateMemo, setEditingDateMemo] = React.useState(null);
+  const [dateMemoOverrides, setDateMemoOverrides] = React.useState({});
+  React.useEffect(() => {
+    if (!dateStr || !isDateConfirmedMeeting(calendar, dateStr)) return undefined;
+    launchClipboardConfetti();
+    return undefined;
+  }, [dateStr]);
   React.useEffect(() => {
     const nextTab = searchFocus?.tab || initialTab;
     if (nextTab) setActiveTab(nextTab);
@@ -449,6 +457,11 @@ export function DateModal({
   };
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
+  const attendingParticipantIds = new Set(
+    dateEntries
+      .map(entry => entry.participantId)
+      .filter(id => id && id !== BULK_NO_PARTICIPANT_ID)
+  );
   const effectiveAnniversaries = (Array.isArray(anniversaries) && anniversaries.length > 0)
     ? anniversaries
     : (Array.isArray(calendar?.anniversaries) && calendar.anniversaries.length > 0
@@ -964,11 +977,14 @@ export function DateModal({
     };
     refresh();
     // A browser without the Firestore SDK has no onSnapshot channel. Keep an open date modal
-    // fresh by rechecking only this date's tagged messages; this is bounded to the modal lifetime
-    // and stops immediately on close, so another device's completed upload appears without a
-    // manual refresh while normal SDK clients still get their push update instantly.
-    const refreshTimer = setInterval(refresh, 6000);
-    return () => { cancelled = true; clearInterval(refreshTimer); };
+    // fresh by rechecking only this date's tagged messages in that fallback case. This timer was
+    // accidentally started even for normal SDK clients, so every open sheet issued a server tag
+    // query every six seconds despite an active realtime channel.
+    const refreshTimer = __fb() ? null : setInterval(refresh, 6000);
+    return () => {
+      cancelled = true;
+      if (refreshTimer) clearInterval(refreshTimer);
+    };
   }, [dateStr, dateStrToHashtag, onFetchDateTaggedMessages]);
   React.useEffect(() => {
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
@@ -1289,15 +1305,19 @@ export function DateModal({
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
     const byId = new Map();
     [...(Array.isArray(memos) ? memos : []), ...(Array.isArray(fetchedTaggedMemos) ? fetchedTaggedMemos : [])]
-      .forEach(memo => { if (memo?.id) byId.set(String(memo.id), memo); });
+      .forEach(memo => {
+        if (!memo?.id) return;
+        const overridden = dateMemoOverrides[String(memo.id)];
+        byId.set(String(memo.id), overridden ? { ...memo, ...overridden } : memo);
+      });
     return Array.from(byId.values()).filter(memo => {
-      if (!memo || isTombstone(memo)) return false;
+      if (!memo || memo._deleted || isTombstone(memo)) return false;
       const raw = [memo.tags, memo.text, memo.title, memo.note, memo.memo, memo.description, memo.content, memo.body]
         .flatMap(value => Array.isArray(value) ? value : [value]).filter(Boolean).join(' ');
       const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(raw) : [];
       return (targetTag && raw.includes(targetTag)) || parsedDates.includes(dateStr);
     }).sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
-  }, [memos, fetchedTaggedMemos, dateStr, dateStrToHashtag]);
+  }, [memos, fetchedTaggedMemos, dateStr, dateStrToHashtag, dateMemoOverrides]);
   const handleBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
     markBrokenMeetingPhoto(photo, brokenInfo);
   };
@@ -2126,11 +2146,11 @@ export function DateModal({
     onChange: (id) => setActiveTab(id),
     style: { backgroundColor: 'var(--bg-card)', width: '100%', borderBottom: '1px solid var(--border-subtle)' },
     options: [
-      { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
-      { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
-      { value: 'settlement', label: /*#__PURE__*/React.createElement(React.Fragment, null, "정산", /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })) },
-      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingImages.length })) },
-      { value: 'memo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "메모", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateTaggedMemos.length })) }
+      { value: 'participant', label: '참석', badge: dateEntries.length, badgeMode: 'dot' },
+      { value: 'meeting', label: '장소', badge: registeredPlaces.length, badgeMode: 'dot' },
+      { value: 'settlement', label: '정산', badge: expenses.length, badgeMode: 'dot' },
+      { value: 'photo', label: '사진', badge: visibleMeetingImages.length, badgeMode: 'dot' },
+      { value: 'memo', label: '메모', badge: dateTaggedMemos.length, badgeMode: 'dot' }
     ]
   }), /*#__PURE__*/React.createElement("form", {
     style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
@@ -2634,8 +2654,12 @@ export function DateModal({
           e.preventDefault();
           e.stopPropagation();
           if (isSubmitting) return;
+          const confirming = !isConfirmed;
           setIsSubmitting(true);
-          try { await Promise.resolve(onConfirmMeeting(dateStr, '')); }
+          try {
+            await Promise.resolve(onConfirmMeeting(dateStr, ''));
+            if (confirming) launchClipboardConfetti();
+          }
           finally { setIsSubmitting(false); }
         },
         style: {
@@ -3330,7 +3354,13 @@ export function DateModal({
         memo,
         calendar,
         variant: "date-modal",
-        onOpenEdit: typeof onOpenEditMemo === 'function' ? () => onOpenEditMemo(memo) : undefined,
+        // Keep the date sheet open and launch the same complete MemoView editor over it.
+        // The legacy callback remains a fallback only while the lazily registered editor is
+        // unavailable during an initial chunk load.
+        onOpenEdit: () => {
+          if (typeof MemoView === 'function') setEditingDateMemo(memo);
+          else if (typeof onOpenEditMemo === 'function') onOpenEditMemo(memo);
+        },
         onTogglePin: typeof onToggleMemoPin === 'function' ? () => onToggleMemoPin(memo) : () => {},
         onShare: typeof onShareMemo === 'function' ? () => onShareMemo(memo) : () => {},
         onSelectTag: typeof onSelectMemoTag === 'function' ? onSelectMemoTag : () => {},
@@ -3549,19 +3579,26 @@ export function DateModal({
       }, "✕")
     ),
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
-      activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
-        key: p.id,
-        type: "button",
-        className: "bottom-sheet-item",
-        disabled: isSubmitting,
-        onClick: () => {
-          if (isSubmitting) return;
-          markDirty();
-          setParticipantId(p.id);
-          setNote(getExistingNoteForParticipant(p.id));
-          setIsSheetOpen(false);
-        }
-      }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name)))
+      activeParticipants.map(p => {
+        const status = attendingParticipantIds.has(p.id) ? '참석함' : (participantId === p.id ? '선택됨' : '');
+        const disabled = isSubmitting || Boolean(status);
+        return /*#__PURE__*/React.createElement("button", {
+          key: p.id,
+          type: "button",
+          className: "bottom-sheet-item",
+          disabled: disabled,
+          "aria-label": `${p.name}${status ? `, ${status}` : ''}`,
+          onClick: () => {
+            if (disabled) return;
+            markDirty();
+            setParticipantId(p.id);
+            setNote(getExistingNoteForParticipant(p.id));
+            setIsSheetOpen(false);
+          },
+          style: disabled ? { cursor: 'not-allowed', opacity: 0.58 } : undefined
+        }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name),
+        status && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 900 } }, status));
+      })
     )
   )) : null;
 
@@ -3603,7 +3640,44 @@ export function DateModal({
     )
   )) : null;
 
-  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal);
+  // Reuse the full memo editor (media, video/link preview, tags, comments, share and delete)
+  // rather than sending the user away from this date detail sheet or offering a partial form.
+  const dateMemoEditorHost = editingDateMemo && typeof MemoView === 'function'
+    ? /*#__PURE__*/React.createElement(MemoView, {
+        key: `${editingDateMemo.id || ''}:${editingDateMemo.updatedAt || ''}`,
+        calendar,
+        memos: [editingDateMemo],
+        chatMessages: [],
+        hasMoreMemos: false,
+        totalMemoCount: 1,
+        onBack: () => {},
+        showToast,
+        onRequestConfirm,
+        setActiveLightbox,
+        onUpdateMemo: (memoId, patch) => {
+          setDateMemoOverrides(previous => ({
+            ...previous,
+            [memoId]: { ...(previous[memoId] || editingDateMemo), ...patch }
+          }));
+        },
+        onUpsertMemo: memo => {
+          if (!memo?.id) return;
+          setDateMemoOverrides(previous => ({ ...previous, [memo.id]: memo }));
+          setEditingDateMemo(previous => previous?.id === memo.id ? memo : previous);
+        },
+        onDeleteMemo: memoId => {
+          setDateMemoOverrides(previous => ({
+            ...previous,
+            [memoId]: { ...(previous[memoId] || editingDateMemo), id: memoId, _deleted: true }
+          }));
+        },
+        editorOnly: true,
+        initialEditingMemo: editingDateMemo,
+        onEditorClosed: () => setEditingDateMemo(null),
+        renderV2: () => null,
+      })
+    : null;
+  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal, dateMemoEditorHost);
   const portalRoot = (typeof document !== 'undefined' && isBentoSheet)
     ? (document.querySelector('.renewal-shell.v2-design') || document.body)
     : (typeof document !== 'undefined' ? document.body : null);

@@ -2,25 +2,143 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
+import { buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
+import {
+  forgetArchiveDeleted,
+  photoHiddenByArchiveDelete,
+  projectArchivePhotoEntries,
+  rememberArchiveDeleted,
+  rememberArchiveTag,
+} from '../core/archive-photo-edits.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { selectImageVariant } from '../core/image-variants.js';
+import { useTabStripGesture } from './tab-strip-gesture.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
-import { buildPlacePhotoGroups, orderCoverPhotos } from './archive-place-groups.js';
+import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
+import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
+import { CommonPagination } from './ui-shared.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
+const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
+// Archive routes can contain thousands of photos. Keeping the gallery interactive matters more
+// than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
+// first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
+const PAGE_RENDER_SIZE = 40;
+const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
 
-function ArchivePhotoThumb({ photo }) {
+// Gallery's existing number-window calculation is the single pagination rule. Archive and
+// content intentionally use the same 40-item bounded rendering instead of scroll-driven DOM
+// growth, which is what previously made data-heavy tabs freeze the browser.
+function ExistingPageNavigation({ currentPage, pageCount, onChange, label = '목록' }) {
+  const React = window.React;
+  if (pageCount <= 1) return null;
+  return React.createElement(CommonPagination, {
+    currentPage,
+    pageCount,
+    onChange,
+    label,
+    style: { gridColumn: '1 / -1' }
+  });
+}
+// The per-photo fields the lightbox (and its tag save) needs, shared with 장소 일괄 지정.
+const toArchiveLightboxMeta = p => ({
+  timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
+  tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+  anniversaryId: p.anniversaryId,
+  meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
+  sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey,
+  legacyKeys: p.legacyKeys
+});
+const archivePhotoSelectKey = (photo, idx) => String(photo?.mediaKey || photo?.refKey || photo?.assetKey || `${photo?.messageId || ''}:${photo?.imageIndex ?? idx}`);
+
+function ArchivePhotoThumb({ photo, onBroken }) {
   const React = window.React;
   return React.createElement(PhotoAssetThumb, {
     photo,
     alt: '',
     fill: true,
     draggable: false,
+    onBroken,
   });
+}
+
+function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
+  const React = window.React;
+  const list = Array.isArray(photos) ? photos : [];
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const prevListKeyRef = React.useRef(listKey);
+  React.useEffect(() => {
+    if (prevListKeyRef.current !== listKey) {
+      prevListKeyRef.current = listKey;
+      setCurrentPage(1);
+    }
+  }, [listKey]);
+  const pageCount = Math.max(1, Math.ceil(list.length / ARCHIVE_GRID_INITIAL_COUNT));
+  React.useEffect(() => {
+    setCurrentPage(prev => (prev > pageCount ? pageCount : prev));
+  }, [pageCount]);
+  const page = paginateGalleryItems(list, currentPage, ARCHIVE_GRID_INITIAL_COUNT);
+  const visible = page.items;
+
+  // Progressive 2-stage chunk rendering: paint first 16 immediately, then the rest on next animation frame
+  const INITIAL_CHUNK = 16;
+  const [renderedCount, setRenderedCount] = React.useState(() => Math.min(visible.length, INITIAL_CHUNK));
+  React.useEffect(() => {
+    setRenderedCount(Math.min(visible.length, INITIAL_CHUNK));
+    if (visible.length <= INITIAL_CHUNK) return undefined;
+    let rafId = requestAnimationFrame(() => {
+      setRenderedCount(visible.length);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [currentPage, listKey, visible.length]);
+
+  // Idle prefetching for adjacent (next) page thumbnails
+  React.useEffect(() => {
+    if (currentPage >= pageCount) return undefined;
+    const nextPageStart = currentPage * ARCHIVE_GRID_INITIAL_COUNT;
+    const nextPageItems = list.slice(nextPageStart, nextPageStart + ARCHIVE_GRID_INITIAL_COUNT);
+    const prefetch = () => {
+      nextPageItems.slice(0, 16).forEach(p => {
+        const url = selectImageVariant({
+          surface: 'grid',
+          uploadSource: p?.uploadSource || p?.source,
+          channel: p?.source === 'memo' ? 'memo' : (p?.source === 'meeting' ? 'meeting' : ''),
+          original: p?.full || p?.imageUrl,
+          chatThumb: p?.thumb || p?.thumbnailUrl || p?.thumbUrl,
+          smallThumb: p?.smallThumb || p?.smallThumbUrl,
+        });
+        if (url && typeof Image !== 'undefined') {
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = url;
+        }
+      });
+    };
+    const timer = (typeof requestIdleCallback === 'function')
+      ? requestIdleCallback(prefetch, { timeout: 1500 })
+      : setTimeout(prefetch, 400);
+    return () => {
+      if (typeof cancelIdleCallback === 'function' && timer) cancelIdleCallback(timer);
+      else clearTimeout(timer);
+    };
+  }, [currentPage, pageCount, list]);
+
+  const itemsToRender = visible.slice(0, renderedCount);
+
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', {
+      className: 'archive-photo-grid',
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
+    }, itemsToRender.map((photo, index) => renderPhoto(photo, (page.currentPage - 1) * ARCHIVE_GRID_INITIAL_COUNT + index))),
+    React.createElement(ExistingPageNavigation, {
+      currentPage: page.currentPage, pageCount: page.pageCount, onChange: setCurrentPage, label: '보관함 사진'
+    })
+  );
 }
 
 // A memory's cover is "its first photo that actually loads": a deleted/missing file must not
@@ -196,9 +314,12 @@ export function SectionCountBadge({ count }) {
   const normalizedCount = Number(count || 0);
 
   if (!Number.isFinite(normalizedCount) || normalizedCount <= 0) return null;
+  const countStr = String(normalizedCount);
+  const isMulti = countStr.length > 1;
 
   return /*#__PURE__*/React.createElement("span", {
-    className: "section-count-badge"
+    className: `section-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+    "data-digits": isMulti ? "multi" : "single"
   }, normalizedCount);
 }
 
@@ -242,12 +363,20 @@ function handleSectionHeaderKeyDown(event, onToggle) {
 
 export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle, activeColor = '#2563EB' }) {
   const React = window.React;
+  const list = Array.isArray(tabs) ? tabs : [];
+  const { rootRef, gestureProps } = useTabStripGesture({
+    values: list.map(tab => tab.key),
+    value: activeKey,
+    onChange: onSelect,
+  });
 
   return /*#__PURE__*/React.createElement("div", {
+    ...gestureProps,
+    ref: rootRef,
     className: "underline-tabs",
     role: "tablist",
-    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', ...containerStyle }
-  }, tabs.map(tab => {
+    style: { display: 'grid', gridTemplateColumns: `repeat(${list.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', touchAction: 'pan-y', ...containerStyle }
+  }, list.map(tab => {
     const count = Number(tab.count || 0);
     const isActive = activeKey === tab.key;
     return /*#__PURE__*/React.createElement("button", {
@@ -270,7 +399,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
         ...tabTextStyle
       }
     }, tab.label, count > 0 && /*#__PURE__*/React.createElement("span", {
-        className: countBadgeClassName || undefined,
+        className: `underline-tabs-count${countBadgeClassName ? ` ${countBadgeClassName}` : ''}`,
         style: {
           display: 'inline-flex',
           alignItems: 'center',
@@ -343,7 +472,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         onClick: () => { if (!opt.disabled) { onSelect(opt.value); setIsOpen(false); } },
         style: opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined
       }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label,
-        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: 'var(--font-size-sm)', color: 'var(--text-light)' } }, "추가됨") : null))
+        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', flexShrink: 0, fontSize: 'var(--font-size-sm)', color: 'var(--accent-primary)', fontWeight: 800 } }, opt.statusText || '선택됨') : null))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -493,11 +622,25 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
+    const countStr = String(count);
+    const isMulti = countStr.length > 1;
     return React.createElement('span', {
-      className: 'photo-comment-count-badge',
+      className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+      'data-digits': isMulti ? 'multi' : 'single',
       'aria-label': `댓글 ${count}개`,
-      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
-    }, String(count));
+      style: {
+        position: 'absolute', top: '6px', right: '6px', zIndex: 3,
+        minWidth: '22px', height: '22px',
+        width: isMulti ? 'auto' : '22px',
+        aspectRatio: isMulti ? 'auto' : '1 / 1',
+        padding: isMulti ? '0 5.5px' : '0',
+        borderRadius: '9999px',
+        background: 'rgba(15,23,42,0.78)', color: '#fff',
+        fontSize: 'var(--font-size-xs)', fontWeight: 800,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', lineHeight: 1
+      }
+    }, countStr);
   };
       const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
@@ -1215,6 +1358,7 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
 export function HistoryView({
   calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings,
   v2Embed = false, onOpenShare = null,
+  v2SearchQuery, onV2SearchQuery = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -1222,13 +1366,14 @@ export function HistoryView({
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
   onAddPersonTag = null, onRenamePersonTag = null, onDeletePersonTag = null, showToast = null,
   anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null,
-  onPromoteImageUrl = null, onSaveImageTags = null, onSearchTag = null,
-  onDeletePhoto = null, onReplacePhoto = null,
+  onPromoteImageUrl = null, onSaveImageTags = null, onBulkSaveImageTags = null, onSearchTag = null,
+  onDeletePhoto = null, onDeletePhotos = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
-  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoComplete = false, onIndexedPhotoLoadAll = null,
+  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null,
+  onIndexedPhotoLoadAll = null,
   photoCommentCounts = {}, onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -1282,13 +1427,49 @@ export function HistoryView({
       else if (mq.removeListener) mq.removeListener(handleChange);
     };
   }, []);
+  // MediaThumb reports a failure only after it has tried both the compressed thumbnail and the
+  // original. Keep that known-dead asset out of this mounted archive view instead of leaving a
+  // growing wall of broken-image icons. We do not persist this suppression: a re-upload or a
+  // recovered Storage object must appear normally on the next visit.
+  const brokenHistoryPhotoKeysRef = React.useRef(new Set());
+  const [brokenHistoryPhotoRevision, setBrokenHistoryPhotoRevision] = React.useState(0);
+  const historyPhotoBrokenKeys = (photo, info = {}) => [
+    photo?.assetKey, photo?.mediaKey, photo?.refKey,
+    photo?.full, photo?.thumb,
+    info?.src, info?.fallbackSrc, info?.currentSrc,
+  ].map(value => String(value || '').trim().split(/[?#]/)[0]).filter(Boolean);
+  const isKnownBrokenHistoryPhoto = photo => historyPhotoBrokenKeys(photo)
+    .some(key => brokenHistoryPhotoKeysRef.current.has(key));
+  const markBrokenHistoryPhoto = (photo, info = {}) => {
+    let changed = false;
+    historyPhotoBrokenKeys(photo, info).forEach(key => {
+      if (brokenHistoryPhotoKeysRef.current.has(key)) return;
+      brokenHistoryPhotoKeysRef.current.add(key);
+      changed = true;
+    });
+    if (changed) setBrokenHistoryPhotoRevision(value => value + 1);
+  };
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
+    const countStr = String(count);
+    const isMulti = countStr.length > 1;
     return /*#__PURE__*/React.createElement('span', {
-      className: 'photo-comment-count-badge',
+      className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+      'data-digits': isMulti ? 'multi' : 'single',
       "aria-label": `댓글 ${count}개`,
-      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
-    }, String(count));
+      style: {
+        position: 'absolute', top: '6px', right: '6px', zIndex: 3,
+        minWidth: '22px', height: '22px',
+        width: isMulti ? 'auto' : '22px',
+        aspectRatio: isMulti ? 'auto' : '1 / 1',
+        padding: isMulti ? '0 5.5px' : '0',
+        borderRadius: '9999px',
+        background: 'rgba(15,23,42,0.78)', color: '#fff',
+        fontSize: 'var(--font-size-xs)', fontWeight: 800,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', lineHeight: 1
+      }
+    }, countStr);
   };
   const formatHistoryDate = value => {
     const text = String(value || '').slice(0, 10);
@@ -1342,12 +1523,23 @@ export function HistoryView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const v2SearchControlled = typeof onV2SearchQuery === 'function';
+  React.useEffect(() => {
+    if (!v2SearchControlled) return;
+    setSearchQuery(v2SearchQuery || '');
+  }, [v2SearchControlled, v2SearchQuery]);
+  const [archiveIndexScan, setArchiveIndexScan] = React.useState('idle');
   // v2 shell (PC): side-nav's per-tab submenu needs 보관함 검색 -- otherwise local to this component.
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
+    onRegisterMenuActions({
+      search: () => {
+        if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(v => !v);
+      },
+    });
     return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions]);
+  }, [onRegisterMenuActions, v2SearchControlled]);
   const VALID_HISTORY_TABS = ['meetings', 'memories', 'people', 'places'];
   // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
   // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
@@ -1383,7 +1575,13 @@ export function HistoryView({
   };
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
-    setHistoryTab(tab);
+    if (typeof React.startTransition === 'function') {
+      React.startTransition(() => {
+        setHistoryTab(tab);
+      });
+    } else {
+      setHistoryTab(tab);
+    }
     setSelectedMemoryGroupId(null);
     pushHistoryState(tab);
   };
@@ -1549,25 +1747,73 @@ export function HistoryView({
     const placeMatch = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d)).some(p =>
       (p.alias || p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
     );
-    return d.includes(q) || namesMatch || memoMatch || placeMatch;
+    const labeledDate = formatHistoryDate(d).toLowerCase();
+    const anniversaryMatch = (anniversaries || []).some(a => {
+      if (!a) return false;
+      const start = String(a.startDate || a.date || '').slice(0, 10);
+      const end = String(a.endDate || a.startDate || a.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || d < start || d > (end || start)) return false;
+      return String(a.title || '').toLowerCase().includes(q)
+        || String(a.memo || a.note || a.description || '').toLowerCase().includes(q);
+    });
+    return d.includes(q) || labeledDate.includes(q) || namesMatch || memoMatch || placeMatch || anniversaryMatch;
   });
 
   const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
-  const personTagChips = [
+  const personTagChips = React.useMemo(() => [
     ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, color: p.color || '#7C3AED' })),
     ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, participantId: null, label: t, color: '#64748B' }))
-  ];
+  ], [activeParticipants, customPersonTags]);
+
+  // 보관함의 첫 화면은 서버 photoIndex의 한 페이지만 사용한다. 이전에는 `complete`가 true일
+  // 때만 index를 신뢰해서, 첫 100장을 정상 수신한 뒤에도 채팅·메모·일정 전체를 다시 합성했다.
+  // 그 중복 전체 순회가 사이드 메뉴에서 보관함을 누른 순간의 Long Task의 직접 원인이었다.
+  // 인덱스가 준비 중이면 빈 목록으로 먼저 화면을 그리고, 레거시 캘린더에 index가 없다고
+  // 확정된 경우에만 제한된 라이브 데이터 소스를 폴백으로 쓴다.
+  const hasExplicitIndexedPhotoStatus = typeof indexedPhotoStatus === 'string' && indexedPhotoStatus.length > 0;
+  const usesCanonicalPhotoIndex = Array.isArray(indexedPhotos)
+    && (indexedPhotoStatus === 'ready' || (!hasExplicitIndexedPhotoStatus && indexedPhotoComplete));
+  const usesLegacyPhotoFallback = indexedPhotoStatus === 'fallback'
+    || (!hasExplicitIndexedPhotoStatus && !Array.isArray(indexedPhotos));
+  const archivePhotoIndexIsPending = hasExplicitIndexedPhotoStatus
+    && !usesCanonicalPhotoIndex
+    && !usesLegacyPhotoFallback
+    && indexedPhotoStatus !== 'error';
+  const archivePhotoIndexHasError = indexedPhotoStatus === 'error';
+  // 보관함 첫 화면은 최근 한 페이지만 그린다. 검색은 컨텐츠 검색과 같이 그 한 페이지에서
+  // 끊기면 안 되므로, 검색어가 있는 동안만 사진 인덱스 전체를 읽어 지난 태그까지 찾는다.
+  React.useEffect(() => {
+    const needle = String(searchQuery || '').trim();
+    if (!needle) {
+      setArchiveIndexScan('idle');
+      return undefined;
+    }
+    if (!usesCanonicalPhotoIndex || indexedPhotoComplete) {
+      setArchiveIndexScan(indexedPhotoComplete ? 'done' : 'idle');
+      return undefined;
+    }
+    if (typeof onIndexedPhotoLoadAll !== 'function') {
+      setArchiveIndexScan('idle');
+      return undefined;
+    }
+    let cancelled = false;
+    setArchiveIndexScan('loading');
+    Promise.resolve(onIndexedPhotoLoadAll())
+      .then(ok => { if (!cancelled) setArchiveIndexScan(ok === false ? 'error' : 'done'); })
+      .catch(() => { if (!cancelled) setArchiveIndexScan('error'); });
+    return () => { cancelled = true; };
+  }, [searchQuery.trim() ? 'search' : '', usesCanonicalPhotoIndex, indexedPhotoComplete, onIndexedPhotoLoadAll, calendar && calendar.id]);
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
   const baseHistoryPhotoEntries = React.useMemo(() => {
     const calendarId = calendar && calendar.id ? calendar.id : '';
-    const canonical = indexedPhotoComplete && Array.isArray(indexedPhotos)
+    const canonical = usesCanonicalPhotoIndex
       // photoIndex rows are server-maintained and never learned about meme keyboard stickers
       // (see isMemeKeyboardPhotoEntry's comment) -- buildCombinedPhotoEntries's composeGalleryPhotos
       // path already excludes them, this branch needs its own filter to match.
       ? indexedPhotos.filter(photo => !isMemeKeyboardPhotoEntry(photo))
-      : buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries);
+      : (usesLegacyPhotoFallback ? buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries) : []);
     return canonical.map(entry => ({
       ...entry,
       tags: resolveGalleryLightboxTags(calendarId, entry, {
@@ -1575,12 +1821,30 @@ export function HistoryView({
         indexTags: String(entry.tags || '')
       })
     }));
-  }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, indexedPhotoComplete]);
-  React.useEffect(() => {
-    if (!indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function') void onIndexedPhotoLoadAll();
-  }, [indexedPhotoComplete, onIndexedPhotoLoadAll]);
+  }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, usesCanonicalPhotoIndex, usesLegacyPhotoFallback]);
+  // Do not turn opening 보관함 into a full-index network request. The archive stays bounded to
+  // the canonical first page; a broad scan without clear progress or a durable result is not a
+  // useful user action.
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
   // chat window is incomplete. Memories need the same for anniversary date ranges.
+  const incompleteArchiveNotice = archivePhotoIndexHasError
+    ? /*#__PURE__*/React.createElement('p', { role: 'alert' },
+      '보관함 사진을 불러오지 못했습니다. ',
+      typeof onIndexedPhotoPageChange === 'function' && /*#__PURE__*/React.createElement('button', {
+        type: 'button', onClick: () => { void onIndexedPhotoPageChange(1, { force: true }); }
+      }, '다시 시도')
+    )
+    : archivePhotoIndexIsPending
+    ? /*#__PURE__*/React.createElement('div', {
+      role: 'status',
+      style: {
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '9px 10px', marginBottom: '8px', border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', color: 'var(--text-muted)',
+        fontSize: 'var(--font-size-xs)'
+      }
+    }, /*#__PURE__*/React.createElement('span', { "aria-hidden": true }, '⏳'), /*#__PURE__*/React.createElement('span', null, '보관함 사진을 준비하는 중입니다.'))
+    : null;
   const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
   // People badges and Memories groups share historyPhotoEntries. Only hydrating the meeting
   // photo index on the Memories tab made People counts jump after the first Memories visit.
@@ -1589,10 +1853,10 @@ export function HistoryView({
   // and drift easily -- session hydrate of the existing index is cheaper and stays accurate.
   const indexedMeetingDatesKeyRef = React.useRef('');
   React.useEffect(() => {
-    // New callers provide the complete canonical photoIndex. Do not also fan out one
+    // New callers provide the canonical photoIndex status. Do not also fan out one
     // meetingPhotoIndex request per anniversary date; that was the main reason History felt
     // slower than Gallery on mobile. Keep the legacy date loader only as a compatibility fallback.
-    if (typeof onIndexedPhotoLoadAll === 'function') {
+    if (hasExplicitIndexedPhotoStatus) {
       setIndexedMeetingPhotoEntries([]);
       indexedMeetingDatesKeyRef.current = '';
       return;
@@ -1680,14 +1944,27 @@ export function HistoryView({
       setIndexedMeetingPhotoEntries(entries);
     });
     return () => { cancelled = true; };
-  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, onIndexedPhotoLoadAll]);
+  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, hasExplicitIndexedPhotoStatus]);
+  const [archiveTagOverrides, setArchiveTagOverrides] = React.useState(() => new Map());
+  const [archiveDeletedKeys, setArchiveDeletedKeys] = React.useState(() => new Set());
   const historyPhotoEntries = React.useMemo(() => {
     const list = indexedMeetingPhotoEntries.length
       ? [...baseHistoryPhotoEntries, ...indexedMeetingPhotoEntries]
       : baseHistoryPhotoEntries;
-    return dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey)
+    const visible = dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey)
+      .filter(photo => !isKnownBrokenHistoryPhoto(photo) && !photoHiddenByArchiveDelete(archiveDeletedKeys, photo))
       .sort((a, b) => (Number(b.timestamp || 0) - Number(a.timestamp || 0)));
-  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries]);
+    return projectArchivePhotoEntries(visible, { tagOverrides: archiveTagOverrides });
+  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries, brokenHistoryPhotoRevision, archiveDeletedKeys, archiveTagOverrides]);
+  // Match memory date ranges from a prepared token list. This is purposely limited to the active
+  // 추억 tab: person/place navigation does not pay for date parsing it cannot display.
+  const historyMemoryPhotoEntries = React.useMemo(() => {
+    if (historyTab !== 'memories' && !q) return [];
+    return historyPhotoEntries.map(entry => ({
+      ...entry,
+      __gatherMemoryDateTokens: parseHistoryDateTokens(entry?.tags || '')
+    }));
+  }, [historyTab, historyPhotoEntries, q ? 1 : 0]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   // 장소 탭: a place group's key, PLACE_UNCLASSIFIED_KEY for "분류 필요", or null (the place grid).
   const [selectedPlaceKey, setSelectedPlaceKey] = React.useState(null);
@@ -1804,30 +2081,217 @@ export function HistoryView({
   // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
   // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
   // 완전일치만 인정한다.
-  const getPhotosForTagLabel = React.useCallback((label) => {
-    if (!label) return [];
-    const variants = getPersonNameVariants(label).map(v => v.toLowerCase());
-    return historyPhotoEntries.filter(entry => {
-      const tokens = entryTagTokens(entry).map(t => t.toLowerCase());
-      return variants.some(v => v.length <= 1 ? tokens.includes(v) : tokens.some(t => t.includes(v)));
+  // 인물 분류는 인물 탭을 실제로 열었을 때만 수행한다. 보관함 첫 진입(기본: 추억)에서
+  // 보이지 않는 인물/장소 분류까지 동시에 실행하면 사진 수에 비례해 메인 스레드를 막는다.
+  // 탭을 다시 열어도 그 탭의 데이터가 바뀌지 않는 한 useMemo 캐시가 유지된다.
+  const { personPhotosByLabel, unclassifiedPeoplePhotos } = React.useMemo(() => {
+    const buckets = new Map(personTagChips.map(tag => [tag.label, []]));
+    const unclassified = [];
+    // 검색 중에는 다른 탭 배지(인물 N)를 내기 위해 인물 탭이 아니어도 분류한다.
+    if (historyTab !== 'people' && !q) return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
+    const matchers = personTagChips.map(tag => ({
+      label: tag.label,
+      variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
+    }));
+    historyPhotoEntries.forEach(entry => {
+      const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
+      if (!tokens.length) {
+        unclassified.push(entry);
+        return;
+      }
+      let hasPerson = false;
+      matchers.forEach(({ label, variants }) => {
+        if (variants.some(value => value.length <= 1 ? tokens.includes(value) : tokens.some(token => token.includes(value)))) {
+          buckets.get(label)?.push(entry);
+          hasPerson = true;
+        }
+      });
+      if (!hasPerson) unclassified.push(entry);
     });
-  }, [historyPhotoEntries]);
+    return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
+  }, [historyTab, historyPhotoEntries, personTagChips, q ? 1 : 0]);
+  const getPhotosForTagLabel = React.useCallback(label => personPhotosByLabel.get(label) || [], [personPhotosByLabel]);
+
   const photosForPersonTag = React.useMemo(
-    () => getPhotosForTagLabel(selectedPersonTag),
-    [getPhotosForTagLabel, selectedPersonTag]
+    () => selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? unclassifiedPeoplePhotos : getPhotosForTagLabel(selectedPersonTag),
+    [getPhotosForTagLabel, selectedPersonTag, unclassifiedPeoplePhotos]
   );
+
+  const [peopleSelectMode, setPeopleSelectMode] = React.useState(false);
+  const [peopleSelectedKeys, setPeopleSelectedKeys] = React.useState(() => new Set());
+  const [isPeopleBulkDeleting, setIsPeopleBulkDeleting] = React.useState(false);
+  const [peopleDeleteProgress, setPeopleDeleteProgress] = React.useState(null);
+  const peopleAnchorKeyRef = React.useRef('');
+
+  React.useEffect(() => {
+    setPeopleSelectMode(false);
+    setPeopleSelectedKeys(new Set());
+    peopleAnchorKeyRef.current = '';
+  }, [selectedPersonTag, historyTab]);
+
+  const togglePeopleSelectedKey = (key, options = {}) => {
+    setPeopleSelectedKeys(prev => {
+      const next = new Set(prev);
+      const orderedKeys = options.orderedKeys || (photosForPersonTag || []).map((p, idx) => archivePhotoSelectKey(p, idx));
+      if (options.shiftKey && peopleAnchorKeyRef.current && orderedKeys.includes(peopleAnchorKeyRef.current) && orderedKeys.includes(key)) {
+        const fromIdx = orderedKeys.indexOf(peopleAnchorKeyRef.current);
+        const toIdx = orderedKeys.indexOf(key);
+        const [start, end] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
+        for (let i = start; i <= end; i += 1) {
+          next.add(orderedKeys[i]);
+        }
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      peopleAnchorKeyRef.current = key;
+      return next;
+    });
+  };
+
+  const handleToggleAllPeople = () => {
+    const keys = (photosForPersonTag || []).map((p, idx) => archivePhotoSelectKey(p, idx));
+    const allSelected = keys.length > 0 && keys.every(k => peopleSelectedKeys.has(k));
+    if (allSelected) {
+      setPeopleSelectedKeys(new Set());
+    } else {
+      setPeopleSelectedKeys(new Set(keys));
+    }
+  };
+
+  const publishArchiveTags = changes => {
+    if (!changes?.length) return;
+    setArchiveTagOverrides(prev => {
+      const next = new Map(prev);
+      changes.forEach(change => rememberArchiveTag(next, change.photo, change.tags));
+      return next;
+    });
+  };
+  const rollbackArchiveTags = changes => {
+    if (!changes?.length) return;
+    setArchiveTagOverrides(prev => {
+      const next = new Map(prev);
+      changes.forEach(change => rememberArchiveTag(next, change.photo, change.beforeTags));
+      return next;
+    });
+  };
+  const hideArchivePhotos = photos => {
+    if (!photos?.length) return;
+    setArchiveDeletedKeys(prev => {
+      const next = new Set(prev);
+      photos.forEach(photo => rememberArchiveDeleted(next, photo));
+      return next;
+    });
+  };
+  const restoreArchivePhotos = photos => {
+    if (!photos?.length) return;
+    setArchiveDeletedKeys(prev => photos.reduce((next, photo) => forgetArchiveDeleted(next, photo), new Set(prev)));
+  };
+
+  const handleApplyPeopleTags = async (tagText) => {
+    const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
+    if (!photos.length) return;
+    const save = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof save !== 'function') {
+      showToast?.('일괄 태그 저장 기능을 준비하지 못했습니다.', 'error');
+      return;
+    }
+    const changes = buildBulkPhotoTagChanges(photos, 'add', tagText);
+    if (!changes.length) {
+      showToast?.('선택한 사진에 이미 해당 태그가 지정되어 있습니다.', 'info');
+      return;
+    }
+    publishArchiveTags(changes);
+    setPeopleSelectedKeys(new Set());
+    try {
+      const result = await save(changes);
+      if (!result?.ok) throw new Error('태그 저장 실패');
+      showToast?.(`사진 ${changes.length}장에 태그를 적용했습니다.`, 'success');
+    } catch (err) {
+      rollbackArchiveTags(changes);
+      showToast?.(String(err?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
+    }
+  };
+
+  const handleDeleteSelectedPeoplePhotos = async () => {
+    const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
+    if (!photos.length) return;
+    const deleteFn = onDeletePhotos || window.__gatherBulkDeletePhotos;
+    hideArchivePhotos(photos);
+    setPeopleSelectedKeys(new Set());
+    setPeopleSelectMode(false);
+    setIsPeopleBulkDeleting(true);
+    setPeopleDeleteProgress({ current: 0, total: photos.length });
+
+    try {
+      if (typeof deleteFn === 'function') {
+        const res = await deleteFn(photos, {
+          onProgress: ({ current, total }) => setPeopleDeleteProgress({ current, total })
+        });
+        const deleted = Number(res?.deleted || 0);
+        const failed = Number(res?.failed || 0);
+        if (!deleted && failed) {
+          restoreArchivePhotos(photos);
+          showToast?.('사진 삭제에 실패했습니다.', 'error');
+        } else if (failed) {
+          showToast?.(`사진 ${deleted}장을 삭제했습니다. ${failed}장은 지우지 못했습니다.`, 'error');
+        } else {
+          showToast?.(`사진 ${deleted || photos.length}장을 삭제했습니다.`, 'success');
+        }
+      } else if (typeof onDeletePhoto === 'function') {
+        let done = 0;
+        let failed = 0;
+        for (const photo of photos) {
+          try {
+            const ok = await onDeletePhoto({ ...photo, silent: true });
+            if (ok === false) failed += 1;
+            else done += 1;
+          } catch (_) {
+            failed += 1;
+          }
+          setPeopleDeleteProgress({ current: done + failed, total: photos.length });
+        }
+        if (!done && failed) {
+          restoreArchivePhotos(photos);
+          showToast?.('사진 삭제에 실패했습니다.', 'error');
+        } else {
+          showToast?.(`사진 ${done}장을 삭제했습니다.`, failed ? 'error' : 'success');
+        }
+      } else {
+        restoreArchivePhotos(photos);
+        showToast?.('사진 삭제 기능을 준비하지 못했습니다.', 'error');
+      }
+    } catch (err) {
+      console.error('handleDeleteSelectedPeoplePhotos failed:', err);
+      restoreArchivePhotos(photos);
+      showToast?.('사진 삭제에 실패했습니다.', 'error');
+    } finally {
+      setIsPeopleBulkDeleting(false);
+      setPeopleDeleteProgress(null);
+    }
+  };
+
+  const handleMovePeopleGroup = async (targetGroup) => {
+    const targetLabel = targetGroup.label || targetGroup.name || targetGroup;
+    await handleApplyPeopleTags(`#${targetLabel}`);
+  };
+
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
-  const placePhotoGroups = React.useMemo(() => buildPlacePhotoGroups({
-    places: getCalendarPlaces(calendar),
-    photos: historyPhotoEntries,
-    getPhotoDates: photo => {
-      const dates = parseHistoryDateTokens(photo?.tags || '');
-      const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
-      return /^\d{4}-\d{2}-\d{2}$/.test(meetingDate) ? [meetingDate, ...dates] : dates;
-    },
-    doesPlaceMatchDate
-  }), [calendar, historyPhotoEntries]);
+  const placePhotoGroups = React.useMemo(() => {
+    if (historyTab !== 'places' && !q) return { groups: [], unclassified: [], unclassifiedCount: 0 };
+    return buildPlacePhotoGroups({
+      places: getCalendarPlaces(calendar),
+      photos: historyPhotoEntries,
+      getPhotoDates: photo => {
+        const dates = parseHistoryDateTokens(photo?.tags || '');
+        const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(meetingDate) ? [meetingDate, ...dates] : dates;
+      },
+      doesPlaceMatchDate
+    });
+  }, [historyTab, calendar, historyPhotoEntries, q ? 1 : 0]);
   const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
     ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
     : null;
@@ -1836,23 +2300,244 @@ export function HistoryView({
     if (selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY && !selectedPlaceGroup) setSelectedPlaceKey(null);
     if (selectedPlaceKey === PLACE_UNCLASSIFIED_KEY && !placePhotoGroups.unclassifiedCount) setSelectedPlaceKey(null);
   }, [selectedPlaceKey, selectedPlaceGroup, placePhotoGroups.unclassifiedCount]);
+  // 분류 필요 → 장소 일괄 지정: select photos, then pick one of the day's candidate places; each
+  // selected photo gets "#장소이름" added through the regular per-photo tag save.
+  const [placeSelectMode, setPlaceSelectMode] = React.useState(false);
+  const [placeSelectedKeys, setPlaceSelectedKeys] = React.useState(() => new Set());
+  const [placeAssignProgress, setPlaceAssignProgress] = React.useState(null);
+  const placeAnchorKeyRef = React.useRef('');
+  const saveImageTagsRef = React.useRef(onSaveImageTags);
+  saveImageTagsRef.current = onSaveImageTags;
+  const bulkSaveImageTagsRef = React.useRef(onBulkSaveImageTags);
+  bulkSaveImageTagsRef.current = onBulkSaveImageTags;
+  React.useEffect(() => {
+    if (selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY) { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }
+    placeAnchorKeyRef.current = '';
+  }, [selectedPlaceKey]);
+  React.useLayoutEffect(() => {
+    // Drill-in swaps the scroller. Reusing the previous scrollTop (or a layout
+    // jump from the new grid) was collapsing the page header while the detail
+    // was already at the top. Pin the new pane to the top, then ask the header
+    // to come back. A later paint can still emit a scroll event; repeat once.
+    if (typeof document === 'undefined') return undefined;
+    const reveal = () => {
+      const root = document.querySelector('.v2-archive');
+      const scroller = root && root.querySelector('.history-page-scroll');
+      if (scroller && (selectedPlaceKey || selectedPersonTag || selectedMemoryGroupId)) scroller.scrollTop = 0;
+      document.dispatchEvent(new Event('v2-page-header-show'));
+    };
+    reveal();
+    const raf = requestAnimationFrame(reveal);
+    return () => cancelAnimationFrame(raf);
+  }, [selectedPlaceKey, selectedPersonTag, selectedMemoryGroupId]);
+  const togglePlaceSelectedKey = (key, options = {}) => setPlaceSelectedKeys(prev => {
+    const next = new Set(prev);
+    const orderedKeys = options.orderedKeys || (options.photos ? options.photos.map((p, i) => archivePhotoSelectKey(p, i)) : []);
+    if (options.shiftKey && placeAnchorKeyRef.current && orderedKeys.includes(placeAnchorKeyRef.current) && orderedKeys.includes(key)) {
+      const fromIdx = orderedKeys.indexOf(placeAnchorKeyRef.current);
+      const toIdx = orderedKeys.indexOf(key);
+      const [start, end] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
+      for (let i = start; i <= end; i += 1) {
+        next.add(orderedKeys[i]);
+      }
+    } else if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    placeAnchorKeyRef.current = key;
+    return next;
+  });
+  const unclassifiedPhotoByKey = React.useMemo(() => {
+    const map = new Map();
+    placePhotoGroups.unclassified.forEach(bucket => bucket.photos.forEach((photo, idx) => map.set(archivePhotoSelectKey(photo, idx), photo)));
+    return map;
+  }, [placePhotoGroups.unclassified]);
+  const selectedCandidatePlaces = React.useMemo(() => {
+    const byId = new Map();
+    placePhotoGroups.unclassified.forEach(bucket => {
+      if (!bucket.photos.some((photo, idx) => placeSelectedKeys.has(archivePhotoSelectKey(photo, idx)))) return;
+      bucket.candidates.forEach(place => byId.set(place.id || place.name, place));
+    });
+    return Array.from(byId.values());
+  }, [placePhotoGroups.unclassified, placeSelectedKeys]);
+  const assignSelectedPhotosToPlace = async place => {
+    const photos = Array.from(placeSelectedKeys).map(key => unclassifiedPhotoByKey.get(key)).filter(Boolean);
+    if (!photos.length || (typeof saveImageTagsRef.current !== 'function' && typeof bulkSaveImageTagsRef.current !== 'function') || placeAssignProgress) return;
+    const placeTag = placeTagToken(place);
+    const bulkChanges = buildBulkPhotoTagChanges(photos, 'add', placeTag);
+    if (!bulkChanges.length) {
+      showToast('선택한 사진에는 이미 같은 장소 태그가 있습니다.', 'info');
+      return;
+    }
+    // The server path groups same-message edits and meeting-copy synchronization in one
+    // transaction. It avoids the old 60ms-per-photo loop (which still resulted in many network
+    // reads/writes) and records the previous tags for an immediate undo.
+    if (typeof bulkSaveImageTagsRef.current === 'function') {
+      publishArchiveTags(bulkChanges);
+      setPlaceSelectedKeys(new Set());
+      setPlaceSelectMode(false);
+      try {
+        const result = await bulkSaveImageTagsRef.current(bulkChanges);
+        if (!result?.ok) throw new Error('일괄 장소 태그 저장 실패');
+        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
+        showToast(`${bulkChanges.length}장을 #${placeTag}(으)로 옮겼어요.`, 'success', 9000, () => {
+          const undo = bulkSaveImageTagsRef.current;
+          if (typeof undo !== 'function') return;
+          publishArchiveTags(undoChanges);
+          void undo(undoChanges)
+            .then(undoResult => {
+              if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
+              showToast(undoResult?.ok ? '장소 분류를 되돌렸습니다.' : '장소 분류를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+            })
+            .catch(error => { rollbackArchiveTags(undoChanges); console.error('Place bulk-tag undo failed:', error); showToast('장소 분류 되돌리기에 실패했습니다.', 'error'); });
+        }, null, '되돌리기');
+      } catch (err) {
+        rollbackArchiveTags(bulkChanges);
+        console.error('Place bulk tag save failed:', err);
+        showToast(String(err?.message || '장소 태그 저장에 실패했습니다.'), 'error');
+      } finally {
+        setPlaceAssignProgress(null);
+      }
+      return;
+    }
+    const counts = { done: 0, full: 0, failed: 0 };
+    // The tag handler keeps an optimistic snapshot per document, so a fresh
+    // server read here would drop tags that have not landed yet.
+    for (let i = 0; i < photos.length; i += 1) {
+      setPlaceAssignProgress({ current: i + 1, total: photos.length, label: placeTag });
+      const photo = photos[i];
+      const next = withPlaceTag(photo.tags, place);
+      if (next.status === 'already') { counts.done += 1; continue; }
+      if (next.status !== 'add') { counts.full += 1; continue; }
+      let ok = false;
+      try {
+        ok = await saveImageTagsRef.current(photo.messageId, photo.imageIndex, next.tags, {
+          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', silent: true
+        });
+      } catch (err) {
+        console.warn('Place bulk tag save failed:', err);
+      }
+      if (ok) counts.done += 1; else counts.failed += 1;
+    }
+    setPlaceAssignProgress(null);
+    setPlaceSelectedKeys(new Set());
+    setPlaceSelectMode(false);
+    const parts = [`${counts.done}장을 #${placeTag}(으)로 옮겼어요.`];
+    if (counts.full) parts.push(`${counts.full}장은 태그가 20개라 건너뛰었어요.`);
+    if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
+    showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
+  };
+  const dismissSelectedPhotosFromPlaces = async () => {
+    const photos = Array.from(placeSelectedKeys).map(key => unclassifiedPhotoByKey.get(key)).filter(Boolean);
+    if (!photos.length || (typeof saveImageTagsRef.current !== 'function' && typeof bulkSaveImageTagsRef.current !== 'function') || placeAssignProgress) return;
+    const seen = new Set();
+    const bulkChanges = [];
+    photos.forEach(photo => {
+      const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
+      if (!assetKey || seen.has(assetKey)) return;
+      const next = withNotAPlaceTag(photo?.tags || '');
+      if (next.status !== 'add') return;
+      seen.add(assetKey);
+      bulkChanges.push({ photo, assetKey, beforeTags: next.before, tags: next.tags });
+    });
+    if (!bulkChanges.length) {
+      showToast('선택한 사진은 이미 분류에서 빠져 있어요.', 'info');
+      setPlaceSelectedKeys(new Set());
+      setPlaceSelectMode(false);
+      return;
+    }
+    if (typeof bulkSaveImageTagsRef.current === 'function') {
+      publishArchiveTags(bulkChanges);
+      setPlaceSelectedKeys(new Set());
+      setPlaceSelectMode(false);
+      try {
+        const result = await bulkSaveImageTagsRef.current(bulkChanges);
+        if (!result?.ok) throw new Error('분류 제거 저장 실패');
+        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
+        showToast(`${bulkChanges.length}장을 분류 필요에서 뺐어요. 사진 파일은 그대로예요.`, 'success', 9000, () => {
+          const undo = bulkSaveImageTagsRef.current;
+          if (typeof undo !== 'function') return;
+          publishArchiveTags(undoChanges);
+          void undo(undoChanges)
+            .then(undoResult => {
+              if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
+              showToast(undoResult?.ok ? '분류 제거를 되돌렸습니다.' : '분류 제거를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+            })
+            .catch(error => { rollbackArchiveTags(undoChanges); console.error('Place dismiss undo failed:', error); showToast('분류 제거 되돌리기에 실패했습니다.', 'error'); });
+        }, null, '되돌리기');
+      } catch (err) {
+        rollbackArchiveTags(bulkChanges);
+        console.error('Place dismiss tag save failed:', err);
+        showToast(String(err?.message || '분류에서 빼지 못했습니다.'), 'error');
+      } finally {
+        setPlaceAssignProgress(null);
+      }
+      return;
+    }
+    const counts = { done: 0, failed: 0 };
+    for (let i = 0; i < photos.length; i += 1) {
+      setPlaceAssignProgress({ current: i + 1, total: photos.length, label: '제거' });
+      const photo = photos[i];
+      const next = withNotAPlaceTag(photo.tags);
+      if (next.status !== 'add') { counts.done += 1; continue; }
+      let ok = false;
+      try {
+        ok = await saveImageTagsRef.current(photo.messageId, photo.imageIndex, next.tags, {
+          ...toArchiveLightboxMeta(photo), imageUrl: photo.full || photo.thumb || '', silent: true
+        });
+      } catch (err) {
+        console.warn('Place dismiss tag save failed:', err);
+      }
+      if (ok) counts.done += 1; else counts.failed += 1;
+    }
+    setPlaceAssignProgress(null);
+    setPlaceSelectedKeys(new Set());
+    setPlaceSelectMode(false);
+    const parts = [`${counts.done}장을 분류 필요에서 뺐어요.`];
+    if (counts.failed) parts.push(`${counts.failed}장은 저장에 실패했어요.`);
+    showToast(parts.join(' '), counts.failed ? 'error' : 'success', 5000);
+  };
   // Same photo cell as the 인물 detail grid (comment badge + heartbeat), for the 장소 tab.
-  const renderArchivePhotoGrid = (photos, keyPrefix) => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-  }, photos.map((photo, idx) => {
+  const renderArchivePhotoGrid = (photos, keyPrefix, selection = null) => /*#__PURE__*/React.createElement(ProgressiveArchivePhotoGrid, {
+    key: keyPrefix,
+    listKey: keyPrefix,
+    photos,
+    renderPhoto: (photo, idx) => {
     const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
     const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+    const selectKey = selection ? archivePhotoSelectKey(photo, idx) : '';
+    const isSelected = !!selection && selection.keys.has(selectKey);
     return /*#__PURE__*/React.createElement("button", {
       key: photo.mediaKey || photo.refKey || `${keyPrefix}_${idx}`,
       type: "button",
       className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
-      onClick: () => openHistoryLightbox(photos, idx),
-      style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
+      onClick: (e) => selection ? selection.onToggle(selectKey, { shiftKey: Boolean(e?.shiftKey), index: idx, photos, key: selectKey }) : openHistoryLightbox(photos, idx),
+      "aria-pressed": selection ? isSelected : undefined,
+      style: {
+        position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s`
+      }
     },
-      /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
-      PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
+      /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo, onBroken: (_event, info) => markBrokenHistoryPhoto(photo, info) }),
+      PhotoCommentCountBadge && !selection && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
+      selection && (EditSelectCheckbox
+        ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isSelected, variant: "onMedia" })
+        : /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": true,
+        style: {
+          position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
+          border: isSelected ? 'none' : '2px solid rgba(255,255,255,0.95)',
+          backgroundColor: isSelected ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none'
+        }
+      }, isSelected && /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+        fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
     );
-  }));
+    }
+  });
   // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
   // 넘겨서, 공유 라이트박스 호스트(app-main.js)가 받는 meta가 비어 태그 입력/삭제/교체 등 표준
   // 라이트박스 기능이 전혀 동작하지 않았다. PhotoGallery와 동일하게 이 탭 전용 라이트박스를
@@ -1862,14 +2547,7 @@ export function HistoryView({
   const openHistoryLightbox = (photos, index, memoryId = null) => {
     const urls = photos.map(p => p.full || p.thumb).filter(Boolean);
     if (urls.length === 0) return;
-    const meta = photos.map(p => ({
-      timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
-      tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
-      anniversaryId: p.anniversaryId,
-      meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
-      sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey,
-      legacyKeys: p.legacyKeys
-    }));
+    const meta = photos.map(toArchiveLightboxMeta);
     setHistoryLightbox({ urls, index, meta, memoryId });
   };
   // 추억 탭: 날짜(startDate/date)가 등록된 기념일이면 카테고리와 상관없이, 그 기간에 등록된
@@ -1886,6 +2564,7 @@ export function HistoryView({
     return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
   const travelMemoryGroups = React.useMemo(() => {
+    if (historyTab !== 'memories' && !q) return [];
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
@@ -1900,7 +2579,7 @@ export function HistoryView({
         // 제외 목록은 기념일 문서 set()에도 살아남아야 한다 -- 같은 날 다른 일정의 사진이
         // 다시 들어오는 건 한 번 고친 작업을 반복하게 만든다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
-        const photosInRange = historyPhotoEntries.filter(entry => {
+        const photosInRange = historyMemoryPhotoEntries.filter(entry => {
           return entryMatchesDateRange(entry, start, end, a.id);
         });
         const photos = photosInRange.filter(entry => !isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
@@ -1912,7 +2591,83 @@ export function HistoryView({
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
-  }, [anniversaries, historyPhotoEntries]);
+  }, [historyTab, anniversaries, historyMemoryPhotoEntries, q ? 1 : 0]);
+
+  const archiveTextHas = (value, needle) => String(value || '').toLowerCase().includes(needle);
+  const archivePhotoMatchesSearch = (photo, needle) => [photo?.tags, photo?.caption, photo?.note, photo?.title, photo?.text, photo?.placeName, photo?.meetingDate]
+    .some(value => archiveTextHas(value, needle));
+  const visibleMemoryGroups = React.useMemo(() => {
+    if (!q) return travelMemoryGroups;
+    return travelMemoryGroups.filter(group => {
+      if (archiveTextHas(group.title, q)) return true;
+      if (archiveTextHas(group.startDate, q) || archiveTextHas(group.endDate, q)) return true;
+      if (archiveTextHas(formatHistoryDate(group.startDate), q) || archiveTextHas(formatHistoryDateRange(group.startDate, group.endDate), q)) return true;
+      return (group.photos || []).some(photo => archivePhotoMatchesSearch(photo, q));
+    });
+  }, [travelMemoryGroups, q]);
+  const visiblePersonChips = React.useMemo(() => {
+    if (!q) return personTagChips;
+    return personTagChips.filter(tag => {
+      const variants = getPersonNameVariants(tag.label).map(value => value.toLowerCase());
+      if (variants.some(value => value.includes(q) || (value.length > 1 && q.includes(value)))) return true;
+      const photos = personPhotosByLabel.get(tag.label) || [];
+      return photos.some(photo => archivePhotoMatchesSearch(photo, q));
+    });
+  }, [q, personTagChips, personPhotosByLabel]);
+  const visibleUnclassifiedPeople = React.useMemo(() => {
+    if (!q) return unclassifiedPeoplePhotos;
+    if (q === '분류' || '분류 필요'.includes(q) || '분류필요'.includes(q)) return unclassifiedPeoplePhotos;
+    return unclassifiedPeoplePhotos.filter(photo => archivePhotoMatchesSearch(photo, q));
+  }, [q, unclassifiedPeoplePhotos]);
+  const visiblePlacePhotoGroups = React.useMemo(() => {
+    if (!q) return placePhotoGroups;
+    const groups = (placePhotoGroups.groups || []).filter(group => {
+      const place = group.place || {};
+      if (archiveTextHas(place.alias, q) || archiveTextHas(place.name, q) || archiveTextHas(place.address, q)) return true;
+      if (archiveTextHas(group.lastDate, q) || archiveTextHas(formatHistoryDate(group.lastDate), q)) return true;
+      return (group.photos || []).some(photo => archivePhotoMatchesSearch(photo, q));
+    });
+    const unclassified = (placePhotoGroups.unclassified || []).map(bucket => {
+      const dateHit = archiveTextHas(bucket.date, q) || archiveTextHas(formatHistoryDate(bucket.date), q);
+      const photos = dateHit ? bucket.photos : (bucket.photos || []).filter(photo => archivePhotoMatchesSearch(photo, q));
+      return photos.length ? { ...bucket, photos } : null;
+    }).filter(Boolean);
+    return {
+      groups,
+      unclassified,
+      unclassifiedCount: unclassified.reduce((sum, bucket) => sum + bucket.photos.length, 0)
+    };
+  }, [q, placePhotoGroups]);
+  const archiveSearchPending = Boolean(q)
+    && usesCanonicalPhotoIndex
+    && !indexedPhotoComplete
+    && indexedPhotoStatus !== 'error'
+    && indexedPhotoStatus !== 'fallback'
+    && archiveIndexScan !== 'error'
+    && typeof onIndexedPhotoLoadAll === 'function';
+  const archiveSearchMissLabel = archiveSearchPending ? '전체 기록에서 검색하는 중...' : '검색 결과가 없습니다.';
+  const autoJumpArchiveNeedleRef = React.useRef('');
+  React.useEffect(() => {
+    if (!q) {
+      autoJumpArchiveNeedleRef.current = '';
+      return;
+    }
+    if (archiveSearchPending) return;
+    const counts = {
+      memories: visibleMemoryGroups.length,
+      people: visiblePersonChips.length + (visibleUnclassifiedPeople.length > 0 ? 1 : 0),
+      places: visiblePlacePhotoGroups.groups.length + (visiblePlacePhotoGroups.unclassifiedCount > 0 ? 1 : 0),
+      meetings: confirmedDates.length
+    };
+    if ((counts[historyTab] || 0) > 0) {
+      autoJumpArchiveNeedleRef.current = q;
+      return;
+    }
+    if (autoJumpArchiveNeedleRef.current === q) return;
+    const firstHit = ['memories', 'people', 'places', 'meetings'].find(key => (counts[key] || 0) > 0);
+    autoJumpArchiveNeedleRef.current = q;
+    if (firstHit && firstHit !== historyTab) changeHistoryTab(firstHit);
+  }, [q, archiveSearchPending, historyTab, visibleMemoryGroups, visiblePersonChips, visibleUnclassifiedPeople, visiblePlacePhotoGroups, confirmedDates]);
 
     const handleExcludeMemoryGroups = async () => {
     const ids = Array.from(selectedMemoryGroupIds);
@@ -1932,14 +2687,17 @@ export function HistoryView({
   // 이미 추억 목록에 있는 기념일을 제외하고, 사진이 있거나 이전에 숨긴 기록이 있는
   // 기념일만 추가 후보로 보여준다. 실제 추가/복원은 기존 기념일 문서 모듈을 재사용한다.
   const memoryGroupIds = new Set(travelMemoryGroups.map(group => group.id));
-  const availableMemoryGroups = React.useMemo(() => (anniversaries || []).filter(a => {
+  const availableMemoryGroups = React.useMemo(() => {
+    if (historyTab !== 'memories') return [];
+    return (anniversaries || []).filter(a => {
     if (!a || !a.id || memoryGroupIds.has(a.id)) return false;
     const start = a.startDate || a.date;
     const end = a.endDate || a.startDate || a.date;
     if (!start || !end) return false;
-    return historyPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end, a.id));
-  }).map(a => ({ id: a.id, title: a.title || '기록', startDate: a.startDate || a.date, endDate: a.endDate || a.startDate || a.date, hidden: !!a.hiddenFromMemories }))
-    .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '')), [anniversaries, historyPhotoEntries, travelMemoryGroups]);
+    return historyMemoryPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end, a.id));
+    }).map(a => ({ id: a.id, title: a.title || '기록', startDate: a.startDate || a.date, endDate: a.endDate || a.startDate || a.date, hidden: !!a.hiddenFromMemories }))
+      .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+  }, [historyTab, anniversaries, historyMemoryPhotoEntries, travelMemoryGroups]);
   const handleRestoreMemoryGroup = async id => {
     if (typeof onRestoreMemoryGroup !== 'function') return;
     setIsChangingMemoryGroups(true);
@@ -1985,9 +2743,9 @@ export function HistoryView({
     type: "button", className: "btn btn-action btn-action-dark", onClick: onClick, title: "추가", "aria-label": "추가",
     style: memoryIconBtn
   }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+");
-  const renderMemoryEditButton = onClick => /*#__PURE__*/React.createElement("button", {
+  const renderMemoryEditButton = (onClick, extraStyle) => /*#__PURE__*/React.createElement("button", {
     type: "button", className: "btn btn-action btn-action-outline", onClick: onClick, title: "편집", "aria-label": "편집",
-    style: memoryIconBtn
+    style: { ...memoryIconBtn, ...(extraStyle || {}) }
   }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집");
   const renderMemoryTrashButton = (onClick, disabled) => /*#__PURE__*/React.createElement("button", {
     type: "button", className: "btn btn-action btn-action-danger", onClick: onClick, disabled: !!disabled,
@@ -1998,13 +2756,13 @@ export function HistoryView({
       opacity: disabled ? 0.5 : 1
     }
   }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "삭제");
-  const renderMemoryCancelButton = onClick => /*#__PURE__*/React.createElement("button", {
+  const renderMemoryCancelButton = (onClick, extraStyle) => /*#__PURE__*/React.createElement("button", {
     type: "button", className: "btn btn-action btn-action-outline", onClick: onClick, title: "취소", "aria-label": "취소",
-    style: memoryTextBtn
+    style: { ...memoryTextBtn, ...(extraStyle || {}) }
   }, "취소");
   const groupedMemorySections = React.useMemo(() => {
     const groups = new Map();
-    (travelMemoryGroups || []).forEach(group => {
+    (visibleMemoryGroups || []).forEach(group => {
       const key = String(group.startDate || '').slice(0, 10) || '__unknown__';
       const list = groups.get(key) || [];
       list.push(group);
@@ -2021,7 +2779,7 @@ export function HistoryView({
         label: dateKey === '__unknown__' ? '날짜 미상' : (formatHistoryDate(dateKey) || dateKey),
         items
       }));
-  }, [travelMemoryGroups]);
+  }, [visibleMemoryGroups]);
   const toggleMemoryDate = dateKey => {
     setCollapsedMemoryDates(prev => {
       const next = new Set(prev);
@@ -2065,7 +2823,7 @@ export function HistoryView({
           display: 'flex', flexDirection: 'column', gap: '1px'
         }
       },
-        /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, group.title),
+        /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, typeof highlightKeyword === 'function' ? highlightKeyword(group.title, searchQuery) : group.title),
         /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.startDate))
       ),
       isMemoryListEditMode && (EditSelectCheckbox
@@ -2090,7 +2848,19 @@ export function HistoryView({
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }
   }, groups.map(renderMemoryGroupCard));
   const renderMemoryGroups = () => {
-    if (travelMemoryGroups.length === 0) {
+    if (archivePhotoIndexIsPending) {
+      return /*#__PURE__*/React.createElement('div', {
+        role: 'status',
+        style: {
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '8px', padding: '24px', textAlign: 'center', color: 'var(--text-muted)'
+        }
+      },
+        /*#__PURE__*/React.createElement('span', { style: { fontSize: '2rem' }, "aria-hidden": true }, '🗂️'),
+        /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, '최근 사진을 불러오는 중입니다')
+      );
+    }
+    if (visibleMemoryGroups.length === 0) {
       return /*#__PURE__*/React.createElement("div", {
         style: {
           flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -2098,11 +2868,11 @@ export function HistoryView({
         }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 추억이 없습니다"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일을 등록하면, 그 날짜(구간)에 올라온 사진을 여기 모아 보여줘요.")
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, q ? archiveSearchMissLabel : "등록된 추억이 없습니다"),
+        !q && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일을 등록하면, 그 날짜(구간)에 올라온 사진을 여기 모아 보여줘요.")
       );
     }
-    if (memoryViewMode !== 'date') return renderMemoryGroupGrid(travelMemoryGroups);
+    if (memoryViewMode !== 'date') return renderMemoryGroupGrid(visibleMemoryGroups);
     return groupedMemorySections.map(section => {
       const isCollapsed = collapsedMemoryDates.has(section.dateKey);
       return /*#__PURE__*/React.createElement("section", {
@@ -2136,9 +2906,11 @@ export function HistoryView({
     });
   };
   const renderPhotoThumbGrid = (photos, { checkable, selectedKeys, onToggle, onOpen, keyPrefix }) => (
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-    }, photos.map((photo, idx) => {
+    /*#__PURE__*/React.createElement(ProgressiveArchivePhotoGrid, {
+      key: keyPrefix,
+      listKey: keyPrefix,
+      photos,
+      renderPhoto: (photo, idx) => {
       const ids = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
       const photoKey = ids[0] || photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
       const isChecked = checkable && selectedKeys.has(photoKey);
@@ -2168,7 +2940,8 @@ export function HistoryView({
           fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
         }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
       );
-    }))
+      }
+    })
   );
 
   const v2ArchiveTabsSlot = v2Embed && typeof document !== 'undefined'
@@ -2211,9 +2984,9 @@ export function HistoryView({
       }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
     )
   ),
-  isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+  isSearchOpen && !v2SearchControlled && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
-    placeholder: "날짜·참여자·메모·장소 검색...",
+    placeholder: "추억·인물·장소·날짜·태그 검색...",
     onChange: e => setSearchQuery(e.target.value),
     onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
   }),
@@ -2222,14 +2995,33 @@ export function HistoryView({
     value: historyTab,
     onChange: changeHistoryTab,
     activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
-    options: [
-      { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
+    options: q ? [
+      { value: 'memories', label: '추억', badge: visibleMemoryGroups.length, faded: visibleMemoryGroups.length === 0 },
+      { value: 'people', label: '인물', badge: visiblePersonChips.length + (visibleUnclassifiedPeople.length > 0 ? 1 : 0), faded: visiblePersonChips.length === 0 && visibleUnclassifiedPeople.length === 0 },
+      { value: 'places', label: '장소', badge: visiblePlacePhotoGroups.groups.length + (visiblePlacePhotoGroups.unclassifiedCount > 0 ? 1 : 0), faded: visiblePlacePhotoGroups.groups.length === 0 && !visiblePlacePhotoGroups.unclassifiedCount },
+      { value: 'meetings', label: '모임', badge: confirmedDates.length, faded: confirmedDates.length === 0 }
+    ] : [
+      { value: 'memories', label: '추억', badge: historyTab === 'memories' ? travelMemoryGroups.length : null },
       { value: 'people', label: '인물', badge: personTagChips.length },
-      { value: 'places', label: '장소', badge: placePhotoGroups.groups.length },
-      { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
+      { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : (placeCount || null) },
+      { value: 'meetings', label: '모임', badge: confirmedDates.length }
     ]
   })
   );
+
+  const openMemoryGroupId = selectedMemoryGroupId && visibleMemoryGroups.some(group => group.id === selectedMemoryGroupId)
+    ? selectedMemoryGroupId
+    : null;
+  const openPersonTag = selectedPersonTag && (
+    selectedPersonTag === PERSON_UNCLASSIFIED_KEY
+      ? (!q || visibleUnclassifiedPeople.length > 0)
+      : visiblePersonChips.some(tag => tag.label === selectedPersonTag)
+  ) ? selectedPersonTag : null;
+  const openPlaceKey = selectedPlaceKey && (
+    selectedPlaceKey === PLACE_UNCLASSIFIED_KEY
+      ? (!q || visiblePlacePhotoGroups.unclassifiedCount > 0)
+      : visiblePlacePhotoGroups.groups.some(group => group.key === selectedPlaceKey)
+  ) ? selectedPlaceKey : null;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -2360,11 +3152,16 @@ export function HistoryView({
     // 추억 탭: 인물 탭과 동일하게, 초기화면은 여행별 벤또 그리드(칸마다 그 여행의 최신 등록
     // 사진을 배경으로, 딤 처리 위에 여행 타이틀). 칸을 누르면 그 여행 사진만 모아 보여주는
     // 상세 페이지로 들어간다.
-    historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'memories' && !openMemoryGroupId && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
+      incompleteArchiveNotice,
+      q && archiveSearchPending && /*#__PURE__*/React.createElement('p', {
+        role: 'status',
+        style: { margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }
+      }, '전체 기록에서 검색하는 중...'),
       /*#__PURE__*/React.createElement("div", {
         style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px', ...(v2Embed ? { padding: '4px 0 2px' } : {}) }
       },
@@ -2417,8 +3214,8 @@ export function HistoryView({
       ))
     )),
     // 추억 상세 페이지: 특정 여행 칸을 눌렀을 때 그 여행 사진만 모아 보여준다.
-    historyTab === 'memories' && !!selectedMemoryGroupId && (() => {
-      const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
+    historyTab === 'memories' && !!openMemoryGroupId && (() => {
+      const group = visibleMemoryGroups.find(g => g.id === openMemoryGroupId);
       if (!group) return null;
       const canBulkExclude = typeof onRemovePhotosFromMemory === 'function';
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -2426,34 +3223,45 @@ export function HistoryView({
         onScroll: handleHistoryScroll,
         style: historyScrollStyle
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
-            style: {
-              width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
-            }
-          }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-              formatHistoryDateRange(group.startDate, group.endDate)
-            )
+        /*#__PURE__*/React.createElement("div", { className: "archive-memory-detail-head", style: { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px', minWidth: 0, width: '100%' } },
+          /*#__PURE__*/React.createElement("div", {
+            className: "archive-memory-detail-title-row",
+            style: { display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: '8px', minWidth: 0, width: '100%' }
+          },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
+              style: {
+                width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+              }
+            }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
+            /*#__PURE__*/React.createElement("span", {
+              className: "archive-memory-detail-title",
+              style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }
+            }, group.title),
+            !isMemoryEditMode ? /*#__PURE__*/React.createElement("div", {
+              className: "archive-memory-detail-actions",
+              style: { display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' }
+            },
+              typeof onAddPhotosBackToMemory === 'function' ? renderMemoryAddButton(() => setIsAddBackModalOpen(true)) : null,
+              canBulkExclude ? renderMemoryEditButton(() => setIsMemoryEditMode(true)) : null
+            ) : null
           ),
           /*#__PURE__*/React.createElement("div", {
-            style: typeof getListEditActionWrapStyle === 'function'
-              ? getListEditActionWrapStyle(isMemoryEditMode, isMobile)
-              : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryEditMode && isMobile ? '100%' : 'auto' }
+            className: "archive-memory-detail-date-row",
+            style: { display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: '8px', minWidth: 0, width: '100%', paddingLeft: '40px', boxSizing: 'border-box' }
           },
-            isMemoryEditMode
-              ? /*#__PURE__*/React.createElement(React.Fragment, null,
-                  renderMemoryTrashButton(() => handleClickExcludeMemoryPhotos(group), selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos),
-                  renderMemoryCancelButton(() => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); })
-                )
-              : /*#__PURE__*/React.createElement(React.Fragment, null,
-                  typeof onAddPhotosBackToMemory === 'function' ? renderMemoryAddButton(() => setIsAddBackModalOpen(true)) : null,
-                  canBulkExclude ? renderMemoryEditButton(() => setIsMemoryEditMode(true)) : null
-                )
+            /*#__PURE__*/React.createElement("span", {
+              className: "archive-memory-detail-date",
+              style: { flex: '0 0 auto', minWidth: 'max-content', width: 'max-content', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'visible', textOverflow: 'clip' }
+            }, formatHistoryDateRange(group.startDate, group.endDate)),
+            isMemoryEditMode ? /*#__PURE__*/React.createElement("div", {
+              className: "archive-memory-detail-actions",
+              style: { display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' }
+            },
+              renderMemoryTrashButton(() => handleClickExcludeMemoryPhotos(group), selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos),
+              renderMemoryCancelButton(() => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); }, { flex: '0 0 auto' })
+            ) : null
           )
         ),
         renderPhotoThumbGrid(group.photos, {
@@ -2509,11 +3317,16 @@ export function HistoryView({
     })(),
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
-    historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'people' && !openPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
+      incompleteArchiveNotice,
+      q && archiveSearchPending && /*#__PURE__*/React.createElement('p', {
+        role: 'status',
+        style: { margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }
+      }, '전체 기록에서 검색하는 중...'),
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
       // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
@@ -2550,10 +3363,12 @@ export function HistoryView({
       /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
         "칸을 누르면 그 사람으로 태그된 사진을 모아 보여줘요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 그 이름을 추가하세요."
       ),
-      personTagChips.length === 0
+      personTagChips.length === 0 && !q
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 위에서 인물 태그를 추가해 보세요.")
+        : (visiblePersonChips.length === 0 && visibleUnclassifiedPeople.length === 0)
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, archiveSearchMissLabel)
         : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
-            personTagChips.map(tag => {
+            visiblePersonChips.map(tag => {
               const tagPhotos = getPhotosForTagLabel(tag.label);
               const cover = tagPhotos[0];
               return /*#__PURE__*/React.createElement("button", {
@@ -2586,16 +3401,40 @@ export function HistoryView({
                   /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(getTaggedDate(tagPhotos[0])) || '최근 일정')
                 )
               );
-            })
+            }),
+            visibleUnclassifiedPeople.length > 0 && /*#__PURE__*/React.createElement("button", {
+              key: PERSON_UNCLASSIFIED_KEY,
+              type: "button",
+              onClick: () => setSelectedPersonTag(PERSON_UNCLASSIFIED_KEY),
+              "aria-label": `분류 필요 사진 ${visibleUnclassifiedPeople.length}장`,
+              className: 'archive-photo-cell',
+              style: {
+                position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                border: '1px dashed var(--border-subtle)', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-secondary, #F1F5F9)'
+              }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(visibleUnclassifiedPeople.length)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(visibleUnclassifiedPeople) }),
+              /*#__PURE__*/React.createElement("div", {
+                style: {
+                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                  display: 'flex', flexDirection: 'column', gap: '1px', textAlign: 'left'
+                }
+              },
+                /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, "분류 필요"),
+                /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, "인물 태그 없는 사진")
+              )
+            )
           )
     )),
     // 인물 상세 페이지: 특정 인물 칸을 눌렀을 때 그 사람으로 태그된 사진만 모아 보여준다.
-    historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'people' && !!openPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-detail", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '12px' } },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setSelectedPersonTag(null), "aria-label": "인물 목록으로",
           style: {
@@ -2603,103 +3442,138 @@ export function HistoryView({
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
           }
         }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-        isEditingPersonTagLabel
-          ? /*#__PURE__*/React.createElement(React.Fragment, null,
-              /*#__PURE__*/React.createElement("input", {
-                type: "text",
-                autoFocus: true,
-                value: editPersonTagLabelDraft,
-                onChange: e => setEditPersonTagLabelDraft(e.target.value),
-                onKeyDown: e => {
-                  if (e.key === 'Enter') { e.preventDefault(); handleConfirmEditPersonTag(); }
-                  if (e.key === 'Escape') { e.preventDefault(); handleCancelEditPersonTag(); }
-                },
-                style: {
-                  flex: 1, minWidth: 0, height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
-                  color: 'var(--text-main)', fontSize: 'var(--font-size-lg)', fontWeight: 800
-                }
-              }),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", onClick: handleConfirmEditPersonTag,
-                disabled: isSavingPersonTagLabel || !editPersonTagLabelDraft.trim(),
-                "aria-label": "이름 저장",
-                style: {
-                  flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: 'none',
-                  backgroundColor: '#111827', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', opacity: (isSavingPersonTagLabel || !editPersonTagLabelDraft.trim()) ? 0.5 : 1
-                }
-              }, "✓"),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", onClick: handleCancelEditPersonTag, disabled: isSavingPersonTagLabel, "aria-label": "취소",
-                style: {
-                  flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                }
-              }, "✕")
+        selectedPersonTag === PERSON_UNCLASSIFIED_KEY
+          ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, "분류 필요"),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } }, `${unclassifiedPeoplePhotos.length}장 · 인물 태그가 없는 사진이에요.`)
             )
-          : /*#__PURE__*/React.createElement(React.Fragment, null,
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
-              // 참여자 태그(캘린더 참여자 명단에서 온 것)는 여기서 이름을 바꾸거나 지울 수 없다 --
-              // 참여자 관리는 캘린더 설정의 몫이고, 이 화면은 사진과 별개로 관리되는 customPersonTags
-              // 커스텀 태그만 손댈 수 있어야 한다.
-              customPersonTags.includes(selectedPersonTag) && /*#__PURE__*/React.createElement("div", {
-                style: { display: 'flex', gap: '6px', marginLeft: 'auto', flexShrink: 0 }
-              },
-                typeof onRenamePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
-                  type: "button", onClick: handleStartEditPersonTag, "aria-label": "태그 이름 수정",
+          : (isEditingPersonTagLabel
+            ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("input", {
+                  type: "text",
+                  autoFocus: true,
+                  value: editPersonTagLabelDraft,
+                  onChange: e => setEditPersonTagLabelDraft(e.target.value),
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleConfirmEditPersonTag(); }
+                    if (e.key === 'Escape') { e.preventDefault(); handleCancelEditPersonTag(); }
+                  },
                   style: {
-                    width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                    flex: 1, minWidth: 0, height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-main)', fontSize: 'var(--font-size-lg)', fontWeight: 800
+                  }
+                }),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button", onClick: handleConfirmEditPersonTag,
+                  disabled: isSavingPersonTagLabel || !editPersonTagLabelDraft.trim(),
+                  "aria-label": "이름 저장",
+                  style: {
+                    flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: 'none',
+                    backgroundColor: '#111827', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', opacity: (isSavingPersonTagLabel || !editPersonTagLabelDraft.trim()) ? 0.5 : 1
+                  }
+                }, "✓"),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button", onClick: handleCancelEditPersonTag, disabled: isSavingPersonTagLabel, "aria-label": "취소",
+                  style: {
+                    flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
                   }
-                }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎"),
-                typeof onDeletePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
-                  type: "button", onClick: handleDeletePersonTagClick, "aria-label": "태그 삭제",
-                  style: {
-                    width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
-                    border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                  }
-                }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕")
+                }, "✕")
               )
-            )
+            : /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("span", { className: "archive-detail-title", style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' } }, selectedPersonTag),
+                customPersonTags.includes(selectedPersonTag) && /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', gap: '6px', marginLeft: 'auto', flexShrink: 0 }
+                },
+                  typeof onRenamePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
+                    type: "button", onClick: handleStartEditPersonTag, "aria-label": "태그 이름 수정",
+                    style: {
+                      width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                    }
+                  }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎"),
+                  typeof onDeletePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
+                    type: "button", onClick: handleDeletePersonTagClick, "aria-label": "태그 삭제",
+                    style: {
+                      width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                      border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                    }
+                  }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕")
+                )
+              )
+          ),
+        photosForPersonTag.length > 0 && (peopleSelectMode
+          ? renderMemoryCancelButton(() => {
+              setPeopleSelectMode(false);
+              setPeopleSelectedKeys(new Set());
+              peopleAnchorKeyRef.current = '';
+            }, {
+              marginLeft: selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'auto' : (customPersonTags.includes(selectedPersonTag) ? '8px' : 'auto'),
+              flex: '0 0 auto'
+            })
+          : renderMemoryEditButton(() => {
+              setPeopleSelectMode(true);
+              setPeopleSelectedKeys(new Set());
+              peopleAnchorKeyRef.current = '';
+            }, {
+              marginLeft: selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'auto' : (customPersonTags.includes(selectedPersonTag) ? '8px' : 'auto')
+            }))
       ),
       photosForPersonTag.length === 0
-        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)
-        : /*#__PURE__*/React.createElement("div", {
-            style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-          }, photosForPersonTag.map((photo, idx) => {
-            const identity = getPhotoCommentIdentity(photo, photosForPersonTag, { source: photo.source, meetingDate: photo.meetingDate }) || {};
-            const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
-            return /*#__PURE__*/React.createElement("button", {
-              key: photo.mediaKey || photo.refKey || `person_${idx}`,
-              type: "button",
-              className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
-              onClick: () => openHistoryLightbox(photosForPersonTag, idx),
-              style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
-            },
-              /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
-              PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
-            );
-          })
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } },
+            selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? '인물 태그가 없는 사진이 없습니다.' : `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`
           )
+        : renderArchivePhotoGrid(
+            photosForPersonTag,
+            selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'unclassified_people' : `person_${selectedPersonTag}`,
+            peopleSelectMode ? { keys: peopleSelectedKeys, onToggle: togglePeopleSelectedKey } : null
+          ),
+      peopleSelectMode && /*#__PURE__*/React.createElement(PhotoBulkActionBar, {
+        selectedKeys: peopleSelectedKeys,
+        allKeys: photosForPersonTag.map((p, idx) => archivePhotoSelectKey(p, idx)),
+        selectedPhotos: photosForPersonTag.filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx))),
+        onToggleAll: handleToggleAllPeople,
+        onClearSelection: () => setPeopleSelectedKeys(new Set()),
+        personCandidates: personTagChips.filter(c => c.label !== selectedPersonTag),
+        groupOptions: selectedPersonTag !== PERSON_UNCLASSIFIED_KEY ? personTagChips.filter(c => c.label !== selectedPersonTag).map(c => ({ id: c.id, label: c.label })) : [],
+        onMoveToGroup: handleMovePeopleGroup,
+        onApplyTags: handleApplyPeopleTags,
+        onDeletePhotos: handleDeleteSelectedPeoplePhotos,
+        showToast,
+        onRequestConfirm,
+        isSaving: false,
+        isDeleting: isPeopleBulkDeleting,
+        deleteProgress: peopleDeleteProgress,
+        mode: 'people'
+      })
     )),
 
     // 장소 목록: 등록된 장소마다 그 장소로 분류된 사진을 모은 칸(인물 탭과 같은 벤또 그리드).
-    historyTab === 'places' && !selectedPlaceKey && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'places' && !openPlaceKey && /*#__PURE__*/React.createElement("div", {
+      key: "archive-places-grid",
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-places-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
+      incompleteArchiveNotice,
+      q && archiveSearchPending && /*#__PURE__*/React.createElement('p', {
+        role: 'status',
+        style: { margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }
+      }, '전체 기록에서 검색하는 중...'),
       /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
         "장소 탭에 등록한 장소별로 사진을 모아요. 사진 위치가 장소 근처이거나 #장소이름 태그가 있으면 그 장소로, 그날 방문한 장소가 한 곳뿐이면 그 장소로 분류돼요."
       ),
-      placePhotoGroups.groups.length === 0 && !placePhotoGroups.unclassifiedCount
+      placePhotoGroups.groups.length === 0 && !placePhotoGroups.unclassifiedCount && !q
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "아직 장소로 분류된 사진이 없어요. 장소 탭에 방문 날짜와 함께 장소를 등록해 보세요.")
+        : (visiblePlacePhotoGroups.groups.length === 0 && !visiblePlacePhotoGroups.unclassifiedCount)
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, archiveSearchMissLabel)
         : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
-            placePhotoGroups.groups.map(group => /*#__PURE__*/React.createElement("button", {
+            visiblePlacePhotoGroups.groups.map(group => /*#__PURE__*/React.createElement("button", {
               key: group.key,
               type: "button",
               onClick: () => setSelectedPlaceKey(group.key),
@@ -2723,19 +3597,19 @@ export function HistoryView({
                 /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.lastDate) || '방문일 미정')
               )
             )),
-            placePhotoGroups.unclassifiedCount > 0 && /*#__PURE__*/React.createElement("button", {
+            visiblePlacePhotoGroups.unclassifiedCount > 0 && /*#__PURE__*/React.createElement("button", {
               key: PLACE_UNCLASSIFIED_KEY,
               type: "button",
               onClick: () => setSelectedPlaceKey(PLACE_UNCLASSIFIED_KEY),
-              "aria-label": `분류 필요 사진 ${placePhotoGroups.unclassifiedCount}장`,
+              "aria-label": `분류 필요 사진 ${visiblePlacePhotoGroups.unclassifiedCount}장`,
               className: 'archive-photo-cell',
               style: {
                 position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                 border: '1px dashed var(--border-subtle)', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-secondary, #F1F5F9)'
               }
             },
-              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(placePhotoGroups.unclassifiedCount)),
-              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(placePhotoGroups.unclassified.flatMap(bucket => bucket.photos)) }),
+              /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(visiblePlacePhotoGroups.unclassifiedCount)),
+              /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(visiblePlacePhotoGroups.unclassified.flatMap(bucket => bucket.photos)) }),
               /*#__PURE__*/React.createElement("div", {
                 style: {
                   position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
@@ -2750,7 +3624,8 @@ export function HistoryView({
           )
     )),
     // 장소 상세: 한 장소의 사진 모음, 또는 "분류 필요"(날짜별 후보 장소와 함께).
-    historyTab === 'places' && !!selectedPlaceKey && /*#__PURE__*/React.createElement("div", {
+    historyTab === 'places' && !!openPlaceKey && /*#__PURE__*/React.createElement("div", {
+      key: "archive-places-detail",
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
@@ -2772,17 +3647,88 @@ export function HistoryView({
       selectedPlaceGroup
         ? renderArchivePhotoGrid(selectedPlaceGroup.photos, 'place')
         : /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
-              "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 사진을 열고 #장소이름 태그를 달면 그 장소로 옮겨져요."),
-            placePhotoGroups.unclassified.map(bucket => /*#__PURE__*/React.createElement("div", {
-              key: bucket.date, style: { display: 'flex', flexDirection: 'column', gap: '6px' }
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px' } },
+              /*#__PURE__*/React.createElement("div", { style: { flex: 1, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+                placeSelectMode
+                  ? "옮길 사진을 고른 뒤 아래에서 장소를 누르거나 ‘제거’를 누르세요. 제거해도 사진 파일은 지우지 않아요."
+                  : "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 장소가 아니면 편집 후 제거하세요. 맞으면 장소를 지정하거나, 사진을 열고 #장소이름 태그를 달아 주세요."),
+              typeof onSaveImageTags === 'function' && (placeSelectMode
+                ? renderMemoryCancelButton(() => { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }, { flex: '0 0 auto' })
+                : renderMemoryEditButton(() => { setPlaceSelectMode(true); setPlaceSelectedKeys(new Set()); }))
+            ),
+            visiblePlacePhotoGroups.unclassified.map(bucket => {
+              const bucketKeys = bucket.photos.map((photo, idx) => archivePhotoSelectKey(photo, idx));
+              const allSelected = bucketKeys.length > 0 && bucketKeys.every(key => placeSelectedKeys.has(key));
+              return /*#__PURE__*/React.createElement("div", {
+                key: bucket.date, style: { display: 'flex', flexDirection: 'column', gap: '6px' }
+              },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                  /*#__PURE__*/React.createElement("div", { className: "archive-detail-title", style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' } },
+                    `${formatHistoryDate(bucket.date) || bucket.date} · ${bucket.photos.length}장`),
+                  placeSelectMode && /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => setPlaceSelectedKeys(prev => {
+                      const next = new Set(prev);
+                      bucketKeys.forEach(key => { if (allSelected) next.delete(key); else next.add(key); });
+                      return next;
+                    }),
+                    style: { border: 'none', background: 'transparent', color: 'var(--brand, #7C3AED)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', padding: '4px 0' }
+                  }, allSelected ? '이 날 선택 해제' : '이 날 전체 선택')
+                ),
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+                  /*#__PURE__*/React.createElement("span", null, "후보"),
+                  bucket.candidates.map(place => /*#__PURE__*/React.createElement("span", { key: place.id || place.name }, `#${placeTagToken(place)}`)),
+                  /*#__PURE__*/React.createElement("span", null, "· 장소가 아니면 아래에서 제거")
+                ),
+                renderArchivePhotoGrid(bucket.photos, `unclassified_${bucket.date}`,
+                  placeSelectMode ? { keys: placeSelectedKeys, onToggle: togglePlaceSelectedKey } : null)
+              );
+            }),
+            placeSelectMode && /*#__PURE__*/React.createElement("div", {
+              className: "v2-archive-place-assign-bar",
+              role: "region",
+              "aria-label": "선택한 사진 장소 지정",
+              style: {
+                position: 'sticky', bottom: 'calc(8px + env(safe-area-inset-bottom, 0px))', zIndex: 5,
+                display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', borderRadius: 'var(--radius-md, 14px)',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', boxShadow: '0 6px 20px rgba(0,0,0,0.18)'
+              }
             },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)' } },
-                `${formatHistoryDate(bucket.date) || bucket.date} · ${bucket.photos.length}장`),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-                `후보: ${bucket.candidates.map(place => `#${String(place.alias || place.name).replace(/\s+/g, '')}`).join(' ')}`),
-              renderArchivePhotoGrid(bucket.photos, `unclassified_${bucket.date}`)
-            ))
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: 'var(--text-main)' } },
+                placeAssignProgress
+                  ? (placeAssignProgress.label === '제거'
+                    ? `분류에서 빼는 중… ${placeAssignProgress.current}/${placeAssignProgress.total}`
+                    : `#${placeAssignProgress.label}(으)로 옮기는 중… ${placeAssignProgress.current}/${placeAssignProgress.total}`)
+                  : placeSelectedKeys.size ? `${placeSelectedKeys.size}장 선택 · 장소를 고르거나 제거하세요` : '사진을 골라 주세요'),
+              !placeAssignProgress && placeSelectedKeys.size > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => {
+                    const run = () => { void dismissSelectedPhotosFromPlaces(); };
+                    if (typeof onRequestConfirm === 'function') onRequestConfirm('분류에서 제거', `선택한 ${placeSelectedKeys.size}장을 분류 필요에서 제거할까요? 스크린샷처럼 장소 사진이 아니면 여기서 빼세요. 사진 파일은 지우지 않아요.`, run);
+                    else run();
+                  },
+                  style: {
+                    minHeight: '32px', padding: '0 12px', borderRadius: '999px', cursor: 'pointer',
+                    border: '1px solid var(--text-main, #1e1b2e)', background: 'var(--bg-card, #fff)',
+                    color: 'var(--text-main)', fontSize: 'var(--font-size-xs)', fontWeight: 800
+                  }
+                }, "제거"),
+                selectedCandidatePlaces.map(place => /*#__PURE__*/React.createElement("button", {
+                  key: place.id || place.name,
+                  type: "button",
+                  onClick: () => {
+                    const run = () => { void assignSelectedPhotosToPlace(place); };
+                    if (typeof onRequestConfirm === 'function') onRequestConfirm('장소 지정', `선택한 ${placeSelectedKeys.size}장에 #${placeTagToken(place)} 태그를 붙일까요?`, run);
+                    else run();
+                  },
+                  style: {
+                    minHeight: '32px', padding: '0 12px', borderRadius: '999px', border: 'none', cursor: 'pointer',
+                    background: 'var(--brand, #7C3AED)', color: 'var(--on-brand, #fff)', fontSize: 'var(--font-size-xs)', fontWeight: 800
+                  }
+                }, `#${placeTagToken(place)}`))
+              )
+            )
           )
     )),
 
@@ -2832,10 +3778,14 @@ export function HistoryView({
       calendar,
       onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
       extraItems: [{
-        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); },
+        onClick: () => {
+          setIsMenuOpen(false);
+          if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+          else setIsSearchOpen(true);
+        },
         icon: SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍",
         title: "보관함 검색",
-        desc: "지난모임 날짜·참여자·메모·장소 검색"
+        desc: "추억·인물·장소·모임 전체 검색"
       }],
       navBlockProps: {
         onClose: () => setIsMenuOpen(false),
@@ -2854,6 +3804,7 @@ export function HistoryView({
 export function ContentView({
   calendar, onBack, onChangeView, onOpenAppSettings,
   v2Embed = false, onOpenShare = null,
+  v2SearchQuery, onV2SearchQuery = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -2892,6 +3843,11 @@ export function ContentView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const v2SearchControlled = typeof onV2SearchQuery === 'function';
+  React.useEffect(() => {
+    if (!v2SearchControlled) return;
+    setSearchQuery(v2SearchQuery || '');
+  }, [v2SearchControlled, v2SearchQuery]);
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const [editingContentItem, setEditingContentItem] = React.useState(null);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
@@ -3053,13 +4009,17 @@ export function ContentView({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
+      search: () => {
+        if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+        else setIsSearchOpen(v => !v);
+      },
       register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); },
       openRegion: () => setIsRegionFilterOpen(true),
       setGridCols: persistGridCols,
       gridCols
     });
     return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions, gridCols]);
+  }, [onRegisterMenuActions, gridCols, v2SearchControlled]);
   const handleUseCurrentLocation = () => {
     if (isLocating) return;
     setIsLocating(true);
@@ -3329,7 +4289,7 @@ export function ContentView({
         }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
       )
     ),
-    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    !v2SearchControlled && isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
       value: searchQuery,
       placeholder: "제목으로 검색...",
       onChange: e => setSearchQuery(e.target.value),
@@ -3674,27 +4634,48 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
       ),
       /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "시/도"),
       /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
-        KOREA_REGIONS.map(r => /*#__PURE__*/React.createElement("button", {
-          key: r.code,
-          type: "button",
-          className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
-          onClick: () => { setQuery(''); setExpandedSido(r.code); setDraftGugun(''); }
-        }, r.label, /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, regionCounts[r.code] || 0)))
+        KOREA_REGIONS.map(r => {
+          const c = regionCounts[r.code] || 0;
+          const isMulti = String(c).length > 1;
+          return /*#__PURE__*/React.createElement("button", {
+            key: r.code,
+            type: "button",
+            className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
+            onClick: () => { setQuery(''); setExpandedSido(r.code); setDraftGugun(''); }
+          }, r.label, /*#__PURE__*/React.createElement("span", {
+            className: `region-filter-chip-count ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+            "data-digits": isMulti ? "multi" : "single"
+          }, c));
+        })
       ),
       activeRegion && /*#__PURE__*/React.createElement(React.Fragment, null,
         /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "군/구"),
         /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: `region-filter-chip${!draftGugun ? ' is-active' : ''}`,
-            onClick: () => setDraftGugun('')
-          }, "전체", /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, regionCounts[activeRegion.code] || 0)),
-          activeRegion.gugun.map(g => /*#__PURE__*/React.createElement("button", {
-            key: g,
-            type: "button",
-            className: `region-filter-chip${g === draftGugun ? ' is-active' : ''}`,
-            onClick: () => setDraftGugun(g)
-          }, g, /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, gugunCounts[g] || 0)))
+          (() => {
+            const c = regionCounts[activeRegion.code] || 0;
+            const isMulti = String(c).length > 1;
+            return /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: `region-filter-chip${!draftGugun ? ' is-active' : ''}`,
+              onClick: () => setDraftGugun('')
+            }, "전체", /*#__PURE__*/React.createElement("span", {
+              className: `region-filter-chip-count ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+              "data-digits": isMulti ? "multi" : "single"
+            }, c));
+          })(),
+          activeRegion.gugun.map(g => {
+            const c = gugunCounts[g] || 0;
+            const isMulti = String(c).length > 1;
+            return /*#__PURE__*/React.createElement("button", {
+              key: g,
+              type: "button",
+              className: `region-filter-chip${g === draftGugun ? ' is-active' : ''}`,
+              onClick: () => setDraftGugun(g)
+            }, g, /*#__PURE__*/React.createElement("span", {
+              className: `region-filter-chip-count ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+              "data-digits": isMulti ? "multi" : "single"
+            }, c));
+          })
         )
       )
     ),
@@ -3734,6 +4715,47 @@ function getCultureItemKind(item) {
 function todayIsoLocal() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+// Keep in step with MOVIE_THEATRICAL_DAYS in scripts/lib/culture-normalize.mjs. Snapshots
+// written before that change have no endDate and isOpenEnded:true, so the list cannot trust
+// those fields — a release older than this window is not still 상영중.
+const MOVIE_THEATRICAL_DAYS = 28;
+function addDaysIsoLocal(iso, days) {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function movieScreeningEnd(item) {
+  const release = cultureItemDay(item);
+  if (!release) return '';
+  const end = String(item?.endDate || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(end) && end !== release) return end;
+  return addDaysIsoLocal(release, MOVIE_THEATRICAL_DAYS);
+}
+function movieStillShowing(item, today) {
+  const release = cultureItemDay(item);
+  if (!release || release > today) return false;
+  const end = movieScreeningEnd(item);
+  return !!end && end >= today;
+}
+
+// Korean fixtures are titled "원정 vs 홈" while homeTeam is the actual home side. The poster
+// must follow the title left-to-right, otherwise the logos look swapped.
+function sportsMatchSides(item) {
+  const home = { name: String(item?.homeTeam || '').trim(), logo: String(item?.homeTeamLogo || '').trim() };
+  const away = { name: String(item?.awayTeam || '').trim(), logo: String(item?.awayTeamLogo || '').trim() };
+  if (!home.name || !away.name) return null;
+  const title = String(item?.title || '').replace(/\s+/g, ' ').trim();
+  const leads = (name) => {
+    const compact = name.replace(/\s+/g, '');
+    const head = title.replace(/\s+/g, '');
+    return compact && head.startsWith(compact);
+  };
+  if (leads(away.name) && !leads(home.name)) return [away, home];
+  if (leads(home.name) && !leads(away.name)) return [home, away];
+  return [away, home];
 }
 
 
@@ -3959,7 +4981,9 @@ function filterAndSortCultureItems(items, category) {
   // (포털·개별등록·캘린더 연동 orphan 동일). 데이터 자체는 지우지 않는다 -- 개별등록/연동은
   // Firestore·cultureSnapshot에 남아 일정 뱃지→백드롭 deep-link(mergedItems focus)로 열린다.
   // 서비스 JSON 풀의 비연동 항목은 sync가 종료+30일 뒤 스냅샷에서 정리한다.
-  // movie: 개봉일이 오늘 이전인데 상영중이 아닌 항목만 숨긴다 (예정·상영중은 유지).
+  // movie: 개봉 예정은 유지. 개봉일이 Theatrical window(28일)보다 오래된 작품은
+  // 종료일이 비어 있어도 상영중이 아니다. 스냅샷이 영화를 전부 open-ended로 넣던 시절의
+  // JSON도 같은 규칙으로 걸러진다.
   if (category !== 'festival' && category !== 'event' && category !== 'sports' && category !== 'movie') {
     return items;
   }
@@ -3968,9 +4992,8 @@ function filterAndSortCultureItems(items, category) {
     if (category === 'movie') {
       const day = cultureItemDay(item);
       if (!day) return true;
-      if (day >= today) return true; // 예정(오늘 포함)
-      // 개봉일 지남: 상영중 배지와 동일 조건(종료일 없거나 오늘 이상)만 유지
-      return !item.endDate || item.endDate >= today;
+      if (day > today) return true;
+      return movieStillShowing(item, today);
     }
     const end = cultureItemEndDay(item);
     if (!end) return true;
@@ -4004,11 +5027,7 @@ function filterAndSortCultureItems(items, category) {
   // movie: 「상영중」 first, then by release/start date ascending so future releases sink.
   // sports (and any other non-festival/event caller): keep near-today proximity sort.
   if (category === 'movie') {
-    const isNowShowing = (item) => {
-      const day = cultureItemDay(item);
-      if (!day || day > today) return false;
-      return !item.endDate || item.endDate >= today;
-    };
+    const isNowShowing = (item) => movieStillShowing(item, today);
     return visible.sort((a, b) => {
       const aNow = isNowShowing(a) ? 0 : 1;
       const bNow = isNowShowing(b) ? 0 : 1;
@@ -4117,6 +5136,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+  const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker;
   const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
 
   // 'performance' | 'festival' | 'sports' -- defaults to whichever 컨텐츠 탭 the user opened this
@@ -4478,15 +5498,30 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
           placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : (kind === 'movie' ? "영화 제목" : "공연 제목")), maxLength: 120
         })),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
-          field("시작일 *", /*#__PURE__*/React.createElement("input", {
-            className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
-            style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
-          }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' }),
-          field(kind === 'movie' ? "상영종료일 (선택)" : "종료일", /*#__PURE__*/React.createElement("input", {
-            className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
-            style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
-          }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
+        field(kind === 'movie' ? "상영 기간 *" : (kind === 'festival' ? "축제 기간 *" : (kind === 'sports' ? "경기/대회 기간 *" : "공연/행사 기간 *")),
+          DeadlineDateTimePicker
+            ? /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                dateOnly: true,
+                rangeMode: true,
+                rangeStart: startDate,
+                rangeEnd: endDate,
+                placeholder: "시작일 ~ 종료일 선택",
+                sheetZIndex: 16000,
+                onChangeRange: ({ start, end }) => {
+                  setStartDate(start || '');
+                  setEndDate(end || '');
+                }
+              })
+            : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
+                /*#__PURE__*/React.createElement("input", {
+                  className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
+                  style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
+                }),
+                /*#__PURE__*/React.createElement("input", {
+                  className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
+                  style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
+                })
+              )
         ),
         kind !== 'movie' && field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : "공연장"), /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
@@ -4548,24 +5583,32 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
               onClick: e => { e.stopPropagation(); setImage(''); },
               title: "이미지 삭제",
               "aria-label": "이미지 삭제",
+              className: "content-thumb-delete-btn",
               style: {
                 position: 'absolute',
                 top: '-6px',
                 right: '-6px',
-                width: '18px',
-                height: '18px',
+                width: '20px',
+                height: '20px',
+                minWidth: '20px',
+                minHeight: '20px',
+                maxWidth: '20px',
+                maxHeight: '20px',
+                aspectRatio: '1 / 1',
                 borderRadius: '50%',
                 border: 'none',
                 backgroundColor: 'rgba(0, 0, 0, 0.65)',
                 color: '#FFFFFF',
-                fontSize: '11px',
-                lineHeight: '18px',
+                fontSize: '12px',
+                lineHeight: 1,
                 textAlign: 'center',
                 cursor: 'pointer',
                 padding: 0,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+                flexShrink: 0
               }
             }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 10 }) : "✕")
           ) : null,
@@ -4640,28 +5683,47 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
             field("관객수", /*#__PURE__*/React.createElement("input", { className: "form-input", value: audience, onChange: e => setAudience(e.target.value), placeholder: "명" }))
           )
         ),
-        field("설명", AutoGrowTextarea
-          ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
-              className: "form-input",
-              value: description,
-              onChange: e => setDescription(e.target.value),
-              placeholder: "간단한 설명",
-              rows: 3,
-              maxLength: 2000,
-              minHeight: 72,
-              maxHeight: 240,
-              style: { width: '100%' }
-            })
-          : /*#__PURE__*/React.createElement("textarea", {
-              className: "form-input", value: description,
-              onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
-              onInput: e => autoGrowTextarea(e.target, 240),
-              placeholder: "간단한 설명", rows: 3, maxLength: 2000,
-              style: { resize: 'none', minHeight: '72px', overflow: 'hidden', width: '100%' }
-            }))),
+        (() => {
+          const isDescMultiline = Boolean(description && (description.includes('\n') || description.length > 28));
+          return field("설명", AutoGrowTextarea
+            ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
+                className: `form-input content-desc-textarea ${isDescMultiline ? 'is-multiline' : 'is-singleline'}`,
+                value: description,
+                onChange: e => setDescription(e.target.value),
+                placeholder: "간단한 설명",
+                rows: isDescMultiline ? 3 : 1,
+                maxLength: 2000,
+                minHeight: isDescMultiline ? 72 : 44,
+                maxHeight: 240,
+                "data-field-lines": isDescMultiline ? "multi" : "1",
+                style: {
+                  width: '100%',
+                  borderRadius: isDescMultiline ? 'var(--field-radius-multiline, 14px)' : 'var(--field-radius-single-line, 22px)',
+                  transition: 'border-radius 0.15s ease'
+                }
+              })
+            : /*#__PURE__*/React.createElement("textarea", {
+                className: `form-input content-desc-textarea ${isDescMultiline ? 'is-multiline' : 'is-singleline'}`,
+                value: description,
+                onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
+                onInput: e => autoGrowTextarea(e.target, 240),
+                placeholder: "간단한 설명",
+                rows: isDescMultiline ? 3 : 1,
+                maxLength: 2000,
+                "data-field-lines": isDescMultiline ? "multi" : "1",
+                style: {
+                  resize: 'none',
+                  minHeight: isDescMultiline ? '72px' : '44px',
+                  overflow: 'hidden',
+                  width: '100%',
+                  borderRadius: isDescMultiline ? 'var(--field-radius-multiline, 14px)' : 'var(--field-radius-single-line, 22px)',
+                  transition: 'border-radius 0.15s ease'
+                }
+              }));
+        })()),
         /*#__PURE__*/React.createElement("div", {
           className: "modal-footer",
-          style: { flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end' }
+          style: { flexShrink: 0, padding: '12px 18px max(16px, calc(10px + env(safe-area-inset-bottom, 0px)))', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end', boxSizing: 'border-box' }
         },
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-primary btn-action", disabled: saving || uploadingImage, onClick: handleSave,
@@ -4846,20 +5908,17 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // switching tabs unmounts this component and this state naturally resets with it.
   const [categoryFilter, setCategoryFilter] = React.useState('');
 
-  // 문화공연 스냅샷은 1500개 안팎, 스포츠도 700개 안팎이라 필터 없이 전부 DOM에 한꺼번에
-  // 그려버리면(포스터 이미지 <img>는 loading:'lazy'라 네트워크는 지연되지만, 카드 자체의 DOM
-  // 노드 생성/레이아웃은 즉시 전부 일어남) 저사양 모바일에서 탭 진입 시 버벅임이 생긴다.
-  // 한 번에 60개만 그리고 "더 보기"로 늘려가는 방식으로 초기 렌더 부담을 줄인다.
-  const CULTURE_RENDER_PAGE_SIZE = 60;
-  const [renderLimit, setRenderLimit] = React.useState(CULTURE_RENDER_PAGE_SIZE);
+  // 문화공연 스냅샷은 수천 건까지 자랄 수 있다. 무한 스크롤/더 보기는 누적 DOM과 이미지
+  // 관찰자를 계속 키우므로, Gallery와 같은 100건 번호 페이지로 한 화면의 작업량을 고정한다.
+  const [contentPage, setContentPage] = React.useState(1);
   // One shuffle seed per tab mount: 문화행사's crawled list is shown in a fresh random order each
   // visit (so thousands of shows all get exposure, not the same first 60), but stays put while
   // the user scrolls, loads more, or toggles a checkbox.
   const shuffleSeedRef = React.useRef(Math.floor(Math.random() * 0x7fffffff));
-  // 필터가 바뀌면(지역/카테고리) 보여줄 항목 자체가 달라지므로 페이지 크기를 처음부터 다시 센다.
+  // 필터가 바뀌면(지역/카테고리) 첫 페이지부터 보여 준다.
   React.useEffect(() => {
-    setRenderLimit(CULTURE_RENDER_PAGE_SIZE);
-  }, [categoryFilter, regionSelections, dataUrl]);
+    setContentPage(1);
+  }, [categoryFilter, regionSelections, dataUrl, searchQuery]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -5195,22 +6254,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       || (mergedItems || []).find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
       || null)
     : null;
+  const pagedItems = paginateGalleryItems(filteredItems, contentPage, PAGE_RENDER_SIZE);
   const visibleItems = (() => {
-    const sliced = filteredItems.slice(0, renderLimit);
+    const sliced = pagedItems.items;
     if (!focusedItem) return sliced;
     return [focusedItem, ...sliced.filter(i => i.id !== focusedItem.id)];
   })();
-  const hasMoreToRender = filteredItems.length > visibleItems.length;
-  // 스크롤이 하단 근처(300px 이내)에 닿으면 "더 보기"를 누른 것과 동일하게 다음 60개를 이어
-  // 붙인다. 이 그리드는 HistoryView가 헤더 접힘 효과에 쓰는 자기 onScroll도 받고 있어서, 그걸
-  // 대체하지 않고 함께 호출한다.
+  // HistoryView's header-hide scroll behavior remains, but scrolling never fetches/renders a
+  // new page. A deliberate page click is the only way to change the 100-card window.
   const handleGridScroll = e => {
     if (typeof onScroll === 'function') onScroll(e);
-    if (!hasMoreToRender) return;
-    const el = e.target;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
-      setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE);
-    }
   };
 
   // 상세보기 설명(selected.description)은 외부 지역축제/문화행사 피드의 원본 텍스트를 그대로
@@ -5272,10 +6325,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
-        const isMovieNowShowing = isMovieCard
-          && cultureItemDay(item)
-          && cultureItemDay(item) <= todayIsoLocal()
-          && (!item.endDate || item.endDate >= todayIsoLocal());
+        const isMovieNowShowing = isMovieCard && movieStillShowing(item, todayIsoLocal());
         const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
         const posterUrl = culturePosterUrl(item);
         const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
@@ -5355,32 +6405,53 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
               },
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
-                  item.homeTeamLogo && /*#__PURE__*/React.createElement("img", {
-                    src: item.homeTeamLogo, alt: item.homeTeam, loading: 'lazy', decoding: 'async',
-                    style: { width: '100%', maxWidth: '112px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
-                    onError: e => { e.currentTarget.style.display = 'none'; }
-                  }),
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
-                  }, item.homeTeam)
-                ),
-                /*#__PURE__*/React.createElement("span", {
-                  style: {
-                    fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 10px'
+                (sportsMatchSides(item) || []).flatMap((side, index) => {
+                  const column = /*#__PURE__*/React.createElement("div", {
+                    key: `${side.name}-${index}`,
+                    style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 }
+                  },
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { position: 'relative', width: '100%', maxWidth: '112px', aspectRatio: '1 / 1' }
+                    },
+                      side.logo && /*#__PURE__*/React.createElement("img", {
+                        src: side.logo,
+                        alt: side.name,
+                        loading: 'lazy',
+                        decoding: 'async',
+                        referrerPolicy: 'no-referrer',
+                        style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
+                        onError: e => {
+                          const img = e.currentTarget;
+                          if (img) img.style.display = 'none';
+                          const fallback = img && img.nextElementSibling;
+                          if (fallback) fallback.style.display = 'flex';
+                        }
+                      }),
+                      /*#__PURE__*/React.createElement("span", {
+                        "aria-hidden": "true",
+                        style: {
+                          display: side.logo ? 'none' : 'flex',
+                          position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center',
+                          borderRadius: '50%', background: 'rgba(255,255,255,0.16)',
+                          fontSize: '1.4rem', fontWeight: 800
+                        }
+                      }, (side.name || '?').slice(0, 1))
+                    ),
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                    }, side.name)
+                  );
+                  if (index === 0) {
+                    return [column, /*#__PURE__*/React.createElement("span", {
+                      key: 'vs',
+                      style: {
+                        fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 10px'
+                      }
+                    }, "vs")];
                   }
-                }, "vs"),
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
-                  item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
-                    src: item.awayTeamLogo, alt: item.awayTeam, loading: 'lazy', decoding: 'async',
-                    style: { width: '100%', maxWidth: '112px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
-                    onError: e => { e.currentTarget.style.display = 'none'; }
-                  }),
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
-                  }, item.awayTeam)
-                )
+                  return [column];
+                })
               ),
               /*#__PURE__*/React.createElement("div", {
                 style: {
@@ -5427,15 +6498,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           )
         );
       }),
-      hasMoreToRender && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE),
-        style: {
-          gridColumn: '1 / -1', padding: '12px', borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-main)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer'
-        }
-      }, `더 보기 (${visibleItems.length}/${filteredItems.length})`)
+      /*#__PURE__*/React.createElement(ExistingPageNavigation, {
+        currentPage: pagedItems.currentPage,
+        pageCount: pagedItems.pageCount,
+        onChange: setContentPage,
+        label: '콘텐츠'
+      })
     ),
     selected && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {
@@ -5444,11 +6512,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 13000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
       },
         /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
-          className: "modal-container",
+          className: "modal-container culture-detail-modal-container",
           onClick: e => e.stopPropagation(),
           style: {
-            position: 'relative', width: '100%', maxWidth: '520px', maxHeight: '85vh',
-            backgroundColor: 'var(--bg-card)', borderRadius: '20px', padding: '20px',
+            position: 'relative', width: '100%', maxWidth: '520px', maxHeight: 'min(88dvh, var(--gather-vv-modal-max, 860px))',
+            backgroundColor: 'var(--bg-card)', borderRadius: '20px', padding: '20px 20px 0',
             display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
           }
         },
@@ -5667,18 +6735,25 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // 자세히보기 URL이 없으면 공유만 남는데, 44px 아이콘만 두면 로드 깨진 것처럼 보인다.
             // 그때는 자세히보기 폭까지 써서 아이콘+「공유하기」풀폭 버튼으로 바꾼다.
             const detailUrl = resolveCultureDetailUrl(selected);
-            return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+            return /*#__PURE__*/React.createElement("div", {
+              className: "modal-footer culture-detail-footer",
+              style: {
+                display: 'flex', gap: '8px', flexShrink: 0,
+                padding: '0 0 max(16px, calc(10px + env(safe-area-inset-bottom, 0px)))',
+                marginTop: '4px', borderTop: 'none', background: 'transparent', boxSizing: 'border-box'
+              }
+            },
               /*#__PURE__*/React.createElement("button", {
                 type: "button", onClick: () => handleShareContent(selected), "aria-label": "공유",
                 style: detailUrl ? {
-                  width: '44px', height: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '44px', height: '44px', minHeight: '44px', maxHeight: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
+                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer', boxSizing: 'border-box'
                 } : {
-                  flex: 1, minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  flex: 1, minHeight: '44px', height: '44px', maxHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer',
-                  fontWeight: 800, fontSize: 'var(--font-size-md)'
+                  fontWeight: 800, fontSize: 'var(--font-size-md)', boxSizing: 'border-box'
                 }
               },
                 ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗",
@@ -5687,8 +6762,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               detailUrl ? /*#__PURE__*/React.createElement("a", {
                 href: detailUrl, target: "_blank", rel: "noopener noreferrer",
                 style: {
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '44px', minHeight: '44px', maxHeight: '44px', textAlign: 'center', padding: '0 16px', borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none', boxSizing: 'border-box'
                 }
               }, "자세히보기") : null
             );

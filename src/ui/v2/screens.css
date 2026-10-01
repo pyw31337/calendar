@@ -222,8 +222,8 @@
 .v2-design .v2-chat-scroll > div:first-child { padding: 4px 14px !important; }
 .v2-design .v2-chat-search-open .v2-chat-scroll > div:first-child { padding-top: 62px !important; }
 .v2-design .v2-chat .inline-search-bar {
-  left: 50% !important; right: auto !important; transform: translateX(-50%);
-  width: 100%; max-width: 480px;
+  left: 0 !important; right: 0 !important; transform: none;
+  width: 100%; max-width: none;
 }
 .v2-design .v2-chat-composer { position: relative; bottom: auto; left: auto; right: auto; z-index: 35; background: var(--bg-card); width: 100%; flex: 0 0 auto; padding: 10px 12px; }
 .v2-design .v2-chat-compose-row { display: flex; align-items: center; gap: 8px; }
@@ -456,12 +456,12 @@
   box-sizing: border-box !important;
 }
 .v2-design .v2-chat .chat-reply-quote-card > span:first-child {
-  font-size: 0.6rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   color: var(--brand, #7C2FE5) !important;
 }
 .v2-design .v2-chat .chat-reply-quote-card > span:last-child {
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
   color: var(--text-muted, #6B7280) !important;
   opacity: 1 !important;
   -webkit-line-clamp: 1 !important;
@@ -474,7 +474,7 @@
 /* Chat name pills denser like ChatFull */
 .v2-design .v2-chat .chat-typing-name,
 .v2-design .v2-chat-legacy .msg-row-hover > span:first-child {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   padding: 2px 8px !important;
   border-radius: 999px !important;
@@ -501,7 +501,7 @@
 }
 .v2-design .v2-places .bp-place-addr,
 .v2-design .v2-places .bp-place-note {
-  font-size: 0.68rem !important;
+  font-size:0.75rem !important;
   color: var(--v2-ink-2, #6b6580) !important;
 }
 .v2-design .v2-places .bp-cat-chip {
@@ -540,23 +540,7 @@
   margin-bottom: 8px !important;
 }
 
-/* Gallery / records hub under ?shell=v2 — keep upload/share/lightbox handlers */
-.v2-design .v2-records-overview.renewal-records-overview,
-.v2-design .renewal-records-overview.v2-records-overview {
-  padding: 16px 14px 24px;
-}
-.v2-design .v2-records-overview .renewal-records-overview-card {
-  border-radius: 16px;
-  border-color: var(--v2-card-border, #eceaf5);
-  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03));
-  background: var(--bg-card);
-}
-.v2-design .v2-records-overview .renewal-records-overview-icon {
-  background: var(--v2-tint-soft, #f3eeff);
-}
-.v2-design .v2-records-overview .renewal-records-overview-card-count {
-  color: var(--brand, #7C2FE5);
-}
+/* Gallery / records destinations under ?shell=v2 — keep upload/share/lightbox handlers */
 .v2-design .renewal-shell-subtab-item.is-active {
   background: var(--v2-tint-soft, #f3eeff) !important;
   border-color: var(--brand, #7C2FE5) !important;
@@ -578,6 +562,23 @@
 .v2-design .v2-records-media button[aria-label*="추가"] {
   /* keep controls visible — do not hide FABs/actions */
   visibility: visible !important;
+}
+
+/* Responsive links and files layout: 1-col on mobile & tablet (<=1024px), 2-col on PC (>1024px) */
+.v2-design .gallery-link-grid,
+.v2-design .gallery-file-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+@media (min-width: 1025px) {
+  .v2-design .gallery-link-grid,
+  .v2-design .gallery-file-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
 }
 
 
@@ -989,7 +990,7 @@
   grid-column: 1 !important;
   grid-row: 1 / span 2 !important;
   align-self: start !important;
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   padding: 2px 6px !important;
   font-weight: 800 !important;
   margin-top: 1px !important;
@@ -1070,7 +1071,7 @@
 /* Meta timestamp denser */
 .v2-design .v2-chat .msg-row-hover > div > span[style*="fontSize"],
 .v2-design .v2-chat .msg-row-hover > div span[style*="font-size"] {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   color: #9ca3af !important;
   line-height: 1.3 !important;
 }
@@ -1089,7 +1090,7 @@
   background: var(--bg-card);
 }
 .v2-design .v2-records-frame .renewal-shell-subtab-item {
-  font-size: 0.72rem !important;
+  font-size:0.75rem !important;
   padding: 5px 10px !important;
   border-radius: 999px !important;
 }
@@ -1127,7 +1128,7 @@
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
 }
 .v2-design .v2-settlement .settlement-person-name {
-  font-size: 0.72rem !important;
+  font-size:0.75rem !important;
   gap: 4px !important;
 }
 .v2-design .v2-settlement .settlement-person-amount {
@@ -1162,7 +1163,7 @@
   font-weight: 600 !important;
 }
 .v2-design .v2-settlement .settlement-running-balance {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   margin-top: 0 !important;
 }
 .v2-design .v2-settlement .settlement-page-body {
@@ -1193,7 +1194,7 @@
 }
 .v2-design .v2-places .place-card-row [style*="fontSize: 'var(--font-size-xs)'"],
 .v2-design .v2-places .place-card-row [style*="font-size: var(--font-size-xs)"] {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
@@ -1293,7 +1294,12 @@
   opacity: 0;
   pointer-events: none;
 }
-.v2-design .v2-chat .msg-row-hover:hover .msg-actions-group,
+@media (hover: hover) and (pointer: fine) {
+  .v2-design .v2-chat .msg-row-hover:hover .msg-actions-group {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .v2-design .v2-chat .msg-row-hover.msg-actions-revealed .msg-actions-group {
   opacity: 1;
   pointer-events: auto;
@@ -1389,7 +1395,7 @@
   background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
 }
 .v2-design .v2-chat-participant-missing {
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 700;
   color: #dc2626;
   background: #fef2f2;
@@ -1488,7 +1494,7 @@
   padding: 12px 10px !important;
 }
 .v2-design .v2-settlement .settlement-metric-card-label {
-  font-size: 0.68rem !important;
+  font-size:0.75rem !important;
   color: var(--v2-ink-2, #6b6580) !important;
   font-weight: 700 !important;
 }
@@ -1543,7 +1549,10 @@
    was never removed, it was rendering right under the header the same way Content/Archive's
    tabs were (see fix/v2-content-archive-header-overlap). */
 .v2-design .renewal-shell-main.is-records .v2-has-page-header > .places-view-container,
-.v2-design .renewal-shell-main.is-records .v2-has-page-header > .gallery-page-container {
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .gallery-page-container,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .v2-archive-legacy,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .v2-content-legacy,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .v2-gallery-legacy {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   position: relative !important;
@@ -1623,7 +1632,7 @@
   grid-column: 1 !important;
   grid-row: 1 / span 2 !important;
   align-self: start !important;
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   padding: 2px 6px !important;
   font-weight: 800 !important;
   margin-top: 1px !important;
@@ -1742,10 +1751,6 @@
   min-height: 0 !important;
   padding-top: 8px !important;
 }
-.v2-design .v2-memo .bp-tag-filter-row,
-.v2-design .v2-memo .tag-filter-row {
-  display: none !important;
-}
 
 /* Settlement density polish (ledger model — no fake 1/N meeting cards) */
 .v2-design .v2-settlement .settlement-metric-grid {
@@ -1757,7 +1762,7 @@
   border-radius: 12px !important;
 }
 .v2-design .v2-settlement .settlement-metric-card-label {
-  font-size: 0.64rem !important;
+  font-size:0.75rem !important;
 }
 .v2-design .v2-settlement .settlement-metric-card-value {
   font-size: 0.88rem !important;
@@ -1769,7 +1774,13 @@
   gap: 2px !important;
 }
 .v2-design .v2-settlement .settlement-person-grid {
-  gap: 5px !important;
+  gap: 8px !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
+}
+@media (min-width: 768px) {
+  .v2-design .v2-settlement .settlement-person-grid {
+    grid-template-columns: repeat(var(--settlement-cols, 3), minmax(0, 1fr)) !important;
+  }
 }
 .v2-design .v2-settlement .settlement-person-card {
   padding: 7px 7px 6px !important;
@@ -1791,14 +1802,25 @@
 .v2-design .v2-archive .history-bento-grid {
   gap: 8px !important;
 }
-.v2-design .v2-content .culture-items-grid > * {
+.v2-design .v2-content .culture-items-grid > *:not(.gallery-pagination) {
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;
   background: var(--bg-card) !important;
 }
-.v2-design .v2-archive .history-bento-grid > * {
+/* Shared pager (CommonPagination / .gallery-pagination). Card rules must not
+   paint a plate behind it on any page. */
+.v2-design .gallery-pagination,
+html:has(.renewal-shell.v2-design) .gallery-pagination {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+.v2-design .v2-archive .history-bento-grid > *:not(.gallery-pagination) {
   border-radius: 12px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;
@@ -2017,7 +2039,7 @@
 /* Section labels (최근 활동 / 메모 목록) sit in the 10px list gap — keep type compact */
 .v2-design .v2-memo .memo-list-scroll > div > div[style*="fontWeight"]:first-child,
 .v2-design .v2-memo .memo-section-label {
-  font-size: 0.72rem !important;
+  font-size:0.75rem !important;
   margin: 2px 0 0 !important;
 }
 
@@ -2037,14 +2059,24 @@
 .v2-design .v2-chat-compose-row > textarea.bp-composer-input {
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  /* The composer forces a fixed 36px single-line height (inline style) but a <textarea> still
-   * wraps long content onto a second line by default -- at 320px, with 4 icon buttons sharing
-   * the row, there's only ~140px left for the input and the Korean placeholder text wraps,
+  border-radius: var(--field-radius-single-line, 22px);
+  transition: border-radius var(--motion-fast, 140ms) ease;
+  /* The composer forces a fixed single-line height (inline style) but a <textarea> still
+   * wraps long content onto a second line by default -- at 320px, with icon buttons sharing
+   * the row, there's limited room for the input and the Korean placeholder text wraps,
    * overflowing the fixed-height box and clipping. Scroll sideways instead of wrapping, matching
    * how a single-line chat composer is expected to behave. */
   white-space: nowrap !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
+}
+.v2-design .v2-chat-compose-row > .bp-composer-input.is-multiline,
+.v2-design .v2-chat-compose-row > textarea.bp-composer-input.is-multiline,
+.v2-design .v2-chat-compose-row > textarea.bp-composer-input[data-field-lines="multi"] {
+  border-radius: var(--field-radius-multiline, 14px) !important;
+  white-space: pre-wrap !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
 .v2-design .v2-chat-compose-row > .v2-tool-icon-btn {
   flex-shrink: 0;
@@ -2084,7 +2116,7 @@
   border: none !important;
   border-radius: 9999px !important;
   font-weight: 800 !important;
-  font-size: 0.72rem !important;
+  font-size:0.75rem !important;
   height: 28px !important;
   padding: 0 10px !important;
 }
@@ -2121,7 +2153,7 @@
 
 /* Author name pills denser (own/other participant colors kept) */
 .v2-design .v2-chat .msg-row-hover > span:first-child {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   padding: 2px 7px !important;
   border-radius: 9999px !important;
@@ -2346,4 +2378,20 @@
 }
 .v2-design .v2-places.v2-wrap-legacy .places-list-body {
   min-height: min-content !important;
+}
+.v2-design .v2-memo-active-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 12px 16px 0;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
 }

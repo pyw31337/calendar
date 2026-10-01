@@ -561,14 +561,22 @@ assert(dateModalSource.includes('album.taggedMessages') && dateModalSource.inclu
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
 assert(photoIndexSource.includes("activeView !== 'gallery' && activeView !== 'history'")
-  && photoIndexSource.includes("activeView === 'history') void loadAll()"),
-  'memories and people must hydrate the complete canonical photo index');
+  && photoIndexSource.includes("void loadPage(1, { includeTotal: !shouldLoadPreview })")
+  && !summaryGallerySource.includes('전체 분석')
+  && !summaryGallerySource.includes('loadEntireArchive'),
+  'archive entry must stay paged without a manual complete-analysis control');
 assert(chatGallerySource.includes("activeTab === 'files' ? filteredFiles"), 'gallery date-mode file tab must group files rather than photo rows');
 assert(chatGallerySource.includes('renderFileListHeader') && chatGallerySource.includes('renderVisitFilterToggleMobile()'), 'file tab must retain the all/date switch');
 const imagePipelineSource = fs.readFileSync(new URL('../src/core/app-image-pipeline.js', import.meta.url), 'utf8');
 assert(imagePipelineSource.includes('async function sniffImageFormat'), 'image attach must sniff real file bytes before trusting .png names');
 assert(imagePipelineSource.includes('withCorrectedImageFile'), 'image attach must rewrite mismatched MIME/extension from sniffed bytes');
 assert(imagePipelineSource.includes("sniffed?.kind === 'heic'"), 'HEIC bytes with a .png name must still take the HEIC convert path');
+assert(/ARRAY_CONTAINS_ANY/.test(imagePipelineSource) && /lookupKnownImageFingerprintsForCalendar/.test(imagePipelineSource), 'image duplicate detection must query submitted fingerprints instead of scanning every historic message');
+assert(!/mask\.fieldPaths'.*imageFingerprints/.test(imagePipelineSource), 'image duplicate detection must not reintroduce a full collection fingerprint scan');
+assert(/const refreshTimer = __fb\(\) \? null : setInterval\(refresh, 6000\)/.test(dateModalSource), 'date-tag scans must poll only when the Firestore realtime SDK is unavailable');
+const productionStressSource = fs.readFileSync(new URL('./firebase-live-stress-tests.mjs', import.meta.url), 'utf8');
+const productionCrudSource = fs.readFileSync(new URL('./firebase-full-crud-tests.mjs', import.meta.url), 'utf8');
+assert(/ALLOW_PRODUCTION_FIREBASE_WRITES/.test(productionStressSource) && /ALLOW_PRODUCTION_FIREBASE_WRITES/.test(productionCrudSource), 'billable production write tests must require an explicit opt-in');
 
 assert(photoIndexSource.includes("sourceEquals: 'anniversary'"), 'gallery photo count must subtract anniversary/content posters');
 assert(photoIndexSource.includes('filterGalleryPhotoIndexItems'), 'gallery photo index pages must drop anniversary/content posters');
@@ -805,7 +813,10 @@ assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
-assert(/controllerchange[\s\S]{0,400}moyeora:service-worker-updated/.test(domainHelpersScript)
+const serviceWorkerRegistration = fs.readFileSync('src/core/service-worker-registration.js', 'utf8');
+assert(/controllerchange[\s\S]{0,400}moyeora:service-worker-updated/.test(serviceWorkerRegistration)
+  && !/controllerchange[\s\S]{0,500}location\.reload/.test(serviceWorkerRegistration)
+  && /bindAppServiceWorker/.test(domainHelpersScript)
   && !/controllerchange[\s\S]{0,400}location\.reload/.test(domainHelpersScript),
   'service worker controller changes must notify without automatically reloading an active session');
 const miscUiScript = fs.readFileSync('src/ui/ui-misc.js', 'utf8');
@@ -984,7 +995,7 @@ assert(!/await\s+subscription\.unsubscribe\(/.test(script), 'calendar-level noti
 assert(/if \(thumbs\.length === 1\)[\s\S]{0,260}src: displayUrls\[0\] \|\| thumbs\[0\][\s\S]{0,420}objectFit: 'contain'/.test(script), 'single chat image must render the full media without cropping');
 assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script), 'multi-image chat grid should keep cropped square thumbnails');
 const domainHelpers = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
-assert(/const appBasePath = window\.location\.pathname\.includes\('\/calendar\/'\) \? '\/calendar\/' : '\/'[\s\S]{0,180}serviceWorker\.register\(`\$\{appBasePath\}sw\.js`\)/.test(domainHelpers), 'service worker registration must resolve from the app base path on share URLs');
+assert(/bindAppServiceWorker\(typeof window !== 'undefined' \? window : null\)/.test(domainHelpers) && /resolveServiceWorkerTarget/.test(fs.readFileSync('src/core/service-worker-registration.js', 'utf8')), 'service worker registration must resolve from the app base path and recover a missing sw.js');
 const sharedUi = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
 const overlaysUi = fs.readFileSync('src/ui/ui-overlays.js', 'utf8');
 assert(domainHelpers.includes('const isRenderableImageUrl = GATHER_APP_UTILS.isRenderableImageUrl') && fs.readFileSync('src/core/app-utils.js', 'utf8').includes('function isRenderableImageUrl'), 'chat image entries must reject malformed/non-http image URLs');
@@ -1007,7 +1018,7 @@ assert(/function getMessageDirectMediaEntry\(msg\)[\s\S]{0,420}imageIndex: 0[\s\
 assert(/function getDirectMediaTagKey\(url\)/.test(script), 'direct URL image tags must use a stable URL hash key');
 assert(/getDirectMediaTagsForUrl\(sourceMessage,\s*meta\.directMediaUrl\)/.test(script), 'direct URL image tag saves must read the correct URL-scoped previous tag value');
 assert(/const nextDirectTags = previous && typeof previous === 'object' && !Array\.isArray\(previous\) \? \{ \.\.\.previous \} : \{\}/.test(script), 'direct URL image tag saves must persist a URL-keyed tag map');
-assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, 10\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the 10-tag persistence limit');
+assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, 20\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the 20-tag persistence limit');
 assert(/directMediaTags/.test(firestoreRules), 'Firestore rules must allow direct URL image tag updates');
 assert(/affectedKeys\(\)\.hasOnly\(\[[^\]]*directMediaTags/.test(firestoreRules), 'message update rules must include directMediaTags in the allowed update mask');
 assert(/directMediaTags is map/.test(firestoreRules), 'Firestore rules must allow URL-keyed directMediaTags maps');

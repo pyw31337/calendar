@@ -1,6 +1,7 @@
 import { shortParticipantName } from './v2/view-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
@@ -100,10 +101,47 @@ function getKoreanSolarTermsForYear(...args) {
   const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function useTapRevealedMsgId() {
+function useTapRevealedMsgId(...args) {
+  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
+  if (typeof f === 'function') return f(...args);
   const React = window.React;
-  const [tapRevealedMsgId, setTapRevealedMsgId] = React.useState(null);
-  return [tapRevealedMsgId, setTapRevealedMsgId];
+  const [revealedId, setRevealedId] = React.useState(null);
+  React.useEffect(() => {
+    let timer = null;
+    // See useTapRevealedMsgId in app-ui-hooks.js: ignore the compatibility mousedown that
+    // follows touchend/pointerup so one tap leaves edit/reply visible until the next tap.
+    let ignoreMouseUntil = 0;
+    const noteTouch = () => {
+      ignoreMouseUntil = Date.now() + 800;
+    };
+    const handler = e => {
+      if (e.type === 'touchstart') noteTouch();
+      if (e.type === 'mousedown' && Date.now() < ignoreMouseUntil) return;
+      if (e.target && e.target.closest && e.target.closest('.msg-actions-group, .msg-actions-group-inline')) {
+        return;
+      }
+      const target = e.target && e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
+      const id = target ? target.getAttribute('data-msg-row-id') : null;
+      setRevealedId(prev => (prev === id ? null : id));
+      if (timer) clearTimeout(timer);
+      if (id) {
+        timer = setTimeout(() => setRevealedId(null), 4000);
+      }
+    };
+    const passive = { passive: true };
+    document.addEventListener('touchstart', handler, passive);
+    document.addEventListener('touchend', noteTouch, passive);
+    document.addEventListener('touchcancel', noteTouch, passive);
+    document.addEventListener('mousedown', handler);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('touchstart', handler, passive);
+      document.removeEventListener('touchend', noteTouch, passive);
+      document.removeEventListener('touchcancel', noteTouch, passive);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, []);
+  return revealedId;
 }
 function getConfirmedMeetings(...args) {
   const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
@@ -469,6 +507,14 @@ export function CalendarGrid({
     endTouchDrag(null);
   };
 
+  const calendarSwipe = useCalendarMonthSwipe({
+    onMonthDelta: delta => {
+      if (delta > 0) onNextMonth?.();
+      else onPrevMonth?.();
+    },
+    isInteractionLocked: () => isTouchDragging || Boolean(touchDragRef.current?.dragging)
+  });
+
   // Sync picker values when month navigates externally
   React.useEffect(() => {
     setPickerYear(year);
@@ -653,15 +699,20 @@ export function CalendarGrid({
       position: 'relative'
     }
   }, isLoading && /*#__PURE__*/React.createElement("div", {
-    className: "calendar-loading-overlay",
+    className: "calendar-loading-overlay bp-cal-skel",
     role: "status",
-    "aria-live": "polite"
+    "aria-live": "polite",
+    "aria-label": "캘린더를 불러오는 중"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "calendar-loading-pill"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "calendar-spinner",
+    className: "bp-cal-skel-nav",
     "aria-hidden": "true"
-  }), /*#__PURE__*/React.createElement("span", null, "Firebase에서 캘린더 데이터를 불러오는 중입니다."))), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bp-cal-skel-grid",
+    "aria-hidden": "true"
+  }, Array.from({ length: 35 }, (_, index) => /*#__PURE__*/React.createElement("span", {
+    key: index,
+    className: "bp-cal-skel-cell"
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav",
     style: compact ? { flexWrap: 'nowrap' } : undefined
   }, /*#__PURE__*/React.createElement("div", {
@@ -713,7 +764,7 @@ export function CalendarGrid({
     title: "\uC774\uC804\uB2EC",
     "aria-label": "\uC774\uC804\uB2EC",
     style: { padding: '8px' },
-    onClick: onPrevMonth
+    onClick: () => calendarSwipe.navigateByMonth(-1)
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "20",
@@ -745,7 +796,7 @@ export function CalendarGrid({
     title: "\uB2E4\uC74C\uB2EC",
     "aria-label": "\uB2E4\uC74C\uB2EC",
     style: { padding: '8px' },
-    onClick: onNextMonth
+    onClick: () => calendarSwipe.navigateByMonth(1)
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "20",
@@ -824,6 +875,13 @@ export function CalendarGrid({
     ));
     return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
   })(), /*#__PURE__*/React.createElement("div", {
+    className: "calendar-month-swipe-surface",
+    "aria-label": "캘린더 월 이동: 좌우로 쓸어 이전 또는 다음 달 보기",
+    ...calendarSwipe.surfaceProps
+  }, /*#__PURE__*/React.createElement("div", {
+    className: calendarSwipe.contentClassName,
+    style: calendarSwipe.contentStyle
+  }, /*#__PURE__*/React.createElement("div", {
     className: "weekday-grid"
   }, /*#__PURE__*/React.createElement("div", {
     className: "weekday-label sun"
@@ -897,7 +955,9 @@ export function CalendarGrid({
         ...(isTouchDropTarget ? { outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' } : {}),
         "--cell-index": idx
       },
-      onClick: () => onSelectDate(dateStr),
+      onClick: () => {
+        if (!calendarSwipe.justSwipedRef.current) onSelectDate(dateStr);
+      },
       onDragOver: event => {
         event.preventDefault();
       },
@@ -1195,7 +1255,7 @@ export function CalendarGrid({
         }
       }))
     ];
-  })]));
+  })]))));
 
   // Floating badge that follows the finger while a touch drag is active (see
   // handleBadgeTouchStart above) -- portaled straight to <body> so it renders above everything
@@ -1630,6 +1690,23 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   // tag-input module's pattern.
   const comments = memo.comments || [];
   const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
+  const [focusedCommentId, setFocusedCommentId] = React.useState('');
+  React.useEffect(() => {
+    const read = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const onMemoScreen = params.get('view') === 'memo' || params.get('tab') === 'memo';
+        const targetMemo = params.get('memo') || params.get('memoFocus') || '';
+        const comment = params.get('comment') || '';
+        setFocusedCommentId(onMemoScreen && targetMemo && String(targetMemo) === String(memo.id) ? String(comment) : '');
+      } catch (_) {
+        setFocusedCommentId('');
+      }
+    };
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, [memo.id]);
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
@@ -1791,7 +1868,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     })));
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("article", {
     id: `memo-${memo.id}`,
     "data-memo-id": memo.id,
     onClick: (e) => {
@@ -1799,26 +1876,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
       if (typeof onOpenEdit === 'function') onOpenEdit(memo);
     },
-    role: "button",
-    tabIndex: 0,
-    onKeyDown: (e) => {
-      // 댓글 등 입력 중 Space/Enter는 카드 열기로 처리하지 않음
-      const t = e.target;
-      const tag = (t && t.tagName || '').toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
-      if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        if (typeof onOpenEdit === 'function') onOpenEdit(memo);
-      }
-    },
     style: {
-      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : '#fff')),
-      border: variant === 'date-modal' ? '1px solid var(--border-subtle)' : '0',
-      borderRadius: 'var(--radius-md)',
-      padding: '12px',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : 'var(--bg-card)')),
+      border: isPageLayout ? '1px solid var(--v2-card-border, #eceaf5)' : (variant === 'date-modal' ? '1px solid var(--border-subtle)' : '0'),
+      borderRadius: isPageLayout ? '14px' : 'var(--radius-md)',
+      padding: isPageLayout ? '14px 16px' : '12px',
       cursor: 'pointer',
-      boxShadow: variant === 'date-modal' ? 'none' : '0 2px 5px rgba(0,0,0,0.03)',
+      boxShadow: isPageLayout ? 'var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03))' : (variant === 'date-modal' ? 'none' : '0 2px 5px rgba(0,0,0,0.03)'),
       display: 'flex',
       flexDirection: 'column',
       position: 'relative',
@@ -1827,6 +1891,18 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     },
     className: "memo-card-hover v2-memo-card-contract"
   },
+    // The card also contains share, pin, link, image, and comment controls.  It therefore
+    // cannot itself be a role=button without nesting interactive elements.  Keep a dedicated
+    // keyboard entry point for the card editor while pointer users can still click card space.
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "aria-label": `${memo.title || '메모'} 열기`,
+      onClick: (e) => { e.stopPropagation(); if (typeof onOpenEdit === 'function') onOpenEdit(memo); },
+      style: {
+        position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px',
+        overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0
+      }
+    }, "메모 열기"),
     /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
        absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color
        as the pin's neutral ("off") state -- including its 0.2 opacity, which is what actually
@@ -1853,6 +1929,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onTogglePin();
       },
       title: effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : undefined,
+      "aria-label": effectivePinned ? (effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : "메모 고정 해제") : "메모 고정",
       style: {
         position: 'absolute', top: '10px', right: '10px',
         background: 'none', border: 'none', cursor: 'pointer',
@@ -1875,7 +1952,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
     memo.title && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-title",
-      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
+      style: {
+        fontSize: '1rem',
+        fontWeight: isPageLayout ? 800 : 'bold',
+        color: 'var(--text-main)',
+        marginBottom: isPageLayout ? '3px' : '8px',
+        lineHeight: isPageLayout ? '1.25' : undefined,
+        paddingRight: hidePinButton ? '30px' : '44px',
+        wordBreak: 'break-all'
+      }
     }, highlightKeyword(memo.title, searchQuery)),
     variant !== 'preview' && !isPageLayout && memoMeta && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-meta",
@@ -1891,9 +1976,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     displayMemoText && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-body",
       style: {
-        fontSize: 'var(--font-size-md)',
-        color: 'var(--text-main)',
-        lineHeight: '1.4',
+        fontSize: isPageLayout ? '0.76rem' : 'var(--font-size-md)',
+        color: isPageLayout ? 'var(--v2-ink-2, #6b6580)' : 'var(--text-main)',
+        lineHeight: '1.5',
+        marginBottom: isPageLayout ? '10px' : undefined,
         whiteSpace: 'pre-wrap',
         overflowWrap: 'break-word',
         wordBreak: 'break-all'
@@ -1950,13 +2036,14 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             }
           },
             urlVideoOpen ? [
-              /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }),
-              " 영상 닫기"
+              /*#__PURE__*/React.createElement(SmallXIcon, { key: 'close', size: 13 }),
+              /*#__PURE__*/React.createElement("span", { key: 'label' }, "영상 닫기")
             ] : [
               /*#__PURE__*/React.createElement("svg", {
+                key: 'play',
                 viewBox: "0 0 24 24", width: "13", height: "13", fill: "currentColor"
               }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
-              " 영상 바로보기"
+              /*#__PURE__*/React.createElement("span", { key: 'label' }, "영상 바로보기")
             ]
           ),
           urlIsVideo && urlVideoOpen && /*#__PURE__*/React.createElement("div", {
@@ -1976,7 +2063,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-tags",
-      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: isPageLayout ? '5px' : '6px',
+        marginTop: isPageLayout ? '4px' : '10px'
+      }
     },
       /* Writer badge:
          In V2 (variant === 'v2-page' or V2 shell active): 8px x 8px circle, no text, no shadow/border.
@@ -1993,7 +2086,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           title: writer.name || '작성자',
           onClick: e => e.stopPropagation(),
           style: {
-            backgroundColor: writer.color || '#94A3B8'
+            width: '8px',
+            height: '8px',
+            minWidth: '8px',
+            minHeight: '8px',
+            maxWidth: '8px',
+            maxHeight: '8px',
+            borderRadius: '50%',
+            backgroundColor: writer.color || '#94A3B8',
+            flexShrink: 0
           }
         });
       })(),
@@ -2005,7 +2106,19 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           e.stopPropagation();
           onSelectTag(tag);
         },
-        style: {
+        style: isPageLayout ? {
+          display: 'inline',
+          padding: 0,
+          border: 0,
+          borderRadius: 0,
+          backgroundColor: 'transparent',
+          color: 'var(--brand, #7C2FE5)',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          lineHeight: 1.2,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap'
+        } : {
           fontSize: 'var(--font-size-xs)', fontWeight: '600',
           color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
           padding: '3px 8px', borderRadius: '4px',
@@ -2014,8 +2127,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }
       }, highlightKeyword(tag, searchQuery))),
 
-      /* Comment toggle button -- pushed to the far right of the row */
-      /*#__PURE__*/React.createElement("button", {
+      /* Comment toggle button -- only in legacy/non-page layout (in page layout it sits in footer) */
+      !isPageLayout && /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: (e) => {
           e.stopPropagation();
@@ -2039,48 +2152,89 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Comment list -- no background, thin divider line between rows instead */
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-comments",
-      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' }
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: isPageLayout ? '4px' : '2px',
+        marginTop: '8px'
+      }
     },
       /*#__PURE__*/React.createElement(MemoCommentFold, {
         comments,
-        forceExpanded: isCommentComposerOpen,
+        forceExpanded: isCommentComposerOpen || !!focusedCommentId,
         renderComment: (comment, commentIdx) => {
-      const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
-      return /*#__PURE__*/React.createElement("div", {
-        key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
-        onClick: e => e.stopPropagation(),
-        style: {
-          display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 2px',
-          borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
-        }
-      },
-        /*#__PURE__*/React.createElement("span", {
-          className: "memo-comment-author-dot",
-          role: "img",
-          tabIndex: 0,
-          "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
-          "data-author-name": author?.name || '알 수 없는 작성자',
-          title: author?.name || '알 수 없는 작성자',
-          style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
-        }),
-        /*#__PURE__*/React.createElement("span", {
-          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
-        }, typeof (window.GATHER_UI_DEPS || {}).renderTextWithUrlBadge === 'function'
-          ? window.GATHER_UI_DEPS.renderTextWithUrlBadge(comment.text)
-          : comment.text),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
-      );
+          const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+          const commentDomId = comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`;
+          const isFocusedComment = !!focusedCommentId && String(comment.id || '') === focusedCommentId;
+          return /*#__PURE__*/React.createElement("div", {
+            key: commentDomId,
+            "data-comment-id": comment.id || '',
+            className: isFocusedComment ? 'chat-search-focused-bubble' : undefined,
+            ref: isFocusedComment ? (node) => {
+              if (!node || node.dataset.commentFocused === '1') return;
+              node.dataset.commentFocused = '1';
+              try { node.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) { node.scrollIntoView(); }
+            } : undefined,
+            onClick: e => e.stopPropagation(),
+            style: {
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              padding: isPageLayout ? '7px 10px' : '6px 2px',
+              borderRadius: isPageLayout ? '10px' : 0,
+              backgroundColor: isPageLayout ? 'var(--brand-soft, #f3eeff)' : 'transparent',
+              borderTop: (!isPageLayout && commentIdx > 0) ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
+            }
+          },
+            /*#__PURE__*/React.createElement("span", {
+              className: "memo-comment-author-dot",
+              role: "img",
+              tabIndex: 0,
+              "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+              "data-author-name": author?.name || '알 수 없는 작성자',
+              title: author?.name || '알 수 없는 작성자',
+              style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+            }),
+            /*#__PURE__*/React.createElement("span", {
+              style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
+            }, typeof (window.GATHER_UI_DEPS || {}).renderTextWithUrlBadge === 'function'
+              ? window.GATHER_UI_DEPS.renderTextWithUrlBadge(comment.text)
+              : comment.text),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
+              style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
+            }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 }))
+          );
         }
       })),
 
     variant !== 'preview' && /*#__PURE__*/React.createElement("div", {
       className: "memo-card-comment-footer",
-      onClick: e => e.stopPropagation()
+      onClick: e => e.stopPropagation(),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        marginTop: '8px',
+        paddingTop: 0,
+        color: 'var(--v2-ink-3, #9793a3)',
+        fontSize: '0.75rem',
+        fontWeight: 500,
+        width: '100%',
+        boxSizing: 'border-box'
+      }
     },
-      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
+      /*#__PURE__*/React.createElement("span", {
+        className: "memo-card-comment-count",
+        style: {
+          marginRight: 'auto',
+          color: 'var(--v2-ink-3, #9793a3)',
+          fontWeight: 500,
+          fontSize: '0.75rem',
+          lineHeight: 1.2
+        }
+      }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "memo-card-comment-toggle",
@@ -2091,11 +2245,23 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           setIsCommentComposerOpen(v => !v);
         },
         title: "댓글 입력",
-        "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력"
+        "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력",
+        style: {
+          border: 0,
+          background: 'transparent',
+          boxShadow: 'none',
+          padding: '3px 2px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '3px',
+          color: 'var(--brand, #7C2FE5)',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          cursor: 'pointer'
+        }
       }, isPageLayout
         ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
-        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), /* Count as plain brand-coloured text ("댓글 2"), same as the home memo section -- no
-           filled badge. */
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }),
         comments.length > 0 ? `댓글 ${comments.length}` : "댓글")
     ),
 
@@ -2562,10 +2728,34 @@ export function GlobalSearchModal({
       fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
     )).then(payloads => {
       const feedKinds = ['performance', 'festival', 'sports', 'movie'];
+      const today = (() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      })();
+      const addDays = (iso, days) => {
+        const d = new Date(`${iso}T00:00:00`);
+        d.setDate(d.getDate() + days);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      const stillListed = (item, kind) => {
+        if (kind === 'movie' || item.genre === 'movie') {
+          const release = /^\d{4}-\d{2}-\d{2}$/.test(String(item.releaseDate || item.startDate || '')) ? String(item.releaseDate || item.startDate) : '';
+          if (!release || release > today) return true;
+          const end = /^\d{4}-\d{2}-\d{2}$/.test(String(item.endDate || '')) && item.endDate !== release
+            ? item.endDate
+            : addDays(release, 28);
+          return end >= today;
+        }
+        const end = item.endDate || item.startDate || '';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(end))) return true;
+        return end >= today;
+      };
       const byId = new Map();
       payloads.forEach((payload, index) => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
         if (!item?.id || byId.has(item.id)) return;
-        byId.set(item.id, { ...item, searchKind: item.kind || feedKinds[index] });
+        const kind = item.kind || feedKinds[index];
+        if (!stillListed(item, kind)) return;
+        byId.set(item.id, { ...item, searchKind: kind });
       }));
       setCatalogContent(Array.from(byId.values()));
     });
@@ -2764,26 +2954,38 @@ export function GlobalSearchModal({
   }, item.meta ? highlightKeyword(item.meta, q) : null);
 
   const Frame = inline ? 'div' : ResizableModalContainer;
-  const tabBar = q && hasResults ? (isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+  const categoryPicker = isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement("div", {
+    className: "global-search-category-wrap"
+  }, /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
     title: "검색 카테고리 선택",
     value: activeTab,
     options: tabDefs.map(t => {
       const hasCount = (t.count || 0) >= 1;
+      const isMulti = String(t.count || 0).length > 1;
       return {
         value: t.key,
         label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
+          className: `global-search-count-badge${hasCount ? ' has-count' : ''} ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+          "data-digits": isMulti ? "multi" : "single",
           style: {
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
-            color: hasCount ? '#FFFFFF' : '#475569',
-            fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            minWidth: '18px', height: '18px',
+            width: isMulti ? 'auto' : '18px',
+            aspectRatio: isMulti ? 'auto' : '1 / 1',
+            borderRadius: '9999px',
+            backgroundColor: hasCount ? 'var(--brand, #7C2FE5)' : 'var(--bg-secondary, #E2E8F0)',
+            color: hasCount ? 'var(--on-brand, #FFFFFF)' : 'var(--text-muted, #475569)',
+            fontSize: 'var(--font-size-sm)', fontWeight: 'bold',
+            padding: isMulti ? '0 5px' : '0',
+            marginLeft: '4px'
           }
         }, t.count))
       };
     }),
     onSelect: setActiveTab
-  }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
+  })) : null;
+
+  const tabBar = q && hasResults ? (categoryPicker || (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
     options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
     value: activeTab,
     onChange: setActiveTab,
@@ -2984,10 +3186,10 @@ export function EditMessageModal({
             showToast
           });
         } else {
-          const remainingSlots = 50 - images.length;
+          const remainingSlots = 200 - images.length;
           const filesToProcess = classified.images.slice(0, Math.max(0, remainingSlots));
           if (!filesToProcess.length) {
-            if (showToast) showToast('사진 최대 50장', 'error');
+            if (showToast) showToast('사진 최대 200장', 'error');
           } else {
             setImageProcessingEdit({ current: 0, total: filesToProcess.length });
             const { succeeded, failed } = await processImageFilesSequentially(

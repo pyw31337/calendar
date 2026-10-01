@@ -25,6 +25,7 @@ const CALENDAR_IDS = (process.env.REPAIR_CALENDAR_IDS || '')
 const APPLY = process.env.APPLY === '1';
 const REPAIR_MESSAGES = process.env.REPAIR_MESSAGES === '1';
 const PLACEHOLDER_TEXTS = new Set(['', '갤러리 사진', '일정 사진', '사진']);
+const STORAGE_METADATA_TIMEOUT_MS = 12 * 1000;
 
 if (!CALENDAR_IDS.length) {
   console.error('Set REPAIR_CALENDAR_IDS (comma separated). Nothing is repaired implicitly.');
@@ -73,7 +74,7 @@ const storage = new Map();
 const fileExists = url => {
   const key = norm(url);
   if (!key || !/firebasestorage/.test(key)) return Promise.resolve(true);
-  if (!storage.has(key)) storage.set(key, fetch(key).then(res => res.status !== 404).catch(() => true));
+  if (!storage.has(key)) storage.set(key, fetch(key, { signal: AbortSignal.timeout(STORAGE_METADATA_TIMEOUT_MS) }).then(res => res.status !== 404).catch(() => true));
   return storage.get(key);
 };
 

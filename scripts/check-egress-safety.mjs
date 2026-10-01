@@ -23,14 +23,25 @@ assert(/message\.thumbUrl \|\| message\.thumbUrls\?\.\[0\]/.test(helpers), 'noti
 assert(!/getDownloadURL\([^)]*imageUrl/.test(data), 'data records must not resolve Storage URLs repeatedly from render data');
 assert(/CHAT_INITIAL_MESSAGE_LIMIT:\s*5/.test(config), 'chat must retain a five-message critical first window');
 assert(/CHAT_OLDER_PAGE_SIZE:\s*20/.test(config), 'older chat reads must retain small cursor pages');
-// Full chat history hydration is allowed for deliberate, user-initiated triggers: global search,
-// 보관함(history), or Gallery (whose contract includes all historic chat/memo links)
-// (their photo-tag matching needs the complete history, not just the bounded realtime window --
-// see the effect's own comment in app-main.js). Both are explicit navigations, not a background
-// effect that could fire unconditionally, so this still guards against unbounded egress.
-assert(/isGlobalSearchOpen[\s\S]{0,40}activeView !== 'history'[\s\S]{0,40}activeView !== 'gallery'/.test(galleryArchive), 'full archives must only hydrate for explicit search, history, or gallery views');
+// Full chat/memo hydration is a deliberate opt-in, not a background effect of opening
+// history or the gallery photo grid. Global search asks for the corpus itself. Gallery
+// files and links are the only other caller: they set galleryCorpusRequested, and the
+// effect still refuses to read unless that flag is set on the gallery view.
+assert(
+  /const wantsSearchCorpus = !!isGlobalSearchOpen/.test(galleryArchive)
+    && /const wantsGalleryCorpus = activeView === 'gallery' && galleryCorpusRequested/.test(galleryArchive)
+    && /if \(activeView === 'history' && !wantsSearchCorpus\) return undefined;/.test(galleryArchive)
+    && /if \(!wantsSearchCorpus && !wantsGalleryCorpus\) return undefined;/.test(galleryArchive)
+    && /activeTab !== 'files' && activeTab !== 'links'[\s\S]{0,80}requestGalleryChatCorpus\(/.test(gallery),
+  'full archives must only hydrate for explicit search, or gallery files and links tabs'
+);
 assert(!/visiblePhotos \|\| \[\]\)\.length >= 60[\s\S]{0,100}onLoadOlderChat/.test(gallery), 'gallery must not auto-chain older history reads');
-assert(/const PAGE_SIZE = 100/.test(photoIndex) && /indexedPhotoTotal[^\n]*\/ 100/.test(gallery), 'gallery must cap each rendered photo page at 100 items');
+assert(
+  /const PAGE_SIZE = 100/.test(photoIndex)
+    && /const GALLERY_PAGE_SIZE = 100/.test(gallery)
+    && /indexedPhotoTotal[^\n]*\/ GALLERY_PAGE_SIZE/.test(gallery),
+  'gallery must cap each rendered photo page at 100 items'
+);
 assert(!/<script[^>]+firebase-storage-compat/.test(index), 'Storage SDK must stay off the initial document path');
 
 console.log('[egress-safety] passed: bounded reads, paged gallery rendering, lazy Storage, and thumbnail-first summaries are intact');

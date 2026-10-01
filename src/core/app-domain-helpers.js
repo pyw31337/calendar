@@ -7,6 +7,8 @@
 import { GATHER_APP_UTILS } from './app-utils.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { bindAppServiceWorker } from './service-worker-registration.js';
+import { normalizePushChannelPreferences } from './push-channel-preferences.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -592,20 +594,23 @@ function sanitizeMessageForFirestore(messageData) {
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
   if (Array.isArray(out.imageUrls) || Array.isArray(out.thumbUrls)) {
     // These arrays describe one physical photo per slot. Remove a rejected base64 photo from
-    // every parallel array in the same pass; filtering only the URL array was what shifted a
-    // later person's tag onto an unrelated food photo.
+    // every parallel array in the same pass; filtering only one of URL, tag, or fingerprint
+    // arrays would shift a later photo's metadata onto an unrelated image.
     const urls = Array.isArray(out.imageUrls) ? out.imageUrls : [];
     const thumbs = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
     const tags = Array.isArray(out.imageTags) ? out.imageTags : null;
+    const fingerprints = Array.isArray(out.imageFingerprints) ? out.imageFingerprints : null;
     const nextUrls = [];
     const nextThumbs = [];
     const nextTags = tags ? [] : null;
+    const nextFingerprints = fingerprints ? [] : null;
     const slots = Math.max(urls.length, thumbs.length);
     for (let index = 0; index < slots; index += 1) {
       if (tooBig(urls[index]) || tooBig(thumbs[index])) continue;
       if (Array.isArray(out.imageUrls)) nextUrls.push(urls[index]);
       if (Array.isArray(out.thumbUrls)) nextThumbs.push(thumbs[index]);
       if (nextTags) nextTags.push(tags[index] || '');
+      if (nextFingerprints) nextFingerprints.push(fingerprints[index] || '');
     }
     if (Array.isArray(out.imageUrls)) {
       out.imageUrls = nextUrls;
@@ -616,6 +621,7 @@ function sanitizeMessageForFirestore(messageData) {
       if (!out.thumbUrls.some(Boolean)) delete out.thumbUrls;
     }
     if (nextTags) out.imageTags = nextTags;
+    if (nextFingerprints) out.imageFingerprints = nextFingerprints;
   }
   if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
     out.imageTagMap = reconcileMessageImageTagMap(out, normalizeImageTagMap(out.imageTagMap));
@@ -868,6 +874,20 @@ async function rebuildPhotoIndexRemote(password, calendarId, options = {}) {
   return result || { ok: false };
 }
 
+// Integrity queue and graph materialization are deliberately opt-in after a dry-run. The
+// server creates snapshots and review records only; no legacy source nor Storage object is
+// deleted by this command.
+async function prepareMediaIntegrityReviewRemote(password, calendarId, options = {}) {
+  const result = await callAdminFunction('prepareMediaIntegrityReview', {
+    password,
+    calendarId,
+    apply: options.apply === true,
+    materializeGraph: options.materializeGraph === true,
+    migrateLegacyComments: options.migrateLegacyComments === true
+  }, 540000);
+  return result || { ok: false };
+}
+
 // 밈 키보드 이미지 풀 메타데이터(해시태그 등)는 어드민 비밀번호로 게이트된 이 두 함수로만
 // 쓸 수 있다 -- 실제 이미지 바이트 업로드는 uploadMemePoolAssets(meme-pool.js)가 Storage에
 // 직접 올리고, 그 다운로드 URL을 여기로 등록만 한다.
@@ -1102,7 +1122,24 @@ function getSubscriptionHashId(endpoint) {
   return 'sub_' + Math.abs(hash) + '_' + endpoint.slice(-20).replace(/[^a-zA-Z0-9]/g, '');
 }
 
+let pushSubscribeInFlight = null;
+
 async function subscribeUserToPush(calendarId, activeParticipantId, options = {}) {
+  if (pushSubscribeInFlight) {
+    try { await pushSubscribeInFlight; } catch (_) {}
+  }
+  const task = (async () => {
+    return _subscribeUserToPushInternal(calendarId, activeParticipantId, options);
+  })();
+  pushSubscribeInFlight = task;
+  try {
+    return await task;
+  } finally {
+    if (pushSubscribeInFlight === task) pushSubscribeInFlight = null;
+  }
+}
+
+async function _subscribeUserToPushInternal(calendarId, activeParticipantId, options = {}) {
   if (!calendarId) return { ok: false, reason: 'missing-calendar' };
   if (!activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
@@ -1150,10 +1187,11 @@ async function subscribeUserToPush(calendarId, activeParticipantId, options = {}
       const participantId = activeParticipantId;
       const subId = getSubscriptionHashId(subscription.endpoint);
       const nowTs = Date.now();
-      let channelPrefs = { chat: true, memo: true, poll: true, schedule: true };
+      let channelPrefs = null;
       try {
-        if (typeof getNotifyChannels === 'function') channelPrefs = getNotifyChannels() || channelPrefs;
+        if (typeof getNotifyChannels === 'function') channelPrefs = getNotifyChannels();
       } catch (_) {}
+      const channels = normalizePushChannelPreferences(channelPrefs, options.channelOverrides);
       const deviceId = typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : ('dev_' + String(nowTs));
       const deviceLabel = typeof getDeviceLabel === 'function' ? getDeviceLabel() : '이 기기';
       const saved = await writeSharedCollection('push_subscriptions', calendarId, subId, {
@@ -1169,12 +1207,7 @@ async function subscribeUserToPush(calendarId, activeParticipantId, options = {}
         lastSeenAt: nowTs,
         deviceId: String(deviceId).slice(0, 80),
         deviceLabel: String(deviceLabel).slice(0, 120),
-        channels: {
-          chat: channelPrefs.chat !== false,
-          memo: channelPrefs.memo !== false,
-          poll: channelPrefs.poll !== false,
-          schedule: channelPrefs.schedule !== false
-        }
+        channels
       }, 'set', '기기 구독 등록', { merge: true });
       if (!saved?.success) throw new Error('Push subscription save failed');
       try {
@@ -1194,7 +1227,7 @@ async function subscribeUserToPush(calendarId, activeParticipantId, options = {}
   }
 }
 
-async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
+async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId, options = {}) {
   if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return { ok: false, reason: 'permission-not-granted' };
@@ -1213,11 +1246,11 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
     const registration = await navigator.serviceWorker.ready;
     const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
     if (!subscription) {
-      return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: false });
+      return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: false });
     }
-    const result = await subscribeUserToPush(calendarId, activeParticipantId, {});
+    const result = await subscribeUserToPush(calendarId, activeParticipantId, options);
     if (result.ok) return result;
-    return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: true });
+    return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: true });
   } catch (err) {
     return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
   }
@@ -1228,7 +1261,7 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
 // Cloud Functions read the copy stored on this browser's push subscription document.
 // Without this explicit update, turning a channel off/on had no effect until a full
 // re-subscription happened (and turning it off never re-subscribed at all).
-async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
+async function syncPushSubscriptionChannels(calendarId, activeParticipantId, options = {}) {
   if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return { ok: false, reason: 'permission-not-granted' };
@@ -1240,7 +1273,7 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
     const registration = await navigator.serviceWorker.ready;
     const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
     if (!subscription || !window.__gatherFirebaseDb) return { ok: false, reason: 'no-browser-subscription' };
-    const channelPrefs = typeof getNotifyChannels === 'function' ? getNotifyChannels() : {};
+    const channelPrefs = typeof getNotifyChannels === 'function' ? getNotifyChannels() : null;
     const nowTs = Date.now();
     const subId = getSubscriptionHashId(subscription.endpoint);
     // Prefer update (field-only) so we never replace endpoint/keys even if a writer forgets merge.
@@ -1249,12 +1282,7 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
       participantId: activeParticipantId,
       updatedAt: nowTs,
       lastSeenAt: nowTs,
-      channels: {
-        chat: channelPrefs.chat !== false,
-        memo: channelPrefs.memo !== false,
-        poll: channelPrefs.poll !== false,
-        schedule: channelPrefs.schedule !== false
-      }
+      channels: normalizePushChannelPreferences(channelPrefs, options.channelOverrides)
     };
     let saved = await writeSharedCollection('push_subscriptions', calendarId, subId, channelPatch, 'update', '알림 채널 설정 동기화');
     if (!saved?.success) {
@@ -1267,7 +1295,45 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
   }
 }
 
-async function subscribeUserToPushWithPermission(calendarId, activeParticipantId) {
+async function syncPushSubscriptionParticipant(calendarId, activeParticipantId) {
+  if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-args' };
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return { ok: false, reason: 'service-worker-unsupported' };
+  }
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
+    if (!subscription || !window.__gatherFirebaseDb) return { ok: false, reason: 'no-browser-subscription' };
+    const nowTs = Date.now();
+    const subId = getSubscriptionHashId(subscription.endpoint);
+    const participantPatch = {
+      participantId: activeParticipantId,
+      updatedAt: nowTs,
+      lastSeenAt: nowTs
+    };
+    let saved = await writeSharedCollection('push_subscriptions', calendarId, subId, participantPatch, 'update', '참여자 변경 푸시 구독 동기화');
+    if (!saved?.success) {
+      saved = await writeSharedCollection('push_subscriptions', calendarId, subId, participantPatch, 'set', '참여자 변경 푸시 구독 동기화', { merge: true });
+    }
+    try {
+      getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
+        subId,
+        participantId: activeParticipantId,
+        endpointTail: String(subscription.endpoint || '').slice(-32),
+        updatedAt: nowTs
+      }));
+    } catch (_) {}
+    return saved?.success ? { ok: true, subId } : { ok: false, reason: 'subscription-update-failed' };
+  } catch (err) {
+    console.warn('Failed to sync push notification participant:', err);
+    return { ok: false, reason: err?.message || 'subscription-update-failed' };
+  }
+}
+
+async function subscribeUserToPushWithPermission(calendarId, activeParticipantId, options = {}) {
   if (!isNotificationSupported()) {
     return { ok: false, reason: 'permission-not-granted' };
   }
@@ -1280,7 +1346,7 @@ async function subscribeUserToPushWithPermission(calendarId, activeParticipantId
       return { ok: false, reason: 'permission-not-granted', permission };
     }
   }
-  return subscribeUserToPush(calendarId, activeParticipantId);
+  return subscribeUserToPush(calendarId, activeParticipantId, options);
 }
 
 async function unsubscribeUserFromPush(calendarId) {
@@ -1314,11 +1380,29 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
-    new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
+    const notice = new Notification(participantName || calendar?.title || '모여라 캘린더', {
       body,
-      tag: `chat-${calendar?.id}`,
+      tag: message?.id ? `chat-cal_${calendar?.id}-${message.id}` : `chat-cal_${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
     });
+    // Foreground notifications do not go through the service worker. Land on the
+    // same ?view=chat&msg= URL a push click uses.
+    if (calendar?.id && message?.id) {
+      notice.onclick = () => {
+        try { window.focus(); } catch (_) {}
+        try {
+          const next = new URL(window.location.href);
+          next.searchParams.set('id', String(calendar.id).replace(/^cal_/, ''));
+          next.searchParams.set('view', 'chat');
+          next.searchParams.set('tab', 'chat');
+          next.searchParams.set('msg', String(message.id));
+          next.searchParams.delete('sub');
+          window.history.pushState(window.history.state, '', next);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        } catch (_) {}
+        try { notice.close(); } catch (_) {}
+      };
+    }
   } catch (e) {
     console.warn('Failed to show chat notification:', e);
   }
@@ -1336,7 +1420,7 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
   const body = `${whenLabel} 모임입니다. ${label}`;
   if (isNotificationSupported() && Notification.permission === 'granted') {
     try {
-      new Notification(`${calendar?.title || '모여라 캘린더'} 모임 알림`, {
+      new Notification('모임 알림', {
         body,
         tag: `meeting-reminder-${calendar?.id}-${meeting.date}`
       });
@@ -1357,7 +1441,7 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
     : `${whenLabel} 반복 일정입니다. ${title}`;
   if (isNotificationSupported() && Notification.permission === 'granted') {
     try {
-      new Notification(`${calendar?.title || '모여라 캘린더'} 일정 알림`, {
+      new Notification('일정 알림', {
         body,
         tag: `repeat-reminder-${calendar?.id}-${ann?.id || 'x'}-${dateStr || ''}`
       });
@@ -1369,35 +1453,10 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
   return body;
 }
 
-// Registers sw.js, which caches static assets (icons/manifests/hashed chunks) and uploaded Storage media
-// -- never index.html itself, since this app deliberately serves its HTML as no-cache (see sw.js). Safe to
-// register unconditionally: browsers without service worker support simply skip this.
-if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const appBasePath = window.location.pathname.includes('/calendar/') ? '/calendar/' : '/';
-    navigator.serviceWorker.register(`${appBasePath}sw.js`).then(reg => {
-      try { reg.update(); } catch (_) {}
-    }).catch(e => console.warn('Service worker registration failed:', e));
-  });
-
-  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then(reg => {
-          try { reg.update(); } catch (_) {}
-        }).catch(() => {});
-      }
-    });
-  }
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    // Never reload an active editing session automatically. UpdateAvailableToast compares the
-    // deployed build SHA and lets the user choose when to activate the new page safely.
-    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-      window.dispatchEvent(new CustomEvent('moyeora:service-worker-updated'));
-    }
-  });
-}
+// Registers sw.js. Path resolution, a preflight so a missing worker never becomes
+// "Script sw.js load failed", and swallowed update() rejections live in
+// service-worker-registration.js. Browsers without service worker support skip this.
+bindAppServiceWorker(typeof window !== 'undefined' ? window : null);
 
 function getContrastTextColor(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getContrastTextColor;
@@ -1516,6 +1575,28 @@ function unionConfirmedMeetings(calendar, subcollectionMeetings) {
 // data) are treated as confirmed for backward compatibility.
 function getTrulyConfirmedMeetings(calendar) {
   return getConfirmedMeetings(calendar).filter(m => m.confirmed !== false);
+}
+
+// The navigation rail needs one authoritative "next meeting" instead of deriving a
+// D-day from whichever embedded record happens to be listed first.  Calendar records
+// can contain historical confirmations and settlement-only (confirmed:false) rows, so
+// discard both before selecting the nearest date at or after the supplied local day.
+function getNextConfirmedMeeting(calendar, now = new Date()) {
+  const reference = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(reference.getTime())) return null;
+  const today = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  let nearest = null;
+  getTrulyConfirmedMeetings(calendar).forEach(meeting => {
+    const date = normalizeDateString(meeting?.date);
+    if (!date) return;
+    const [year, month, day] = date.split('-').map(Number);
+    const target = new Date(year, month - 1, day);
+    if (target < today || target.getFullYear() !== year || target.getMonth() !== month - 1 || target.getDate() !== day) return;
+    if (!nearest || target < nearest.target) nearest = { ...meeting, date, target };
+  });
+  if (!nearest) return null;
+  const { target: _target, ...meeting } = nearest;
+  return meeting;
 }
 
 function isDateConfirmedMeeting(calendar, dateStr) {
@@ -2477,6 +2558,9 @@ function getMessageImageEntries(msg) {
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
     ? msg.thumbUrls
     : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
+  const smalls = Array.isArray(msg.smallThumbUrls) && msg.smallThumbUrls.length > 0
+    ? msg.smallThumbUrls
+    : (typeof msg.smallThumbUrl === 'string' && msg.smallThumbUrl ? [msg.smallThumbUrl] : []);
   const count = Math.max(urls.length, thumbs.length);
   if (count === 0) return [];
   const entries = [];
@@ -2489,6 +2573,8 @@ function getMessageImageEntries(msg) {
     // render its normal empty/failed-photo state when both variants are unusable.
     const full = isRenderableImageUrl(fullCandidate) ? fullCandidate.trim() : '';
     const thumb = isRenderableImageUrl(thumbCandidate) ? thumbCandidate.trim() : '';
+    const smallCandidate = typeof smalls[i] === 'string' ? smalls[i] : '';
+    const smallThumb = isRenderableImageUrl(smallCandidate) ? smallCandidate.trim() : '';
     if (!full && !thumb) continue;
     const keys = getMediaIdentityKeys({
       messageId: msg.id,
@@ -2499,6 +2585,7 @@ function getMessageImageEntries(msg) {
     entries.push(stampPhotoAssetIdentity({
       full: full || thumb,
       thumb: thumb || full,
+      smallThumb,
       imageIndex: i,
       messageId: msg.id,
       timestamp: msg.timestamp,
@@ -2589,7 +2676,7 @@ function reconcileMessageImageTagMap(message, tagMap = null) {
     if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey)) return;
     const state = getMessagePhotoTagState({ ...(message || {}), imageTagMap: existing }, entry, entry.imageIndex);
     if (!state.authoritative) return;
-    next[assetKey] = String(state.tags || '').slice(0, 100);
+    next[assetKey] = String(state.tags || '').slice(0, 640);
   });
   return next;
 }
@@ -3002,6 +3089,7 @@ export {
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,
   rebuildPhotoIndexRemote,
+  prepareMediaIntegrityReviewRemote,
   listPushSubscriptionHealthRemote,
   queueServerAuditEvent,
   getClientAuditContext,
@@ -3037,6 +3125,7 @@ export {
   subscribeUserToPush,
   ensurePushSubscriptionHealthy,
   syncPushSubscriptionChannels,
+  syncPushSubscriptionParticipant,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush,
   notifyNewChatMessage,
@@ -3051,6 +3140,7 @@ export {
   getConfirmedMeetings,
   unionConfirmedMeetings,
   getTrulyConfirmedMeetings,
+  getNextConfirmedMeeting,
   isDateConfirmedMeeting,
   calculateSettlementBalance,
   formatBalanceBadge,

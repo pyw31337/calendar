@@ -6,20 +6,48 @@
  */
 
 // Tracks which message row's edit/delete controls should be revealed: desktop hover is
-// handled purely in CSS (see .msg-row-hover:hover), this only drives the mobile tap case --
-// tapping a row reveals its controls, tapping anywhere else (including another row) hides them.
+// handled purely in CSS (see .msg-row-hover:hover), this only drives the tap case --
+// one tap reveals a row's controls and a second tap (or a tap elsewhere) hides them.
+// The revealed state must survive pointerup/touchend; only a later tap toggles it off.
 export function useTapRevealedMsgId() {
   const React = window.React;
   const [revealedId, setRevealedId] = React.useState(null);
   React.useEffect(() => {
-    const handler = e => {
-      const target = e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
-      setRevealedId(target ? target.getAttribute('data-msg-row-id') : null);
+    let timer = null;
+    // A finger tap emits touchstart, then a compatibility mousedown after touchend/pointerup.
+    // Toggling on both shows the buttons on press and hides them the moment the finger lifts.
+    // Refresh ignoreMouseUntil on touch end so that ghost mousedown is dropped, including after
+    // a long press. A second real tap (or a desktop click) still toggles. pointerup/touchend
+    // themselves never hide the buttons.
+    let ignoreMouseUntil = 0;
+    const noteTouch = () => {
+      ignoreMouseUntil = Date.now() + 800;
     };
-    document.addEventListener('touchstart', handler, { passive: true });
+    const handler = e => {
+      if (e.type === 'touchstart') noteTouch();
+      if (e.type === 'mousedown' && Date.now() < ignoreMouseUntil) return;
+      // If clicking inside the actions group itself (reply/edit button), let the action proceed
+      if (e.target && e.target.closest && e.target.closest('.msg-actions-group, .msg-actions-group-inline')) {
+        return;
+      }
+      const target = e.target && e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
+      const id = target ? target.getAttribute('data-msg-row-id') : null;
+      setRevealedId(prev => (prev === id ? null : id));
+      if (timer) clearTimeout(timer);
+      if (id) {
+        timer = setTimeout(() => setRevealedId(null), 4000);
+      }
+    };
+    const passive = { passive: true };
+    document.addEventListener('touchstart', handler, passive);
+    document.addEventListener('touchend', noteTouch, passive);
+    document.addEventListener('touchcancel', noteTouch, passive);
     document.addEventListener('mousedown', handler);
     return () => {
-      document.removeEventListener('touchstart', handler);
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('touchstart', handler, passive);
+      document.removeEventListener('touchend', noteTouch, passive);
+      document.removeEventListener('touchcancel', noteTouch, passive);
       document.removeEventListener('mousedown', handler);
     };
   }, []);

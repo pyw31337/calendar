@@ -3,8 +3,8 @@
  */
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
-const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
-function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+const GATHER_APP_UTILS = typeof window !== 'undefined' ? (window.GATHER_APP_UTILS || {}) : {};
+function __gatherUiDeps() { return typeof window !== 'undefined' ? (window.GATHER_UI_DEPS || {}) : {}; }
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -1320,6 +1320,30 @@ export function ImageDownIcon({ size = 24 } = {}) {
   }));
 }
 
+export function ClipboardPasteIcon({ size = 16, style = {}, className = "" } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: `lucide lucide-clipboard-paste ${className}`.trim(),
+    style
+  },
+    /*#__PURE__*/React.createElement("rect", { width: "8", height: "4", x: "8", y: "2", rx: "1", ry: "1" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16 4h2a2 2 0 0 1 2 2v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M21 14H11" }),
+    /*#__PURE__*/React.createElement("path", { d: "m15 10-4 4 4 4" })
+  );
+}
+
 export function PlaceSectionIcon({ size = 20 } = {}) {
   const React = window.React;
 
@@ -1733,17 +1757,24 @@ export function ClapperboardIcon({ size = 18 } = {}) {
 export function PhotoCommentCountBadge({ count = 0 } = {}) {
   const React = window.React;
   if (!count) return null;
+  const countStr = String(count);
+  const isMulti = countStr.length > 1;
   return /*#__PURE__*/React.createElement('span', {
-    className: 'photo-comment-count-badge',
+    className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+    "data-digits": isMulti ? "multi" : "single",
     "aria-label": `댓글 ${count}개`,
     style: {
       position: 'absolute', top: '6px', right: '6px', zIndex: 3,
-      minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px',
+      minWidth: '22px', height: '22px',
+      width: isMulti ? 'auto' : '22px',
+      aspectRatio: isMulti ? 'auto' : '1 / 1',
+      padding: isMulti ? '0 5.5px' : '0',
+      borderRadius: '9999px',
       background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none', lineHeight: 1
     }
-  }, String(count));
+  }, countStr);
 }
 
   if (typeof window !== 'undefined') {

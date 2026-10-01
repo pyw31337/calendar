@@ -2,13 +2,74 @@
  * Chat / gallery modal (P4-13)
  */
 
-import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
+import { classifyGalleryItem, dedupeGalleryFiles, galleryFileViewModel } from '../core/gallery-item-kind.js';
+import { getPhotoTagCompleteness } from '../core/photo-tag-completeness.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
+import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, formatMediaAnalysisTime, recordMediaAnalysisFeedback } from '../core/media-analysis-feed.js';
+import { ClipboardPasteIcon } from './ui-icons.js';
+import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
+import { isExternalServiceUrl } from '../core/memo-share-link.js';
+import { collectChatFileAttachmentsFromMessages } from '../core/chat-file-attachments.js';
+import { requestGalleryChatCorpus } from '../core/gallery-archive-state.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const AI_REVIEW_MAX_TAGS = 20;
+const GALLERY_PAGE_SIZE = 100;
+const GALLERY_CARD_PAGE_SIZE = 20;
+const ANALYSIS_BATCH_FETCH_CONCURRENCY = 6;
+function normalizeAnalysisTagList(values) {
+  const input = (Array.isArray(values) ? values : [values])
+    .flatMap(value => String(value || '').split(/[\s,#]+/));
+  return Array.from(new Set(input
+    .map(value => String(value || '').replace(/^#+/, '').trim())
+    .filter(Boolean))).slice(0, AI_REVIEW_MAX_TAGS);
+}
+function getAnalysisSuggestedTags(item) {
+  return normalizeAnalysisTagList([
+    ...(Array.isArray(item?.suggestedTags) ? item.suggestedTags : []),
+    ...(Array.isArray(item?.people) ? item.people : []),
+    ...(Array.isArray(item?.places) ? item.places : []),
+    ...(Array.isArray(item?.meetings) ? item.meetings : [])
+  ]);
+}
+
+function createAnalysisTagChange(item, photo, finalTags) {
+  const assetKey = String(item?.assetKey || photo?.assetKey || '').trim();
+  const imageUrl = String(photo?.full || photo?.imageUrl || photo?.url || photo?.directMediaUrl || photo?.thumb || '').trim();
+  const thumbUrl = String(photo?.thumb || photo?.thumbUrl || imageUrl).trim();
+  return {
+    assetKey,
+    beforeTags: normalizeAnalysisTagList(photo?.tags || '').join(' '),
+    tags: normalizeAnalysisTagList(finalTags).join(' '),
+    photo: {
+      ...photo,
+      assetKey,
+      mediaKey: assetKey,
+      refKey: assetKey,
+      full: imageUrl,
+      imageUrl,
+      thumb: thumbUrl,
+      thumbUrl,
+    },
+  };
+}
+
+function getSuggestedDateTag(photo, item) {
+  const ts = photo?.timestamp || photo?.capturedAt || item?.lastReceivedAt || item?.analyzedAt;
+  if (!ts) return '';
+  const date = new Date(Number(ts));
+  if (Number.isNaN(date.getTime()) || date.getTime() <= 0) return '';
+  const yy = String(date.getFullYear()).slice(2);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yy}${mm}${dd}`;
+}
+
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getPhotoCommentIdentity(...args) {
   const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
@@ -152,6 +213,7 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
       flexDirection: 'column',
       gap: '8px',
       width: '100%',
+      minWidth: 0,
       backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
@@ -164,9 +226,10 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
         fontSize: '0.9rem',
         fontWeight: 700,
         color: 'var(--text-main)',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'normal',
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
+        lineHeight: 1.45
       }
     }, highlightKeyword(fallbackTitle, searchQuery)),
 
@@ -175,7 +238,8 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
       url: item.url,
       fallbackTitle: fallbackTitle,
       cachedData: item.linkPreview,
-      stretch: true
+      stretch: true,
+      wrapTitle: true
     }),
 
     /* Video Toggle Button for video media */
@@ -203,13 +267,14 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
       }
     },
       isVideoOpen ? [
-        SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }) : null,
-        " 영상 닫기"
+        SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { key: 'close', size: 14 }) : null,
+        /*#__PURE__*/React.createElement("span", { key: 'label' }, "영상 닫기")
       ] : [
         /*#__PURE__*/React.createElement("svg", {
+          key: 'play',
           viewBox: "0 0 24 24", width: "14", height: "14", fill: "currentColor"
         }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
-        " 영상 바로보기"
+        /*#__PURE__*/React.createElement("span", { key: 'label' }, "영상 바로보기")
       ]
     ),
 
@@ -299,7 +364,7 @@ function parseGatherLinksClipboardText(text) {
     if (!payload || payload.kind !== 'gather-links' || !Array.isArray(payload.links)) return null;
     const links = payload.links
       .map(item => ({ url: String(item?.url || '').trim(), title: String(item?.title || '').trim() }))
-      .filter(item => /^https?:\/\//i.test(item.url));
+      .filter(item => /^https?:\/\//i.test(item.url) && isExternalServiceUrl(item.url));
     return links.length ? links : null;
   } catch (_) {
     return null;
@@ -383,6 +448,8 @@ export function ChatGalleryModal({
   calendar = null,
   asPage = false,
   v2Embed = false,
+  v2SearchQuery,
+  onV2SearchQuery = null,
   onClose,
   onUploadImages = null,
   onAddLink = null,
@@ -431,6 +498,8 @@ export function ChatGalleryModal({
   onPasteGatherPhoto = null,
   onPasteGatherPhotos = null,
   syncStatus = null,
+  onSaveImageTags = null,
+  onBulkSaveImageTags = null,
   onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -497,11 +566,25 @@ export function ChatGalleryModal({
   };
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
+    const countStr = String(count);
+    const isMulti = countStr.length > 1;
     return React.createElement('span', {
-      className: 'photo-comment-count-badge',
+      className: `photo-comment-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+      'data-digits': isMulti ? 'multi' : 'single',
       'aria-label': `댓글 ${count}개`,
-      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
-    }, String(count));
+      style: {
+        position: 'absolute', top: '6px', right: '6px', zIndex: 3,
+        minWidth: '22px', height: '22px',
+        width: isMulti ? 'auto' : '22px',
+        aspectRatio: isMulti ? 'auto' : '1 / 1',
+        padding: isMulti ? '0 5.5px' : '0',
+        borderRadius: '9999px',
+        background: 'rgba(15,23,42,0.78)', color: '#fff',
+        fontSize: 'var(--font-size-xs)', fontWeight: 800,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none', lineHeight: 1
+      }
+    }, countStr);
   };
   const getMediaIdentityKeys = __deps.getMediaIdentityKeys;
   const getLegacyMeetingMediaKey = __deps.getLegacyMeetingMediaKey;
@@ -512,8 +595,8 @@ export function ChatGalleryModal({
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const FileAttachmentCard = __comp.FileAttachmentCard || __deps.FileAttachmentCard;
   const DocumentLightbox = __comp.DocumentLightbox || __deps.DocumentLightbox;
-  const collectChatFileAttachmentsFromMessages = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages);
-        const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
+  const collectChatFileAttachments = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages) || collectChatFileAttachmentsFromMessages;
+  const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
     const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -521,22 +604,332 @@ export function ChatGalleryModal({
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
   const [activeTab, setActiveTab] = React.useState('photos');
+  const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
+  const [galleryListPage, setGalleryListPage] = React.useState(1);
   const setGalleryTab = next => {
     setActiveTab(next);
+    setGalleryListPage(1);
     setSelectedBulkShareKeys(new Set());
-  }; // 'photos' | 'links' | 'files'
+  }; // 'photos' | 'links' | 'files' | 'analysis'
+  const [analysisViewMode, setAnalysisViewMode] = React.useState('unreviewed'); // 'unreviewed' | 'reviewed'
+  const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
+  const [analysisPhotoCache, setAnalysisPhotoCache] = React.useState({});
+  const photoByAssetKeyRef = React.useRef(new Map());
+  const [isBatchApplying, setIsBatchApplying] = React.useState(false);
+  const [batchProgress, setBatchProgress] = React.useState({ current: 0, total: 0 });
+  const [analysisAction, setAnalysisAction] = React.useState({ assetKey: '', mode: '', draft: '' });
+  const [analysisSavingAssetKey, setAnalysisSavingAssetKey] = React.useState('');
+  const loadMediaAnalysis = React.useCallback((force = false) => {
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId) return Promise.resolve();
+    setMediaAnalysis(previous => ({ ...previous, loading: true, error: '' }));
+    return fetchMediaAnalysisFeed({ calendarId, projectId, force, limit: 100 })
+      .then(items => setMediaAnalysis({ loading: false, error: '', items }))
+      .catch(error => setMediaAnalysis(previous => ({ ...previous, loading: false, error: String(error?.message || error) })));
+  }, [calendar?.id]);
+  React.useEffect(() => {
+    if (activeTab === 'analysis') void loadMediaAnalysis();
+  }, [activeTab, loadMediaAnalysis]);
+  const updateAnalysisReview = React.useCallback((assetKey, review) => {
+    setMediaAnalysis(previous => ({
+      ...previous,
+      items: previous.items.map(item => item.assetKey === assetKey ? { ...item, review } : item)
+    }));
+  }, []);
+  const saveAnalysisReview = React.useCallback(async (item, decision, finalTags = [], acceptedTags = []) => {
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
+    const optimisticReview = {
+      decision,
+      proposedTags: getAnalysisSuggestedTags(item),
+      acceptedTags,
+      finalTags,
+      reviewedAt: Date.now(),
+      reviewCount: (Number(item?.review?.reviewCount) || 0) + 1
+    };
+    updateAnalysisReview(item.assetKey, optimisticReview);
+    if (decision === 'rejected') {
+      showToast('추천에서 제외했습니다.', 'info');
+    }
+    void recordMediaAnalysisFeedback({
+      calendarId,
+      projectId,
+      assetKey: item.assetKey,
+      decision,
+      proposedTags: getAnalysisSuggestedTags(item),
+      acceptedTags,
+      finalTags
+    }).catch(err => console.warn('Background feedback save warning:', err));
+    return optimisticReview;
+  }, [calendar?.id, updateAnalysisReview, showToast]);
+  const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied', { silent = false } = {}) => {
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    const saveBulk = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (!onSaveImageTags && typeof saveBulk !== 'function') throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
+    if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
+
+    // 1. Resolve photo from memory cache immediately if available (avoids 1~2s REST delay)
+    const cachedPhoto = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey] || null;
+    let photo = cachedPhoto;
+    if (!photo) {
+      setAnalysisSavingAssetKey(item.assetKey);
+      try {
+        photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
+      } catch (err) {
+        setAnalysisSavingAssetKey('');
+        throw err;
+      }
+    }
+
+    const finalTags = normalizeAnalysisTagList([photo?.tags || '', ...requestedTags]);
+    const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo?.tags || '').join(' ');
+
+    // 2. Optimistic UI update: Immediately mark review in state so user experiences instant response (0.05s)
+    const optimisticReview = {
+      decision,
+      proposedTags: getAnalysisSuggestedTags(item),
+      acceptedTags: requestedTags,
+      finalTags,
+      reviewedAt: Date.now(),
+      reviewCount: (Number(item?.review?.reviewCount) || 0) + 1
+    };
+    updateAnalysisReview(item.assetKey, optimisticReview);
+    setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+    setAnalysisSavingAssetKey('');
+
+    if (!silent) {
+      showToast(changed ? '태그를 적용했습니다.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했습니다.', 'success');
+    }
+
+    // 3. Save to server in background without blocking user UI
+    try {
+      const tagSavePromise = (async () => {
+        if (!changed) return true;
+        if (typeof saveBulk === 'function') {
+          const result = await saveBulk([createAnalysisTagChange(item, photo, finalTags)]);
+          return result?.ok;
+        } else if (typeof onSaveImageTags === 'function') {
+          const sourceOwner = String(photo.tagSourceOwner || photo.sourceOwner || photo.owners?.[0]?.sourceOwner || '');
+          const ownerMatch = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
+          if (!ownerMatch) return false;
+          const [, sourceType, sourceId, sourceIndex] = ownerMatch;
+          const imageIndex = Number(sourceIndex);
+          const source = sourceType === 'message' ? 'chat' : sourceType;
+          return onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
+            source,
+            sourceOwner,
+            imageIndex,
+            sourceImageIndex: imageIndex,
+            meetingDate: sourceType === 'meeting' ? sourceId : '',
+            photoId: String(photo.photoId || ''),
+            imageUrl: photo.full || photo.thumb || '',
+            thumb: photo.thumb || photo.full || '',
+            assetKey: item.assetKey,
+            mediaKey: item.assetKey,
+            refKey: item.assetKey,
+            directMediaUrl: String(photo.directMediaUrl || ''),
+            readFresh: true,
+            silent: true
+          });
+        }
+        return true;
+      })();
+
+      const feedbackPromise = recordMediaAnalysisFeedback({
+        calendarId,
+        projectId,
+        assetKey: item.assetKey,
+        decision,
+        proposedTags: getAnalysisSuggestedTags(item),
+        acceptedTags: requestedTags,
+        finalTags
+      }).catch(err => console.warn('Background feedback save error:', err));
+
+      const [tagSaveOk] = await Promise.all([tagSavePromise, feedbackPromise]);
+      if (changed && !tagSaveOk) {
+        showToast('태그 서버 저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+      }
+    } catch (err) {
+      console.error('Server save error in applyAnalysisTags:', err);
+      showToast('태그 서버 동기화 중 오류가 발생했습니다.', 'error');
+    }
+  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, analysisPhotoCache, showToast, updateAnalysisReview]);
+  const handleBatchApplyAnalysis = React.useCallback(async () => {
+    const unreviewed = (mediaAnalysis.items || []).filter(item => {
+      if (!item?.assetKey || item.review) return false;
+      const photo = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+      if (photo && classifyGalleryItem(photo) !== 'photo') return false;
+      const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
+      const completeness = getPhotoTagCompleteness(currentTagsText, calendar, {
+        caption: photo?.caption,
+        tags: photo?.tags,
+        personTags: photo?.personTags
+      });
+      return !completeness.isComplete;
+    });
+    if (!unreviewed.length) {
+      showToast('처리할 미검토 항목이 없습니다.', 'info');
+      return;
+    }
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId) {
+      showToast('분석 대상 캘린더를 찾을 수 없습니다.', 'error');
+      return;
+    }
+    const saveBulk = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof saveBulk !== 'function') {
+      showToast('사진 태그 일괄 저장 기능을 준비하지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
+    setIsBatchApplying(true);
+    setBatchProgress({ current: 0, total: unreviewed.length });
+    const resolved = [];
+    const failures = [];
+    let cursor = 0;
+    try {
+      const workers = Array.from({ length: Math.min(ANALYSIS_BATCH_FETCH_CONCURRENCY, unreviewed.length) }, async () => {
+        while (cursor < unreviewed.length) {
+          const index = cursor++;
+          const item = unreviewed[index];
+          try {
+            const cachedPhoto = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+            const photo = (cachedPhoto && (cachedPhoto.tags != null || cachedPhoto.sourceOwner))
+              ? cachedPhoto
+              : await fetchMediaAnalysisPhoto({
+                  calendarId,
+                  projectId,
+                  assetKey: item.assetKey,
+                });
+            resolved.push({
+              item,
+              finalTags: normalizeAnalysisTagList([photo.tags || '', ...getAnalysisSuggestedTags(item)]),
+              photo,
+            });
+          } catch (error) {
+            failures.push({ item, error });
+            console.warn('AI batch photo lookup failed for', item.assetKey, error);
+          } finally {
+            setBatchProgress({ current: index + 1, total: unreviewed.length });
+          }
+        }
+      });
+      await Promise.all(workers);
+
+      const changed = resolved
+        .map(({ item, photo, finalTags }) => ({ item, finalTags, photo, change: createAnalysisTagChange(item, photo, finalTags) }))
+        .filter(record => record.change.tags !== record.change.beforeTags);
+      if (changed.length) {
+        const result = await saveBulk(changed.map(record => record.change));
+        if (!result?.ok) throw new Error('AI 추천 태그 일괄 저장에 실패했습니다.');
+      }
+      // Reviews are audit records, so keep them after the canonical tag write and use bounded
+      // parallelism. A failed review never rolls back an already successful photo mutation.
+      let reviewCursor = 0;
+      const reviewWorkers = Array.from({ length: Math.min(ANALYSIS_BATCH_FETCH_CONCURRENCY, resolved.length) }, async () => {
+        while (reviewCursor < resolved.length) {
+          const record = resolved[reviewCursor++];
+          try {
+            await saveAnalysisReview(record.item, 'applied', record.finalTags, getAnalysisSuggestedTags(record.item));
+          } catch (error) {
+            failures.push({ item: record.item, error });
+            console.warn('AI batch review save failed for', record.item.assetKey, error);
+          }
+        }
+      });
+      await Promise.all(reviewWorkers);
+      const failedAssetCount = new Set(failures.map(({ item }) => item?.assetKey).filter(Boolean)).size;
+      const message = failedAssetCount
+        ? `사진 태그 ${resolved.length}장을 반영했습니다. 분석 기록 ${failedAssetCount}건은 다시 시도해 주세요.`
+        : `미검토 사진 ${resolved.length}장에 AI 추천 태그를 일괄 적용했습니다.`;
+      showToast(message, failures.length ? 'error' : 'success');
+    } catch (error) {
+      console.error('AI batch tag apply failed:', error);
+      showToast(String(error?.message || 'AI 추천 태그 일괄 저장에 실패했습니다.'), 'error');
+    } finally {
+      setIsBatchApplying(false);
+      setBatchProgress({ current: 0, total: 0 });
+    }
+  }, [calendar, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast, analysisPhotoCache]);
+  const rejectAnalysisTags = React.useCallback(async item => {
+    if (!item?.assetKey) return;
+    setAnalysisSavingAssetKey(item.assetKey);
+    try {
+      await saveAnalysisReview(item, 'rejected', []);
+      setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+    } finally {
+      setAnalysisSavingAssetKey('');
+    }
+  }, [saveAnalysisReview]);
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const v2SearchControlled = typeof onV2SearchQuery === 'function';
+  React.useEffect(() => {
+    if (!v2SearchControlled) return;
+    setSearchQuery(v2SearchQuery || '');
+  }, [v2SearchControlled, v2SearchQuery]);
+  const [gallerySearchCorpus, setGallerySearchCorpus] = React.useState({ calId: '', status: 'idle', messages: null, memos: null });
+  const gallerySearchCorpusRef = React.useRef(gallerySearchCorpus);
+  gallerySearchCorpusRef.current = gallerySearchCorpus;
+  const gallerySearchRequestRef = React.useRef(0);
+  const gallerySearchActive = Boolean(String(searchQuery || '').trim());
+  React.useEffect(() => {
+    const calId = calendar?.id || '';
+    if (!gallerySearchActive || !calId) return undefined;
+    const current = gallerySearchCorpusRef.current;
+    if (current.calId === calId && (current.status === 'ready' || current.status === 'loading')) return undefined;
+    const requestId = gallerySearchRequestRef.current + 1;
+    gallerySearchRequestRef.current = requestId;
+    const next = { calId, status: 'loading', messages: null, memos: null };
+    gallerySearchCorpusRef.current = next;
+    setGallerySearchCorpus(next);
+    const fetchIndex = (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.fetchCalendarSearchIndex) || null;
+    const run = typeof fetchIndex === 'function' ? fetchIndex(calId) : Promise.reject(new Error('search index unavailable'));
+    Promise.resolve(run).then(index => {
+      if (gallerySearchRequestRef.current !== requestId) return;
+      const ready = {
+        calId,
+        status: 'ready',
+        messages: Array.isArray(index?.chatMessages) ? index.chatMessages : [],
+        memos: Array.isArray(index?.memos) ? index.memos : []
+      };
+      gallerySearchCorpusRef.current = ready;
+      setGallerySearchCorpus(ready);
+    }).catch(err => {
+      console.warn('full gallery search failed', err);
+      if (gallerySearchRequestRef.current !== requestId) return;
+      const failed = { calId, status: 'error', messages: null, memos: null };
+      gallerySearchCorpusRef.current = failed;
+      setGallerySearchCorpus(failed);
+    });
+    return undefined;
+  }, [gallerySearchActive, calendar?.id]);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   // Tracked as real state with a matchMedia listener (same pattern/breakpoint as ui-places.js's
   // isMobile) so the PC header filter vs. mobile select+tab row swap reacts live to resize/rotate
   // instead of only whatever this component happened to read on its first render.
   const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 720px)').matches);
+  const [isTabletOrMobile, setIsTabletOrMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 1024px)').matches);
   React.useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined;
     const mq = window.matchMedia('(max-width: 720px)');
     const handleChange = () => setIsMobile(mq.matches);
+    handleChange();
+    if (mq.addEventListener) mq.addEventListener('change', handleChange);
+    else if (mq.addListener) mq.addListener(handleChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handleChange);
+      else if (mq.removeListener) mq.removeListener(handleChange);
+    };
+  }, []);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => setIsTabletOrMobile(mq.matches);
     handleChange();
     if (mq.addEventListener) mq.addEventListener('change', handleChange);
     else if (mq.addListener) mq.addListener(handleChange);
@@ -557,6 +950,12 @@ export function ChatGalleryModal({
   const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
   const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
+  // 마지막 기준점을 키로 보관하면 OS 파일 관리자처럼 Shift+클릭으로 현재 목록의
+  // 연속 구간을 고를 수 있다. URL/배열 인덱스 대신 immutable asset key를 사용하므로
+  // 중복 정리나 정렬 변경 뒤에도 다른 사진을 선택하지 않는다.
+  const bulkSelectionAnchorKeyRef = React.useRef('');
+  const [isBulkTagPanelOpen, setIsBulkTagPanelOpen] = React.useState(false);
+  const [bulkTagDraft, setBulkTagDraft] = React.useState('');
   const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
   const [bulkShareResultUrl, setBulkShareResultUrl] = React.useState('');
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
@@ -651,6 +1050,24 @@ export function ChatGalleryModal({
     return () => window.removeEventListener('resize', onWin);
   }, [asPage, activeTab, v2Embed]);
 
+  const gallerySearchCorpusReady = gallerySearchActive
+    && gallerySearchCorpus.calId === (calendar?.id || '')
+    && gallerySearchCorpus.status === 'ready';
+  const sourceChatMessages = React.useMemo(() => {
+    if (!gallerySearchCorpusReady) return chatMessages;
+    const byId = new Map();
+    (gallerySearchCorpus.messages || []).forEach(msg => { if (msg?.id) byId.set(msg.id, msg); });
+    (chatMessages || []).forEach(msg => { if (msg?.id) byId.set(msg.id, msg); });
+    return Array.from(byId.values());
+  }, [gallerySearchCorpusReady, gallerySearchCorpus, chatMessages]);
+  const sourceMemos = React.useMemo(() => {
+    if (!gallerySearchCorpusReady) return memos;
+    const byId = new Map();
+    (gallerySearchCorpus.memos || []).forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+    (memos || []).forEach(memo => { if (memo?.id) byId.set(memo.id, memo); });
+    return Array.from(byId.values());
+  }, [gallerySearchCorpusReady, gallerySearchCorpus, memos]);
+
   const sharedLinks = React.useMemo(() => {
     // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image
     // link grid, any mix of URLs typed/pasted together) only ever contributed its first one here,
@@ -662,26 +1079,29 @@ export function ChatGalleryModal({
     // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
     // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
     // preview live the same way a fresh link normally would. Recognized image links are excluded
-    // In the gallery, all shared URLs belong to the 링크 tab.
+    // In the gallery, only external service URLs belong to the 링크 tab.
+    // Internal service links (memos, calendar shares, app routes, self origin) are excluded.
     const list = [];
     const seen = new Set();
-    (chatMessages || []).forEach(msg => {
+    (sourceChatMessages || []).forEach(msg => {
       if (!msg.text) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(msg.text).forEach(info => {
         if (!info.url || seen.has(info.url)) return;
+        if (!isExternalServiceUrl(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
         firstUrlSeen = true;
       });
     });
-    (memos || []).forEach(memo => {
+    (sourceMemos || []).forEach(memo => {
       const body = memo?.text || memo?.content || memo?.body || '';
       if (!body) return;
       if (!body || isTombstone(memo)) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(body).forEach(info => {
         if (!info.url || seen.has(info.url)) return;
+        if (!isExternalServiceUrl(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '', text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
         firstUrlSeen = true;
@@ -692,6 +1112,7 @@ export function ChatGalleryModal({
       if (!body) return;
       extractAllUrlInfosLoose(body).forEach(info => {
         if (!info.url || seen.has(info.url)) return;
+        if (!isExternalServiceUrl(info.url)) return;
         seen.add(info.url);
         list.push({
           url: info.url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
@@ -700,10 +1121,14 @@ export function ChatGalleryModal({
         });
       });
     });
-    return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages, memos, calendar]);
+    return list
+      .filter(item => classifyGalleryItem(item) === 'link')
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [sourceChatMessages, sourceMemos, calendar]);
 
   const sharedPhotos = React.useMemo(() => {
+    const chatMessages = sourceChatMessages;
+    const memos = sourceMemos;
     if (Array.isArray(indexedPhotos)) {
       return indexedPhotos
         .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
@@ -715,8 +1140,8 @@ export function ChatGalleryModal({
         })
         // Meme keyboard stickers
         .filter(photo => !isMemeKeyboardPhotoEntry(photo))
-        // Photos tab must only contain real photos, not link URLs
-        .filter(photo => !photo.directMediaUrl)
+        // One classifier: storage PDFs are files, webpages are links, images are photos.
+        .filter(photo => classifyGalleryItem(photo) === 'photo')
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)
@@ -828,7 +1253,54 @@ export function ChatGalleryModal({
         indexTags: String(photo.tags || '')
       })
     }));
-  }, [chatMessages, memos, calendar, indexedPhotos]);
+  }, [sourceChatMessages, sourceMemos, calendar, indexedPhotos]);
+
+  const photoByAssetKey = React.useMemo(() => {
+    const map = new Map();
+    (sharedPhotos || []).forEach(p => {
+      const k1 = p.assetKey;
+      const k2 = p.mediaKey;
+      const k3 = p.refKey;
+      if (k1) map.set(k1, p);
+      if (k2 && !map.has(k2)) map.set(k2, p);
+      if (k3 && !map.has(k3)) map.set(k3, p);
+    });
+    return map;
+  }, [sharedPhotos]);
+  photoByAssetKeyRef.current = photoByAssetKey;
+
+  React.useEffect(() => {
+    if (activeTab !== 'analysis' || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId) return;
+
+    const missingKeys = mediaAnalysis.items
+      .map(item => item.assetKey)
+      .filter(key => key && !photoByAssetKey.has(key) && !analysisPhotoCache[key]);
+
+    if (missingKeys.length === 0) return;
+
+    let canceled = false;
+    const fetchMissingPhotos = async () => {
+      const updates = {};
+      await Promise.all(
+        missingKeys.slice(0, 30).map(async key => {
+          try {
+            const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: key });
+            if (photo && (photo.thumb || photo.full || photo.imageUrl)) {
+              updates[key] = photo;
+            }
+          } catch (_) {}
+        })
+      );
+      if (!canceled && Object.keys(updates).length > 0) {
+        setAnalysisPhotoCache(previous => ({ ...previous, ...updates }));
+      }
+    };
+    void fetchMissingPhotos();
+    return () => { canceled = true; };
+  }, [activeTab, mediaAnalysis.items, photoByAssetKey, analysisPhotoCache, calendar?.id]);
 
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
@@ -845,10 +1317,26 @@ export function ChatGalleryModal({
   }, [sharedLinks, searchQuery]);
 
   const sharedFiles = React.useMemo(() => {
-    const collect = collectChatFileAttachmentsFromMessages;
-    if (typeof collect !== 'function') return [];
-    return collect(chatMessages || []);
-  }, [chatMessages]);
+    const collect = collectChatFileAttachments;
+    const fromMessages = typeof collect === 'function'
+      ? collect(sourceChatMessages || [], sourceMemos || [])
+      : [];
+    // Photo-index rows used to stay in 사진 whenever the URL was Firebase Storage,
+    // so a PDF storage object was both a file card and a photo tile.
+    const fromIndex = (Array.isArray(indexedPhotos) ? indexedPhotos : [])
+      .filter(photo => classifyGalleryItem(photo) === 'file')
+      .map(galleryFileViewModel);
+    const fromLinkText = [];
+    (sourceChatMessages || []).forEach(msg => {
+      extractAllUrlInfosLoose(msg?.text || '').forEach(info => {
+        if (info?.url && classifyGalleryItem({ url: info.url }) === 'file') {
+          fromLinkText.push(galleryFileViewModel({ url: info.url, messageId: msg.id, timestamp: msg.timestamp, uploadSource: 'chat' }));
+        }
+      });
+    });
+    return dedupeGalleryFiles([...fromMessages, ...fromIndex, ...fromLinkText]
+      .filter(item => classifyGalleryItem(item) === 'file'));
+  }, [sourceChatMessages, sourceMemos, indexedPhotos]);
 
   const filteredFiles = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedFiles;
@@ -877,37 +1365,86 @@ export function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
   const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
-    if (photo.directMediaUrl) return false;
+    if (classifyGalleryItem(photo) !== 'photo') return false;
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
   }), [filteredPhotos, brokenPhotoRevision]);
-  const [photoRenderLimit, setPhotoRenderLimit] = React.useState(24);
-  const usingPhotoIndex = Array.isArray(indexedPhotos);
-  const renderedPhotos = React.useMemo(
-    () => asPage && !usingPhotoIndex ? visiblePhotos.slice(0, photoRenderLimit) : visiblePhotos,
-    [asPage, visiblePhotos, photoRenderLimit, usingPhotoIndex]
-  );
-  const hasLocallyHiddenPhotos = !usingPhotoIndex && renderedPhotos.length < visiblePhotos.length;
-  const loadMorePhotos = () => {
-    if (hasLocallyHiddenPhotos) {
-      setPhotoRenderLimit(limit => limit + 20);
+  const selectedBulkPhotos = React.useMemo(() => {
+    if (activeTab !== 'photos' || selectedBulkShareKeys.size === 0) return [];
+    return visiblePhotos.filter(photo => selectedBulkShareKeys.has(getPhotoKey(photo)));
+  }, [activeTab, visiblePhotos, selectedBulkShareKeys]);
+  const selectedBulkTagTokens = React.useMemo(() => {
+    const counts = new Map();
+    selectedBulkPhotos.forEach(photo => normalizePhotoTagTokens(photo.tags).forEach(tag => {
+      counts.set(tag, (counts.get(tag) || 0) + 1);
+    }));
+    return Array.from(counts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .map(([tag, count]) => ({ tag, count }));
+  }, [selectedBulkPhotos]);
+  const applyBulkPhotoTags = async (operation, rawTags = bulkTagDraft) => {
+    const targetPhotos = selectedBulkPhotos;
+    const changes = buildBulkPhotoTagChanges(targetPhotos, operation, rawTags);
+    if (!targetPhotos.length) {
+      showToast?.('태그를 관리할 사진을 먼저 선택해 주세요.', 'error');
       return;
     }
-    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-  };
-  const handleGalleryContentScroll = e => {
-    handleGalleryScroll(e);
-    if (!asPage || activeTab !== 'photos' || galleryViewMode !== 'all' || !hasLocallyHiddenPhotos) return;
-    const el = e?.currentTarget;
-    if (!el) return;
-    // Keep the initial DOM light, then progressively reveal the complete already-hydrated
-    // gallery before the user reaches the bottom. The button remains as an accessibility and
-    // slow-device fallback, but ordinary scrolling no longer requires repeated manual taps.
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 900) {
-      setPhotoRenderLimit(limit => Math.min(visiblePhotos.length, limit + 40));
+    if (!normalizePhotoTagTokens(rawTags).length) {
+      showToast?.('추가하거나 삭제할 태그를 입력해 주세요.', 'error');
+      return;
+    }
+    if (!changes.length) {
+      showToast?.(operation === 'remove' ? '선택한 사진에 해당 태그가 없습니다.' : '선택한 사진에는 이미 같은 태그가 있습니다.', 'info');
+      return;
+    }
+    const save = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof save !== 'function') {
+      showToast?.('일괄 태그 저장 기능을 준비하지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
+    // The save patches the gallery index before its network write. Close the
+    // panel now so the next batch can be classified while that write runs.
+    setBulkTagDraft('');
+    setIsBulkTagPanelOpen(false);
+    setSelectedBulkShareKeys(new Set());
+    try {
+      const result = await save(changes);
+      if (!result?.ok) throw new Error('사진 태그 일괄 저장 실패');
+      const undoneChanges = changes.map(change => ({ ...change, tags: change.beforeTags }));
+      const label = operation === 'remove' ? '삭제' : '추가';
+      showToast?.(`사진 ${changes.length}장에 태그를 ${label}했습니다.`, 'success', 9000, () => {
+        const undoSave = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+        if (typeof undoSave !== 'function') return;
+        void undoSave(undoneChanges)
+          .then(undoResult => showToast?.(undoResult?.ok ? '태그 일괄 변경을 되돌렸습니다.' : '되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error'))
+          .catch(error => {
+            console.error('Bulk photo tag undo failed:', error);
+            showToast?.('태그 되돌리기에 실패했습니다.', 'error');
+          });
+      }, null, '되돌리기');
+    } catch (error) {
+      console.error('Bulk photo tag save failed:', error);
+      showToast?.(String(error?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
     }
   };
+  const pagedFallbackPhotos = React.useMemo(
+    () => paginateGalleryItems(visiblePhotos, galleryListPage, GALLERY_PAGE_SIZE),
+    [visiblePhotos, galleryListPage]
+  );
+  const usingPhotoIndex = Array.isArray(indexedPhotos);
+  const galleryFullScanPending = gallerySearchActive && (
+    (gallerySearchCorpus.status !== 'ready' && gallerySearchCorpus.status !== 'error')
+    || (usingPhotoIndex && !indexedPhotoComplete && (activeTab === 'photos' || galleryViewMode === 'date'))
+  );
+  const gallerySearchMissLabel = gallerySearchCorpus.status === 'error'
+    ? '전체 기록 검색에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+    : (galleryFullScanPending ? '전체 기록을 검색하는 중...' : '검색 결과가 없습니다.');
+  const renderedPhotos = React.useMemo(
+    () => asPage && !usingPhotoIndex ? pagedFallbackPhotos.items : visiblePhotos,
+    [asPage, visiblePhotos, pagedFallbackPhotos.items, usingPhotoIndex]
+  );
+  const handleGalleryContentScroll = handleGalleryScroll;
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
     markBrokenPhoto(photo, brokenInfo);
@@ -926,15 +1463,22 @@ export function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, onLoadOlderChat, onLoadMoreMemos]);
 
-  const displayPhotoTabCount = usingPhotoIndex && Number.isFinite(Number(indexedPhotoTotal))
-    ? Number(indexedPhotoTotal) : visiblePhotos.length;
-  const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
+  // Files and links are not photoIndex rows. Gallery uploads use uploadSource=gallery, so they
+  // never enter the live chat window. Ask for the search-index corpus only on these tabs.
+  React.useEffect(() => {
+    if (activeTab !== 'files' && activeTab !== 'links') return;
+    requestGalleryChatCorpus();
+  }, [activeTab]);
+
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
   const [isGalleryPickerOpen, setIsGalleryPickerOpen] = React.useState(false);
   const [pickerGalleryYear, setPickerGalleryYear] = React.useState(() => new Date().getFullYear());
   const [pickerGalleryMonth, setPickerGalleryMonth] = React.useState(() => new Date().getMonth());
   const galleryMonthKey = `${galleryMonthDate.getFullYear()}-${String(galleryMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  React.useEffect(() => {
+    setGalleryListPage(1);
+  }, [searchQuery, galleryViewMode, galleryMonthKey]);
   const requiresCompletePhotoIndex = usingPhotoIndex
     && activeTab === 'photos'
     && (Boolean(searchQuery.trim()) || galleryViewMode === 'date');
@@ -973,16 +1517,23 @@ export function ChatGalleryModal({
     list.sort((a, b) => Number(b?.timestamp || 0) - Number(a?.timestamp || 0));
     return list;
   };
+  const dateModeSourceItems = React.useMemo(() => {
+    const sourceItems = activeTab === 'links' ? filteredLinks : (activeTab === 'files' ? filteredFiles : visiblePhotos);
+    return (sourceItems || []).filter(item => {
+      const key = getGalleryItemDateKey(item) || '__unknown__';
+      return key === '__unknown__' || key.startsWith(galleryMonthKey);
+    });
+  }, [activeTab, filteredLinks, filteredFiles, visiblePhotos, galleryMonthKey]);
+  const pagedDateModeItems = React.useMemo(
+    () => paginateGalleryItems(dateModeSourceItems, galleryListPage, (activeTab === 'links' || activeTab === 'files') ? GALLERY_CARD_PAGE_SIZE : GALLERY_PAGE_SIZE),
+    [activeTab, dateModeSourceItems, galleryListPage]
+  );
   const groupedGallerySections = React.useMemo(() => {
     if (galleryViewMode !== 'date') return [];
-    // Date mode must group the full filtered list (visiblePhotos), not the flat-mode
-    // render slice (renderedPhotos). Slicing left hasLocallyHiddenPhotos true for other
-    // months and made auto load-more keep firing without growing the current month UI.
-    const sourceItems = activeTab === 'links' ? filteredLinks : (activeTab === 'files' ? filteredFiles : visiblePhotos);
+    const sourceItems = pagedDateModeItems.items;
     const groups = new Map();
     (sourceItems || []).forEach((item, idx) => {
       const key = getGalleryItemDateKey(item) || '__unknown__';
-      if (key !== '__unknown__' && !key.startsWith(galleryMonthKey)) return;
       const next = groups.get(key) || [];
       next.push({ item, idx });
       groups.set(key, next);
@@ -1001,41 +1552,7 @@ export function ChatGalleryModal({
           .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
           .map(entry => entry.item)
       }));
-  }, [galleryViewMode, activeTab, filteredLinks, filteredFiles, visiblePhotos, galleryMonthKey]);
-
-  // Per-month photo count for the active galleryMonthKey (already-loaded visiblePhotos only).
-  const monthVisiblePhotoCount = React.useMemo(() => {
-    if (galleryViewMode !== 'date' || activeTab !== 'photos') return 0;
-    return (visiblePhotos || []).reduce((count, item) => {
-      const key = getGalleryItemDateKey(item) || '';
-      return key.startsWith(galleryMonthKey) ? count + 1 : count;
-    }, 0);
-  }, [galleryViewMode, activeTab, visiblePhotos, galleryMonthKey]);
-
-  // When an older-chat load finishes without adding any photos for the current month,
-  // mark that month exhausted so date-mode auto load-more stops bouncing at the bottom.
-  const [exhaustedGalleryMonthKey, setExhaustedGalleryMonthKey] = React.useState(null);
-  const prevLoadingOlderChatRef = React.useRef(!!loadingOlderChat);
-  const prevMonthVisiblePhotoCountRef = React.useRef(monthVisiblePhotoCount);
-  const prevGalleryMonthKeyForExhaustRef = React.useRef(galleryMonthKey);
-  React.useEffect(() => {
-    if (prevGalleryMonthKeyForExhaustRef.current !== galleryMonthKey) {
-      prevGalleryMonthKeyForExhaustRef.current = galleryMonthKey;
-      setExhaustedGalleryMonthKey(null);
-      prevMonthVisiblePhotoCountRef.current = monthVisiblePhotoCount;
-      prevLoadingOlderChatRef.current = !!loadingOlderChat;
-      return;
-    }
-    const wasLoading = prevLoadingOlderChatRef.current;
-    prevLoadingOlderChatRef.current = !!loadingOlderChat;
-    if (monthVisiblePhotoCount > prevMonthVisiblePhotoCountRef.current) {
-      setExhaustedGalleryMonthKey(prev => prev === galleryMonthKey ? null : prev);
-    }
-    if (wasLoading && !loadingOlderChat && monthVisiblePhotoCount <= prevMonthVisiblePhotoCountRef.current) {
-      setExhaustedGalleryMonthKey(galleryMonthKey);
-    }
-    prevMonthVisiblePhotoCountRef.current = monthVisiblePhotoCount;
-  }, [loadingOlderChat, monthVisiblePhotoCount, galleryMonthKey]);
+  }, [galleryViewMode, pagedDateModeItems.items]);
 
   const toggleGalleryDate = dateKey => {
     setCollapsedGalleryDates(prev => {
@@ -1214,16 +1731,32 @@ export function ChatGalleryModal({
       setIsSavingGatherPhotosPaste(false);
     }
   };
-  const toggleBulkShareSelected = key => {
+  const toggleBulkShareSelected = (key, options = {}) => {
+    const orderedKeys = Array.isArray(options.orderedKeys) ? options.orderedKeys.filter(Boolean) : [];
     setSelectedBulkShareKeys(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      const anchorKey = bulkSelectionAnchorKeyRef.current;
+      const canSelectRange = Boolean(options.shiftKey && anchorKey && orderedKeys.length);
+      const start = canSelectRange ? orderedKeys.indexOf(anchorKey) : -1;
+      const end = canSelectRange ? orderedKeys.indexOf(key) : -1;
+      if (start >= 0 && end >= 0) {
+        const [from, to] = start <= end ? [start, end] : [end, start];
+        orderedKeys.slice(from, to + 1).forEach(itemKey => next.add(itemKey));
+      } else if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      bulkSelectionAnchorKeyRef.current = key;
       return next;
     });
   };
   const handleToggleBulkShareMode = () => {
     setIsBulkShareMode(v => !v);
     setSelectedBulkShareKeys(new Set());
+    bulkSelectionAnchorKeyRef.current = '';
+    setIsBulkTagPanelOpen(false);
+    setBulkTagDraft('');
   };
   const handleClickBulkDelete = () => {
     const keys = Array.from(selectedBulkShareKeys);
@@ -1334,6 +1867,17 @@ export function ChatGalleryModal({
       );
     }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
+      activeTab === 'photos' && /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: () => setIsBulkTagPanelOpen(open => !open),
+        disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting,
+        title: "일괄 태그", "aria-label": "일괄 태그",
+        style: {
+          ...textBtn,
+          cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 0.5 : 1
+        }
+      }, `태그${selectedBulkShareKeys.size ? ` (${selectedBulkShareKeys.size})` : ''}`),
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-danger",
         onClick: handleClickBulkDelete,
@@ -1349,8 +1893,11 @@ export function ChatGalleryModal({
       onPaste ? /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-outline",
         onClick: onPaste, disabled: pasteDisabled || isBulkDeleting,
-        style: { ...textBtn, cursor: (pasteDisabled || isBulkDeleting) ? 'wait' : 'pointer' }
-      }, "붙여넣기") : null,
+        style: { ...textBtn, cursor: (pasteDisabled || isBulkDeleting) ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }
+      },
+        ClipboardPasteIcon ? /*#__PURE__*/React.createElement(ClipboardPasteIcon, { size: 14 }) : null,
+        "붙여넣기"
+      ) : null,
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-dark",
         onClick: handleClickBulkShare,
@@ -1498,19 +2045,29 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
-      search: () => setIsSearchOpen(true),
+      search: () => {
+        if (v2SearchControlled && window.__gatherOpenPageSearch) {
+          window.__gatherOpenPageSearch();
+          return;
+        }
+        setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; });
+      },
       uploadMixed: () => handleUploadClick(),
       uploadImage: () => handleUploadClick(),
       uploadFile: () => handleUploadClick(),
       uploadLink: () => { setActiveTab('links'); setIsAddingLink(true); },
     });
     return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions]);
+  }, [onRegisterMenuActions, v2SearchControlled]);
   const handleSubmitLinkInput = async () => {
     if (typeof onAddLink !== 'function' || isSavingLink) return;
     const url = extractFirstUrl(linkUrlInput);
     if (!url) {
       if (showToast) showToast('올바른 링크(URL)를 입력해 주세요.', 'error');
+      return;
+    }
+    if (!isExternalServiceUrl(url)) {
+      if (showToast) showToast('외부 서비스의 링크(URL)만 추가할 수 있습니다.', 'error');
       return;
     }
     setIsSavingLink(true);
@@ -1545,10 +2102,11 @@ export function ChatGalleryModal({
       try {
         let added = 0;
         for (const item of gatherLinks) {
+          if (!isExternalServiceUrl(item.url)) continue;
           const ok = await onAddLink(item.url);
           if (ok !== false) added += 1;
         }
-        if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '링크 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+        if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '붙여넣을 수 있는 외부 서비스 링크가 없습니다.', added ? 'success' : 'error');
         if (added) setActiveTab('links');
       } finally {
         setIsSavingLink(false);
@@ -1558,6 +2116,10 @@ export function ChatGalleryModal({
     const url = extractFirstUrl(text);
     if (!url) {
       if (showToast) showToast('클립보드에 붙여넣을 링크가 없습니다.', 'error');
+      return;
+    }
+    if (!isExternalServiceUrl(url)) {
+      if (showToast) showToast('외부 서비스의 링크(URL)만 추가할 수 있습니다.', 'error');
       return;
     }
     setIsSavingLink(true);
@@ -1647,6 +2209,40 @@ export function ChatGalleryModal({
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
   }, [onUploadImages, onPasteGatherPhoto, onPasteGatherPhotos, onAddFiles, onAddLink, showToast]);
+
+  React.useEffect(() => {
+    const handleGalleryKeyDown = e => {
+      const target = e.target;
+      if (target && ((target.closest && target.closest('input, textarea, select, [contenteditable="true"]')) || target.isContentEditable)) return;
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && (e.key === 'a' || e.key === 'A')) {
+        if (isBulkShareMode && activeTab === 'photos') {
+          e.preventDefault();
+          const allKeys = (visiblePhotos || []).map(getPhotoKey);
+          const isAll = allKeys.length > 0 && allKeys.every(k => selectedBulkShareKeys.has(k));
+          setSelectedBulkShareKeys(isAll ? new Set() : new Set(allKeys));
+        }
+      } else if (isCmdOrCtrl && (e.key === 'c' || e.key === 'C')) {
+        if (isBulkShareMode && selectedBulkPhotos.length > 0) {
+          e.preventDefault();
+          const tokens = [];
+          selectedBulkPhotos.forEach(p => normalizePhotoTagTokens(p.tags).forEach(t => { if (!tokens.includes(t)) tokens.push(t); }));
+          if (tokens.length) {
+            setTagClipboard(tokens);
+            showToast?.(`태그 ${tokens.length}개를 복사했습니다.`, 'success');
+          }
+        }
+      } else if (isCmdOrCtrl && (e.key === 'v' || e.key === 'V')) {
+        if (isBulkShareMode && selectedBulkPhotos.length > 0 && getTagClipboard().length > 0) {
+          e.preventDefault();
+          const tags = getTagClipboard();
+          void applyBulkPhotoTags('add', tags.map(t => `#${t}`).join(' '));
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGalleryKeyDown);
+    return () => window.removeEventListener('keydown', handleGalleryKeyDown);
+  }, [isBulkShareMode, activeTab, visiblePhotos, selectedBulkShareKeys, selectedBulkPhotos, showToast]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {
@@ -1915,7 +2511,9 @@ export function ChatGalleryModal({
       loading: "lazy",
       decoding: "async",
       referrerPolicy: 'no-referrer',
-      onClick: () => isBulkShareMode ? toggleBulkShareSelected(photoKey) : (setActiveLightbox && setActiveLightbox({
+      onClick: event => isBulkShareMode ? toggleBulkShareSelected(photoKey, {
+        shiftKey: Boolean(event?.shiftKey), orderedKeys: (items || []).map(getPhotoKey)
+      }) : (setActiveLightbox && setActiveLightbox({
         urls: (lightboxItems || []).map(p => p.full),
         index: lightboxIndex >= 0 ? lightboxIndex : idx,
         meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey }))
@@ -1958,7 +2556,16 @@ export function ChatGalleryModal({
       commentBadge
     );
   }));
-  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
+  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement("div", {
+    className: "gallery-link-grid",
+    style: {
+      display: 'grid',
+      gridTemplateColumns: isTabletOrMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+      gap: isMobile ? '8px' : '12px',
+      width: '100%',
+      boxSizing: 'border-box'
+    }
+  },
     (items || []).map(item => {
       const itemKey = item.messageId || item.url;
       const isChecked = selectedBulkShareKeys.has(itemKey);
@@ -1971,7 +2578,7 @@ export function ChatGalleryModal({
       return /*#__PURE__*/React.createElement("div", {
         key: itemKey,
         onClick: ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); },
-        style: { position: 'relative', width: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+        style: { position: 'relative', width: '100%', minWidth: 0, height: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
       },
         card,
         EditSelectCheckbox
@@ -1993,7 +2600,14 @@ export function ChatGalleryModal({
     })
   );
   const renderGalleryFileList = items => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+    className: "gallery-file-grid",
+    style: {
+      display: 'grid',
+      gridTemplateColumns: isTabletOrMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+      gap: isMobile ? '8px' : '12px',
+      width: '100%',
+      boxSizing: 'border-box'
+    }
   }, (items || []).map((item, idx) => {
     const itemKey = String(item.id || item.url || idx);
     const isChecked = selectedBulkShareKeys.has(itemKey);
@@ -2010,7 +2624,7 @@ export function ChatGalleryModal({
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
       onClick: isBulkShareMode ? ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); } : undefined,
-      style: { position: 'relative', width: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+      style: { position: 'relative', width: '100%', minWidth: 0, height: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
     },
       card,
       isBulkShareMode && (EditSelectCheckbox
@@ -2040,65 +2654,6 @@ export function ChatGalleryModal({
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
   );
-  // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
-  // its own IntersectionObserver to auto-fire onClick once the user scrolls near it, instead of
-  // requiring an explicit tap. A sentinel div sits 300px above the visible button so the next
-  // page starts loading just before the user actually reaches the bottom.
-  //
-  // Auto-fire is gated by an "armed" flag, not just by `disabled` -- a page that happens to add
-  // no net-new content (a stretch of text-only chat history with no photos, or a page shorter
-  // than the 300px lookahead) leaves the sentinel sitting in the trigger zone with nothing having
-  // moved, so gating on `disabled` alone would re-fire the instant it clears and hammer Firestore
-  // in a tight loop for as long as that page keeps coming back empty.
-  // Re-arm only when the sentinel leaves the viewport (intersecting → not intersecting). Arming
-  // on every scroll (including bottom rubber-band) would loop-fire while the sentinel stays
-  // intersecting. Manual tap on the button still calls onClick directly.
-  const GalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => {
-    const sentinelRef = React.useRef(null);
-    const armedRef = React.useRef(true);
-    const wasIntersectingRef = React.useRef(false);
-    React.useEffect(() => {
-      const node = sentinelRef.current;
-      if (!node || disabled || typeof IntersectionObserver !== 'function') return undefined;
-      const root = gridHostRef.current || null;
-      const observer = new IntersectionObserver(entries => {
-        const isIntersecting = entries.some(entry => entry.isIntersecting);
-        if (wasIntersectingRef.current && !isIntersecting) {
-          armedRef.current = true;
-        }
-        wasIntersectingRef.current = isIntersecting;
-        if (!armedRef.current) return;
-        if (isIntersecting) {
-          armedRef.current = false;
-          onClick();
-        }
-      }, { root, rootMargin: '300px 0px' });
-      observer.observe(node);
-      return () => observer.disconnect();
-    }, [disabled, onClick]);
-    return /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", { ref: sentinelRef, "aria-hidden": "true" }),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onClick,
-        disabled: !!disabled,
-        style: {
-          width: '100%',
-          marginTop: '4px',
-          padding: '12px 0',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: 'var(--text-main)',
-          fontSize: 'var(--font-size-base)',
-          fontWeight: 700,
-          cursor: disabled ? 'wait' : 'pointer',
-          textAlign: 'center'
-        }
-      }, disabled ? loadingLabel : label)
-    );
-  };
-  const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
   // Mobile pagination has no arrows -- a horizontal drag pans the centered page window so more
   // numbers can be revealed, then a tap (or drag-release past the threshold) selects a page.
   const [paginationDragPage, setPaginationDragPage] = React.useState(null);
@@ -2108,24 +2663,33 @@ export function ChatGalleryModal({
     setPaginationDragPage(null);
     paginationDragRef.current = null;
     paginationSuppressClickRef.current = false;
-  }, [indexedPhotoPage, indexedPhotoTotal]);
-  const renderGalleryPagination = () => {
-    if (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function') return null;
-    const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
-    if (pageCount <= 1) return null;
+  }, [indexedPhotoPage, indexedPhotoTotal, galleryListPage]);
+  // One existing gallery paginator serves server-indexed photos and every local 100-row view.
+  // Keeping the same control prevents an unbounded date/list DOM from returning through a
+  // separate “load on scroll” implementation.
+  const renderGalleryPagination = (options = null) => {
+    const isIndexedPage = !options;
+    if (isIndexedPage && (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function')) return null;
+    const currentPage = Number(options?.currentPage || indexedPhotoPage || 1);
+    const pageCount = Math.max(1, Number(options?.pageCount || Math.ceil(Number(indexedPhotoTotal || 0) / GALLERY_PAGE_SIZE)) || 1);
+    const onPageChange = options?.onChange || onIndexedPhotoPageChange;
+    const pageLoading = options?.loading ?? indexedPhotoLoading;
+    const alwaysShow = !!options?.alwaysShow;
+    if (pageCount <= 1 && !alwaysShow) return null;
     const windowSize = isMobile ? 5 : 10;
-    const focusPage = paginationDragPage != null ? paginationDragPage : indexedPhotoPage;
+    const focusPage = paginationDragPage != null ? paginationDragPage : currentPage;
     const pages = getPaginationWindow(focusPage, pageCount, windowSize);
     const go = page => {
-      if (indexedPhotoLoading || page < 1 || page > pageCount || page === indexedPhotoPage) return;
-      void onIndexedPhotoPageChange(page);
+      if (pageLoading || page < 1 || page > pageCount || page === currentPage || typeof onPageChange !== 'function') return;
+      if (isIndexedPage) void onPageChange(page);
+      else onPageChange(page);
       if (gridHostRef.current) gridHostRef.current.scrollTop = 0;
     };
     // Same chevron used by the month-nav / BackArrowIcon (down path, rotated). Double-stack for
     // first/last. Mobile hides arrows entirely -- number window alone is enough on a phone.
     const chevron = (direction, key) => /*#__PURE__*/React.createElement("svg", {
       key: key,
-      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+      xmlns: "http://www.w3.org/2000/svg", width: isMobile ? "13" : "18", height: isMobile ? "13" : "18", viewBox: "0 0 24 24",
       fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
       style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
       className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down", "aria-hidden": "true"
@@ -2137,28 +2701,28 @@ export function ChatGalleryModal({
       style: { display: 'inline-flex', alignItems: 'center' }
     },
       chevron(direction, `${direction}-a`),
-      /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginLeft: '-11px' } },
+      /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginLeft: isMobile ? '-9px' : '-11px' } },
         chevron(direction, `${direction}-b`)
       )
     );
     const arrow = (label, page, disabled, glyph) => /*#__PURE__*/React.createElement("button", {
       key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
-      "aria-label": label, disabled: disabled || indexedPhotoLoading, onClick: () => go(page)
+      "aria-label": label, disabled: disabled || pageLoading, onClick: () => go(page)
     }, glyph);
     const endMobileDrag = () => {
       const drag = paginationDragRef.current;
       paginationDragRef.current = null;
       if (!drag) return;
-      const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || indexedPhotoPage));
+      const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || currentPage));
       setPaginationDragPage(null);
       if (!drag.moved) return;
       // Prevent the synthesized click on the button under the finger from also selecting a page.
       paginationSuppressClickRef.current = true;
-      if (target !== indexedPhotoPage) go(target);
+      if (target !== currentPage) go(target);
     };
     const mobileDragProps = isMobile ? {
       onPointerDown: event => {
-        if (indexedPhotoLoading || event.button != null && event.button !== 0) return;
+        if (pageLoading || event.button != null && event.button !== 0) return;
         paginationDragRef.current = {
           pointerId: event.pointerId,
           startX: event.clientX,
@@ -2186,15 +2750,15 @@ export function ChatGalleryModal({
     } : {};
     return /*#__PURE__*/React.createElement("nav", {
       className: `gallery-pagination${isMobile ? ' is-mobile is-swipeable' : ''}`,
-      "aria-label": "갤러리 페이지",
+      "aria-label": options?.label || "갤러리 페이지",
       ...mobileDragProps
     },
-      !isMobile && arrow('첫 페이지', 1, indexedPhotoPage <= 1, doubleChevron('left')),
-      !isMobile && arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, chevron('left')),
+      arrow('첫 페이지', 1, currentPage <= 1, doubleChevron('left')),
+      arrow('이전 페이지', currentPage - 1, currentPage <= 1, chevron('left')),
       pages.map(page => /*#__PURE__*/React.createElement("button", {
-        key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}${page === focusPage && page !== indexedPhotoPage ? ' is-focus' : ''}`,
-        "aria-current": page === indexedPhotoPage ? 'page' : undefined,
-        disabled: indexedPhotoLoading,
+        key: page, type: "button", className: `gallery-pagination-button${page === currentPage ? ' is-active' : ''}${page === focusPage && page !== currentPage ? ' is-focus' : ''}`,
+        "aria-current": page === currentPage ? 'page' : undefined,
+        disabled: pageLoading,
         onClick: event => {
           if (paginationSuppressClickRef.current) {
             paginationSuppressClickRef.current = false;
@@ -2205,8 +2769,8 @@ export function ChatGalleryModal({
           go(page);
         }
       }, String(page))),
-      !isMobile && arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, chevron('right')),
-      !isMobile && arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, doubleChevron('right'))
+      arrow('다음 페이지', currentPage + 1, currentPage >= pageCount, chevron('right')),
+      arrow('마지막 페이지', pageCount, currentPage >= pageCount, doubleChevron('right'))
     );
   };
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
@@ -2254,15 +2818,91 @@ export function ChatGalleryModal({
       }
     }, tab.label))
   );
-  const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
+  const renderBulkTagPanel = () => (!isBulkShareMode || !isBulkTagPanelOpen || activeTab !== 'photos') ? null : /*#__PURE__*/React.createElement("section", {
+    className: "gallery-bulk-tag-panel",
+    "aria-label": "선택한 사진 태그 관리",
+    style: {
+      display: 'flex', flexDirection: 'column', gap: '8px', padding: isMobile ? '10px' : '12px',
+      border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)'
+    }
   },
-    (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
-    /*#__PURE__*/React.createElement("div", {
-      style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
-    },
-      renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("strong", { style: { color: 'var(--text-main)', fontSize: 'var(--font-size-sm)' } }, `선택한 사진 ${selectedBulkPhotos.length}장`),
+      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } }, '추가 또는 일괄 삭제')
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', alignItems: 'center', width: '100%' } },
+      /*#__PURE__*/React.createElement("input", {
+        type: "text", className: "form-input", value: bulkTagDraft,
+        onChange: event => setBulkTagDraft(event.target.value),
+        onKeyDown: event => { if (event.key === 'Enter') { event.preventDefault(); void applyBulkPhotoTags('add'); } },
+        placeholder: '태그 입력 (공백 또는 쉼표로 구분)', maxLength: 640,
+        style: { flex: 1, minWidth: 0, minHeight: '38px', borderRadius: 'var(--radius-full)' }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-dark",
+        onClick: () => { void applyBulkPhotoTags('add'); },
+        style: { minHeight: '38px', padding: '0 12px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', fontWeight: 800 }
+      }, '추가')
+    ),
+    selectedBulkTagTokens.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' } },
+      selectedBulkTagTokens.map(({ tag, count }) => /*#__PURE__*/React.createElement("button", {
+        key: tag, type: "button", title: `#${tag} 입력`, onClick: () => setBulkTagDraft(tag),
+        style: { minHeight: '26px', padding: '2px 9px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer' }
+      }, `#${tag}${count === selectedBulkPhotos.length ? '' : ` · ${count}`}`))
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-outline",
+          onClick: () => {
+            const tokens = selectedBulkTagTokens.map(t => t.tag);
+            if (!tokens.length) {
+              showToast?.('선택한 사진에 등록된 태그가 없습니다.', 'info');
+              return;
+            }
+            setTagClipboard(tokens);
+            showToast?.(`태그 ${tokens.length}개를 복사했습니다.`, 'success');
+          },
+          title: "선택한 사진 태그 복사 (Ctrl+C)",
+          style: { minHeight: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700 }
+        }, "태그 복사"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-outline",
+          disabled: getTagClipboard().length === 0,
+          onClick: () => {
+            const tags = getTagClipboard();
+            if (!tags.length) {
+              showToast?.('복사된 태그가 없습니다.', 'info');
+              return;
+            }
+            void applyBulkPhotoTags('add', tags.map(t => `#${t}`).join(' '));
+          },
+          title: "복사한 태그 붙여넣기 (Ctrl+V)",
+          style: { minHeight: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }
+        },
+          ClipboardPasteIcon ? /*#__PURE__*/React.createElement(ClipboardPasteIcon, { size: 14 }) : null,
+          `붙여넣기${getTagClipboard().length > 0 ? ` (${getTagClipboard().length})` : ''}`
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-danger", disabled: !bulkTagDraft.trim(),
+        onClick: () => { void applyBulkPhotoTags('remove'); },
+        style: { minHeight: '34px', padding: '0 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 800 }
+      }, '입력한 태그 일괄 삭제')
     )
+  );
+  const renderPhotoListHeader = () => /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
+    },
+      (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
+      /*#__PURE__*/React.createElement("div", {
+        style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
+      },
+        renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
+      )
+    ),
+    renderBulkTagPanel()
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
@@ -2300,6 +2940,963 @@ export function ChatGalleryModal({
     )
   );
   const renderGalleryContent = () => {
+    if (activeTab === 'analysis') {
+      const allItems = mediaAnalysis.items || [];
+      const unreviewed = [];
+      const reviewed = [];
+      for (const item of allItems) {
+        const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
+        if (photo && classifyGalleryItem(photo) !== 'photo') continue;
+        const isReviewed = Boolean(item.review);
+        const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
+        const completeness = getPhotoTagCompleteness(currentTagsText, calendar, {
+        caption: photo?.caption,
+        tags: photo?.tags,
+        personTags: photo?.personTags
+      });
+        const isHandled = isReviewed || completeness.isComplete;
+        const meta = { item, photo, completeness, isReviewed, isHandled };
+        if (isHandled) {
+          reviewed.push(meta);
+        } else {
+          unreviewed.push(meta);
+        }
+      }
+      const displayList = analysisViewMode === 'unreviewed' ? unreviewed : reviewed;
+      const canSaveAnalysisTags = typeof onSaveImageTags === 'function'
+        || typeof onBulkSaveImageTags === 'function'
+        || typeof window.__gatherBulkSaveImageTags === 'function';
+
+      const renderChips = (values, colorType = 'accent') => {
+        const bgMap = {
+          people: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+          places: 'color-mix(in srgb, var(--status-green, #10b981) 12%, transparent)',
+          meetings: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+          accent: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)'
+        };
+        const colorMap = {
+          people: 'var(--status-danger, #e11d48)',
+          places: 'var(--status-green, #10b981)',
+          meetings: 'var(--accent-primary)',
+          accent: 'var(--accent-primary)'
+        };
+        const borderMap = {
+          people: 'color-mix(in srgb, var(--status-danger, #e11d48) 22%, transparent)',
+          places: 'color-mix(in srgb, var(--status-green, #10b981) 22%, transparent)',
+          meetings: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)',
+          accent: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)'
+        };
+        return (Array.isArray(values) ? values : []).slice(0, 16).map(value => /*#__PURE__*/React.createElement('span', {
+          key: value,
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: '26px',
+            padding: '2px 10px',
+            borderRadius: 'var(--radius-full)',
+            background: bgMap[colorType] || bgMap.accent,
+            color: colorMap[colorType] || colorMap.accent,
+            border: `1px solid ${borderMap[colorType] || borderMap.accent}`,
+            fontSize: 'var(--font-size-xs, 12px)',
+            fontWeight: 800,
+            whiteSpace: 'nowrap'
+          }
+        }, `#${value}`));
+      };
+
+      const appendTagToDraft = tagToAdd => {
+        const clean = String(tagToAdd || '').replace(/^#+/, '').trim();
+        if (!clean) return;
+        setAnalysisAction(prev => {
+          const rawTokens = (prev.draft || '').trim().split(/\s+/).filter(Boolean);
+          const existingClean = rawTokens.map(t => t.replace(/^#+/, ''));
+          if (existingClean.includes(clean)) return prev;
+          const newTokens = [...rawTokens, `#${clean}`];
+          return { ...prev, draft: newTokens.join(' ') };
+        });
+      };
+
+      return /*#__PURE__*/React.createElement('section', {
+        className: 'media-analysis-feed',
+        style: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '12px 0 24px' },
+        'aria-label': 'AI 사진 분석 추천'
+      },
+        /* Top summary and batch action toolbar */
+        /*#__PURE__*/React.createElement('div', {
+          className: 'v2-analysis-header-toolbar',
+          style: {
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '14px 18px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--v2-card-border, var(--border-subtle))',
+            borderRadius: 'var(--radius-lg, 16px)',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
+          }
+        },
+          /* Left summary info & view toggle */
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+            /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
+              /*#__PURE__*/React.createElement('span', { style: { fontWeight: 900, color: 'var(--text-main)', fontSize: 'var(--font-size-md, 15px)' } }, 'AI 사진 분석 추천'),
+              /* Segmented view switcher */
+              /*#__PURE__*/React.createElement('div', {
+                style: {
+                  display: 'inline-flex',
+                  padding: '2px',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  border: '1px solid var(--border-subtle)',
+                  gap: '2px'
+                }
+              },
+                /* Unreviewed tab */
+                /*#__PURE__*/React.createElement('button', {
+                  type: 'button',
+                  onClick: () => setAnalysisViewMode('unreviewed'),
+                  style: {
+                    padding: '4px 12px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    border: 'none',
+                    background: analysisViewMode === 'unreviewed' ? 'var(--bg-card)' : 'transparent',
+                    color: analysisViewMode === 'unreviewed' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    fontWeight: analysisViewMode === 'unreviewed' ? 900 : 600,
+                    fontSize: 'var(--font-size-xs, 12px)',
+                    boxShadow: analysisViewMode === 'unreviewed' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }
+                },
+                  '미처리',
+                  /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      background: analysisViewMode === 'unreviewed' ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                      color: analysisViewMode === 'unreviewed' ? '#fff' : 'var(--text-secondary)',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }
+                  }, unreviewed.length)
+                ),
+                /* Reviewed tab */
+                /*#__PURE__*/React.createElement('button', {
+                  type: 'button',
+                  onClick: () => setAnalysisViewMode('reviewed'),
+                  style: {
+                    padding: '4px 12px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    border: 'none',
+                    background: analysisViewMode === 'reviewed' ? 'var(--bg-card)' : 'transparent',
+                    color: analysisViewMode === 'reviewed' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    fontWeight: analysisViewMode === 'reviewed' ? 900 : 600,
+                    fontSize: 'var(--font-size-xs, 12px)',
+                    boxShadow: analysisViewMode === 'reviewed' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }
+                },
+                  '검토 완료',
+                  /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                      background: analysisViewMode === 'reviewed' ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                      color: analysisViewMode === 'reviewed' ? '#fff' : 'var(--text-secondary)',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }
+                  }, reviewed.length)
+                )
+              )
+            ),
+            /*#__PURE__*/React.createElement('p', {
+              style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', lineHeight: 1.4 }
+            }, analysisViewMode === 'unreviewed'
+              ? '날짜(YYMMDD)·장소·인물 태그 중 누락되었거나 추천된 항목입니다. 수정/적용 시 검토 완료로 이동합니다.'
+              : '검토를 마쳤거나 필수 태그(날짜·장소·인물)가 모두 입력된 사진 목록입니다.')
+          ),
+          /* Right action buttons */
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+            analysisViewMode === 'unreviewed' && unreviewed.length > 0 && /*#__PURE__*/React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-action',
+              disabled: isBatchApplying || mediaAnalysis.loading,
+              onClick: handleBatchApplyAnalysis,
+              style: {
+                minHeight: '36px',
+                padding: '0 16px',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--accent-primary)',
+                color: 'var(--on-brand, #fff)',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: 'var(--font-size-sm, 13px)',
+                cursor: isBatchApplying ? 'wait' : 'pointer',
+                boxShadow: '0 2px 6px rgba(124, 47, 229, 0.25)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }
+            },
+              /* Sparkle icon */
+              /*#__PURE__*/React.createElement('svg', { width: '13', height: '13', viewBox: '0 0 24 24', fill: 'currentColor' },
+                /*#__PURE__*/React.createElement('path', { d: 'm12 2 2.4 7.2L21.6 12l-7.2 2.8L12 22l-2.4-7.2L2.4 12l7.2-2.8L12 2z' })
+              ),
+              isBatchApplying
+                ? `적용 중 (${batchProgress.current}/${batchProgress.total})…`
+                : `미처리 전체 태그 적용 (${unreviewed.length})`
+            ),
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-action',
+              onClick: () => void loadMediaAnalysis(true),
+              disabled: mediaAnalysis.loading || isBatchApplying,
+              style: {
+                minHeight: '36px',
+                padding: '0 14px',
+                borderRadius: 'var(--radius-full)',
+                background: 'var(--bg-card)',
+                color: 'var(--text-main)',
+                border: '1px solid var(--border-subtle)',
+                fontWeight: 700,
+                fontSize: 'var(--font-size-sm, 13px)',
+                cursor: mediaAnalysis.loading ? 'wait' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }
+            },
+              /* Refresh icon */
+              /*#__PURE__*/React.createElement('svg', {
+                width: '13',
+                height: '13',
+                viewBox: '0 0 24 24',
+                fill: 'none',
+                stroke: 'currentColor',
+                strokeWidth: '2.5',
+                strokeLinecap: 'round',
+                strokeLinejoin: 'round'
+              },
+                /*#__PURE__*/React.createElement('path', { d: 'M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2' })
+              ),
+              mediaAnalysis.loading ? '불러오는 중…' : '새로고침'
+            )
+          )
+        ),
+        mediaAnalysis.error && /*#__PURE__*/React.createElement('p', {
+          role: 'alert',
+          style: { margin: 0, padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'color-mix(in srgb, var(--status-danger) 10%, var(--bg-card))', color: 'var(--status-danger)', fontSize: 'var(--font-size-sm)' }
+        }, mediaAnalysis.error),
+        !mediaAnalysis.loading && !mediaAnalysis.error && displayList.length === 0 && (
+          analysisViewMode === 'unreviewed'
+            ? /*#__PURE__*/React.createElement('div', {
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: '48px 16px',
+                  textAlign: 'center',
+                  background: 'var(--bg-card)',
+                  borderRadius: 'var(--radius-lg, 16px)',
+                  border: '1px dashed var(--border-subtle)',
+                  color: 'var(--text-muted)'
+                }
+              },
+                /* Big check circle */
+                /*#__PURE__*/React.createElement('div', {
+                  style: {
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: 'color-mix(in srgb, var(--status-green, #10b981) 15%, transparent)',
+                    color: 'var(--status-green, #10b981)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }
+                },
+                  /*#__PURE__*/React.createElement('svg', { width: '28', height: '28', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+                    /*#__PURE__*/React.createElement('polyline', { points: '20 6 9 17 4 12' })
+                  )
+                ),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 15px)', fontWeight: 800, color: 'var(--text-main)' } }, '모든 사진의 검토 및 태그 작성이 완료되었습니다!'),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)', maxWidth: '380px', lineHeight: 1.5 } }, '미처리 항목이 없습니다. 날짜(YYMMDD)·장소·인물 필수 정보가 모두 등록되었거나 추천 태그가 적용되었습니다.'),
+                reviewed.length > 0 && /*#__PURE__*/React.createElement('button', {
+                  type: 'button',
+                  onClick: () => setAnalysisViewMode('reviewed'),
+                  style: {
+                    marginTop: '6px',
+                    padding: '8px 18px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid var(--accent-primary)',
+                    background: 'transparent',
+                    color: 'var(--accent-primary)',
+                    fontWeight: 800,
+                    fontSize: 'var(--font-size-xs, 12px)',
+                    cursor: 'pointer'
+                  }
+                }, `검토 완료된 사진 보기 (${reviewed.length}건)`)
+              )
+            : /*#__PURE__*/React.createElement('div', {
+                style: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '48px 16px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)'
+                }
+              },
+                /* Info circle */
+                /*#__PURE__*/React.createElement('svg', { width: '36', height: '36', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8' },
+                  /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '10' }),
+                  /*#__PURE__*/React.createElement('line', { x1: '12', y1: '16', x2: '12', y2: '12' }),
+                  /*#__PURE__*/React.createElement('line', { x1: '12', y1: '8', x2: '12.01', y2: '8' })
+                ),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 14px)', fontWeight: 700 } }, '검토 완료된 사진이 아직 없습니다.'),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)' } }, '미처리 탭에서 태그를 적용하거나 수정한 사진이 이곳에 보관됩니다.')
+              )
+        ),
+        displayList.map(({ item, photo, completeness, isReviewed }) => {
+          const thumbUrl = photo?.thumb || photo?.full || photo?.imageUrl || '';
+          const fullUrl = photo?.full || photo?.imageUrl || photo?.thumb || '';
+          const isSaving = analysisSavingAssetKey === item.assetKey;
+          const isEditing = analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit';
+          const suggestedTags = getAnalysisSuggestedTags(item);
+          const suggestedDate = getSuggestedDateTag(photo, item);
+
+          return /*#__PURE__*/React.createElement('article', {
+            key: item.id || item.assetKey,
+            className: 'v2-analysis-card',
+            style: {
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'stretch' : 'flex-start',
+              gap: isMobile ? '12px' : '16px',
+              padding: '16px',
+              border: '1px solid var(--v2-card-border, var(--border-subtle))',
+              borderRadius: 'var(--radius-lg, 16px)',
+              background: 'var(--bg-card)',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              position: 'relative'
+            }
+          },
+            /* Left: Photo Thumbnail */
+            /*#__PURE__*/React.createElement('div', {
+              className: 'v2-analysis-thumb-wrap',
+              style: {
+                position: 'relative',
+                width: isMobile ? '100%' : '110px',
+                height: isMobile ? '190px' : '110px',
+                minWidth: isMobile ? 'auto' : '110px',
+                borderRadius: 'var(--radius-md, 12px)',
+                overflow: 'hidden',
+                flexShrink: 0,
+                background: 'var(--bg-secondary)',
+                cursor: fullUrl ? 'pointer' : 'default',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              },
+              title: fullUrl ? '클릭하여 사진 원본 보기' : '사진을 불러오는 중',
+              onClick: () => {
+                if (!fullUrl) return;
+                if (typeof setActiveLightbox === 'function') {
+                  setActiveLightbox({
+                    urls: [fullUrl],
+                    index: 0,
+                    meta: [{
+                      ...(photo || {}),
+                      full: fullUrl,
+                      thumb: thumbUrl,
+                      assetKey: item.assetKey,
+                      mediaKey: item.assetKey,
+                      tags: photo?.tags || suggestedTags.join(' ')
+                    }]
+                  });
+                }
+              }
+            },
+              thumbUrl
+                ? /*#__PURE__*/React.createElement('img', {
+                    src: thumbUrl,
+                    alt: '분석 대상 사진',
+                    loading: 'lazy',
+                    decoding: 'async',
+                    referrerPolicy: 'no-referrer',
+                    style: {
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }
+                  })
+                : /*#__PURE__*/React.createElement('div', {
+                    style: {
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      color: 'var(--text-muted)'
+                    }
+                  },
+                    /* Photo icon */
+                    /*#__PURE__*/React.createElement('svg', {
+                      width: '24',
+                      height: '24',
+                      viewBox: '0 0 24 24',
+                      fill: 'none',
+                      stroke: 'currentColor',
+                      strokeWidth: '1.8'
+                    },
+                      /*#__PURE__*/React.createElement('rect', { x: '3', y: '3', width: '18', height: '18', rx: '3' }),
+                      /*#__PURE__*/React.createElement('circle', { cx: '8.5', cy: '8.5', r: '1.5' }),
+                      /*#__PURE__*/React.createElement('path', { d: 'm21 15-5-5L5 21' })
+                    ),
+                    /*#__PURE__*/React.createElement('span', { style: { fontSize: '12px', fontWeight: 600 } }, '사진 로딩 중')
+                  ),
+              fullUrl && /*#__PURE__*/React.createElement('div', {
+                style: {
+                  position: 'absolute',
+                  right: '6px',
+                  bottom: '6px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  pointerEvents: 'none'
+                }
+              },
+                /* Magnifier icon */
+                /*#__PURE__*/React.createElement('svg', {
+                  width: '13',
+                  height: '13',
+                  viewBox: '0 0 24 24',
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  strokeWidth: '2.5',
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round'
+                },
+                  /*#__PURE__*/React.createElement('circle', { cx: '11', cy: '11', r: '8' }),
+                  /*#__PURE__*/React.createElement('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' })
+                )
+              )
+            ),
+            /* Right: Content details and actions */
+            /*#__PURE__*/React.createElement('div', {
+              className: 'v2-analysis-content',
+              style: {
+                flex: '1 1 auto',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                width: '100%'
+              }
+            },
+              /* Card header: Badge + existing tags + completeness badges + time */
+              /*#__PURE__*/React.createElement('div', {
+                style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+              },
+                /* Left badges */
+                /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+                  /* Sparkle type badge */
+                  /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'var(--accent-tint, rgba(124, 47, 229, 0.08))',
+                      color: 'var(--accent-primary)',
+                      fontSize: 'var(--font-size-xs, 12px)',
+                      fontWeight: 800
+                    }
+                  },
+                    /* Sparkle icon */
+                    /*#__PURE__*/React.createElement('svg', { width: '12', height: '12', viewBox: '0 0 24 24', fill: 'currentColor' },
+                      /*#__PURE__*/React.createElement('path', { d: 'm12 2 2.4 7.2L21.6 12l-7.2 2.8L12 22l-2.4-7.2L2.4 12l7.2-2.8L12 2z' })
+                    ),
+                    item.assetKey ? '사진 분석' : '로컬 사진 분석'
+                  ),
+                  /* Existing tags badge */
+                  photo?.tags
+                    ? /*#__PURE__*/React.createElement('span', {
+                        style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' },
+                        title: `기존 등록 태그: ${photo.tags}`
+                      }, `기존: ${photo.tags.slice(0, 32)}${photo.tags.length > 32 ? '…' : ''}`)
+                    : /*#__PURE__*/React.createElement('span', {
+                        style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' }
+                      }, '기존 태그 없음'),
+                  /* Completeness indicators */
+                  !completeness.hasDate && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+                      color: 'var(--status-danger, #e11d48)',
+                      border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }
+                  }, '날짜 누락'),
+                  !completeness.hasPlace && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+                      color: 'var(--status-danger, #e11d48)',
+                      border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }
+                  }, '장소 누락'),
+                  !completeness.hasPerson && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-danger, #e11d48) 12%, transparent)',
+                      color: 'var(--status-danger, #e11d48)',
+                      border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 25%, transparent)',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }
+                  }, '인물 누락'),
+                  completeness.isComplete && /*#__PURE__*/React.createElement('span', {
+                    style: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '1px 7px',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'color-mix(in srgb, var(--status-green, #10b981) 12%, transparent)',
+                      color: 'var(--status-green, #10b981)',
+                      border: '1px solid color-mix(in srgb, var(--status-green, #10b981) 25%, transparent)',
+                      fontSize: '12px',
+                      fontWeight: 800
+                    }
+                  }, '✓ 날짜·장소·인물 완비')
+                ),
+                /* Right time */
+                /*#__PURE__*/React.createElement('time', {
+                  style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', whiteSpace: 'nowrap' }
+                }, formatMediaAnalysisTime(item.lastReceivedAt || item.analyzedAt))
+              ),
+              /* Suggested tag chips */
+              /*#__PURE__*/React.createElement('div', {
+                style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }
+              },
+                renderChips(item.suggestedTags, 'accent'),
+                renderChips(item.people, 'people'),
+                renderChips(item.places, 'places'),
+                renderChips(item.meetings, 'meetings'),
+                suggestedTags.length === 0 && /*#__PURE__*/React.createElement('span', {
+                  style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)' }
+                }, '추천 태그 없음')
+              ),
+              /* OCR Text */
+              item.ocrText?.length > 0 && /*#__PURE__*/React.createElement('div', {
+                style: {
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                  fontSize: 'var(--font-size-xs, 12px)',
+                  lineHeight: 1.45,
+                  wordBreak: 'break-all'
+                }
+              },
+                /*#__PURE__*/React.createElement('span', { style: { fontWeight: 700, color: 'var(--text-muted)', marginRight: '6px' } }, '텍스트 인식:'),
+                item.ocrText.join(' · ')
+              ),
+              /* Action row or Review state */
+              item.review
+                ? /*#__PURE__*/React.createElement('div', {
+                    style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '4px' }
+                  },
+                    /* Decision badge */
+                    /*#__PURE__*/React.createElement('span', {
+                      style: {
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        minHeight: '26px',
+                        padding: '2px 10px',
+                        borderRadius: 'var(--radius-full)',
+                        background: item.review.decision === 'rejected'
+                          ? 'var(--bg-secondary)'
+                          : 'var(--status-success-bg, #DCFCE7)',
+                        color: item.review.decision === 'rejected'
+                          ? 'var(--text-muted)'
+                          : 'var(--status-success, #15803D)',
+                        fontSize: 'var(--font-size-xs, 12px)',
+                        fontWeight: 800
+                      }
+                    },
+                      item.review.decision === 'rejected'
+                        ? '✕ 제외됨'
+                        : (item.review.decision === 'edited' ? '✓ 수정 적용됨' : '✓ 태그 적용 완료')
+                    ),
+                    item.review.finalTags?.length > 0 && /*#__PURE__*/React.createElement('div', {
+                      style: { display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }
+                    },
+                      item.review.finalTags.map(tag => /*#__PURE__*/React.createElement('span', {
+                        key: tag,
+                        style: {
+                          fontSize: 'var(--font-size-xs, 12px)',
+                          fontWeight: 700,
+                          color: 'var(--text-secondary)',
+                          background: 'var(--bg-secondary)',
+                          padding: '1px 7px',
+                          borderRadius: 'var(--radius-full)'
+                        }
+                      }, `#${tag}`))
+                    ),
+                    /* Re-edit option */
+                    /*#__PURE__*/React.createElement('button', {
+                      type: 'button',
+                      onClick: () => {
+                        const existingList = normalizeAnalysisTagList(photo?.tags || '');
+                        const finalTags = item.review.finalTags?.length ? item.review.finalTags : suggestedTags;
+                        const combined = normalizeAnalysisTagList([...existingList, ...finalTags]).map(t => `#${t}`).join(' ');
+                        setAnalysisAction({
+                          assetKey: item.assetKey,
+                          mode: 'edit',
+                          draft: combined
+                        });
+                      },
+                      style: {
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: 'var(--font-size-xs, 12px)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        padding: '2px 6px'
+                      }
+                    }, '다시 수정')
+                  )
+                : /*#__PURE__*/React.createElement('div', {
+                    style: { display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '2px' }
+                  },
+                    isEditing
+                      ? /*#__PURE__*/React.createElement('div', {
+                          style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+                        },
+                          /* Tag input */
+                          /*#__PURE__*/React.createElement('input', {
+                            type: 'text',
+                            value: analysisAction.draft,
+                            onChange: event => setAnalysisAction(previous => ({ ...previous, draft: event.target.value })),
+                            placeholder: '적용할 태그를 공백 또는 쉼표로 구분 (#서준 #콘소넌스 #250615)',
+                            maxLength: 640,
+                            autoFocus: true,
+                            style: {
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              minHeight: '40px',
+                              padding: '0 14px',
+                              borderRadius: 'var(--radius-md, 8px)',
+                              border: '1.5px solid var(--accent-primary)',
+                              background: 'var(--bg-primary)',
+                              color: 'var(--text-main)',
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              outline: 'none'
+                            },
+                            onKeyDown: e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error'));
+                              } else if (e.key === 'Escape') {
+                                setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+                              }
+                            }
+                          }),
+                          /* Quick chip suggestions */
+                          /*#__PURE__*/React.createElement('div', {
+                            style: {
+                              display: 'flex',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '6px',
+                              padding: '6px 10px',
+                              background: 'var(--bg-secondary)',
+                              borderRadius: 'var(--radius-md, 8px)',
+                              fontSize: 'var(--font-size-xs, 12px)'
+                            }
+                          },
+                            /*#__PURE__*/React.createElement('span', { style: { fontWeight: 700, color: 'var(--text-muted)' } }, '빠른 추가:'),
+                            /* Date suggestion */
+                            !completeness.hasDate && suggestedDate && /*#__PURE__*/React.createElement('button', {
+                              type: 'button',
+                              onClick: () => appendTagToDraft(suggestedDate),
+                              style: {
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px dashed var(--accent-primary)',
+                                background: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
+                                color: 'var(--accent-primary)',
+                                fontSize: '12px',
+                                fontWeight: 800,
+                                cursor: 'pointer'
+                              }
+                            }, `+ #${suggestedDate} (촬영일)`),
+                            /* Place suggestions from calendar */
+                            (Array.isArray(calendar?.places) ? calendar.places : []).map(p => {
+                              const name = String(p?.name || p?.title || '').trim();
+                              if (!name) return null;
+                              return /*#__PURE__*/React.createElement('button', {
+                                key: `place-${name}`,
+                                type: 'button',
+                                onClick: () => appendTagToDraft(name),
+                                style: {
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-full)',
+                                  border: '1px solid color-mix(in srgb, var(--status-green, #10b981) 30%, transparent)',
+                                  background: 'color-mix(in srgb, var(--status-green, #10b981) 10%, transparent)',
+                                  color: 'var(--status-green, #10b981)',
+                                  fontSize: '12px',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }
+                              }, `+ #${name}`);
+                            }),
+                            /* Participant suggestions from calendar */
+                            (Array.isArray(calendar?.participants) ? calendar.participants : []).map(part => {
+                              const name = String(part?.name || '').trim();
+                              if (!name) return null;
+                              return /*#__PURE__*/React.createElement('button', {
+                                key: `person-${name}`,
+                                type: 'button',
+                                onClick: () => appendTagToDraft(name),
+                                style: {
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-full)',
+                                  border: '1px solid color-mix(in srgb, var(--status-danger, #e11d48) 30%, transparent)',
+                                  background: 'color-mix(in srgb, var(--status-danger, #e11d48) 10%, transparent)',
+                                  color: 'var(--status-danger, #e11d48)',
+                                  fontSize: '12px',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }
+                              }, `+ #${name}`);
+                            }),
+                            /* AI suggestions */
+                            suggestedTags.map(tag => /*#__PURE__*/React.createElement('button', {
+                              key: `ai-${tag}`,
+                              type: 'button',
+                              onClick: () => appendTagToDraft(tag),
+                              style: {
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px solid var(--border-subtle)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-secondary)',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }
+                            }, `+ #${tag}`))
+                          ),
+                          /* Action buttons */
+                          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+                            /*#__PURE__*/React.createElement('button', {
+                              type: 'button',
+                              className: 'btn btn-action',
+                              disabled: isSaving,
+                              onClick: () => {
+                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error'));
+                              },
+                              style: {
+                                minHeight: '34px',
+                                padding: '0 14px',
+                                borderRadius: 'var(--radius-full)',
+                                background: 'var(--accent-primary)',
+                                color: 'var(--on-brand, #fff)',
+                                border: 'none',
+                                fontWeight: 800,
+                                fontSize: 'var(--font-size-xs, 12px)',
+                                cursor: 'pointer'
+                              }
+                            }, isSaving ? '저장 중…' : '수정 적용'),
+                            /*#__PURE__*/React.createElement('button', {
+                              type: 'button',
+                              className: 'btn btn-action',
+                              disabled: isSaving,
+                              onClick: () => setAnalysisAction({ assetKey: '', mode: '', draft: '' }),
+                              style: {
+                                minHeight: '34px',
+                                padding: '0 12px',
+                                borderRadius: 'var(--radius-full)',
+                                background: 'var(--bg-card)',
+                                color: 'var(--text-muted)',
+                                border: '1px solid var(--border-subtle)',
+                                fontWeight: 700,
+                                fontSize: 'var(--font-size-xs, 12px)',
+                                cursor: 'pointer'
+                              }
+                            }, '취소')
+                          )
+                        )
+                      : /*#__PURE__*/React.createElement('div', {
+                          style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }
+                        },
+                          /* Primary: 태그 적용 */
+                          /*#__PURE__*/React.createElement('button', {
+                            type: 'button',
+                            className: 'btn btn-action',
+                            disabled: isSaving || isBatchApplying || !canSaveAnalysisTags,
+                            onClick: () => {
+                              void applyAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error'));
+                            },
+                            style: {
+                              minHeight: '36px',
+                              padding: '0 16px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--accent-primary)',
+                              color: 'var(--on-brand, #fff)',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              cursor: isSaving ? 'wait' : 'pointer',
+                              boxShadow: '0 2px 6px rgba(124, 47, 229, 0.25)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }
+                          },
+                            /* Check icon */
+                            /*#__PURE__*/React.createElement('svg', {
+                              width: '14',
+                              height: '14',
+                              viewBox: '0 0 24 24',
+                              fill: 'none',
+                              stroke: 'currentColor',
+                              strokeWidth: '2.5',
+                              strokeLinecap: 'round',
+                              strokeLinejoin: 'round'
+                            },
+                              /*#__PURE__*/React.createElement('polyline', { points: '20 6 9 17 4 12' })
+                            ),
+                            isSaving ? '적용 중…' : '태그 적용'
+                          ),
+                          /* Secondary: 수정 */
+                          /*#__PURE__*/React.createElement('button', {
+                            type: 'button',
+                            className: 'btn btn-action',
+                            disabled: isSaving || isBatchApplying || !canSaveAnalysisTags,
+                            onClick: () => {
+                              const existingList = normalizeAnalysisTagList(photo?.tags || '');
+                              const aiTags = getAnalysisSuggestedTags(item);
+                              const combined = normalizeAnalysisTagList([...existingList, ...aiTags]).map(t => `#${t}`).join(' ');
+                              setAnalysisAction({
+                                assetKey: item.assetKey,
+                                mode: 'edit',
+                                draft: combined
+                              });
+                            },
+                            style: {
+                              minHeight: '36px',
+                              padding: '0 14px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-main)',
+                              border: '1px solid var(--border-subtle)',
+                              fontWeight: 700,
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }
+                          },
+                            /* Edit icon */
+                            /*#__PURE__*/React.createElement('svg', {
+                              width: '13',
+                              height: '13',
+                              viewBox: '0 0 24 24',
+                              fill: 'none',
+                              stroke: 'currentColor',
+                              strokeWidth: '2.2',
+                              strokeLinecap: 'round',
+                              strokeLinejoin: 'round'
+                            },
+                              /*#__PURE__*/React.createElement('path', { d: 'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z' })
+                            ),
+                            '수정'
+                          ),
+                          /* Tertiary: 제외 */
+                          /*#__PURE__*/React.createElement('button', {
+                            type: 'button',
+                            className: 'btn btn-action',
+                            disabled: isSaving,
+                            onClick: () => {
+                              void rejectAnalysisTags(item).catch(error => showToast(String(error?.message || error), 'error'));
+                            },
+                            style: {
+                              minHeight: '36px',
+                              padding: '0 14px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-muted)',
+                              border: '1px solid var(--border-subtle)',
+                              fontWeight: 700,
+                              fontSize: 'var(--font-size-sm, 13px)',
+                              cursor: isSaving ? 'wait' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }
+                          },
+                            /* X icon */
+                            /*#__PURE__*/React.createElement('svg', {
+                              width: '13',
+                              height: '13',
+                              viewBox: '0 0 24 24',
+                              fill: 'none',
+                              stroke: 'currentColor',
+                              strokeWidth: '2.2',
+                              strokeLinecap: 'round',
+                              strokeLinejoin: 'round'
+                            },
+                              /*#__PURE__*/React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
+                              /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
+                            ),
+                            isSaving ? '저장 중…' : '제외'
+                          )
+                        )
+                  )
+            )
+          );
+        })
+      );
+    }
     if (activeTab === 'photos' && usingPhotoIndex && indexedPhotoStatus !== 'ready') {
       const failed = indexedPhotoStatus === 'error';
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2314,39 +3911,19 @@ export function ChatGalleryModal({
               onClick: () => { if (typeof onIndexedPhotoPageChange === 'function') void onIndexedPhotoPageChange(indexedPhotoPage || 1, { force: true }); },
               style: { minHeight: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)', fontWeight: 800 }
             }, "사진 목록 다시 불러오기")
-          : "사진 목록을 불러오는 중…")
+          : /*#__PURE__*/React.createElement("div", {
+              className: "bp-skel-page",
+              role: "status",
+              "aria-label": "사진 목록을 불러오는 중"
+            }, /*#__PURE__*/React.createElement("div", { className: "bp-skel-block is-tabs", "aria-hidden": "true" }),
+              /*#__PURE__*/React.createElement("div", { className: "bp-skel-photo-grid", "aria-hidden": "true" },
+                Array.from({ length: 9 }, (_, index) => /*#__PURE__*/React.createElement("span", { key: index, className: "bp-skel-thumb" }))
+              )))
       );
     }
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
       const isFileMode = activeTab === 'files';
-      const monthExhausted = activeTab === 'photos' && exhaustedGalleryMonthKey === galleryMonthKey;
-      // Date mode: do not gate on hasLocallyHiddenPhotos (flat slice). Photos already group from
-      // visiblePhotos; only older-chat pagination (plus loading) matters. Hide when this month
-      // was exhausted by a load that added zero month photos.
-      const showLoadMore = isLinkMode
-        ? (hasMoreOlderChat || hasMoreMemos)
-        : (isFileMode ? hasMoreOlderChat : ((hasMoreOlderChat || loadingOlderChat) && !monthExhausted));
-      const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
-        isLinkMode
-          ? renderGalleryLoadMoreButton({
-              label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
-              loadingLabel: '이전 링크를 불러오는 중…',
-              disabled: !!loadingOlderChat,
-              onClick: () => {
-                if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-                if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
-              }
-            })
-          : renderGalleryLoadMoreButton({
-              label: isFileMode ? `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
-              loadingLabel: isFileMode ? '이전 파일을 불러오는 중…' : '이전 사진을 불러오는 중…',
-              disabled: !!loadingOlderChat,
-              onClick: () => {
-                if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-              }
-            })
-      );
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         // Keep 전체|일자 + 붙여넣기/추가 toolbar visible in date mode (same mobile header as flat).
         isLinkMode ? renderLinkListHeader() : (isFileMode ? renderFileListHeader() : renderPhotoListHeader()),
@@ -2354,7 +3931,7 @@ export function ChatGalleryModal({
         groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery
-          ? "검색 결과가 없습니다."
+          ? gallerySearchMissLabel
           : (isLinkMode
             ? describeGalleryLinkEmptyState("이 달에 공유된 링크가 없습니다.")
             : (isFileMode ? "이 달에 업로드된 파일이 없습니다." : describeGalleryPhotoEmptyState("이 달에 등록된 사진이 없습니다."))))
@@ -2395,41 +3972,46 @@ export function ChatGalleryModal({
             }, isLinkMode ? renderGalleryLinkList(section.items) : (isFileMode ? renderGalleryFileList(section.items) : renderGalleryPhotoGrid(section.items, section.items)))
           );
         }),
-        loadMoreNode
+        renderGalleryPagination({
+          currentPage: pagedDateModeItems.currentPage,
+          pageCount: pagedDateModeItems.pageCount,
+          onChange: setGalleryListPage,
+          label: '일자별 갤러리 페이지',
+          alwaysShow: ((activeTab === 'links' || activeTab === 'files') && dateModeSourceItems.length > 0)
+        })
       );
     }
     if (activeTab === 'files') {
       const sortedFiles = sortGalleryFlatItems(filteredFiles);
+      const pagedFiles = paginateGalleryItems(sortedFiles, galleryListPage, GALLERY_CARD_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderFileListHeader(),
         sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : renderGalleryFileList(sortedFiles),
-        (hasMoreOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-          label: `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)`,
-          loadingLabel: '이전 파일을 불러오는 중…',
-          disabled: !!loadingOlderChat,
-          onClick: () => {
-            if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-          }
+        }, searchQuery ? gallerySearchMissLabel : "업로드된 파일이 없습니다.") : renderGalleryFileList(pagedFiles.items),
+        renderGalleryPagination({
+          currentPage: pagedFiles.currentPage,
+          pageCount: pagedFiles.pageCount,
+          onChange: setGalleryListPage,
+          label: '파일 갤러리 페이지',
+          alwaysShow: sortedFiles.length > 0
         })
       );
     }
     if (activeTab === 'links') {
       const sortedLinks = sortGalleryFlatItems(filteredLinks);
+      const pagedLinks = paginateGalleryItems(sortedLinks, galleryListPage, GALLERY_CARD_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderLinkListHeader(),
         sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(sortedLinks),
-        (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-          label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
-          loadingLabel: '이전 링크를 불러오는 중…',
-          disabled: !!loadingOlderChat,
-          onClick: () => {
-            if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-            if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
-          }
+        }, searchQuery ? gallerySearchMissLabel : "공유된 링크가 없습니다.") : renderGalleryLinkList(pagedLinks.items),
+        renderGalleryPagination({
+          currentPage: pagedLinks.currentPage,
+          pageCount: pagedLinks.pageCount,
+          onChange: setGalleryListPage,
+          label: '링크 갤러리 페이지',
+          alwaysShow: sortedLinks.length > 0
         })
       );
     }
@@ -2441,16 +4023,17 @@ export function ChatGalleryModal({
       sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
       }, searchQuery
-        ? "검색 결과가 없습니다."
+        ? gallerySearchMissLabel
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedVisiblePhotos),
-      usingPhotoIndex && !(searchQuery || '').trim() && renderGalleryPagination(),
-      (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-        label: hasLocallyHiddenPhotos ? `사진 더 보기 (${visiblePhotos.length}장 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
-        loadingLabel: '이전 사진을 불러오는 중…',
-        disabled: !!loadingOlderChat && !hasLocallyHiddenPhotos,
-        onClick: loadMorePhotos
-      })
+      usingPhotoIndex && !(searchQuery || '').trim()
+        ? renderGalleryPagination()
+        : renderGalleryPagination({
+          currentPage: pagedFallbackPhotos.currentPage,
+          pageCount: pagedFallbackPhotos.pageCount,
+          onChange: setGalleryListPage,
+          label: '사진 갤러리 페이지'
+        })
     );
   };
 
@@ -2561,7 +4144,11 @@ export function ChatGalleryModal({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); }
+        onClick: () => {
+          setIsMenuOpen(false);
+          if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
+          else setIsSearchOpen(true);
+        }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
@@ -2628,7 +4215,7 @@ export function ChatGalleryModal({
     })
   )), document.body)
     : null,
-  isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+  !v2SearchControlled && isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
     placeholder: "사진·링크·파일 통합 검색 (태그, 텍스트, URL)",
     onChange: e => setSearchQuery(e.target.value),
@@ -2659,13 +4246,16 @@ export function ChatGalleryModal({
     },
       UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
         ariaLabel: "갤러리 탭",
+        variant: "flush",
+        activeColor: "var(--brand, #7C2FE5)",
         value: activeTab,
         onChange: v => setGalleryTab(v),
         style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
         options: [
-          { value: 'photos', label: '사진', badge: displayPhotoTabCount },
-          { value: 'links', label: '링크', badge: filteredLinks.length },
-          { value: 'files', label: '파일', badge: filteredFiles.length }
+          { value: 'photos', label: '사진' },
+          { value: 'links', label: '링크' },
+          { value: 'files', label: '파일' },
+          { value: 'analysis', label: 'AI 분석' }
         ]
       })
     );

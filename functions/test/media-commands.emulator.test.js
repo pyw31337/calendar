@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const admin = require('firebase-admin');
-const { deleteAsset, tagAsset, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey } = require('../media-commands');
+const { deleteAsset, tagAsset, bulkTagAssets, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey } = require('../media-commands');
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Run under `firebase emulators:exec` (FIRESTORE_EMULATOR_HOST unset).');
 const app = admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'demo-moyeora', storageBucket: 'demo-moyeora.appspot.com' }, 'media-commands-test');
@@ -53,6 +53,7 @@ test('tagAsset writes the tag to the owning slot and every album copy in one tra
   assert.equal(result.ok, true);
   assert.equal(result.slotsTagged, 1);
   assert.equal(result.albumCopiesTagged, 2);
+  assert.equal(result.meetingReadScope, 'full-scan', 'legacy owner previews must retain the correctness-first fallback');
   const m1 = (await root.collection('messages').doc('m1').get()).data();
   assert.deepEqual(m1.imageTags, ['ta', '260919 서준 도은', 'tc']);
   assert.equal(m1.imageTagMap[getPhotoAssetKey(b.imageUrl)], '260919 서준 도은');
@@ -61,6 +62,65 @@ test('tagAsset writes the tag to the owning slot and every album copy in one tra
   assert.equal(d19.find(p => p.id === 'p1').tags, '260919 서준 도은');
   assert.equal(d19.find(p => p.id === 'p0').tags, 'ta');
   assert.equal(d20[0].tags, '260919 서준 도은');
+});
+
+test('tagAsset scopes complete owner projections to only the owning meetings', async () => {
+  await reset();
+  const { b } = await seed();
+  const indexRef = root.collection('photoIndex').doc(getPhotoAssetKey(b.imageUrl));
+  await indexRef.set({
+    owners: [
+      { sourceOwner: 'message:m1:1' },
+      { sourceOwner: 'meeting:2026-09-19:1' },
+      { sourceOwner: 'meeting:2026-09-20:0' },
+    ],
+    ownerCount: 3,
+    ownerListComplete: true,
+  }, { merge: true });
+  const unrelated = photo('unrelated');
+  await root.collection('confirmedMeetings').doc('unrelated').set({
+    date: '2026-09-21',
+    photos: [{ id: 'u', ...unrelated, tags: 'leave-me' }],
+  });
+
+  const result = await tagAsset({ db, calendarDocId: CAL, asset: b, tags: '완전한 소유 관계' });
+  assert.equal(result.ok, true);
+  assert.equal(result.meetingReadScope, 'owners');
+  assert.equal(result.meetingDocumentsRead, 2);
+  assert.equal(result.albumCopiesTagged, 2);
+  const untouched = (await root.collection('confirmedMeetings').doc('unrelated').get()).data().photos;
+  assert.equal(untouched[0].tags, 'leave-me');
+});
+
+test('bulkTagAssets updates multiple assets in one source and every meeting copy', async () => {
+  await reset();
+  const { a, b, c } = await seed();
+  const result = await bulkTagAssets({
+    db,
+    calendarDocId: CAL,
+    items: [
+      { ...a, messageId: 'm1', tags: '260919 서준' },
+      { ...b, messageId: 'm1', tags: '260919 도은' },
+      { ...c, messageId: 'm1', tags: '파주 하니랜드' },
+    ],
+    now: 9,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.itemCount, 3);
+  assert.equal(result.sourceDocumentsTouched, 1);
+  assert.equal(result.slotsTagged, 3);
+  // a, b, c are in 9/19 and b is also referenced by the 9/20 meeting copy.
+  assert.equal(result.albumCopiesTagged, 4);
+  const m1 = (await root.collection('messages').doc('m1').get()).data();
+  assert.deepEqual(m1.imageTags, ['260919 서준', '260919 도은', '파주 하니랜드']);
+  assert.equal(m1.imageTagMap[getPhotoAssetKey(a.imageUrl)], '260919 서준');
+  assert.equal(m1.imageTagMap[getPhotoAssetKey(c.imageUrl)], '파주 하니랜드');
+  const d19 = (await root.collection('confirmedMeetings').doc('2026-09-19').get()).data().photos;
+  assert.equal(d19.find(p => p.id === 'p0').tags, '260919 서준');
+  assert.equal(d19.find(p => p.id === 'p1').tags, '260919 도은');
+  assert.equal(d19.find(p => p.id === 'p2').tags, '파주 하니랜드');
+  const d20 = (await root.collection('confirmedMeetings').doc('2026-09-20').get()).data().photos;
+  assert.equal(d20[0].tags, '260919 도은');
 });
 
 test('deleteAsset removes every copy, re-links positional refs by file, and queues files for GC', async () => {

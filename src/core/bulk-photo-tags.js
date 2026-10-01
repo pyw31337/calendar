@@ -1,0 +1,85 @@
+import { canonicalPhotoAssetKey } from './photo-asset.js';
+
+export const BULK_TAG_CHUNK_SIZE = 80;
+export const MAX_BULK_PHOTO_TAGS = 20;
+
+export function normalizePhotoTagTokens(value) {
+  const seen = new Set();
+  return String(value || '').split(/[\s,#]+/)
+    .map(token => token.trim().replace(/^#+/, '').slice(0, 30))
+    .filter(token => token && !seen.has(token) && (seen.add(token) || true))
+    .slice(0, MAX_BULK_PHOTO_TAGS);
+}
+
+export function joinPhotoTagTokens(tokens) {
+  return normalizePhotoTagTokens(Array.isArray(tokens) ? tokens.join(' ') : tokens).join(' ');
+}
+
+export function applyPhotoTagOperation(currentTags, operation, tagText) {
+  const current = normalizePhotoTagTokens(currentTags);
+  const targets = normalizePhotoTagTokens(tagText);
+  if (!targets.length) return { tags: current.join(' '), changed: false, reason: 'empty' };
+  const targetSet = new Set(targets);
+  const next = operation === 'remove'
+    ? current.filter(tag => !targetSet.has(tag))
+    : normalizePhotoTagTokens([...current, ...targets].join(' '));
+  const tags = next.join(' ');
+  return { tags, changed: tags !== current.join(' '), reason: next.length >= MAX_BULK_PHOTO_TAGS && operation !== 'remove' ? 'limit' : '' };
+}
+
+export function buildBulkPhotoTagChanges(photos, operation, tagText) {
+  const seen = new Set();
+  const changes = [];
+  (Array.isArray(photos) ? photos : []).forEach(photo => {
+    const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
+    if (!assetKey || seen.has(assetKey)) return;
+    seen.add(assetKey);
+    const result = applyPhotoTagOperation(photo?.tags || '', operation, tagText);
+    if (!result.changed) return;
+    changes.push({
+      photo,
+      assetKey,
+      beforeTags: joinPhotoTagTokens(photo?.tags || ''),
+      tags: result.tags,
+    });
+  });
+  return changes;
+}
+
+function toCommandItem(change) {
+  const photo = change?.photo || change || {};
+  return {
+    imageUrl: String(photo.full || photo.imageUrl || photo.url || photo.directMediaUrl || photo.thumb || photo.thumbUrl || ''),
+    thumbUrl: String(photo.thumb || photo.thumbUrl || photo.full || photo.imageUrl || ''),
+    messageId: String(photo.messageId || photo.sourceMessageId || ''),
+    memoId: String(photo.memoId || (photo.source === 'memo' ? photo.messageId || '' : '')),
+    directMediaUrl: String(photo.directMediaUrl || ''),
+    tags: joinPhotoTagTokens(change?.tags ?? photo.tags),
+  };
+}
+
+export async function saveBulkPhotoTagsRemote({ calendarId, projectId, changes, fetchImpl = fetch } = {}) {
+  const list = (Array.isArray(changes) ? changes : []).map(toCommandItem)
+    .filter(item => /^https?:\/\//i.test(item.imageUrl || item.thumbUrl));
+  if (!calendarId || !projectId || !list.length) return { ok: false, changed: 0, results: [], reason: 'invalid' };
+  const results = [];
+  for (let offset = 0; offset < list.length; offset += BULK_TAG_CHUNK_SIZE) {
+    const items = list.slice(offset, offset + BULK_TAG_CHUNK_SIZE);
+    const response = await fetchImpl(`https://us-central1-${encodeURIComponent(projectId)}.cloudfunctions.net/mediaCommand`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ calendarId, op: 'bulkTagAssets', items })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.message || `사진 태그 일괄 저장 실패 (${response.status})`);
+    }
+    results.push(payload);
+  }
+  return {
+    ok: true,
+    changed: list.length,
+    results,
+    sourceDocumentsTouched: results.reduce((count, result) => count + (Number(result.sourceDocumentsTouched) || 0), 0),
+  };
+}

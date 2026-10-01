@@ -38,6 +38,47 @@ html:has(.v2-design) #root {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
+  animation: bp-screen-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes bp-screen-fade-in {
+  0% {
+    opacity: 0.88;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .v2-destination,
+  .v2-design .is-bento-home {
+    animation: none !important;
+  }
+}
+
+html:has(.v2-design)::view-transition-old(root) {
+  animation: 160ms cubic-bezier(0.4, 0, 1, 1) both bp-view-fade-out;
+}
+
+html:has(.v2-design)::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0, 0, 0.2, 1) both bp-view-fade-in;
+}
+
+@keyframes bp-view-fade-out {
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes bp-view-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .v2-design .v2-fullscreen {
@@ -62,9 +103,11 @@ html:has(.v2-design) #root {
   max-height: 100% !important;
   min-height: 0 !important;
   overflow-x: hidden !important;
+  /* clip keeps horizontal bleed in without the WebKit bug that drops
+     position:sticky when the scrollport is overflow-x:hidden. */
+  overflow-x: clip !important;
   overflow-y: auto !important;
   overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
   box-sizing: border-box !important;
 }
 
@@ -155,6 +198,7 @@ html:has(.v2-design) #root {
 
 /* Lightbox is portaled to body — scope via :has(.v2-design). */
 body:has(.v2-design) .lightbox-overlay .lightbox-stage,
+body:has(.v2-design) .lightbox-overlay .lightbox-single-stage,
 body:has(.v2-design) .lightbox-overlay .lightbox-image-stage {
   width: 100% !important;
   max-width: 100% !important;
@@ -191,9 +235,16 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
  * this is a no-op.  Desktop retains its rail/viewport sizing unchanged.
  */
 @media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) {
+    /* On certain standalone iOS installations env(safe-area-inset-top)
+       reports zero even though the visual viewport is one status bar short.
+       visual-viewport-sync publishes that measured shortfall as a fallback. */
+    --v2-pwa-safe-top: max(env(safe-area-inset-top, 0px), var(--app-vv-standalone-top-inset, 0px));
+    --v2-pwa-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .renewal-shell.v2-design {
-    --v2-safe-top: env(safe-area-inset-top, 0px);
-    --v2-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --v2-safe-top: var(--v2-pwa-safe-top);
+    --v2-safe-bottom: var(--v2-pwa-safe-bottom);
   }
 
   /* The home is its own scrollport.  Keep the purple hero under the status
@@ -360,5 +411,56 @@ html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="di
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
     padding-bottom: calc(80px + var(--v2-pane-bottom)) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * iOS focused-control contract
+ * --------------------------------------------------------------------------
+ * Safari zooms a text control whose computed font size is below 16px.  The V2
+ * chat composer intentionally uses compact desktop typography, but keeping
+ * that value on an iPhone made a tap zoom the whole standalone window and
+ * invalidated the fixed-pane geometry.  Use one mobile control token across
+ * every editable text control instead of special-casing the chat textarea.
+ * Buttons (including the author picker) do not trigger Safari's input zoom.
+ */
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design {
+    --v2-mobile-control-font-size: max(16px, 1rem);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design textarea,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design select {
+    font-size: var(--v2-mobile-control-font-size) !important;
+  }
+}
+
+/* Touch devices keep zooming a focused control under 16px no matter how wide
+   the layout viewport is (iPhone landscape, iPad). A width query misses them,
+   and portaled sheets/lightbox fields sit outside .renewal-shell. The user's
+   type scale can also shrink 1rem below 16px, which Safari still zooms.
+   max(16px, 1rem) is the floor; larger type settings still grow the field.
+   Double-tap zoom is disabled so a stray tap cannot rescale the fixed shell.
+   Pinch zoom stays available. */
+@media (hover: none) and (pointer: coarse) {
+  html:has(.renewal-shell.v2-design) {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  html:has(.renewal-shell.v2-design) :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='hidden']):not([type='button']):not([type='submit']):not([type='reset']),
+    textarea,
+    select,
+    [contenteditable='true']
+  ) {
+    font-size: max(16px, 1rem) !important;
+    scroll-margin-top: 12px;
+    scroll-margin-bottom: calc(12px + var(--mobile-bottom-nav-height, 0px));
   }
 }

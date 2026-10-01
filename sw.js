@@ -77,7 +77,7 @@ self.addEventListener('fetch', event => {
     || req.url.endsWith('/index.html')
     || (accept.includes('text/html') && (req.url.endsWith('/calendar/') || req.url.endsWith('/calendar')));
   if (isDocument) {
-    event.respondWith(fetch(req, { cache: 'no-store' }).catch(() => Response.error()));
+    event.respondWith(fetchFreshDocument(req));
     return;
   }
 
@@ -149,6 +149,81 @@ self.addEventListener('fetch', event => {
   })());
 });
 
+// A home-screen web clip can retain an app/<id>/ URL from an interrupted deploy or an older
+// manifest.  If that document path is temporarily unavailable, retry the canonical root page
+// for the same calendar instead of surfacing Safari's opaque "cannot connect" screen. The root
+// page has the same boot bundle and preserves the id query parameter, so this is a safe fallback
+// for the legacy installed apps while normal app-scoped paths keep their preferred response.
+async function fetchFreshDocument(req) {
+  try {
+    const response = await fetch(req, { cache: 'no-store' });
+    if (response && response.ok) return response;
+
+    const url = new URL(req.url);
+    // Dynamic share link (e.g. /share/cw/memo/memo_123/): redirect to canonical SPA route
+    const shareMatch = url.pathname.match(/^(.*)\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
+    if (shareMatch) {
+      const basePath = shareMatch[1] ? `${shareMatch[1]}/` : '/';
+      const calendarId = shareMatch[2];
+      const view = shareMatch[3] || '';
+      const extraId = shareMatch[4] || '';
+      const redirectUrl = new URL(basePath, url.origin);
+      redirectUrl.searchParams.set('id', calendarId);
+      if (view === 'memo') {
+        redirectUrl.searchParams.set('view', 'memo');
+        if (extraId) redirectUrl.searchParams.set('memo', extraId);
+      } else if (view && ['chat', 'places', 'gallery', 'settlement'].includes(view)) {
+        redirectUrl.searchParams.set('view', view);
+        if (extraId) redirectUrl.searchParams.set('detail', extraId);
+      } else if (view) {
+        redirectUrl.searchParams.set('view', view);
+      }
+      for (const [k, v] of url.searchParams.entries()) {
+        if (!redirectUrl.searchParams.has(k)) redirectUrl.searchParams.set(k, v);
+      }
+      try {
+        return Response.redirect(redirectUrl.toString(), 302);
+      } catch (_) {
+        const res = await fetch(redirectUrl.toString(), { cache: 'no-store' });
+        if (res && (res.ok || res.status === 404)) return res;
+      }
+    }
+
+    // Allow 404 status (to let 404.html execute client-side redirection on GitHub Pages)
+    if (response && response.status === 404) return response;
+    throw new Error(`document status ${response?.status || 0}`);
+  } catch (_) {
+    try {
+      const url = new URL(req.url);
+      const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)\/?$/);
+      if (appPath) {
+        const fallback = new URL(`${appPath[1]}/`, url.origin);
+        fallback.search = url.search;
+        if (!fallback.searchParams.get('id') && !fallback.searchParams.get('cal')) {
+          fallback.searchParams.set('id', appPath[2]);
+        }
+        const response = await fetch(fallback.toString(), { cache: 'no-store' });
+        if (response && (response.ok || response.status === 404)) return response;
+      }
+
+      const sharePath = url.pathname.match(/^(.*)\/share\/([A-Za-z0-9_-]+)/);
+      if (sharePath) {
+        const basePath = sharePath[1] ? `${sharePath[1]}/` : '/';
+        const fallback = new URL(basePath, url.origin);
+        fallback.searchParams.set('id', sharePath[2]);
+        for (const [k, v] of url.searchParams.entries()) {
+          if (!fallback.searchParams.has(k)) fallback.searchParams.set(k, v);
+        }
+        const response = await fetch(fallback.toString(), { cache: 'no-store' });
+        if (response && (response.ok || response.status === 404)) return response;
+      }
+      return Response.error();
+    } catch (_) {
+      return Response.error();
+    }
+  }
+}
+
 function isCacheableStorageMedia(req, url) {
   // Range requests (video/audio seeking) stream partial content -- leave them to the network.
   if (req.headers.has('range')) return false;
@@ -218,44 +293,71 @@ self.addEventListener('push', event => {
     }
   } catch (_) {}
   const title = payload.title || '모여라 캘린더';
+  const scopeUrl = self.registration?.scope || (self.location.origin + '/calendar/');
+  const iconUrl = new URL('icons/icon-v6-192.png', scopeUrl).href;
   const options = {
     body: payload.body || '',
-    icon: 'icons/icon-v6-192.png',
-    badge: 'icons/icon-v6-192.png',
+    icon: iconUrl,
+    badge: iconUrl,
     tag: payload.tag || 'gather-push',
-    renotify: true,
+    // Same tag replaces the previous card. A caller must opt in to buzz again;
+    // memo/chat retries send renotify:false so a duplicate delivery stays one card.
+    renotify: payload.renotify !== false,
     data: payload.url || './',
     vibrate: [80, 40, 80]
   };
   event.waitUntil(
     self.registration.showNotification(title, options).catch(function () {
-      return self.registration.showNotification(title, { body: options.body, tag: 'gather-push-fallback', data: options.data });
+      return self.registration.showNotification(title, {
+        body: options.body,
+        icon: iconUrl,
+        tag: 'gather-push-fallback',
+        data: options.data
+      });
     })
   );
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const targetUrl = event.notification.data || './';
-  const absoluteTargetUrl = new URL(targetUrl, self.location.href).href;
+  // data is the push payload url string (./?id=&view=chat&msg= / view=memo&memo=&comment=).
+  // Some browsers hand the same field back as { url }.
+  const raw = event.notification && event.notification.data;
+  const targetUrl = (raw && typeof raw === 'object' && raw.url) || (typeof raw === 'string' ? raw : '') || './';
+  const scopeHref = (self.registration && self.registration.scope) || self.location.href;
+  const absoluteTargetUrl = new URL(targetUrl, scopeHref).href;
+  const target = new URL(absoluteTargetUrl);
+  const inScope = (client) => {
+    try {
+      const url = new URL(client.url);
+      return url.origin === target.origin && url.pathname.indexOf(new URL(scopeHref).pathname) === 0;
+    } catch (_) { return false; }
+  };
+  const sameDocument = (client) => {
+    try {
+      const url = new URL(client.url);
+      return url.origin === target.origin && url.pathname === target.pathname && url.search === target.search;
+    } catch (_) { return false; }
+  };
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      // 1. Try to find a tab matching the target URL exactly
-      for (const client of clientList) {
-        if (client.url === absoluteTargetUrl && 'focus' in client) return client.focus();
-      }
-      // 2. If not found, find any tab on our origin, navigate it to target URL, and focus it
-      for (const client of clientList) {
-        const clientUrl = new URL(client.url);
-        if (clientUrl.origin === self.location.origin && 'focus' in client) {
-          if (client.navigate) {
-            client.navigate(absoluteTargetUrl);
-          }
-          return client.focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
+      const scoped = clientList.filter(inScope);
+      const exact = scoped.find(sameDocument);
+      if (exact && 'focus' in exact) return exact.focus();
+      const client = scoped[0];
+      if (client) {
+        // An already-open calendar tab ignores a bare focus(). Tell it to apply the
+        // same URL the cold load reads, and navigate when the browser allows it.
+        try { client.postMessage({ type: 'notification-open', url: absoluteTargetUrl }); } catch (_) {}
+        let next = client;
+        if (client.navigate) {
+          try { next = await client.navigate(absoluteTargetUrl) || client; } catch (_) {}
         }
+        if (next && next.focus) return next.focus();
+        return undefined;
       }
-      // 3. Fallback to opening a new tab
       if (self.clients.openWindow) return self.clients.openWindow(absoluteTargetUrl);
+      return undefined;
     })
   );
 });

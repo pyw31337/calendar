@@ -1,3 +1,9 @@
+import { saveBulkPhotoTagsRemote } from './bulk-photo-tags.js';
+import { archivePhotosShareIdentity } from './archive-photo-edits.js';
+
+export const MAX_MEDIA_TAGS = 20;
+export const MAX_MEDIA_TAG_TEXT_LENGTH = 640;
+
 // Per-photo tag persistence is deliberately kept out of CalendarApp.  The handler receives its
 // live UI/data dependencies so the app shell stays a composition layer rather than a second
 // source of photo identity logic.
@@ -48,8 +54,8 @@ export function createImageTagSaveHandler(context) {
     return Number.isFinite(number) ? Math.max(0, Math.round(number)) : null;
   };
   const tokenList = value => Array.from(new Set(String(value || '')
-    .split(/[,\s#]+/).map(token => sanitizeText(token.trim(), 30)).filter(Boolean))).slice(0, 10);
-  const cleanTagText = value => sanitizeText(tokenList(value).join(' '), 100);
+    .split(/[,\s#]+/).map(token => sanitizeText(token.trim(), 30)).filter(Boolean))).slice(0, MAX_MEDIA_TAGS);
+  const cleanTagText = value => sanitizeText(tokenList(value).join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
   const sourceMissing = () => {
     showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
     return false;
@@ -78,6 +84,61 @@ export function createImageTagSaveHandler(context) {
     }
   };
 
+  const docSnapshots = new Map();
+  const persistedDocs = new Map();
+  const lanes = new Map();
+  // Rapid tag edits on one document collapse into the latest payload. The UI
+  // already shows that payload; a second in-flight write of an older payload
+  // would clobber it, and a write per keystroke would just add round-trips.
+  const scheduleDocWrite = (docKey, job) => {
+    let lane = lanes.get(docKey);
+    if (!lane) {
+      lane = { pendingJob: null, waiters: [], pumping: false };
+      lanes.set(docKey, lane);
+    }
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    lane.pendingJob = job;
+    lane.waiters.push(resolve);
+    const pump = async () => {
+      while (lane.pendingJob) {
+        await Promise.resolve();
+        if (!lane.pendingJob) break;
+        const jobToRun = lane.pendingJob;
+        const waiters = lane.waiters;
+        lane.pendingJob = null;
+        lane.waiters = [];
+        let ok = false;
+        try {
+          ok = await jobToRun() !== false;
+        } catch (err) {
+          console.error('Image tag save failed:', err);
+          ok = false;
+        }
+        waiters.forEach(waiter => waiter(ok));
+      }
+      lane.pumping = false;
+      if (lane.pendingJob) {
+        lane.pumping = true;
+        void pump();
+      }
+    };
+    if (!lane.pumping) {
+      lane.pumping = true;
+      void pump();
+    }
+    return promise;
+  };
+  const publishDoc = (docKey, nextDoc) => {
+    docSnapshots.set(docKey, nextDoc);
+  };
+  const isCurrentDoc = (docKey, nextDoc) => docSnapshots.get(docKey) === nextDoc;
+  const notePersistedBaseline = (docKey, doc) => {
+    if (!persistedDocs.has(docKey)) persistedDocs.set(docKey, doc);
+  };
+  const markPersisted = (docKey, doc) => { persistedDocs.set(docKey, doc); };
+  const persistedOr = (docKey, fallback) => persistedDocs.get(docKey) || fallback;
+
   return async function handleSaveImageTags(messageId, imageIndex, tagsText, meta = {}) {
     const requestedIndex = toIndex(imageIndex);
     const metaIndex = toIndex(meta?.imageIndex);
@@ -89,13 +150,15 @@ export function createImageTagSaveHandler(context) {
       if (meta.sourceMessageId && sourceIndex != null) {
         return handleSaveImageTags(meta.sourceMessageId, sourceIndex, tagsText, {
           source: 'chat', imageUrl: meta.imageUrl || meta.full || '', thumb: meta.thumb || meta.thumbUrl || '',
-          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || ''
+          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || '',
+          readFresh: meta.readFresh, silent: meta.silent
         });
       }
       if (messageId && requestedIndex != null && !meta.meetingDate) {
         return handleSaveImageTags(messageId, requestedIndex, tagsText, {
           source: 'chat', imageUrl: meta.imageUrl || meta.full || '', thumb: meta.thumb || meta.thumbUrl || '',
-          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || ''
+          assetKey: meta.assetKey || '', mediaKey: meta.mediaKey || '', refKey: meta.refKey || '',
+          readFresh: meta.readFresh, silent: meta.silent
         });
       }
       return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
@@ -104,13 +167,16 @@ export function createImageTagSaveHandler(context) {
       let memoId = messageId || meta.messageId || '';
       if (!memoId) memoId = String(meta.sourceOwner || (meta.owners || [])[0]?.sourceOwner || '').match(/^memo:([^:]+):/)?.[1] || '';
       if (!memoId || requestedIndex == null) return sourceMissing();
-      const memo = await findMemoById(memoId);
+      const docKey = `memos:${memoId}`;
+      let memo = docSnapshots.get(docKey) || null;
+      if (!memo) memo = await findMemoById(memoId);
       if (!memo) return sourceMissing();
       const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
       const targetIndex = resolveMessagePhotoImageIndex(memo, requestedIndex, { ...meta, imageIndex: requestedIndex, imageUrl: meta.imageUrl || meta.full || '' });
       const entry = getMessageImageEntries({ ...memo, id: memoId, uploadSource: 'memo' }).find(item => item.imageIndex === targetIndex);
       if (!entry || targetIndex < 0 || targetIndex >= urls.length) return sourceMissing();
       const tags = cleanTagText(tagsText);
+      const previousDoc = { ...memo, id: memoId };
       const imageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
       while (imageTags.length < urls.length) imageTags.push('');
       imageTags[targetIndex] = tags;
@@ -118,23 +184,44 @@ export function createImageTagSaveHandler(context) {
       const assetKey = getPhotoAssetCommentKey(entry);
       if (assetKey) imageTagMap[assetKey] = tags;
       const nextMap = reconcileMessageImageTagMap({ ...memo, id: memoId, uploadSource: 'memo', imageTags, imageTagMap }, imageTagMap);
-      try {
-        const saved = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags, imageTagMap: nextMap }), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
+      const patch = { imageTags, imageTagMap: nextMap };
+      const nextDoc = { ...previousDoc, ...patch };
+      const applyMemo = (doc) => {
+        const nextPatch = { imageTags: doc.imageTags, imageTagMap: doc.imageTagMap };
+        setMemos(previous => previous.map(item => item.id === memoId ? { ...item, ...nextPatch } : item));
+        patchGalleryArchiveMemo(memoId, nextPatch);
+        const appliedTags = Array.isArray(doc.imageTags) ? (doc.imageTags[targetIndex] || '') : '';
+        patchIndex(memoId, targetIndex, appliedTags, { ...meta, assetKey: meta.assetKey || assetKey });
+      };
+      notePersistedBaseline(docKey, previousDoc);
+      publishDoc(docKey, nextDoc);
+      applyMemo(nextDoc);
+      const ok = await scheduleDocWrite(docKey, async () => {
+        const saved = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore(patch), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
         if (!saved?.success || saved?.queued) throw new Error('Memo image tags update failed');
-        setMemos(previous => previous.map(item => item.id === memoId ? { ...item, imageTags, imageTagMap: nextMap } : item));
-        patchGalleryArchiveMemo(memoId, { imageTags, imageTagMap: nextMap });
-        patchIndex(memoId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || assetKey });
-        await writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags);
-        showToast('태그 저장완료', 'success');
+        writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags).catch(() => {});
+        markPersisted(docKey, nextDoc);
+        if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
         return true;
-      } catch (err) {
-        console.error('Memo image tag save failed:', err);
-        showToast('태그 저장 실패', 'error');
+      });
+      if (!ok) {
+        if (isCurrentDoc(docKey, nextDoc)) {
+          const restored = persistedOr(docKey, previousDoc);
+          publishDoc(docKey, restored);
+          applyMemo(restored);
+          showToast('태그 저장 실패', 'error');
+        }
         return false;
       }
+      return true;
     }
     if (!messageId || requestedIndex == null) return sourceMissing();
-    let message = (chatMessages || []).find(item => item.id === messageId);
+    // Prefer the optimistic snapshot from a save that has not landed yet. Re-reading the
+    // stored message (or the chat window from before that save) rebuilds imageTags without
+    // the tags the user just added and the next write wipes them.
+    const docKey = `messages:${messageId}`;
+    let message = docSnapshots.get(docKey) || null;
+    if (!message && !meta?.readFresh) message = (chatMessages || []).find(item => item.id === messageId) || null;
     if (!message) {
       try {
         if (firebaseDb) {
@@ -152,6 +239,7 @@ export function createImageTagSaveHandler(context) {
     const previousTokens = tokenList(direct ? getDirectMediaTagsForUrl(message, meta.directMediaUrl) : entry.tags);
     const nextTokens = tokenList(tagsText);
     const tags = cleanTagText(tagsText);
+    const previousDoc = { ...message, id: messageId };
     const data = direct ? (() => {
       const next = message.directMediaTags && typeof message.directMediaTags === 'object' && !Array.isArray(message.directMediaTags) ? { ...message.directMediaTags } : {};
       const key = getDirectMediaTagKey(meta.directMediaUrl);
@@ -167,24 +255,20 @@ export function createImageTagSaveHandler(context) {
       if (assetKey) imageTagMap[assetKey] = tags;
       return { imageTags, imageTagMap: reconcileMessageImageTagMap({ ...message, imageTags, imageTagMap }, imageTagMap) };
     })();
-    try {
+    const nextDoc = { ...previousDoc, ...data };
+    const applyMessage = (doc) => {
+      patchLocalChatMessage(messageId, { ...doc, id: messageId });
+      const appliedTags = direct
+        ? (doc.directMediaTags && doc.directMediaTags[getDirectMediaTagKey(meta.directMediaUrl)]) || ''
+        : (Array.isArray(doc.imageTags) ? (doc.imageTags[targetIndex] || '') : '');
+      patchIndex(messageId, targetIndex, appliedTags, { ...meta, assetKey: meta.assetKey || getPhotoAssetCommentKey(entry) }, direct);
+    };
+    notePersistedBaseline(docKey, previousDoc);
+    publishDoc(docKey, nextDoc);
+    applyMessage(nextDoc);
+    const ok = await scheduleDocWrite(docKey, async () => {
       const saved = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장', { requirePersisted: true });
       if (!saved?.success || saved?.queued) throw new Error('Image tags update failed');
-      // A write acknowledgement is authoritative. Verification refreshes state only and cannot
-      // turn a confirmed tag save into the false "태그 저장 실패" result from the old flow.
-      let verified = null;
-      try {
-        if (firebaseDb) {
-          const snapshot = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 5000, 'image tag verification read');
-          verified = snapshot?.exists ? { id: messageId, ...snapshot.data() } : null;
-        }
-        if (!verified) verified = await fetchMessageRest(activeCalId, messageId);
-      } catch (err) { console.warn('Image tag verification read skipped:', err); }
-      if (verified) {
-        const actual = direct ? getDirectMediaTagsForUrl(verified, meta.directMediaUrl) : getMessageImageEntries(verified).find(item => item.imageIndex === targetIndex)?.tags || '';
-        if (String(actual) !== tags) throw new Error('Image tags verification mismatch');
-      }
-      patchLocalChatMessage(messageId, verified || { ...message, ...data, id: messageId });
       const identity = getMediaIdentityKeys({ messageId, imageIndex: direct ? 0 : targetIndex, directMediaUrl: direct ? meta.directMediaUrl : '', source: 'chat' }, { source: 'chat', messageId });
       const resource = { resourceType: 'photo-tag', resourceId: identity.mediaKey, source: 'chat', sourceMessageId: messageId, imageIndex: direct ? 0 : targetIndex, before: previousTokens.join(' '), after: tags };
       const addedTokens = nextTokens.filter(token => !previousTokens.includes(token));
@@ -194,22 +278,111 @@ export function createImageTagSaveHandler(context) {
         ...addedTokens.map((token, index) => createActivityLog(activeCalId, 'tag_add', '', '', activityTimestamp + index, `#${token}`, resource)),
         ...removedTokens.map((token, index) => createActivityLog(activeCalId, 'tag_remove', '', '', activityTimestamp + addedTokens.length + index, `#${token}`, resource))
       ].filter(Boolean);
-      if (logs.length) try { await writeActivityLogsToFirestore(activeCalId, logs); } catch (err) { console.warn('Image tag activity log write skipped:', err); }
-    } catch (err) {
-      console.error('Image tag save failed:', err);
-      showToast('태그 저장 실패', 'error');
+      if (logs.length) {
+        writeActivityLogsToFirestore(activeCalId, logs).catch(err => console.warn('Image tag activity log write skipped:', err));
+      }
+      if (!direct) {
+        writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags).catch(() => {});
+      }
+      const imageUrl = String(meta.imageUrl || meta.directMediaUrl || entry?.full || entry?.thumb || '').trim();
+      if (imageUrl) {
+        linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, nextDoc, tags).catch(err => {
+          console.warn('Image tag date link skipped:', err);
+        });
+      }
+      markPersisted(docKey, nextDoc);
+      if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
+      return true;
+    });
+    if (!ok) {
+      if (isCurrentDoc(docKey, nextDoc)) {
+        const restored = persistedOr(docKey, previousDoc);
+        publishDoc(docKey, restored);
+        applyMessage(restored);
+        showToast('태그 저장 실패', 'error');
+      }
       return false;
     }
-    // Before the date-link step: that step writes the tagged dates' meetings with these same tags,
-    // so running it last means a meeting touched by both still ends with the new tags.
-    if (!direct) await writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags);
-    const imageUrl = String(meta.imageUrl || meta.directMediaUrl || entry?.full || entry?.thumb || '').trim();
-    if (imageUrl) {
-      try { await linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, message, tags); }
-      catch (err) { console.warn('Image tag date link skipped:', err); showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000); }
-    }
-    patchIndex(messageId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || getPhotoAssetCommentKey(entry) }, direct);
-    showToast('태그 저장완료', 'success');
     return true;
+  };
+}
+
+
+// A gallery/archive selection can contain many photos from the same source message. Sending each
+// through handleSaveImageTags made every one perform its own source read, write, verification,
+// meeting-copy fan-out and index reload. The mediaCommand endpoint groups those writes in one
+// transaction per <=80-photo chunk. `changes` always contains final tags so callers can pass the
+// captured previous values back for a real undo without guessing an inverse operation.
+export function createBulkImageTagSaveHandler(context) {
+  const {
+    activeCalId,
+    projectId,
+    galleryPhotoIndex,
+    invalidatePhotoIndexCache,
+    rememberPhotoIndexTags,
+  } = context;
+  let chain = Promise.resolve();
+  const probesFor = (list, tagsOf) => list.map(change => ({
+    assetKey: change.assetKey,
+    mediaKey: change.photo?.mediaKey || change.assetKey,
+    refKey: change.photo?.refKey || change.assetKey,
+    full: change.photo?.full || change.photo?.imageUrl || '',
+    thumb: change.photo?.thumb || change.photo?.thumbUrl || '',
+    messageId: change.photo?.messageId || change.photo?.sourceMessageId || '',
+    sourceMessageId: change.photo?.sourceMessageId || '',
+    imageIndex: Number.isFinite(Number(change.photo?.imageIndex)) ? Number(change.photo.imageIndex) : 0,
+    sourceImageIndex: change.photo?.sourceImageIndex,
+    meetingDate: change.photo?.meetingDate || '',
+    photoId: change.photo?.photoId || '',
+    legacyKeys: change.photo?.legacyKeys,
+    tags: tagsOf(change),
+  }));
+  const patchList = (list, tagsOf, { onlyIfTags = null } = {}) => {
+    try {
+      invalidatePhotoIndexCache(activeCalId);
+      const probes = [];
+      const applyPhoto = (photo) => {
+        const hit = list.find(change => archivePhotosShareIdentity(change.photo, photo)
+          || String(change.assetKey || '') === String(photo?.assetKey || photo?.mediaKey || photo?.refKey || ''));
+        if (!hit) return photo;
+        const nextTags = tagsOf(hit);
+        if (nextTags == null) return photo;
+        if (onlyIfTags != null && String(photo?.tags || '') !== String(onlyIfTags(hit) || '')) return photo;
+        probes.push({ ...hit, tags: String(nextTags) });
+        return { ...photo, tags: String(nextTags), tagAuthoritative: true };
+      };
+      if (typeof galleryPhotoIndex?.patchItems === 'function') {
+        galleryPhotoIndex.patchItems(items => (items || []).map(applyPhoto));
+      } else {
+        list.forEach(change => {
+          const nextTags = tagsOf(change);
+          if (nextTags != null) probes.push({ ...change, tags: String(nextTags) });
+        });
+      }
+      const remembered = probesFor(probes, probe => probe.tags).filter(probe => probe.tags != null);
+      if (remembered.length) rememberPhotoIndexTags(activeCalId, remembered);
+    } catch (err) {
+      console.warn('Bulk gallery tag index sync skipped:', err);
+    }
+  };
+  return function saveBulkImageTags(changes) {
+    const list = Array.isArray(changes) ? changes.filter(change => change?.photo && change?.assetKey) : [];
+    if (!activeCalId || !projectId || !list.length) return Promise.resolve({ ok: false, changed: 0, reason: 'invalid' });
+    // Local gallery/archive chips move before the mediaCommand round-trip.
+    patchList(list, change => String(change.tags || ''));
+    const run = async () => {
+      try {
+        const result = await saveBulkPhotoTagsRemote({ calendarId: activeCalId, projectId, changes: list });
+        if (!result?.ok) throw new Error(result?.reason || '사진 태그 일괄 저장 실패');
+        return { ...result, changes: list };
+      } catch (err) {
+        console.error('Bulk image tag save failed:', err);
+        patchList(list, change => String(change.beforeTags || ''), { onlyIfTags: change => String(change.tags || '') });
+        return { ok: false, changed: 0, reason: String(err?.message || err), changes: list };
+      }
+    };
+    const queued = chain.then(run, run);
+    chain = queued.then(() => {}, () => {});
+    return queued;
   };
 }

@@ -212,7 +212,15 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
 
   return /*#__PURE__*/React.createElement("div", { className: "lightbox-comment-thread", onClick: e => e.stopPropagation() },
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+        marginTop: '4px',
+        maxHeight: '140px',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }
     },
       hasMoreComments && /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -442,9 +450,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const [optimisticTags, setOptimisticTags] = React.useState(null);
   const tagTokens = String(optimisticTags != null ? optimisticTags : (tags || '')).split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   const [tagInput, setTagInput] = React.useState('');
-  const [isSavingTags, setIsSavingTags] = React.useState(false);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
-  const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   const tagInputRef = React.useRef(null);
   const keepTagFocusRef = React.useRef(false);
   const refocusComposerField = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField)
@@ -465,9 +471,8 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   // Keep the draft while navigating between photos. The lightbox intentionally reuses this
   // panel so a user can tap a photo once, then enter tags continuously with previous/next.
   if (tagTokens.length === 0 && !onSaveTags) return null;
-  const MAX_TAGS = 10;
+  const MAX_TAGS = 20;
   const handleSaveTags = async () => {
-    if (isSavingTags) return;
     if (!onSaveTags) {
       if (typeof showToast === 'function') showToast('이 사진에는 태그를 저장할 수 없습니다.', 'error');
       return;
@@ -486,53 +491,43 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       // Check if any of the new tokens would actually be added
       const wouldAdd = newTokens.filter(t => !tagTokens.includes(t));
       if (tagTokens.length >= MAX_TAGS || (tagTokens.length + wouldAdd.length) > MAX_TAGS) {
-        if (typeof showToast === 'function') showToast('태그는 최대 10개 저장 가능', 'error');
+        if (typeof showToast === 'function') showToast(`태그는 최대 ${MAX_TAGS}개 저장 가능`, 'error');
         return;
       }
     }
     const finalTags = merged.slice(0, MAX_TAGS);
-    // Optimistic: show the new chip and clear the input immediately, before the server round
-    // trip. A failure rolls back to the last confirmed value (see optimisticTags' declaration).
+    // Optimistic: show the new chip and clear the input immediately. The Firebase
+    // write continues in the background; only a failed write puts the chip back.
     const finalTagsStr = finalTags.join(' ');
     setOptimisticTags(finalTagsStr);
     setTagInput('');
     keepTagFocusRef.current = true;
     refocusComposerField(tagInputRef);
-    setIsSavingTags(true);
     try {
       const saved = await onSaveTags(finalTagsStr);
-      if (saved === false) {
-        setOptimisticTags(null);
-        if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
-        return;
-      }
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === finalTagsStr ? null : current));
+      if (saved === false && typeof showToast === 'function') showToast('태그 저장 실패', 'error');
     } catch (err) {
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === finalTagsStr ? null : current));
       console.error('Lightbox tag save failed:', err);
       if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
-    } finally {
-      setIsSavingTags(false);
     }
   };
   const handleConfirmDeleteTag = async () => {
-    if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
+    if (!onSaveTags || !confirmDeleteTag) return;
     const nextTagsStr = tagTokens.filter(t => t !== confirmDeleteTag).join(' ');
     // Optimistic: the chip and its confirm dialog disappear immediately; roll back (chip
     // reappears) only if the server rejects the delete.
     setOptimisticTags(nextTagsStr);
     setConfirmDeleteTag(null);
-    setIsDeletingTag(true);
     try {
       const saved = await onSaveTags(nextTagsStr);
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === nextTagsStr ? null : current));
       if (saved === false && typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
     } catch (err) {
-      setOptimisticTags(null);
+      setOptimisticTags(current => (current === nextTagsStr ? null : current));
       console.error('Lightbox tag delete failed:', err);
       if (typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
-    } finally {
-      setIsDeletingTag(false);
     }
   };
   const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
@@ -542,6 +537,9 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     style: {
       width: '92vw',
       maxWidth: '92vw',
+      maxHeight: isDesktop ? 'none' : '150px',
+      overflowY: isDesktop ? 'visible' : 'auto',
+      WebkitOverflowScrolling: 'touch',
       boxSizing: 'border-box',
       backgroundColor: 'rgba(15, 23, 42, 0.72)',
       border: '1px solid rgba(255,255,255,0.12)',
@@ -590,8 +588,8 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     },
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "태그입력"),
       /*#__PURE__*/React.createElement("input", {
-        // Remount when token count changes so iOS Safari refreshes placeholder (n/10); it often
-        // keeps a stale "(0/10)" after chips catch up from async gallery tag resolution.
+        // Remount when token count changes so iOS Safari refreshes the placeholder count after
+        // chips catch up from async gallery tag resolution.
         key: `tag-input-${tagTokens.length}`,
         type: "text",
         className: "lightbox-tag-input",
@@ -613,7 +611,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         // 태그는 한 번에 짧게 입력하고 바로 저장하는 용도라 "완료"로 명시해 다음 필드로 넘어가지
         // 않게 한다.
         enterKeyHint: "enter",
-        placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
+        placeholder: tagTokens.length >= MAX_TAGS ? `태그 최대 ${MAX_TAGS}개 도달` : `태그 입력 (${tagTokens.length}/${MAX_TAGS})`,
         maxLength: 100,
         style: {
           flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
@@ -626,14 +624,14 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         onMouseDown: e => e.stopPropagation(),
         onTouchStart: e => e.stopPropagation(),
         onClick: e => { e.stopPropagation(); handleSaveTags(); },
-        disabled: isSavingTags || tagTokens.length >= 10,
+        disabled: tagTokens.length >= MAX_TAGS,
         style: {
           flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
           color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-          opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
+          opacity: tagTokens.length >= MAX_TAGS ? 0.45 : 1
         }
-      }, isSavingTags ? '...' : '저장')
+      }, '저장')
     )
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
@@ -729,6 +727,28 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     return () => {
       if (mq.removeEventListener) mq.removeEventListener('change', onChange);
       else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  const [viewportSize, setViewportSize] = React.useState(() => ({
+    width: typeof window !== 'undefined' ? (window.visualViewport?.width || window.innerWidth) : 390,
+    height: typeof window !== 'undefined' ? (window.visualViewport?.height || window.innerHeight) : 800
+  }));
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateSize = () => {
+      setViewportSize({
+        width: Math.round(window.visualViewport?.width || window.innerWidth),
+        height: Math.round(window.visualViewport?.height || window.innerHeight)
+      });
+    };
+    window.addEventListener('resize', updateSize);
+    window.addEventListener('orientationchange', updateSize);
+    const vv = window.visualViewport;
+    if (vv) vv.addEventListener('resize', updateSize);
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('orientationchange', updateSize);
+      if (vv) vv.removeEventListener('resize', updateSize);
     };
   }, []);
   // ZOOM_DEFAULT (100%, fit-view) is the neutral/reset value -- ZOOM_MIN lets the user zoom
@@ -1031,8 +1051,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         // Ready threads size to their comment count + composer. A fixed minHeight here used to
         // keep a tall empty band under sparse threads; only loading/error keep a tap target floor.
         minHeight: commentStatus === 'ready' ? undefined : (isDesktop ? '64px' : '58px'),
-        maxHeight: isDesktop ? '55vh' : '36dvh',
-        overflowY: isDesktop ? 'auto' : 'visible', resize: isDesktop ? 'vertical' : 'none',
+        maxHeight: isDesktop ? '55vh' : (showTags ? '24dvh' : '32dvh'),
+        overflowY: isDesktop ? 'auto' : 'visible',
+        WebkitOverflowScrolling: 'touch',
+        resize: isDesktop ? 'vertical' : 'none',
         marginTop: isDesktop ? '4px' : '0', padding: isDesktop ? '10px 14px' : '6px 10px',
         flexShrink: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
@@ -1109,6 +1131,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // denormalization trigger runs. Keep the durable source untouched, but avoid
   // showing an empty tag panel for a newly uploaded chat/gallery photo.
   const currentTagsWithUploadDate = (() => {
+    if (tagOverrideKey && Object.prototype.hasOwnProperty.call(tagOverrides, tagOverrideKey)) return currentTags;
     if (String(currentTags || '').trim()) return currentTags;
     const source = String(currentMeta?.source || currentMeta?.uploadSource || '').toLowerCase();
     if (source === 'meme' || source === 'anniversary' || source === 'meeting') return currentTags;
@@ -1129,17 +1152,35 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
     String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
-  )).slice(0, 10).join(' ');
+  )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
-        const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {
-          ...currentMeta,
-          imageIndex: currentImageIndex,
-          sourceImageIndex: currentSourceImageIndex,
-          imageUrl: currentUrl
-        });
-        if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));
-        return ok;
+        const normalized = normalizeTagsForDisplay(tagsText);
+        // Show the edited tags immediately. A newer edit on this photo owns the
+        // override, so a failed older write must not put its own value back.
+        if (tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalized }));
+        const dropFailedOverride = () => {
+          if (!tagOverrideKey) return;
+          setTagOverrides(prev => {
+            if (prev[tagOverrideKey] !== normalized) return prev;
+            const next = { ...prev };
+            delete next[tagOverrideKey];
+            return next;
+          });
+        };
+        try {
+          const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {
+            ...currentMeta,
+            imageIndex: currentImageIndex,
+            sourceImageIndex: currentSourceImageIndex,
+            imageUrl: currentUrl
+          });
+          if (!ok) dropFailedOverride();
+          return ok;
+        } catch (err) {
+          dropFailedOverride();
+          throw err;
+        }
       }
     : null;
   // Memo photos support delete/replace and per-photo tags (imageTags[imageIndex]).
@@ -1408,11 +1449,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     setIsDragging(false);
   }, [index]);
 
-  const goTo = i => {
-    if (i < 0 || i >= total || i === index) return;
-    setShowInfo(false);
-    onNavigate(i);
-  };
   // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
   // motion as a completed drag -- used by the arrow buttons and arrow keys so every way of
   // moving between photos feels like the same carousel, not just the drag gesture.
@@ -1731,8 +1767,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     style: {
       position: 'absolute',
       top: '8px',
-      left: '8px',
-      right: '8px',
+      left: 'max(8px, calc((100% - 92vw) / 2))',
+      right: 'max(8px, calc((100% - 92vw) / 2))',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -1844,43 +1880,100 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const isLandscape = currentDim?.width && currentDim?.height ? currentDim.width > currentDim.height : false;
   const isPortrait = currentDim?.width && currentDim?.height ? currentDim.height >= currentDim.width : false;
 
-  const reservedBottomPx = isDesktop ? (showTags ? 220 : 160) : (showTags ? 210 : 145);
+  const vpH = viewportSize.height;
+  const vpW = viewportSize.width;
+
+  const isTagPanelOpen = showTags && zoomLevel === ZOOM_DEFAULT;
+  const currentComments = photoCommentsByKey[photoCommentKey] || [];
+  const commentsCount = currentComments.length;
+
+  const showPhotoCounter = total > 1 && !showTags && !showInfo && zoomLevel === ZOOM_DEFAULT;
+
+  const desktopReservedPx = (() => {
+    let reserved = 48;
+    if (isTagPanelOpen) reserved += 130;
+    const commentsContentHeight = commentsCount === 0
+      ? 64
+      : (commentsCount === 1 ? 98 : (commentsCount === 2 ? 130 : 164));
+    reserved += Math.min(220, commentsContentHeight);
+    if (showPhotoCounter) reserved += 24;
+    return Math.max(110, reserved);
+  })();
+
+  // On mobile, dynamically account for all non-stage UI (safe areas, header buttons,
+  // tag panel card, comments card, indicator, and flex gaps) so content never overflows
+  // the viewport even when tags and comments are fully exposed.
+  const mobileReservedPx = (() => {
+    // Top & bottom safe-areas (iPhone dynamic island/notch ~47px + bottom home bar ~34px)
+    // plus close button clearance and container paddings
+    const chromeAndPadding = 84;
+
+    // Tag panel card height when open
+    const tagsHeight = isTagPanelOpen ? 124 : 0;
+
+    // Comments thread height based on current comment count + composer
+    const commentsContentHeight = commentsCount === 0
+      ? 64
+      : (commentsCount === 1 ? 98 : (commentsCount === 2 ? 130 : 164));
+    const commentsHeight = Math.min(190, commentsContentHeight);
+
+    // Multi-photo indicator text ("1 / 9") above comment input when tags/info are closed
+    const indicatorHeight = showPhotoCounter ? 20 : 0;
+
+    // Flex gaps (8px between each visible block)
+    let visibleBlocks = 1; // stage
+    if (isTagPanelOpen) visibleBlocks++;
+    if (showPhotoCounter) visibleBlocks++;
+    visibleBlocks++; // comments
+    const gapsHeight = (visibleBlocks - 1) * 8;
+
+    return chromeAndPadding + tagsHeight + commentsHeight + indicatorHeight + gapsHeight;
+  })();
+
+  const reservedBottomPx = isDesktop ? desktopReservedPx : mobileReservedPx;
+
+  // Available vertical height for the image stage. Capped at 56dvh reference max.
   const availableHeightPx = typeof window !== 'undefined'
-    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) - reservedBottomPx))
+    ? Math.max(140, Math.round(vpH - reservedBottomPx))
     : 480;
+
+  const stageWidthPx = typeof window === 'undefined'
+    ? 640
+    : Math.max(240, Math.round(vpW));
 
   const mobileStageHeightPx = (() => {
     if (isDesktop) return null;
-    if (isPortrait) return availableHeightPx;
     if (currentDim?.width && currentDim?.height) {
-      const fitted = window.innerWidth * (currentDim.height / currentDim.width);
-      return Math.max(120, Math.min(availableHeightPx, Math.round(fitted)));
+      // Natural fitted height of this photo when spanning across stage width
+      const naturalAspectHeight = Math.round(stageWidthPx * (currentDim.height / currentDim.width));
+      // Cap at available vertical space so tags and comments never get pushed off-screen,
+      // while fitting the image tightly so no empty vertical gaps appear above/below it.
+      return Math.max(120, Math.min(availableHeightPx, naturalAspectHeight));
     }
-    return Math.max(120, Math.min(availableHeightPx, Math.round(window.innerWidth * 0.75)));
+    const fallbackAspect = isPortrait ? 1.25 : 0.75;
+    return Math.max(120, Math.min(availableHeightPx, Math.round(stageWidthPx * fallbackAspect)));
   })();
 
   const mobileImageStageStyle = isDesktop
     ? {
-        width: isLandscape ? '100vw' : '92vw',
-        maxWidth: '100vw',
-        height: `calc(100vh - ${reservedBottomPx}px)`,
-        maxHeight: `calc(100vh - ${reservedBottomPx}px)`,
-        overflow: 'hidden',
-        position: 'relative'
-      }
-    : {
-        width: isLandscape ? '100vw' : '92vw',
-        maxWidth: '100vw',
-        height: `${mobileStageHeightPx}px`,
+        width: '100%',
+        maxWidth: '100%',
+        height: `calc(100dvh - ${reservedBottomPx}px)`,
         maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
         overflow: 'hidden',
         position: 'relative',
-        flexShrink: 0
+        transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
+      }
+    : {
+        width: '100%',
+        maxWidth: '100%',
+        height: `${mobileStageHeightPx}px`,
+        maxHeight: `${mobileStageHeightPx}px`,
+        overflow: 'hidden',
+        position: 'relative',
+        flexShrink: 0,
+        transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
       };
-
-  const stageWidthPx = typeof window === 'undefined'
-    ? 640
-    : Math.max(240, Math.round((window.visualViewport?.width || window.innerWidth) * (isLandscape ? 1 : 0.92)));
 
   const renderSlide = (url, slot) => {
     const wrapperStyle = {
@@ -1900,8 +1993,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
     const slideThumb = String(slideMeta.thumb || slideMeta.thumbUrl || '').trim();
     const isSlideThumbBroken = slideThumb && getBrokenThumbSet().has(slideThumb);
-    const visualUrl = slideThumb && slideThumb !== url && !isSlideThumbBroken
-      && !loadedOriginalUrls.has(url) && !failedOriginalUrls.has(url) ? slideThumb : url;
+    const hasThumb = Boolean(slideThumb && slideThumb !== url && !isSlideThumbBroken);
+    const isOriginalLoaded = loadedOriginalUrls.has(url);
+    const isOriginalFailed = failedOriginalUrls.has(url);
+    const showOriginal = isOriginalLoaded && !isOriginalFailed;
 
     if (slot === 'current') {
       if (imageLoadFailed) {
@@ -1941,28 +2036,63 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           overflow: 'hidden'
         },
         onClick: handleImageTap
-      }, /*#__PURE__*/React.createElement("img", {
-        ref: zoomedImgRef,
-        src: visualUrl,
-        alt: "원본 이미지",
-        "data-slide": slot,
-        draggable: false,
-        decoding: 'async',
-        referrerPolicy: 'no-referrer',
-        onLoad: e => recordImageDimensions(url, e),
-        onError: handleCurrentImageError,
-        onMouseDown: handleZoomedImageMouseDown,
-        style: {
-          width: isLandscape ? '100%' : 'auto',
-          maxWidth: '100%',
-          height: isPortrait ? '100%' : 'auto',
-          maxHeight: '100%',
-          objectFit: 'contain',
-          borderRadius: isLandscape ? 0 : 'var(--radius-md)',
-          display: 'block',
-          ...zoomImageStyle
-        }
-      }), renderPhotoActions(),
+      },
+        hasThumb && /*#__PURE__*/React.createElement("img", {
+          src: slideThumb,
+          alt: "썸네일",
+          className: "lightbox-thumb-img",
+          draggable: false,
+          onLoad: e => {
+            recordImageDimensions(url, e);
+          },
+          style: {
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            width: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+            display: 'block',
+            opacity: showOriginal ? 0 : 1,
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+            pointerEvents: 'none',
+            ...zoomImageStyle
+          }
+        }),
+        /*#__PURE__*/React.createElement("img", {
+          ref: zoomedImgRef,
+          src: url,
+          alt: "원본 이미지",
+          "data-slide": slot,
+          draggable: false,
+          decoding: 'async',
+          referrerPolicy: 'no-referrer',
+          onLoad: e => {
+            recordImageDimensions(url, e);
+            setLoadedOriginalUrls(prev => new Set(prev).add(url));
+          },
+          onError: handleCurrentImageError,
+          onMouseDown: handleZoomedImageMouseDown,
+          style: {
+            position: hasThumb ? 'absolute' : 'relative',
+            inset: hasThumb ? 0 : undefined,
+            margin: hasThumb ? 'auto' : undefined,
+            width: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+            display: 'block',
+            opacity: showOriginal ? 1 : (hasThumb ? 0 : 1),
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+            ...zoomImageStyle
+          }
+        }),
+        renderPhotoActions(),
         showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
           key: `meta-${tagOverrideKey || String(currentUrl || index)}`,
           info: currentInfo,
@@ -1973,19 +2103,74 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       ));
     }
 
-    return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
-      src: visualUrl,
-      alt: "원본 이미지",
-      "data-slide": slot,
-      draggable: false,
-      decoding: 'async',
-      referrerPolicy: 'no-referrer',
-      onLoad: e => recordImageDimensions(url, e),
-      onClick: e => e.stopPropagation(),
-      style: {
-        maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)'
-      }
-    }));
+    return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle },
+      /*#__PURE__*/React.createElement("div", {
+        className: "lightbox-slide-frame",
+        style: {
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          minWidth: 0,
+          overflow: 'hidden'
+        }
+      },
+        hasThumb && /*#__PURE__*/React.createElement("img", {
+          src: slideThumb,
+          alt: "썸네일",
+          className: "lightbox-thumb-img",
+          draggable: false,
+          onLoad: e => {
+            recordImageDimensions(url, e);
+          },
+          style: {
+            position: 'absolute',
+            inset: 0,
+            margin: 'auto',
+            width: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: 'var(--radius-md)',
+            opacity: showOriginal ? 0 : 1,
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+            pointerEvents: 'none'
+          }
+        }),
+        /*#__PURE__*/React.createElement("img", {
+          src: url,
+          alt: "원본 이미지",
+          "data-slide": slot,
+          draggable: false,
+          decoding: 'async',
+          referrerPolicy: 'no-referrer',
+          onLoad: e => {
+            recordImageDimensions(url, e);
+            setLoadedOriginalUrls(prev => new Set(prev).add(url));
+          },
+          onClick: e => e.stopPropagation(),
+          style: {
+            position: hasThumb ? 'absolute' : 'relative',
+            inset: hasThumb ? 0 : undefined,
+            margin: hasThumb ? 'auto' : undefined,
+            width: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            borderRadius: 'var(--radius-md)',
+            display: 'block',
+            opacity: showOriginal ? 1 : (hasThumb ? 0 : 1),
+            transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)'
+          }
+        })
+      )
+    );
   };
 
   const lightboxNode = /*#__PURE__*/React.createElement("div", {
@@ -1999,7 +2184,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       // chunk and vertically center that unit via margin:auto on the chunk; flex-start on the
       // overlay keeps tall threads scrollable from the top instead of clipping both ends.
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: 'auto',
       paddingTop: isDesktop ? 0 : 'max(12px, calc(env(safe-area-inset-top, 0px) + 8px))',
       paddingBottom: isDesktop ? 0 : 'max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px))', boxSizing: 'border-box',
       userSelect: 'none'
@@ -2072,8 +2257,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'center',
       width: '100%',
       maxWidth: '100%',
+      maxHeight: isDesktop ? '100%' : 'calc(100dvh - max(28px, calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + 20px)))',
       flexShrink: 1,
       minHeight: 0,
       gap: '8px',
@@ -2118,50 +2305,88 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-single-stage",
     style: {
       position: 'relative',
-      display: 'inline-flex',
+      display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      width: isLandscape ? '100vw' : 'auto',
-      maxWidth: '100vw',
-      height: isPortrait ? (isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`) : 'auto',
-      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
-      touchAction: 'none'
+      width: '100%',
+      maxWidth: '100%',
+      height: isDesktop ? (isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto') : `${mobileStageHeightPx}px`,
+      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`,
+      touchAction: 'none',
+      transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'
     },
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
     onTouchEnd: handleTouchEnd,
     onTouchCancel: handleTouchEnd,
     onClick: handleImageTap
-  }, /*#__PURE__*/React.createElement("img", {
-    ref: zoomedImgRef,
-    src: currentVisualUrl,
-    alt: "원본 이미지",
-    draggable: false,
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
-    onLoad: e => recordImageDimensions(currentUrl, e),
-    onError: handleCurrentImageError,
-    onMouseDown: handleZoomedImageMouseDown,
-    style: {
-      width: isLandscape ? '100%' : 'auto',
-      maxWidth: '100vw',
-      height: isPortrait ? '100%' : 'auto',
-      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
-      borderRadius: isLandscape ? 0 : 'var(--radius-md)',
-      objectFit: 'contain',
-      display: 'block',
-      ...zoomImageStyle
-    }
-  }), renderPhotoActions(),
+  },
+    Boolean(currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) && /*#__PURE__*/React.createElement("img", {
+      src: currentThumbUrl,
+      alt: "썸네일",
+      className: "lightbox-thumb-img",
+      draggable: false,
+      onLoad: e => {
+        recordImageDimensions(currentUrl, e);
+      },
+      style: {
+        position: 'absolute',
+        inset: 0,
+        margin: 'auto',
+        width: '100%',
+        maxWidth: '100%',
+        height: '100%',
+        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : '100%',
+        borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+        objectFit: 'contain',
+        display: 'block',
+        opacity: (loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)) ? 0 : 1,
+        transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+        pointerEvents: 'none',
+        ...zoomImageStyle
+      }
+    }),
+    /*#__PURE__*/React.createElement("img", {
+      ref: zoomedImgRef,
+      src: currentUrl,
+      alt: "원본 이미지",
+      draggable: false,
+      decoding: 'async',
+      referrerPolicy: 'no-referrer',
+      onLoad: e => {
+        recordImageDimensions(currentUrl, e);
+        setLoadedOriginalUrls(prev => new Set(prev).add(currentUrl));
+      },
+      onError: handleCurrentImageError,
+      onMouseDown: handleZoomedImageMouseDown,
+      style: {
+        position: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'absolute' : 'relative',
+        inset: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 0 : undefined,
+        margin: (currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 'auto' : undefined,
+        width: '100%',
+        maxWidth: '100%',
+        height: '100%',
+        maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : '100%',
+        borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+        objectFit: 'contain',
+        display: 'block',
+        opacity: (loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)) ? 1 : ((currentThumbUrl && currentThumbUrl !== currentUrl && !isThumbKnownBroken) ? 0 : 1),
+        transition: 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+        ...zoomImageStyle
+      }
+    }),
+    renderPhotoActions(),
     showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
       key: `meta-${tagOverrideKey || String(currentUrl || index)}`,
       info: currentInfo,
       sourceInfo: sourceInfo,
       onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
       isRemovingFromMemory: isRemovingFromMemory
-    })),
+    })
+  ),
   showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
     key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
     tags: currentTagsWithUploadDate,
@@ -2172,55 +2397,30 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
     onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
   }),
-  renderCommentThread(),
-  total > 1 && (() => {
-    const maxVisibleDots = 10;
-    const startIdx = total <= maxVisibleDots
-      ? 0
-      : Math.max(0, Math.min(index - Math.floor(maxVisibleDots / 2), total - maxVisibleDots));
-    const endIdx = startIdx + Math.min(total, maxVisibleDots);
-    const visibleIndices = Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i);
-
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: isDesktop ? '6px' : '2px',
-        marginTop: isDesktop ? '16px' : '4px',
-        zIndex: 9001
-      }
-    },
-      /* Text indicator */
-      /*#__PURE__*/React.createElement("span", {
-        style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 'var(--font-size-md)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
-      }, `${index + 1} / ${total}`),
-      /* Dots container -- 모바일에서는 숫자 표시("1 / 9")만으로 충분해 점은 생략한다 */
-      isDesktop && /*#__PURE__*/React.createElement("div", {
-        onClick: e => e.stopPropagation(),
-        style: { display: 'flex', alignItems: 'center', gap: '7px' }
-      },
-        startIdx > 0 && /*#__PURE__*/React.createElement("span", {
-          style: { width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-        }),
-        visibleIndices.map(i => /*#__PURE__*/React.createElement("span", {
-          key: i,
-          onClick: () => goTo(i),
-          style: {
-            width: i === index ? '8px' : '6px',
-            height: i === index ? '8px' : '6px',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            backgroundColor: i === index ? '#FFFFFF' : 'rgba(255, 255, 255, 0.35)',
-            transition: 'all 0.15s'
-          }
-        })),
-        endIdx < total && /*#__PURE__*/React.createElement("span", {
-          style: { width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-        })
-      )
-    );
-  })()), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+  showPhotoCounter && /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-counter-bar",
+    style: {
+      width: '92vw',
+      maxWidth: '92vw',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      marginBottom: isDesktop ? '-4px' : '-2px',
+      flexShrink: 0,
+      zIndex: 10,
+      pointerEvents: 'none'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255, 255, 255, 0.75)',
+      fontSize: isDesktop ? 'var(--font-size-md)' : 'var(--font-size-sm)',
+      fontWeight: 700,
+      fontVariantNumeric: 'tabular-nums',
+      userSelect: 'none'
+    }
+  }, `${index + 1} / ${total}`)),
+  renderCommentThread()
+  ), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
     tags: currentTagsWithUploadDate,
     onClose: () => setImageUrlModalOpen(false),

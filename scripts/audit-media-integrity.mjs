@@ -14,6 +14,7 @@ const ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databas
 const CALENDAR_IDS = (process.env.AUDIT_CALENDAR_IDS || 'kkot,cw,jhair')
   .split(',').map(value => value.trim()).filter(value => /^[a-z0-9_-]{1,60}$/i.test(value));
 const CONCURRENCY = 12;
+const STORAGE_METADATA_TIMEOUT_MS = 12 * 1000;
 
 function decode(value) {
   if (!value || typeof value !== 'object') return undefined;
@@ -58,7 +59,8 @@ function fileExists(url) {
   if (!storageStatus.has(key)) {
     // Network errors count as "exists": the audit must never report data as lost when it merely
     // could not reach Storage.
-    storageStatus.set(key, fetch(key).then(res => res.status !== 404).catch(() => true));
+    storageStatus.set(key, fetch(key, { signal: AbortSignal.timeout(STORAGE_METADATA_TIMEOUT_MS) })
+      .then(res => res.status !== 404).catch(() => true));
   }
   return storageStatus.get(key);
 }
@@ -139,6 +141,17 @@ async function auditCalendar(calendarId) {
       if (report.samples.orphanComments.length < 10) report.samples.orphanComments.push(`${c.id} (${c.comments.length})`);
     }
   });
+  // Classification only. This script never writes, and it must not: photoIndex is
+  // server-owned (firestore.rules write: false), Storage originals that 404 are already
+  // gone, and copying an empty message tag slot onto a meeting album would wipe the tags
+  // the album and the index still have. Orphan comments stay; deleting them drops text.
+  report.handling = {
+    hide: report.deadIndexRows + report.sourceRefsToMissingFiles,
+    reconnect: report.staleIndexOwners,
+    reviewTags: report.copiesWithDifferentTags,
+    keepComments: report.orphanCommentThreads,
+    originalsDeleted: 0
+  };
   return report;
 }
 

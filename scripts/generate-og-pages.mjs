@@ -128,7 +128,7 @@ function createMemoShareHtml(calendar) {
     description: `${calendar.title} 메모를 확인해보세요.`,
     calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=memo`,
     shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/memo/`,
-    forwardSearch: false
+    forwardSearch: true
   });
 }
 

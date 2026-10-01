@@ -81,11 +81,11 @@
      imperceptible) into whichever value in that cluster was already used most often. Rarer,
      more widely-spread sizes (headings, one-off badges) are left alone since collapsing them
      would be a real, unverified visual change rather than a no-op cleanup. */
-  --font-size-2xs: 0.62rem;
-  --font-size-xs: 0.68rem;
-  --font-size-sm: 0.72rem;
-  --font-size-md: 0.8rem;
-  --font-size-base: 0.85rem;
+  --font-size-2xs: max(12px, 0.75rem);
+  --font-size-xs: max(12px, 0.75rem);
+  --font-size-sm: max(12px, 0.75rem);
+  --font-size-md: max(12px, 0.8rem);
+  --font-size-base: max(12px, 0.85rem);
 }
 
 /* Dark theme: an explicit choice via the header toggle stamps data-theme="dark"/"light" on
@@ -392,6 +392,15 @@ body:has(.admin-login-gate) {
   }
 }
 
+canvas.bp-confetti-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 2147483646 !important;
+}
+
 /* Motion system ---------------------------------------------------------
    Inspired by GSAP/Motion/Anime.js principles: transform + opacity first,
    small interruptible movements, clear press feedback, and strict reduced-
@@ -401,9 +410,16 @@ body:has(.admin-login-gate) {
   --motion-fast: 140ms;
   --motion-base: 220ms;
   --motion-slow: 420ms;
+  /* Enter and release: fast start, long settle. */
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Exit and press-down: accelerates away. */
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Hover lift and focus: gentle both ends. */
   --motion-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Symmetric nod, used between shake keyframes. */
+  --motion-ease-in-out: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  /* Overshoot for sheets, toasts, and pops. */
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes motion-fade-up {
   from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.985); }
@@ -1110,10 +1126,52 @@ summary.is-pressing,
 .lightbox-overlay .lightbox-stage {
   flex-shrink: 0 !important;
 }
-.lightbox-overlay .lightbox-slide img {
+.lightbox-overlay .lightbox-slide img,
+.lightbox-overlay .lightbox-single-stage img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+.lightbox-content-chunk {
+  box-sizing: border-box !important;
+}
+.lightbox-overlay .lightbox-stage,
+.lightbox-overlay .lightbox-single-stage,
+.lightbox-overlay .lightbox-slide,
+.lightbox-overlay .lightbox-slide-frame {
+  transition: height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lightbox-overlay .lightbox-slide img,
+.lightbox-overlay .lightbox-single-stage img {
+  transition: width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lightbox-tag-panel-card {
+  animation: lightbox-panel-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.lightbox-info-panel {
+  animation: lightbox-panel-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.lightbox-comment-thread {
+  transition: max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              min-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              padding 0.25s ease,
+              opacity 0.25s ease !important;
+}
+@keyframes lightbox-panel-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .motion-ripple {
   position: absolute;
@@ -1261,7 +1319,7 @@ summary.is-pressing,
   }
 }
 .app-footer-copyright {
-  font-size: 0.7rem;
+  font-size:0.75rem;
   color: var(--text-muted);
   margin: 0;
 }
@@ -1272,7 +1330,7 @@ summary.is-pressing,
   gap: 10px;
 }
 .app-footer-family-label {
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.04em;
@@ -1363,6 +1421,78 @@ summary.is-pressing,
 button, input, textarea, select {
   word-break: keep-all;
   max-width: 100%;
+}
+
+/* Calendar month paging: the same pointer gesture is shared by the legacy and V2 grids.
+   `pan-y` deliberately leaves vertical document scrolling to the browser while giving a
+   horizontal drag to the calendar. The moving child, rather than the clipping surface, is
+   animated so range-event bars and day cells always enter as one coherent month. */
+:root {
+  --field-radius-single-line: calc(var(--field-single-line-height, 44px) / 2);
+  --field-radius-multiline: var(--radius-md, 14px);
+  --field-radius-edge: 0px;
+  --field-single-line-height: 44px;
+  --calendar-month-swipe-exit-duration: 150ms;
+  --calendar-month-swipe-enter-duration: 210ms;
+  --calendar-month-swipe-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --calendar-month-swipe-exit-distance: 18%;
+}
+.field-edge-bottom,
+.field-edge-top,
+.field-edge-left,
+.field-edge-right {
+  border-radius: var(--field-radius-edge);
+}
+.calendar-month-swipe-surface {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+}
+.calendar-month-swipe-content {
+  min-width: 0;
+  will-change: transform, opacity;
+}
+.calendar-month-swipe-content.is-dragging {
+  transition: none;
+}
+.calendar-month-swipe-content.is-exiting {
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform var(--calendar-month-swipe-exit-duration) var(--calendar-month-swipe-ease),
+    opacity var(--calendar-month-swipe-exit-duration) ease;
+}
+.calendar-month-swipe-content.is-exiting.is-next {
+  transform: translate3d(calc(var(--calendar-month-swipe-exit-distance) * -1), 0, 0);
+}
+.calendar-month-swipe-content.is-exiting.is-previous {
+  transform: translate3d(var(--calendar-month-swipe-exit-distance), 0, 0);
+}
+.calendar-month-swipe-content.is-entering.is-next {
+  animation: calendar-month-swipe-enter-next var(--calendar-month-swipe-enter-duration) var(--calendar-month-swipe-ease) both;
+}
+.calendar-month-swipe-content.is-entering.is-previous {
+  animation: calendar-month-swipe-enter-previous var(--calendar-month-swipe-enter-duration) var(--calendar-month-swipe-ease) both;
+}
+@keyframes calendar-month-swipe-enter-next {
+  from { transform: translate3d(var(--calendar-month-swipe-exit-distance), 0, 0); opacity: 0; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@keyframes calendar-month-swipe-enter-previous {
+  from { transform: translate3d(calc(var(--calendar-month-swipe-exit-distance) * -1), 0, 0); opacity: 0; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .calendar-month-swipe-content.is-exiting,
+  .calendar-month-swipe-content.is-entering.is-next,
+  .calendar-month-swipe-content.is-entering.is-previous {
+    animation: none;
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
 }
 
 .app-container {
@@ -1514,20 +1644,33 @@ button, input, textarea, select {
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
   border-radius: 9999px;
-  font-size: 0.68rem;
+  box-sizing: border-box;
+  font-size:0.75rem;
   font-weight: 800;
   line-height: 1;
   background-color: var(--border-subtle);
   color: var(--text-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.main-menu-badge:is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: 18px;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+}
+.main-menu-badge:is([data-digits="multi"], .is-multi-digit) {
+  width: auto;
+  padding: 0 5px;
+  aspect-ratio: auto;
 }
 .main-menu-badge.is-unread {
   background-color: #EF4444;
   color: #FFFFFF;
 }
 @media (max-width: 480px) {
-  .main-menu-item { font-size: 0.74rem; padding: 6px 2px; }
+  .main-menu-item { font-size:0.75rem; padding: 6px 2px; }
   .main-menu-sep { margin: 0 1px; }
 }
 
@@ -1679,7 +1822,28 @@ button, input, textarea, select {
   textarea,
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
   select {
-    font-size: 1rem !important;
+    font-size: max(16px, 1rem) !important;
+  }
+}
+/* iPhone landscape and iPad are wider than 720px. Safari still zooms any
+   focused control whose computed size is under 16px, and an 80% type scale
+   makes 1rem itself smaller than that. */
+@media (hover: none) and (pointer: coarse) {
+  input.form-input,
+  textarea.form-input,
+  select.form-select,
+  button.form-select,
+  .form-input,
+  .form-select,
+  .inline-search-input,
+  .places-list-search-input,
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+  select {
+    font-size: max(16px, 1rem) !important;
   }
 }
 html {
@@ -1811,7 +1975,7 @@ select.form-select {
   border-radius: 6px;
   background: #0F172A;
   color: #FFFFFF;
-  font-size: 0.7rem;
+  font-size:0.75rem;
   font-weight: 700;
   line-height: 1.2;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22);
@@ -2017,8 +2181,8 @@ select.form-select {
   .month-display-year-short { display: inline; }
   .modal-header h3 { font-size: 0.95rem !important; }
   .modal-header .holiday-label { font-size: 0.82rem !important; }
-  .modal-header .status-badge { font-size: 0.7rem !important; padding: 2px 4px !important; }
-  .modal-header .btn { padding: 4px 8px !important; font-size: 0.72rem !important; min-width: 32px; box-sizing: border-box; }
+  .modal-header .status-badge { font-size:0.75rem !important; padding: 2px 4px !important; }
+  .modal-header .btn { padding: 4px 8px !important; font-size:0.75rem !important; min-width: 32px; box-sizing: border-box; }
   .modal-header .btn-action { padding: 0 16px !important; min-width: 44px; font-size: var(--font-size-sm) !important; }
 }
 
@@ -2254,7 +2418,7 @@ select.form-select {
   opacity: 0.78;
 }
 
-.day-number { font-size: 0.6rem; font-weight: 700; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+.day-number { font-size:0.75rem; font-weight: 700; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
 @media (min-width: 640px) {
   .day-number { font-size: 0.95rem; width: 24px; height: 24px; }
 }
@@ -2294,24 +2458,26 @@ select.form-select {
 
 .participant-badge {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
-  font-size: 0.72rem; font-weight: 700; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  font-size:0.75rem; font-weight: 700; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
 /* Own-message edit/delete controls: hidden by default, revealed on hover (desktop) or
    tap (mobile, via the .msg-actions-revealed class toggled in JS). Tapping elsewhere
    clears the revealed state so the buttons hide again. */
 .msg-actions-group { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
-.msg-row-hover:hover .msg-actions-group,
+@media (hover: hover) and (pointer: fine) {
+  .msg-row-hover:hover .msg-actions-group { opacity: 1; pointer-events: auto; }
+  .msg-row-hover:hover .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
+}
 .msg-row-hover.msg-actions-revealed .msg-actions-group { opacity: 1; pointer-events: auto; }
 /* Same reveal behavior, but also collapses its own width to 0 while hidden (instead of
    just fading) so it doesn't reserve empty space next to the timestamp -- used where the
    actions sit inline in a header row (CommentsSection) rather than in their own column. */
 .msg-actions-group-inline { max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; transition: max-width 0.15s ease, opacity 0.15s ease; }
-.msg-row-hover:hover .msg-actions-group-inline,
 .msg-row-hover.msg-actions-revealed .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
 .registered-at-text {
   color: #A7B0BF;
-  font-size: 0.6rem;
+  font-size:0.75rem;
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.25;
@@ -2480,7 +2646,7 @@ select.form-select {
 }
 .poll-option-link {
   color: rgb(100, 116, 139);
-  font-size: 0.6rem;
+  font-size:0.75rem;
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.25;
@@ -2494,7 +2660,7 @@ select.form-select {
 .poll-confirmed-badge {
   background: var(--cta-fill, #8B5CF6);
   color: var(--on-cta, white);
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 800;
   padding: 2px 8px;
   border-radius: 9999px;
@@ -2534,7 +2700,7 @@ select.form-select {
   gap: 6px;
   border-radius: var(--radius-full);
   padding: 3px 4px 3px 8px;
-  font-size: 0.72rem;
+  font-size:0.75rem;
   font-weight: 900;
   line-height: 1;
   box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.14);
@@ -2804,39 +2970,55 @@ select.form-select {
 
 @media (max-width: 640px) {
   .gallery-pagination {
-    gap: 4px;
-    padding-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap !important;
+    gap: 2px;
+    padding: 10px 2px calc(8px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .gallery-pagination-button {
-    min-width: 40px;
-    min-height: 40px;
-    padding: 0 6px;
+    min-width: 25px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 2px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: var(--radius-sm, 5px);
+    flex-shrink: 1;
+    flex-grow: 0;
   }
 
-  /* Numbers only on phones -- arrow buttons are omitted in markup, keep CSS belt-and-suspenders. */
-  .gallery-pagination.is-mobile .gallery-pagination-arrow {
-    display: none;
+  /* 모바일에서도 양쪽 화살표(처음, 이전, 다음, 맨끝) 버튼 모두 표시 */
+  .gallery-pagination.is-mobile .gallery-pagination-arrow,
+  .gallery-pagination .gallery-pagination-arrow {
+    display: inline-flex;
+    min-width: 25px;
+    padding: 0;
   }
 
-  /* Horizontal drag pans the centered page window; keep a single row so numbers slide as a strip. */
+  /* 가로폭 제한으로 줄바꿈되지 않게 1줄 유지 */
   .gallery-pagination.is-mobile.is-swipeable {
-    flex-wrap: nowrap;
+    flex-wrap: nowrap !important;
     justify-content: center;
     overflow: hidden;
     touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
-    cursor: grab;
+    cursor: default;
   }
 
   .gallery-pagination.is-mobile.is-swipeable:active {
-    cursor: grabbing;
+    cursor: default;
   }
 
   .gallery-pagination.is-mobile.is-swipeable .gallery-pagination-button {
-    flex: 0 0 auto;
-    touch-action: none;
+    flex: 0 1 auto;
+    touch-action: manipulation;
   }
 
   .gallery-pagination-button.is-focus:not(.is-active) {
@@ -2912,19 +3094,32 @@ select.form-select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
+  min-width: 20px;
   height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-full, 9999px);
+  box-sizing: border-box;
   /* Plain fallback first (ignored by browsers that support color-mix, kept as-is by those that
      don't -- an unsupported color-mix() value makes the whole declaration invalid, so it never
      overwrites this one) so the badge still has a visible pill background everywhere. */
   background: rgba(100, 116, 139, 0.16);
   background: color-mix(in srgb, currentColor 16%, transparent);
   color: currentColor;
-  font-size: 0.72rem;
+  font-size:0.75rem;
   font-weight: 800;
   line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.section-count-badge:is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: 20px;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+}
+.section-count-badge:is([data-digits="multi"], .is-multi-digit) {
+  width: auto;
+  padding: 0 5.5px;
+  aspect-ratio: auto;
 }
 .sync-status-chip {
   display: inline-flex;
@@ -2959,12 +3154,12 @@ select.form-select {
 }
 .sync-status-chip__label,
 .sync-status-chip__time {
-  font-size: 0.72rem;
+  font-size:0.75rem;
   font-weight: 800;
   line-height: 1;
 }
 .sync-status-chip__time {
-  font-size: 0.64rem;
+  font-size:0.75rem;
   opacity: 0.82;
 }
 .sync-status-chip.is-live {
@@ -3049,11 +3244,11 @@ select.form-select {
   line-height: 1.15;
 }
 .sync-status-banner__time {
-  font-size: 0.68rem;
+  font-size:0.75rem;
   opacity: 0.88;
 }
 .sync-status-banner__detail {
-  font-size: 0.72rem;
+  font-size:0.75rem;
   font-weight: 600;
   line-height: 1.4;
   opacity: 0.88;
@@ -3366,7 +3561,7 @@ select.form-select {
   line-height: 1.2;
 }
 .admin-side-menu-subtitle {
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 800;
   color: #94A3B8;
   line-height: 1.2;
@@ -3491,7 +3686,7 @@ select.form-select {
   line-height: 1.2;
 }
 .side-menu-meta-pill {
-  font-size: 0.6rem !important;
+  font-size:0.75rem !important;
   font-weight: 500 !important;
   background: transparent !important;
   background-color: transparent !important;
@@ -3505,7 +3700,7 @@ select.form-select {
   vertical-align: middle;
 }
 .admin-side-menu-item-desc {
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 400;
   line-height: 1.2;
   color: #94A3B8;
@@ -3691,8 +3886,14 @@ select.form-select {
 }
 .settlement-person-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* Auto-fit: distributes width evenly across cards without trailing empty gaps. */
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
   gap: 10px;
+}
+@media (min-width: 768px) {
+  .settlement-person-grid {
+    grid-template-columns: repeat(var(--settlement-cols, 3), minmax(0, 1fr));
+  }
 }
 .settlement-person-card {
   min-width: 0;
@@ -3771,7 +3972,7 @@ select.form-select {
   display: block;
   align-self: flex-end;
   color: var(--text-muted);
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -3799,7 +4000,7 @@ select.form-select {
   border-radius: 999px;
   background: var(--settlement-person-capsule-bg);
   color: var(--settlement-person-capsule-text);
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 700;
   line-height: 1.3;
   white-space: nowrap;
@@ -3889,9 +4090,6 @@ select.form-select {
   outline: none;
 }
 @media (max-width: 640px) {
-  .settlement-person-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .settlement-total-card {
     grid-column: 1 / -1;
     flex-direction: row;
@@ -3914,7 +4112,7 @@ select.form-select {
     display: inline-flex;
     flex: 0 0 auto;
     padding: 2px 5px;
-    font-size: 0.62rem;
+    font-size:0.75rem;
     font-weight: 600;
   }
   .settlement-person-desktop-badge {
@@ -3928,11 +4126,7 @@ select.form-select {
     font-size: 0.76rem;
   }
 }
-@media (min-width: 641px) and (max-width: 1100px) {
-  .settlement-person-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 .admin-metric-card {
   border: 1px solid var(--v2-line, #E2E8F0);
   border-radius: var(--radius-md);
@@ -4250,11 +4444,35 @@ select.form-select {
   background: var(--accent-primary); border-color: var(--accent-primary); color: var(--on-brand, white);
 }
 .region-filter-chip-count {
-  padding: 1px 6px; border-radius: var(--radius-full); background: rgba(100, 116, 139, 0.14);
-  color: var(--text-muted); font-size: var(--font-size-sm); font-weight: 800; line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full, 9999px);
+  box-sizing: border-box;
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.region-filter-chip-count:is([data-digits="single"], .is-single-digit, :not([data-digits="multi"]):not(.is-multi-digit)) {
+  width: 18px;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+}
+.region-filter-chip-count:is([data-digits="multi"], .is-multi-digit) {
+  width: auto;
+  padding: 0 5px;
+  aspect-ratio: auto;
 }
 .region-filter-chip.is-active .region-filter-chip-count {
-  background: rgba(255, 255, 255, 0.25); color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
 }
 .region-filter-reset-btn {
   background: none; border: none; color: var(--accent-primary); font-size: var(--font-size-sm);
@@ -4588,7 +4806,7 @@ select.form-select {
   vertical-align: middle;
   line-height: 1;
   box-sizing: border-box;
-  font-size: 0.72rem;
+  font-size:0.75rem;
   padding: 4px 10px;
   border-radius: 9999px;
   font-weight: 700;
@@ -4867,7 +5085,15 @@ select.form-select {
 }
 .meme-preview-overlay {
   z-index: 14000;
-  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  /* Bottom padding must clear the mobile bottom nav bar (58px) + safe area so the
+     confirm/cancel buttons are always reachable. On desktop (≥1200px) the nav is
+     hidden so we fall back to just the safe-area-inset. */
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(74px, calc(58px + env(safe-area-inset-bottom, 0px)));
+}
+@media (min-width: 1200px) {
+  .meme-preview-overlay {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
 }
 .meme-preview-modal {
   width: min(92vw, 520px);
@@ -5112,7 +5338,7 @@ select.form-select {
    fully hiding it, to leave more visual room for pins on small screens. */
 @media (max-width: 720px) {
   .leaflet-control-attribution {
-    font-size: 0.5rem;
+    font-size:0.75rem;
     line-height: 1.2;
     padding: 0 4px;
     max-width: 60vw;
@@ -5843,7 +6069,7 @@ textarea.form-input {
   line-height: 1.2;
 }
 .admin-side-menu .main-side-menu-manual-banner-sub {
-  font-size: 0.72rem;
+  font-size:0.75rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.88);
   line-height: 1.2;
@@ -5910,7 +6136,7 @@ textarea.form-input {
   }
   .date-modal-attendance-note {
     padding-left: 16px !important;
-    font-size: 0.74rem !important;
+    font-size:0.75rem !important;
   }
   .modal-container,
   .modal { margin: 10px; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
@@ -5921,7 +6147,7 @@ textarea.form-input {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
-  .weekday-label { font-size: 0.7rem; }
+  .weekday-label { font-size:0.75rem; }
   .day-cell { min-height: 52px; }
   .url-capsule-badge {
     max-width: min(100%, 240px);
@@ -5998,7 +6224,7 @@ textarea.form-input {
 .poll-deadline-badge {
   padding: 2px 8px;
   border-radius: 9999px;
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -6248,6 +6474,21 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
     min-height: 22px;
   }
 
+  .content-thumb-delete-btn,
+  .modal-body button.content-thumb-delete-btn {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+    aspect-ratio: 1 / 1 !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
+  }
+
   .modal-body {
     padding-left: 18px;
     padding-right: 18px;
@@ -6426,12 +6667,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-hero .dday-expanded-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 2px; }
 .renewal-home-hero .dday-expanded-tag {
   display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.28);
-  border-radius: var(--radius-full); padding: 3px 9px; font-size: 0.66rem; font-weight: 700;
+  border-radius: var(--radius-full); padding: 3px 9px; font-size:0.75rem; font-weight: 700;
 }
 .renewal-home-hero .dday-expanded-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
-.renewal-home-hero .dday-expanded-badge { background: var(--bg-card); color: var(--brand); font-weight: 800; font-size: 0.66rem; padding: 3px 9px; border-radius: var(--radius-full); }
+.renewal-home-hero .dday-expanded-badge { background: var(--bg-card); color: var(--brand); font-weight: 800; font-size:0.75rem; padding: 3px 9px; border-radius: var(--radius-full); }
 .renewal-home-hero .dday-view-btn {
-  background: var(--bg-card); color: var(--brand); font-weight: 800; font-size: 0.68rem; border: none;
+  background: var(--bg-card); color: var(--brand); font-weight: 800; font-size:0.75rem; border: none;
   border-radius: var(--radius-full); padding: 6px 14px; white-space: nowrap; cursor: pointer; transition: transform 0.14s ease, background 0.14s ease;
 }
 .renewal-home-hero .dday-view-btn:hover { background: var(--bg-card)0F2; }
@@ -6451,11 +6692,11 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-home-hero .dday-chip:hover { background: rgba(255,255,255,0.28); }
 .renewal-home-hero .dday-chip:active { transform: scale(0.95); }
-.renewal-home-hero .dday-date { font-size: 0.7rem; font-weight: 800; }
-.renewal-home-hero .dday-dow { font-size: 0.6rem; opacity: 0.85; }
+.renewal-home-hero .dday-date { font-size:0.75rem; font-weight: 800; }
+.renewal-home-hero .dday-dow { font-size:0.75rem; opacity: 0.85; }
 .renewal-home-hero .dday-pill {
   display: inline-block; background: rgba(255,255,255,0.3); border-radius: var(--radius-full);
-  font-size: 0.6rem; font-weight: 800; padding: 1px 7px; margin-top: 2px;
+  font-size:0.75rem; font-weight: 800; padding: 1px 7px; margin-top: 2px;
 }
 
 /* V2 calendar-home surface: Floating cards hierarchy matching Bento reference */
@@ -6521,7 +6762,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-bottom-nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
   position: relative; background: none; border: none; padding: 9px 4px 7px; cursor: pointer;
-  color: var(--text-muted); font-size: 0.64rem; font-weight: 700; font-family: inherit;
+  color: var(--text-muted); font-size:0.75rem; font-weight: 700; font-family: inherit;
 }
 .renewal-shell-bottom-nav-item.is-active {
   color: var(--brand); font-weight: 800;
@@ -6529,17 +6770,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-shell-bottom-nav-item.is-active::before { content: ''; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 4px 4px; background: var(--brand); }
 
-.renewal-records-overview-subtitle { margin: -2px 0 16px; color: var(--text-muted, #64748b); font-size: .84rem; }
-.renewal-records-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.renewal-records-overview-card { display: flex; align-items: center; gap: 10px; min-height: 104px; padding: 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 16px; background: var(--surface, #fff); color: inherit; text-align: left; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
-.renewal-records-overview-card:hover, .renewal-records-overview-card:focus-visible { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(15, 23, 42, .1); outline: none; }
-.renewal-records-overview-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: #eef2ff; font-size: 18px; flex: 0 0 auto; }
-.renewal-records-overview-card-main { display: grid; gap: 3px; min-width: 0; }
-.renewal-records-overview-card-label { font-weight: 800; font-size: .9rem; }
-.renewal-records-overview-card-count { color: var(--brand, #4f46e5); font-weight: 800; font-size: .82rem; }
-.renewal-records-overview-card-hint { color: var(--text-muted, #64748b); font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.renewal-records-overview-arrow { margin-left: auto; color: var(--text-muted, #64748b); font-size: 1.3rem; }
-@media (max-width: 520px) { .renewal-records-overview-grid { grid-template-columns: 1fr; } .renewal-records-overview-card { min-height: 84px; } }
+
 .renewal-shell-upcoming-list { display: flex; flex-direction: column; gap: 6px; }
 .renewal-shell-upcoming-item {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
@@ -6548,7 +6779,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-shell-upcoming-item:hover, .renewal-shell-upcoming-item:focus-visible { border-color: color-mix(in srgb, var(--brand, #4f46e5) 35%, var(--border-subtle, #e2e8f0)); box-shadow: 0 4px 12px rgba(15, 23, 42, .08); transform: translateY(-1px); outline: none; }
 .renewal-shell-upcoming-dday {
-  flex-shrink: 0; font-weight: 800; font-size: 0.72rem; color: #fff;
+  flex-shrink: 0; font-weight: 800; font-size:0.75rem; color: #fff;
   background: linear-gradient(120deg, var(--brand, #4f46e5), #7c3aed); padding: 3px 9px; border-radius: var(--radius-full, 999px); line-height: 1.25; letter-spacing: .01em;
 }
 .renewal-shell-upcoming-label { font-weight: 700; font-size: 0.82rem; color: var(--text-main, #0f172a); }
@@ -6724,7 +6955,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-summary-section { padding: 18px 14px; border: 0; border-radius: 0; background: var(--renewal-card); box-shadow: none; }
 .renewal-home-summary-heading { margin-bottom: 10px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--renewal-muted); }
 .renewal-home-chat-item, .renewal-home-memo-card { border-color: var(--renewal-border); border-radius: 12px; box-shadow: none; }
-.renewal-shell-section-title { font-size: .72rem; letter-spacing: .08em; color: var(--renewal-muted); text-transform: uppercase; }
+.renewal-shell-section-title { font-size:0.75rem; letter-spacing: .08em; color: var(--renewal-muted); text-transform: uppercase; }
 .renewal-home-summary-section:has(.renewal-home-photo-strip) { padding: 0; overflow: hidden; }
 .renewal-home-summary-section:has(.renewal-home-photo-strip) .renewal-home-summary-heading { padding: 18px 14px 0; }
 .renewal-home-summary-section:has(.renewal-home-photo-strip) .renewal-home-photo-strip { gap: 2px; }
@@ -6768,7 +6999,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 @keyframes renewal-dday-heartbeat { 0%,100% { transform: scale(1); } 14% { transform: scale(1.07); } 28% { transform: scale(1); } 42% { transform: scale(1.08); } 70% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .renewal-home-hero .dday-compact-badge { animation: none; } }
-.renewal-home-hero .dday-compact-text { font-size: .7rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.renewal-home-hero .dday-compact-text { font-size:0.75rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .renewal-home-hero .dday-compact-chevron { flex-shrink: 0; opacity: .85; }
 .renewal-home-hero .dday-toggle-wrap.is-open .dday-compact { display: none; }
 .renewal-home-hero .dday-expanded {
@@ -6782,12 +7013,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-hero .dday-expanded-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .renewal-home-hero .dday-expanded-title { font-weight: 800; font-size: .82rem; }
 .renewal-home-hero .dday-expanded-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 2px; }
-.renewal-home-hero .dday-expanded-tag { display: inline-flex; align-items: center; background: rgba(255,255,255,.28); border-radius: 9999px; padding: 3px 9px; font-size: .62rem; font-weight: 700; }
+.renewal-home-hero .dday-expanded-tag { display: inline-flex; align-items: center; background: rgba(255,255,255,.28); border-radius: 9999px; padding: 3px 9px; font-size:0.75rem; font-weight: 700; }
 .renewal-home-hero .dday-expanded-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 .renewal-home-hero .dday-collapse-btn { flex-shrink: 0; background: rgba(255,255,255,.24); border: none; color: #fff; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; }
 .renewal-home-hero .dday-expanded-badge, .renewal-home-hero .dday-view-btn { background: var(--bg-card); color: var(--v2-accent, #7C3AED); font-weight: 800; border-radius: 9999px; }
-.renewal-home-hero .dday-expanded-badge { font-size: .62rem; padding: 3px 8px; }
-.renewal-home-hero .dday-view-btn { border: 0; font-size: .66rem; padding: 6px 12px; white-space: nowrap; cursor: pointer; }
+.renewal-home-hero .dday-expanded-badge { font-size:0.75rem; padding: 3px 8px; }
+.renewal-home-hero .dday-view-btn { border: 0; font-size:0.75rem; padding: 6px 12px; white-space: nowrap; cursor: pointer; }
 
 /* Destination surfaces follow each Full reference's focused-page geometry. */
 .renewal-shell-main.is-chat > .renewal-shell-header,
@@ -6817,7 +7048,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   display: flex; gap: 6px; overflow-x: auto;
 }
 .renewal-shell-main.is-records .renewal-shell-subtab-item {
-  flex: 0 0 auto; font-size: 0.68rem; font-weight: 700; color: var(--text-muted);
+  flex: 0 0 auto; font-size:0.75rem; font-weight: 700; color: var(--text-muted);
   background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: 9999px;
   padding: 5px 12px; cursor: pointer; transition: all .15s ease;
 }
@@ -6935,7 +7166,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-chat div[style*="margin: 24px 0 16px"] > span {
   background: var(--bg-primary) !important;
   color: var(--text-light) !important;
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
   font-weight: 700 !important;
   padding: 4px 12px !important;
   border-radius: 9999px !important;
@@ -6949,7 +7180,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   gap: 6px !important;
 }
 .renewal-shell-main.is-chat .msg-row-hover > span[style*="borderRadius"] {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   padding: 2px 6px !important;
   border-radius: 9999px !important;
@@ -6989,12 +7220,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   max-width: 260px !important;
 }
 .renewal-shell-main.is-chat .chat-reply-quote-author {
-  font-size: 0.6rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   color: var(--v2-accent, #7C3AED) !important;
 }
 .renewal-shell-main.is-chat .chat-reply-quote-text {
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
   color: var(--text-muted) !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -7006,7 +7237,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   right: 4px;
   background: rgba(20,15,35,0.62) !important;
   color: #fff !important;
-  font-size: 0.56rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   padding: 1px 6px !important;
   border-radius: 9999px !important;
@@ -7070,7 +7301,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-records .tag-chip,
 .renewal-shell-main.is-records [data-tag-chip] {
   flex: 0 0 auto;
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 700;
   color: var(--text-muted);
   background: var(--bg-primary);
@@ -7101,20 +7332,20 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-records .memo-tag {
   color: var(--v2-accent, #7C3AED) !important;
   font-weight: 700 !important;
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
 }
 .renewal-shell-main.is-records .memo-comment-input {
   border: 1px solid var(--border-subtle) !important;
   border-radius: 9999px !important;
   padding: 7px 12px !important;
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   background: var(--bg-primary) !important;
 }
 .renewal-shell-main.is-records .memo-comment-send {
   background: var(--brand-soft) !important;
   color: var(--v2-accent, #7C3AED) !important;
   font-weight: 800 !important;
-  font-size: 0.68rem !important;
+  font-size:0.75rem !important;
   border: none !important;
   border-radius: 9999px !important;
   padding: 7px 12px !important;
@@ -7139,7 +7370,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-records .places-category-sticky-tabs { padding: 10px 14px 0; background: var(--bg-primary); }
 .renewal-shell-main.is-records .cat-chip,
 .renewal-shell-main.is-records .places-category-sticky-tabs button {
-  font-size: 0.68rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   color: var(--text-muted) !important;
   background: var(--bg-primary) !important;
@@ -7168,12 +7399,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   color: var(--text-main) !important;
 }
 .renewal-shell-main.is-records .place-addr {
-  font-size: 0.72rem !important;
+  font-size:0.75rem !important;
   color: var(--text-muted) !important;
   margin: 3px 0 !important;
 }
 .renewal-shell-main.is-records .place-note {
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   color: var(--text-light) !important;
 }
 .renewal-shell-main.is-records .place-meta-row {
@@ -7185,12 +7416,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   border-top: 1px solid var(--border-subtle) !important;
 }
 .renewal-shell-main.is-records .place-visit-count {
-  font-size: 0.68rem !important;
+  font-size:0.75rem !important;
   font-weight: 700 !important;
   color: var(--v2-accent, #7C3AED) !important;
 }
 .renewal-shell-main.is-records .place-last-visit {
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
   color: var(--text-light) !important;
   margin-left: auto !important;
 }
@@ -7235,7 +7466,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   margin-bottom: 4px;
 }
 .renewal-shell-main.is-settlement .settlement-card-badge {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   color: var(--v2-accent, #7C3AED) !important;
   background: var(--brand-soft) !important;
@@ -7266,7 +7497,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   cursor: pointer !important;
 }
 .renewal-shell-main.is-settlement .expense-section-label {
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   color: var(--text-light) !important;
   text-transform: uppercase !important;
@@ -7381,7 +7612,7 @@ body:has(.v2-design) {
 .renewal-shell-main.is-calendar .calendar-nav { margin-bottom: 14px; }
 .renewal-shell-main.is-calendar .month-display { font-size: 1rem; }
 .renewal-shell-main.is-calendar .weekday-grid { gap: 2px; margin-bottom: 5px; }
-.renewal-shell-main.is-calendar .weekday-label { padding: 2px 0; font-size: .62rem; }
+.renewal-shell-main.is-calendar .weekday-label { padding: 2px 0; font-size:0.75rem; }
 .renewal-shell-main.is-calendar .days-grid { gap: 2px; grid-auto-rows: 40px; }
 .renewal-shell-main.is-calendar .day-cell,
 .renewal-shell-main.is-calendar .day-cell.other-month,
@@ -7404,14 +7635,14 @@ body:has(.v2-design) {
 }
 .renewal-shell-main.is-calendar .day-cell.today { background: transparent; border: 0; }
 .renewal-shell-main.is-calendar .day-cell.all-available:not(.other-month) { background: transparent; border: 0; box-shadow: none; }
-.renewal-shell-main.is-calendar .day-number { margin: 0 auto; font-size: .66rem; }
+.renewal-shell-main.is-calendar .day-number { margin: 0 auto; font-size:0.75rem; }
 .renewal-shell-main.is-calendar .badges-container { justify-content: center; gap: 2px; }
 .renewal-shell-main.is-calendar .participant-badge {
   min-width: 6px; width: 6px; height: 6px; padding: 0; border-radius: 50%;
   overflow: hidden; font-size: 0; line-height: 0; text-indent: -9999px;
   box-shadow: 0 0 0 1px rgba(30, 27, 46, 0.08); flex-shrink: 0;
 }
-.renewal-shell-main.is-calendar .calendar-legend { margin-top: 10px; padding: 0; gap: 8px 10px; font-size: .6rem; }
+.renewal-shell-main.is-calendar .calendar-legend { margin-top: 10px; padding: 0; gap: 8px 10px; font-size:0.75rem; }
 
 .renewal-shell-main.is-calendar > .renewal-home-summary {
   display: grid;
@@ -7420,7 +7651,7 @@ body:has(.v2-design) {
   padding: 26px 0 0;
 }
 .renewal-shell-main.is-calendar .cal-card { padding: 0; width: 100%; }
-.renewal-shell-main.is-calendar .weekday-label { font-size: 0.6rem; font-weight: 700; color: var(--text-light, #83798F); padding: 3px 0; text-align: center; }
+.renewal-shell-main.is-calendar .weekday-label { font-size:0.75rem; font-weight: 700; color: var(--text-light, #83798F); padding: 3px 0; text-align: center; }
 .renewal-shell-main.is-calendar .day-cell {
   min-height: 40px; border-radius: 8px; padding: 2px 1px; display: flex; flex-direction: column;
   align-items: center; gap: 1px; position: relative; cursor: pointer; background: none; border: none; width: 100%;
@@ -7429,11 +7660,11 @@ body:has(.v2-design) {
 .renewal-shell-main.is-calendar .day-cell:focus-visible { outline: 1.5px solid var(--brand, #7C3AED); outline-offset: 1px; }
 .renewal-shell-main.is-calendar .day-cell.has-event { cursor: pointer; }
 .renewal-shell-main.is-calendar .day-cell.has-event:active { transform: scale(0.93); }
-.renewal-shell-main.is-calendar .day-num { font-size: 0.66rem; font-weight: 700; color: var(--text-main, #1E1B2E); }
+.renewal-shell-main.is-calendar .day-num { font-size:0.75rem; font-weight: 700; color: var(--text-main, #1E1B2E); }
 .renewal-shell-main.is-calendar .day-cell.other-month .day-num { color: var(--text-light, #83798F); opacity: 0.5; }
 .renewal-shell-main.is-calendar .day-cell.today .day-num {
   position: relative; background: var(--brand, #7C3AED); color: var(--on-brand, white); border-radius: 50%; width: 16px; height: 16px;
-  display: flex; align-items: center; justify-content: center; font-size: 0.62rem; z-index: 1;
+  display: flex; align-items: center; justify-content: center; font-size:0.75rem; z-index: 1;
 }
 .renewal-shell-main.is-calendar .day-cell.today .day-num::after {
   content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid var(--brand, #7C3AED);
@@ -7461,13 +7692,13 @@ body:has(.v2-design) {
 }
 .renewal-shell-main.is-calendar .day-anniversary.lvl-1 { bottom: 9px; }
 .renewal-shell-main.is-calendar .day-anniversary-label { display: none; }
-.renewal-shell-main.is-calendar .day-corner-label { display: none; font-size: 0.52rem; font-weight: 700; color: var(--text-light, #83798F); }
+.renewal-shell-main.is-calendar .day-corner-label { display: none; font-size:0.75rem; font-weight: 700; color: var(--text-light, #83798F); }
 .renewal-shell-main.is-calendar .day-corner-label.is-holiday { color: #EF4444; }
 .renewal-shell-main.is-calendar .day-event-title {
-  display: none; font-size: 0.56rem; font-weight: 800; color: var(--brand, #7C3AED); line-height: 1.15;
+  display: none; font-size:0.75rem; font-weight: 800; color: var(--brand, #7C3AED); line-height: 1.15;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px;
 }
-.renewal-shell-main.is-calendar .cal-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 12px 0 10px; font-size: 0.62rem; font-weight: 700; color: var(--text-muted, #6B6580); }
+.renewal-shell-main.is-calendar .cal-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 12px 0 10px; font-size:0.75rem; font-weight: 700; color: var(--text-muted, #6B6580); }
 .renewal-shell-main.is-calendar .cal-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .renewal-shell-main.is-calendar .cal-legend .dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
 
@@ -7475,7 +7706,7 @@ body:has(.v2-design) {
   .renewal-shell-main.is-calendar .day-corner-label,
   .renewal-shell-main.is-calendar .day-event-title { display: block; }
   .renewal-shell-main.is-calendar .day-cell { min-height: 52px; padding: 3px 2px; }
-  .renewal-shell-main.is-calendar .day-num { font-size: 0.74rem; }
+  .renewal-shell-main.is-calendar .day-num { font-size:0.75rem; }
 }
 
 .renewal-shell-main.is-calendar .renewal-home-summary-section,
@@ -7511,7 +7742,7 @@ body:has(.v2-design) {
 }
 .bento-card-title {
   font-weight: 700 !important;
-  font-size: .66rem !important;
+  font-size:0.75rem !important;
   color: var(--text-light) !important;
   letter-spacing: .08em !important;
   text-transform: uppercase !important;
@@ -7526,7 +7757,7 @@ body:has(.v2-design) {
   outline: none !important;
   padding: 0 !important;
   color: var(--text-light) !important;
-  font-size: .64rem !important;
+  font-size:0.75rem !important;
   font-weight: 700 !important;
   cursor: pointer !important;
   transition: color 0.15s ease !important;
@@ -7542,31 +7773,31 @@ body:has(.v2-design) {
   display: flex; align-items: flex-start; gap: 6px; width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; text-align: left;
 }
 .renewal-home-chat-name {
-  flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 18px; padding: 2px 7px; border-radius: 9999px; color: #fff; font-size: .6rem; font-weight: 800; white-space: nowrap;
+  flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 18px; padding: 2px 7px; border-radius: 9999px; color: #fff; font-size:0.75rem; font-weight: 800; white-space: nowrap;
 }
 .renewal-home-chat-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .renewal-home-chat-image { width: 92px; height: 130px; object-fit: cover; border: 2px solid var(--v2-accent-line, #a78bfa); border-radius: 12px; background: var(--v2-surface-2, #e9e5f7); }
 .renewal-home-chat-reply { display: flex; flex-direction: column; width: min(210px, 100%); margin-bottom: 4px; padding: 4px 8px; border-left: 2.5px solid var(--v2-accent, #7c3aed); border-radius: 0 8px 8px 0; background: var(--brand-soft); }
-.renewal-home-chat-reply strong { color: var(--v2-accent, #7c3aed); font-size: .6rem; }
-.renewal-home-chat-reply span { color: var(--text-muted); font-size: .66rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.renewal-home-chat-reply strong { color: var(--v2-accent, #7c3aed); font-size:0.75rem; }
+.renewal-home-chat-reply span { color: var(--text-muted); font-size:0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .renewal-shell-main.is-calendar .renewal-home-chat-text { color: var(--text-main); font-size: .76rem; line-height: 1.4; white-space: normal; }
-.renewal-shell-main.is-calendar .renewal-home-chat-time { margin-top: 3px; color: var(--text-light); font-size: .6rem; }
+.renewal-shell-main.is-calendar .renewal-home-chat-time { margin-top: 3px; color: var(--text-light); font-size:0.75rem; }
 
 .renewal-shell-main.is-calendar .renewal-home-memo-list { gap: 10px; }
 .renewal-shell-main.is-calendar .renewal-home-memo-card {
   display: flex; flex-direction: column; align-items: stretch; gap: 0; width: 100%; padding: 14px; border: 0; border-left: 4px solid var(--renewal-memo-author, var(--border-subtle)); border-radius: 0 14px 14px 0; background: var(--bg-card); box-shadow: 0 4px 14px rgba(30,27,46,.07); text-align: left;
 }
 .renewal-home-memo-title { color: var(--text-main); font-size: .86rem !important; line-height: 1.35; }
-.renewal-home-memo-summary { display: -webkit-box; margin-top: 4px; color: var(--text-muted) !important; font-size: .72rem !important; line-height: 1.45 !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.renewal-home-memo-summary { display: -webkit-box; margin-top: 4px; color: var(--text-muted) !important; font-size:0.75rem !important; line-height: 1.45 !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .renewal-home-memo-preview { display: flex; gap: 10px; margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--bg-primary); }
 .renewal-home-memo-preview img { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 8px; object-fit: cover; }
 .renewal-home-memo-preview > span { min-width: 0; }
 .renewal-home-memo-preview strong, .renewal-home-memo-preview small { display: block; }
-.renewal-home-memo-preview strong { color: var(--text-main); font-size: .74rem !important; }
-.renewal-home-memo-preview small { margin-top: 2px; color: var(--text-muted); font-size: .64rem; line-height: 1.35; }
+.renewal-home-memo-preview strong { color: var(--text-main); font-size:0.75rem !important; }
+.renewal-home-memo-preview small { margin-top: 2px; color: var(--text-muted); font-size:0.75rem; line-height: 1.35; }
 .renewal-home-memo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 10px; }
-.renewal-home-memo-meta b { padding: 2px 7px; border-radius: 9999px; color: #fff; font-size: .58rem; }
-.renewal-home-memo-meta em { color: var(--v2-accent, #7c3aed); font-size: .62rem; font-style: normal; font-weight: 700; }
+.renewal-home-memo-meta b { padding: 2px 7px; border-radius: 9999px; color: #fff; font-size:0.75rem; }
+.renewal-home-memo-meta em { color: var(--v2-accent, #7c3aed); font-size:0.75rem; font-style: normal; font-weight: 700; }
 
 .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery { padding: 28px 0 0 !important; overflow: hidden; }
 .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery .renewal-home-summary-heading { padding: 0 14px; }
@@ -7621,7 +7852,7 @@ body:has(.v2-design) {
   right: 4px;
   background: rgba(20, 15, 35, 0.62) !important;
   color: #fff !important;
-  font-size: 0.56rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   padding: 1px 6px !important;
   border-radius: 9999px !important;
@@ -7649,15 +7880,15 @@ body:has(.v2-design) {
 .renewal-shell-main.is-calendar .renewal-home-place-card { display: block; width: 100%; padding: 12px; border: 0; border-radius: 12px; background: var(--bg-primary); box-shadow: none; text-align: left; }
 .renewal-home-place-copy { display: block; min-width: 0; }
 .renewal-home-place-tags { display: flex; gap: 4px; margin-bottom: 6px; }
-.renewal-home-place-tags em { padding: 2px 6px; border-radius: 9999px; background: #f1f5f9; color: var(--text-muted); font-size: .58rem; font-style: normal; font-weight: 800; }
+.renewal-home-place-tags em { padding: 2px 6px; border-radius: 9999px; background: #f1f5f9; color: var(--text-muted); font-size:0.75rem; font-style: normal; font-weight: 800; }
 .renewal-home-place-tags em.is-planned { background: var(--brand-soft); color: var(--v2-accent, #7c3aed); }
 .renewal-home-place-tags em.is-visited { background: #ecfdf5; color: #059669; }
 .renewal-shell-main.is-calendar .renewal-home-place-card strong { color: var(--text-main); font-size: .8rem; }
-.renewal-shell-main.is-calendar .renewal-home-place-card small { margin-top: 2px; color: var(--text-muted); font-size: .68rem; }
+.renewal-shell-main.is-calendar .renewal-home-place-card small { margin-top: 2px; color: var(--text-muted); font-size:0.75rem; }
 .renewal-shell-main.is-calendar .renewal-home-place-card .renewal-home-place-note {
   overflow: hidden;
   color: var(--text-light);
-  font-size: .64rem;
+  font-size: max(12px, 0.8rem);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -7686,7 +7917,7 @@ body:has(.v2-design) {
   border-top: 0;
   border-radius: 0 0 18px 18px;
   box-shadow: 0 1px 4px rgba(30, 27, 46, 0.05);
-  font-size: 0.62rem;
+  font-size:0.75rem;
   font-weight: 700;
   color: var(--text-muted);
   box-sizing: border-box;
@@ -7703,8 +7934,8 @@ body:has(.v2-design) {
   box-shadow: 0 0 0 1px rgba(30, 27, 46, 0.08);
 }
 
-.renewal-home-footer { padding: 24px 14px 86px; text-align: center; color: var(--text-light); font-size: .62rem; }
-.renewal-home-footer-links { display: flex; justify-content: center; gap: 12px; margin-top: 8px; color: var(--text-muted); font-size: .6rem; }
+.renewal-home-footer { padding: 24px 14px 86px; text-align: center; color: var(--text-light); font-size:0.75rem; }
+.renewal-home-footer-links { display: flex; justify-content: center; gap: 12px; margin-top: 8px; color: var(--text-muted); font-size:0.75rem; }
 
 /* Side Nav Styling matching BentoPinkFinal */
 .side-nav-backdrop {
@@ -7737,10 +7968,10 @@ body:has(.v2-design) {
 .side-nav-item-icon { display: inline-flex; flex-shrink: 0; }
 .side-nav-item-title { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .side-nav-item-meta {
-  margin-left: auto; font-size: 0.66rem; font-weight: 600; color: var(--text-light); flex-shrink: 0;
+  margin-left: auto; font-size:0.75rem; font-weight: 600; color: var(--text-light); flex-shrink: 0;
   max-width: 6.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.side-nav-item-badge { background: #ef4444; color: #fff; font-size: 0.56rem; font-weight: 800; padding: 1px 6px; border-radius: 9999px; margin-left: 4px; }
+.side-nav-item-badge { background: #ef4444; color: #fff; font-size:0.75rem; font-weight: 800; padding: 1px 6px; border-radius: 9999px; margin-left: 4px; }
 .side-nav-manual-banner {
   width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
   background: var(--brand-soft); border: none; border-radius: 12px; padding: 10px 10px 10px 8px;
@@ -7753,12 +7984,12 @@ body:has(.v2-design) {
 }
 .side-nav-manual-banner-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .side-nav-manual-banner-title { font-weight: 800; font-size: 0.82rem; color: var(--v2-accent, #7c3aed); }
-.side-nav-manual-banner-sub { font-size: 0.66rem; font-weight: 600; color: var(--text-muted); margin-top: 1px; }
+.side-nav-manual-banner-sub { font-size:0.75rem; font-weight: 600; color: var(--text-muted); margin-top: 1px; }
 .side-nav-manual-banner-chevron { flex-shrink: 0; color: var(--v2-accent, #7c3aed); opacity: 0.7; display: flex; }
 .side-nav-collapse-btn {
   display: none; width: 100%; align-items: center; justify-content: center; gap: 6px; margin-top: 6px;
   background: none; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 7px;
-  font-weight: 700; font-size: 0.72rem; color: var(--text-muted); cursor: pointer;
+  font-weight: 700; font-size:0.75rem; color: var(--text-muted); cursor: pointer;
 }
 .side-nav-collapse-btn:hover { background: var(--bg-primary); color: var(--v2-accent, #7c3aed); }
 
@@ -7804,7 +8035,7 @@ body:has(.v2-design) {
   .renewal-shell-main.is-calendar .day-anniversary:has(.day-anniversary-label) { height: 13px; bottom: 3px; }
   .renewal-shell-main.is-calendar .day-anniversary.lvl-1:has(.day-anniversary-label) { bottom: 20px; }
   .renewal-shell-main.is-calendar .day-anniversary-label {
-    display: block; font-size: 0.5rem; font-weight: 800; color: #fff; white-space: nowrap;
+    display: block; font-size:0.75rem; font-weight: 800; color: #fff; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
   }
   .renewal-home-footer { padding-bottom: 34px; }
@@ -7890,7 +8121,7 @@ body:has(.v2-design) {
   }
   .renewal-shell-main.is-calendar .day-cell { min-height: 76px !important; padding: 5px 3px !important; }
   .renewal-shell-main.is-calendar .day-num { font-size: 0.8rem !important; }
-  .renewal-shell-main.is-calendar .day-event-title { font-size: 0.6rem !important; }
+  .renewal-shell-main.is-calendar .day-event-title { font-size:0.75rem !important; }
 }
 
 /* ===== BentoPinkFinal lock — last rules, v2 only. Wins earlier renewal layers. ===== */
@@ -8083,7 +8314,7 @@ body:has(.v2-design) {
   }
   .renewal-shell-main.is-calendar .day-cell { min-height: 76px !important; padding: 5px 3px !important; }
   .renewal-shell-main.is-calendar .day-num { font-size: 0.8rem !important; }
-  .renewal-shell-main.is-calendar .day-event-title { font-size: 0.6rem !important; display: block !important; }
+  .renewal-shell-main.is-calendar .day-event-title { font-size:0.75rem !important; display: block !important; }
   .renewal-home-footer { padding-bottom: 40px !important; }
 }
 
@@ -8188,3 +8419,43 @@ button.toggle-switch[role="switch"] {
   background: #C9FD58 !important;
   color: #0D0D0D !important;
 }
+
+/* Photo grids performance: skip layout/paint of offscreen thumbnails */
+.archive-photo-grid > * {
+  content-visibility: auto;
+  contain-intrinsic-size: 90px 90px;
+}
+
+body .modal-overlay.region-filter-overlay .modal-header > h3 .region-setting-current-location {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: var(--brand, #7c2fe5) !important;
+  margin-left: 8px !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-detail-header .weather-detail-location-copy > span {
+  margin-top: -4px !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-highlight-content-right {
+  position: relative;
+  z-index: 3;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  cursor: grab !important;
+  user-select: none !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline:active {
+  cursor: grabbing !important;
+}
+
+body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+

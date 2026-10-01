@@ -6,6 +6,7 @@ import {
   isChatNotifyEnabledForCalendar,
   isNotificationSupported,
   probeNotificationCapability,
+  setNotifyChannel,
   setChatNotifyEnabledForCalendar,
   setNotifGuideSeen,
   subscribeUserToPush,
@@ -34,6 +35,20 @@ export function useNotificationPwaState({
     typeof getNotifyChannels === 'function' ? getNotifyChannels() : { ...DEFAULT_NOTIFY_CHANNELS }
   ));
 
+  // `mainChatNotifyEnabled` is the per-calendar switch the user sees in the side menu.  Make
+  // it authoritative for the matching server-side channel whenever it is on.  Before this,
+  // a legacy/global `channels.chat: false` value was copied onto the subscription even though
+  // the master switch displayed "on", so Cloud Functions legitimately skipped that device.
+  const getChatDeliveryOptions = React.useCallback(() => {
+    let channels = null;
+    try { channels = typeof getNotifyChannels === 'function' ? getNotifyChannels() : null; } catch (_) {}
+    if (channels?.chat === false && typeof setNotifyChannel === 'function') {
+      const next = setNotifyChannel('chat', true);
+      setNotifyChannelsState(next);
+    }
+    return { channelOverrides: { chat: true } };
+  }, []);
+
   React.useEffect(() => {
     setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
     setMainNotifPermission(readNotificationPermission());
@@ -50,7 +65,7 @@ export function useNotificationPwaState({
       } catch (_) {}
       if (!participantId) return;
       try {
-        await ensurePushSubscriptionHealthy(activeCalId, participantId);
+        await ensurePushSubscriptionHealthy(activeCalId, participantId, getChatDeliveryOptions());
       } catch (error) {
         console.warn('push health:', error);
       }
@@ -66,15 +81,15 @@ export function useNotificationPwaState({
       window.removeEventListener('focus', run);
       clearInterval(intervalId);
     };
-  }, [activeCalId, firebaseDb, mainChatNotifyEnabled]);
+  }, [activeCalId, firebaseDb, getChatDeliveryOptions, mainChatNotifyEnabled]);
 
   React.useEffect(() => {
     if (!activeCalId || !chatParticipantId) return;
     if (!mainChatNotifyEnabled || mainNotifPermission !== 'granted') return;
-    subscribeUserToPush(activeCalId, chatParticipantId).then(result => {
+    subscribeUserToPush(activeCalId, chatParticipantId, getChatDeliveryOptions()).then(result => {
       if (result && !result.ok) console.warn('Main chat notification auto-subscribe skipped:', result.reason);
     });
-  }, [activeCalId, chatParticipantId, mainChatNotifyEnabled, mainNotifPermission]);
+  }, [activeCalId, chatParticipantId, getChatDeliveryOptions, mainChatNotifyEnabled, mainNotifPermission]);
 
   const openNotificationHelp = React.useCallback(() => setIsNotificationHelpOpen(true), []);
   const handleMainToggleNotifications = React.useCallback(async () => {
@@ -104,10 +119,10 @@ export function useNotificationPwaState({
       setMainChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(activeCalId, next);
       if (next) {
-        let result = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId());
+        let result = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
         if (result && !result.ok) {
           await new Promise(resolve => setTimeout(resolve, 400));
-          result = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId());
+          result = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
         }
         if (result && !result.ok) {
           setMainChatNotifyEnabled(false);
@@ -148,10 +163,10 @@ export function useNotificationPwaState({
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
     setMainChatNotifyEnabled(true);
-    let subscribeResult = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId());
+    let subscribeResult = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
     if (subscribeResult && !subscribeResult.ok) {
       await new Promise(resolve => setTimeout(resolve, 400));
-      subscribeResult = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId());
+      subscribeResult = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
     }
     if (subscribeResult && !subscribeResult.ok) {
       setMainChatNotifyEnabled(false);
@@ -163,7 +178,7 @@ export function useNotificationPwaState({
     }
     showToast('알림이 켜졌습니다.', 'success');
     if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-  }, [activeCalId, getCurrentParticipantId, mainChatNotifyEnabled, openNotificationHelp, showToast]);
+  }, [activeCalId, getChatDeliveryOptions, getCurrentParticipantId, mainChatNotifyEnabled, openNotificationHelp, showToast]);
 
   return {
     mainNotifPermission,

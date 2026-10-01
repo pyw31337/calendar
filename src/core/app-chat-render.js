@@ -173,7 +173,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const isMemeAsset = msg?.uploadSource === 'meme'
     || entries.some(entry => /\/memePool(?:%2F|\/)/i.test(String(entry.full || entry.thumb || '')));
   const imageLoading = isMemeAsset ? 'eager' : 'lazy';
-  const resolvedEntries = entries.map(entry => ({ entry, resolved: resolvePhotoAsset(entry) }))
+  const resolvedEntries = entries.map(entry => ({ entry, resolved: resolvePhotoAsset(entry, { surface: 'chat-bubble' }) }))
     .filter(item => item.resolved.state === 'ready' && item.resolved.displaySrc);
   if (resolvedEntries.length === 0) return null;
   const displayUrls = resolvedEntries.map(item => item.entry.full || item.resolved.full);
@@ -196,7 +196,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     const resolved = resolvedEntries[0].resolved;
     // The bubble caps display to maxWidth 420px/60vh (singleImageStyle below), so the small
     // thumb (480px cap) is already higher resolution than this ever needs to render at -- using
-    // the full/original asset here (up to a 2000px-capped JPEG, or an untouched original up to
+    // the full/original asset here (up to a 2000px WebP, or an untouched original up to
     // 1.5MB) downloads and decodes several times more data than the bubble can even show. The
     // lightbox onClick below still opens `displayUrls` (the full asset) when the user taps in.
     // If the thumb 404s, bindChatPhotoFallback swaps in the original of the same pair.

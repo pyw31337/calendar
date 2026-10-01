@@ -6,6 +6,7 @@ import {
 import { reverseGeocodeCoords } from './app-place-search.js';
 import { firebaseConfig, isStorageDisabled, ensureFirebaseStorageReady, checkFirebaseStorageHealth, writeCollectionDocumentWithFallback, fetchMessageRest } from './app-firebase-data.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
+import { CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY, SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY } from './image-variants.js';
 
 // Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
 // global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
@@ -185,6 +186,18 @@ function isHeicFile(file) {
   return name.endsWith('.heic') || name.endsWith('.heif');
 }
 
+// Google Photos and the iOS/macOS share sheet occasionally expose an otherwise normal JPEG
+// with an empty MIME type.  MIME alone therefore makes a multiple-selection look as though the
+// later photos disappeared before compression even started.  Keep the allowlist explicit (no
+// video/document catch-all), but let a recognised filename participate in the same pipeline.
+const IMAGE_UPLOAD_FILE_EXTENSION = /\.(?:avif|bmp|gif|heic|heif|jpe?g|png|webp)$/i;
+function isImageUploadFile(file) {
+  if (!file) return false;
+  return /^image\//i.test(String(file.type || ''))
+    || isHeicFile(file)
+    || IMAGE_UPLOAD_FILE_EXTENSION.test(String(file.name || ''));
+}
+
 // Wraps Image() decoding with a timeout so one stuck/malformed file can't hang a whole batch
 // indefinitely (the caller is otherwise waiting on onload/onerror, which some browsers never
 // fire for certain corrupt inputs).
@@ -225,6 +238,40 @@ function resetHeic2anyLoader() {
   window.heic2any = null;
 }
 
+// A filename, MIME type, size, and EXIF fields are useful diagnostics, but none of them is a
+// safe duplicate key on its own: a user can rename a photo, a messenger can rewrite its MIME,
+// and two different frames can share every EXIF value.  Keep that descriptor for traceability,
+// then use a SHA-256 of the original bytes as the actual identity.  This intentionally happens
+// before any resize/re-encode, so the same original is recognised even when a browser would
+// produce slightly different compressed JPEG bytes on a later upload.
+function imageFingerprintFallback(file, metadata, sniffed) {
+  const name = String(file?.name || '').trim().toLowerCase();
+  const type = String(sniffed?.mime || file?.type || '').trim().toLowerCase();
+  const capturedAt = String(metadata?.capturedAt || '').trim();
+  const device = String(metadata?.device || '').trim().toLowerCase();
+  const coordinates = Number.isFinite(Number(metadata?.latitude)) && Number.isFinite(Number(metadata?.longitude))
+    ? `${Number(metadata.latitude).toFixed(6)},${Number(metadata.longitude).toFixed(6)}`
+    : '';
+  return [name, type, Number(file?.size) || 0, Number(file?.lastModified) || 0, capturedAt, device, coordinates].join('|');
+}
+
+async function buildImageFingerprint(file, metadata, sniffed) {
+  const fallback = imageFingerprintFallback(file, metadata, sniffed);
+  try {
+    if (file?.arrayBuffer && globalThis.crypto?.subtle?.digest) {
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      if (hex) return { value: `sha256:${hex}`, strength: 'content', fallback };
+    }
+  } catch (error) {
+    // A file can disappear while an iOS share sheet is closing.  The descriptor fallback still
+    // prevents an immediate identical retry from being uploaded twice; never fail a valid photo
+    // merely because the optional fingerprint read lost its source handle.
+    console.warn('Image fingerprint digest unavailable; using descriptor fallback.', error);
+  }
+  return { value: `descriptor:${fallback}`, strength: 'descriptor', fallback };
+}
+
 async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
   // Messengers often rewrite the bytes (JPEG/HEIC) while keeping a .png name or a wrong MIME.
   // Sniff the header so decode/encode follow the real format instead of the filename.
@@ -232,6 +279,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
   const workingFile = withCorrectedImageFile(file, sniffed) || file;
   let sourceBlob = workingFile;
   const metadata = await extractPhotoMetadata(workingFile).catch(() => null);
+  const imageFingerprint = await buildImageFingerprint(workingFile, metadata, sniffed);
   let img = null;
   const treatAsHeic = isHeicFile(workingFile) || sniffed?.kind === 'heic';
 
@@ -370,13 +418,17 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
-    // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers) --
-    // this path only fires for genuinely oversized sources (small ones already return the
-    // original file untouched below), so a bigger cap and higher quality here doesn't cost much:
-    // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is.
+    // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers).
+    // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is,
+    // so every stored still-image original uses this 2000px / WebP 0.85 encode. A camera
+    // JPG/PNG is not uploaded once that WebP blob exists. Animated GIF cannot survive a
+    // canvas re-encode, so a GIF that already fit the old small-file rule stays the original
+    // bytes; oversized GIFs still follow the canvas path below.
     const maxDimHigh = 2000;
     const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
-    if (!isOversized && workingFile.size <= 1.5 * 1024 * 1024) {
+    const gifName = (workingFile.name || file.name || '').toLowerCase();
+    const isGif = sniffed?.kind === 'gif' || (!sniffed && (workingFile.type === 'image/gif' || gifName.endsWith('.gif')));
+    if (isGif && !isOversized && workingFile.size <= 1.5 * 1024 * 1024) {
       return Promise.resolve(workingFile);
     }
     return new Promise(res => {
@@ -390,36 +442,55 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
-      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
+      try {
+        canvas.toBlob(webpBlob => {
+          if (webpBlob && webpBlob.type === 'image/webp' && webpBlob.size > 0) {
+            res(webpBlob);
+          } else if (isPng) {
+            canvas.toBlob(pngBlob => res(pngBlob), 'image/png');
+          } else {
+            canvas.toBlob(jpgBlob => res(jpgBlob), 'image/jpeg', 0.85);
+          }
+        }, 'image/webp', 0.85);
+      } catch (_) {
+        if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+        else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
+      }
     });
   };
 
-  const getHighQualityThumbBlob = () => {
+  const encodeScaledWebpBlob = (maxEdge, quality) => {
     if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
-      // 640px: this thumb is shared by the gallery grid (~122px cells) and the single-image
-      // chat bubble (renderChatMessageImages caps that display at maxWidth 420px/60vh and
-      // intentionally reuses this thumb instead of the full asset). A 480px cap (tried in
-      // #556) visibly softened the chat bubble on retina/high-DPI screens -- a 420 CSS px
-      // bubble on a 2x+ display needs 840px+ of real pixels to look sharp, and 480px fell far
-      // short. Reverted back to 640px; the gallery grid can live with the larger per-photo
-      // bytes since 640px is still well under the un-thumbed full asset.
-      const maxDimThumb = 640;
-      if (w > maxDimThumb || h > maxDimThumb) {
-        if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
-        else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
+      if (w > maxEdge || h > maxEdge) {
+        if (w > h) { h = Math.round(h * maxEdge / w); w = maxEdge; }
+        else { w = Math.round(w * maxEdge / h); h = maxEdge; }
       }
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       const isPng = sniffed?.kind === 'png' || (!sniffed && (workingFile.type === 'image/png' || (workingFile.name || file.name || '').toLowerCase().endsWith('.png')));
-      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
-      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.82);
+      try {
+        canvas.toBlob(webpBlob => {
+          if (webpBlob && webpBlob.type === 'image/webp' && webpBlob.size > 0) {
+            res(webpBlob);
+          } else if (isPng) {
+            canvas.toBlob(pngBlob => res(pngBlob), 'image/png');
+          } else {
+            canvas.toBlob(jpgBlob => res(jpgBlob), 'image/jpeg', 0.82);
+          }
+        }, 'image/webp', quality);
+      } catch (_) {
+        if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+        else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.82);
+      }
     });
   };
+  // 512px stays the chat-bubble thumb. Grids use the 160px sibling instead.
+  const getHighQualityThumbBlob = () => encodeScaledWebpBlob(CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY);
+  const getSmallThumbBlob = () => encodeScaledWebpBlob(SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY);
 
   let originalMeta = null;
   let thumbnailMeta = null;
@@ -430,10 +501,11 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 
   const highQualityBlob = await getHighQualityBlob();
   const highQualityThumbBlob = await getHighQualityThumbBlob();
+  const highQualitySmallBlob = await getSmallThumbBlob();
 
   return new Promise((resolve) => {
     const objectUrls = [];
-    const finish = (origBlob, thumbBlob) => {
+    const finish = (origBlob, thumbBlob, smallBlob) => {
       let originalStr = originalMeta ? originalMeta.base64 : null;
       let thumbnailStr = thumbnailMeta ? thumbnailMeta.base64 : null;
       if (preferStorage) {
@@ -453,8 +525,13 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
         thumbnail: thumbnailStr,
         originalBlob: origBlob,
         thumbnailBlob: thumbBlob,
+        smallThumbBlob: smallBlob || null,
         needsBase64Fallback: preferStorage,
         metadata,
+        // Persisted beside the eventual URL in the message/memo record.  Tags and comments are
+        // still keyed to their asset URL; this field is only for duplicate prevention.
+        fingerprint: imageFingerprint.value,
+        fingerprintStrength: imageFingerprint.strength,
         _objectUrls: objectUrls
       });
     };
@@ -469,7 +546,11 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       else if (thumbnailMeta && thumbnailMeta.canvas) thumbnailMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnailMeta.quality);
       else getOrig(cb);
     };
-    getOrig(origBlob => getThumb(thumbBlob => finish(origBlob, thumbBlob)));
+    const getSmall = (cb) => {
+      if (highQualitySmallBlob) cb(highQualitySmallBlob);
+      else cb(null);
+    };
+    getOrig(origBlob => getThumb(thumbBlob => getSmall(smallBlob => finish(origBlob, thumbBlob, smallBlob))));
   });
 }
 
@@ -493,20 +574,22 @@ async function extractPhotoMetadata(file) {
   if (!file) return null;
   const exifr = await loadExifr();
   if (typeof exifr?.parse !== 'function') return null;
-  // `latitude`/`longitude` are values exifr COMPUTES from the raw GPS tags -- they are not tags
-  // themselves, so picking only them made exifr skip the GPS block and never return a position
-  // (no photo ever got a location tag). Pick the raw GPS tags; exifr then adds latitude/longitude.
-  const exif = await exifr.parse(file, {
-    pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef']
-  });
-  if (!exif) return null;
+  // `exifr.gps()` is the library's dedicated, computed-coordinate reader.  A selective `parse`
+  // call only sees raw EXIF fields and can miss GPS blocks exported by Google Photos, so read the
+  // compact general metadata and the coordinate-only view independently.  Either result is useful
+  // on its own (for example, a privacy-stripped file can retain the capture date but no GPS).
+  const [exif, gps] = await Promise.all([
+    exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model'] }).catch(() => null),
+    typeof exifr.gps === 'function' ? exifr.gps(file).catch(() => null) : Promise.resolve(null)
+  ]);
+  if (!exif && !gps) return null;
   const result = {};
-  const date = exif.DateTimeOriginal || exif.CreateDate;
+  const date = exif?.DateTimeOriginal || exif?.CreateDate;
   if (date instanceof Date && !Number.isNaN(date.getTime())) result.capturedAt = date.toISOString();
-  const make = String(exif.Make || '').trim();
-  const model = String(exif.Model || '').trim();
+  const make = String(exif?.Make || '').trim();
+  const model = String(exif?.Model || '').trim();
   if (make || model) result.device = [make, model].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 100);
-  const lat = Number(exif.latitude), lon = Number(exif.longitude);
+  const lat = Number(gps?.latitude ?? exif?.latitude), lon = Number(gps?.longitude ?? exif?.longitude);
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     result.latitude = Number(lat.toFixed(6)); result.longitude = Number(lon.toFixed(6));
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
@@ -605,6 +688,150 @@ function revokeCompressedObjectUrls(compressed) {
 // full-size blobs.
 const imagePreprocessCache = new Map();
 const IMAGE_PREPROCESS_CACHE_LIMIT = 80;
+export const MAX_IMAGE_UPLOADS_PER_ACTION = 200;
+
+function getImageUploadCandidates(files) {
+  return Array.from(files || []).filter(isImageUploadFile);
+}
+
+// Keep the product limit at the selection boundary.  The subsequent 50-photo batching is only a
+// Firestore *record* constraint, never an upload/action limit.
+function limitImageUploadSelection(files, maxImages = MAX_IMAGE_UPLOADS_PER_ACTION) {
+  const candidates = getImageUploadCandidates(files);
+  const limit = Math.max(1, Number(maxImages) || MAX_IMAGE_UPLOADS_PER_ACTION);
+  return {
+    candidates,
+    selected: candidates.slice(0, limit),
+    omittedCount: Math.max(0, candidates.length - limit)
+  };
+}
+// The page hydrates this index from already-saved message and memo records.  It is deliberately
+// calendar-scoped: the same stock photo may be useful in two different family calendars, while a
+// second copy in one calendar only creates another gallery asset with ambiguous tags/comments.
+const knownImageFingerprintsByCalendar = new Map();
+const KNOWN_IMAGE_FINGERPRINT_LIMIT = 6000;
+const FINGERPRINT_QUERY_CHUNK_SIZE = 30;
+
+function normalizeImageFingerprint(value) {
+  const fingerprint = String(value || '').trim();
+  return /^(?:sha256|descriptor):.+$/i.test(fingerprint) ? fingerprint : '';
+}
+
+function rememberKnownImageFingerprints(calendarId, values) {
+  const id = String(calendarId || '').trim();
+  if (!id) return;
+  const next = new Set(knownImageFingerprintsByCalendar.get(id) || []);
+  Array.from(values || []).forEach(value => {
+    const fingerprint = normalizeImageFingerprint(value);
+    if (fingerprint) next.add(fingerprint);
+  });
+  // Preserve the most recently seen values without allowing a long-running gallery session to
+  // grow without bound.  A server reload rebuilds the complete index from persisted data.
+  while (next.size > KNOWN_IMAGE_FINGERPRINT_LIMIT) next.delete(next.values().next().value);
+  knownImageFingerprintsByCalendar.set(id, next);
+}
+
+function getKnownImageFingerprintSet(calendarId) {
+  return knownImageFingerprintsByCalendar.get(String(calendarId || '').trim()) || new Set();
+}
+
+function readFirestoreFingerprintValues(document) {
+  const values = document?.fields?.imageFingerprints?.arrayValue?.values;
+  return Array.isArray(values)
+    ? values.map(value => value?.stringValue || '').filter(Boolean)
+    : [];
+}
+
+// The normal chat and gallery windows are deliberately paginated, so duplicate detection also
+// needs to see older media.  The previous approach listed *every* message and memo field on the
+// first upload in each browser tab.  Field masks reduce bytes, not Firestore document reads;
+// a long-running calendar therefore paid one read per historic record for every fresh client.
+//
+// Query only the submitted fingerprints instead.  `array-contains-any` supports 30 values, so
+// a 200-photo selection makes at most 14 small queries (two collections) and returns only
+// matched records.  This preserves exact historical duplicate protection without a full scan.
+async function lookupKnownImageFingerprintsForCalendar(calendarId, candidateValues) {
+  const id = String(calendarId || '').trim();
+  if (!id) return;
+  const projectId = String(firebaseConfig?.projectId || '').trim();
+  if (!projectId || typeof fetch !== 'function') return;
+  const known = getKnownImageFingerprintSet(id);
+  const candidates = Array.from(new Set(Array.from(candidateValues || [])
+    .map(normalizeImageFingerprint)
+    .filter(fingerprint => fingerprint && !known.has(fingerprint))));
+  if (candidates.length === 0) return;
+
+  const queryCollection = async (collection, fingerprints) => {
+    const parent = `projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(id)}`;
+    const response = await fetch(`https://firestore.googleapis.com/v1/${parent}:runQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: collection }],
+          select: { fields: [{ fieldPath: 'imageFingerprints' }] },
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'imageFingerprints' },
+              op: 'ARRAY_CONTAINS_ANY',
+              value: { arrayValue: { values: fingerprints.map(value => ({ stringValue: value })) } }
+            }
+          }
+        }
+      })
+    });
+    if (!response.ok) throw new Error(`fingerprint lookup ${collection} status ${response.status}`);
+    const rows = await response.json();
+    (Array.isArray(rows) ? rows : [rows])
+      .filter(row => row?.document)
+      .forEach(row => rememberKnownImageFingerprints(id, readFirestoreFingerprintValues(row.document)));
+  };
+
+  const chunks = [];
+  for (let offset = 0; offset < candidates.length; offset += FINGERPRINT_QUERY_CHUNK_SIZE) {
+    chunks.push(candidates.slice(offset, offset + FINGERPRINT_QUERY_CHUNK_SIZE));
+  }
+  const requests = [];
+  chunks.forEach(chunk => {
+    requests.push(queryCollection('messages', chunk), queryCollection('memos', chunk));
+  });
+  await Promise.all(requests).catch(error => {
+    // Do not turn a read-only duplicate check into an upload blocker.  The selection-level hash
+    // dedupe still runs and any loaded records remain in the local index.
+    console.warn('Image fingerprint lookup skipped:', error);
+  });
+}
+
+// Compatibility export for older integration code.  An empty candidate set is intentionally a
+// no-op: a blind collection hydration would recreate the read-amplification bug above.
+async function hydrateKnownImageFingerprintsForCalendar(calendarId) {
+  return lookupKnownImageFingerprintsForCalendar(calendarId, []);
+}
+
+function selectNonDuplicateCompressedImages(calendarId, compressedList) {
+  const known = getKnownImageFingerprintSet(calendarId);
+  const seen = new Set(known);
+  const accepted = [];
+  const duplicateIndexes = [];
+  Array.from(compressedList || []).forEach((item, index) => {
+    // Existing assets are an edit form's own retained slots, not uploads.  They must never be
+    // filtered even though their fingerprint can already appear in the saved-record index.
+    if (item?.isExisting) {
+      accepted.push({ item, index });
+      return;
+    }
+    const fingerprint = normalizeImageFingerprint(item?.fingerprint);
+    if (fingerprint && seen.has(fingerprint)) {
+      duplicateIndexes.push(index);
+      return;
+    }
+    if (fingerprint) seen.add(fingerprint);
+    accepted.push({ item, index });
+  });
+  return { accepted, duplicateIndexes };
+}
+
 function getImagePreprocessCacheKey(file) {
   if (!file) return '';
   return [file.name || '', file.size || 0, file.lastModified || 0, file.type || ''].join('::');
@@ -660,7 +887,9 @@ async function processImageFilesSequentially(files, onProgress) {
   await acquireMediaUploadWakeLock();
   try {
   await checkFirebaseStorageHealth().catch(() => {});
-  const list = Array.from(files || []).sort((a, b) => String(a && a.name || '').localeCompare(String(b && b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const list = Array.from(files || [])
+    .map((file, sourceIndex) => ({ file, sourceIndex }))
+    .sort((a, b) => String(a.file && a.file.name || '').localeCompare(String(b.file && b.file.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
   const succeeded = new Array(list.length);
   const failed = [];
   const startedAt = Date.now();
@@ -689,7 +918,8 @@ async function processImageFilesSequentially(files, onProgress) {
     while (true) {
       const i = cursor++;
       if (i >= list.length) return;
-      const file = list[i];
+      const source = list[i];
+      const file = source.file;
       report(file && file.name);
       try {
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -701,9 +931,16 @@ async function processImageFilesSequentially(files, onProgress) {
           succeeded[i] = await compressImageToDataUrls(file);
           rememberPreprocessedImage(file, succeeded[i]);
         }
+        // `failed` retries and upload chunks must retain the original picker identity even though
+        // processing is name-sorted for a stable progress order.  Non-enumerable bookkeeping is
+        // deliberately excluded from Firestore/queue payloads.
+        Object.defineProperties(succeeded[i], {
+          sourceIndex: { value: source.sourceIndex, writable: true, configurable: true, enumerable: false },
+          sourceFile: { value: file, writable: true, configurable: true, enumerable: false }
+        });
         await new Promise(resolve => setTimeout(resolve, 0));
       } catch (err) {
-        failed.push({ fileName: file && file.name, error: err });
+        failed.push({ fileName: file && file.name, index: source.sourceIndex, file, error: err });
         succeeded[i] = null;
       }
       completed += 1;
@@ -713,7 +950,23 @@ async function processImageFilesSequentially(files, onProgress) {
 
   await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
   if (onProgress) onProgress({ current: list.length, total: list.length, fileName: null, pct: 100, remainingSec: 0 });
-  return { succeeded: succeeded.filter(Boolean), failed };
+  // File pickers and share sheets can hand us the exact same byte stream twice (especially when
+  // a single photo is selected from both "recent" and "files").  Filter after preprocessing so
+  // every format, including HEIC converted for preview, has the same original-byte identity.
+  const batchFingerprints = new Set();
+  const duplicates = [];
+  const uniqueSucceeded = succeeded.filter((item, index) => {
+    if (!item) return false;
+    const fingerprint = normalizeImageFingerprint(item.fingerprint);
+    if (!fingerprint || !batchFingerprints.has(fingerprint)) {
+      if (fingerprint) batchFingerprints.add(fingerprint);
+      return true;
+    }
+    duplicates.push({ fileName: list[index]?.file?.name || '', fingerprint });
+    revokeCompressedObjectUrls(item);
+    return false;
+  });
+  return { succeeded: uniqueSucceeded, failed, duplicates };
   } finally {
     releaseMediaUploadWakeLock();
   }
@@ -721,13 +974,20 @@ async function processImageFilesSequentially(files, onProgress) {
 
 // Chunk resolved images so a base64-fallback batch never exceeds Firestore's 1MiB/doc limit.
 const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 120000; // large images must use Storage URLs, not Firestore
+// Firestore rules cap each parallel media array at 50 slots. A user may select more photos in
+// one action, but they must be split into separate message documents before the write so an
+// otherwise valid Storage-url batch cannot be rejected just because its URLs are small.
+const CHAT_MESSAGE_MAX_IMAGE_SLOTS = 50;
 function chunkResolvedImagesForMessages(resolvedImages) {
   const chunks = [];
   let current = [];
   let currentBytes = 0;
   for (const img of resolvedImages) {
     const imgBytes = (img.imageUrl?.length || 0) + (img.thumbUrl?.length || 0);
-    if (current.length > 0 && currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET) {
+    if (current.length > 0 && (
+      current.length >= CHAT_MESSAGE_MAX_IMAGE_SLOTS
+      || currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET
+    )) {
       chunks.push(current);
       current = [];
       currentBytes = 0;
@@ -788,22 +1048,22 @@ async function appendChatImageFiles({
   setChatImages,
   showToast
 }) {
-  const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+  const imageFiles = getImageUploadCandidates(files);
   if (imageFiles.length === 0) return { handled: false, succeeded: 0, failed: 0 };
 
-  const remainingSlots = 50 - currentCount;
+  const remainingSlots = MAX_IMAGE_UPLOADS_PER_ACTION - currentCount;
   if (remainingSlots <= 0) {
-    if (showToast) showToast('사진 최대 50장', 'error');
+    if (showToast) showToast(`사진 최대 ${MAX_IMAGE_UPLOADS_PER_ACTION}장`, 'error');
     return { handled: true, succeeded: 0, failed: 0 };
   }
 
   const filesToProcess = imageFiles.slice(0, remainingSlots);
   if (imageFiles.length > remainingSlots && showToast) {
-    showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+    showToast(`${remainingSlots}장만 추가됨 (최대 ${MAX_IMAGE_UPLOADS_PER_ACTION}장)`, 'info');
   }
 
   setImageProcessing({ current: 0, total: filesToProcess.length });
-  const { succeeded, failed } = await processImageFilesSequentially(
+  const { succeeded, failed, duplicates } = await processImageFilesSequentially(
     filesToProcess,
     progress => setImageProcessing(progress)
   );
@@ -815,10 +1075,13 @@ async function appendChatImageFiles({
     console.error('Image compression failed for:', failed.map(f => f.fileName));
     if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
   } else if (succeeded.length > 0 && showToast) {
-    showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+    const duplicateSuffix = duplicates?.length ? ` · 중복 ${duplicates.length}장 제외` : '';
+    showToast(`${succeeded.length}장 첨부완료${duplicateSuffix}`, 'success', 3000);
+  } else if (duplicates?.length && showToast) {
+    showToast(`이미 선택한 사진과 같은 ${duplicates.length}장을 제외했습니다.`, 'info', 4000);
   }
 
-  return { handled: true, succeeded: succeeded.length, failed: failed.length };
+  return { handled: true, succeeded: succeeded.length, failed: failed.length, duplicates: duplicates?.length || 0 };
 }
 
 function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
@@ -852,60 +1115,68 @@ function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
 // if Storage isn't available/the upload fails -- callers should fall back to the base64 data
 // URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
 // total)` is called as each upload progresses so a caller can aggregate progress across a batch.
-function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+
+function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, profile) {
   return new Promise((resolve) => {
     const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+    const grid = profile === 'grid';
+    const originalBlob = compressed?.originalBlob || null;
+    const chatBlob = compressed?.thumbnailBlob || null;
+    const smallBlob = compressed?.smallThumbBlob || null;
+    const smallSource = smallBlob || (grid ? chatBlob : null);
+    if (!storage || !originalBlob || (grid ? !smallSource : !chatBlob)) {
       resolve(null);
       return;
     }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
-    // The byte size is embedded in the filename itself (parsed back out by
-    // getStorageUrlFileSize) so the Lightbox info panel can show it without any extra network
-    // request -- Firebase Storage's download endpoint doesn't send a CORS header by default, so
-    // a plain fetch() to read Content-Length from a different origin (like this app's GitHub
-    // Pages host) is silently blocked by the browser and would never work.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
-    // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
-    // whole send/edit flow would hang forever with no way for the user to recover. Time out and
-    // fall back to inline base64 for that image instead.
+    const stampJobs = [];
+    const originalMeta = getUploadImageBlobMeta(originalBlob, originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
+    const originalRef = storage.ref(`${basePath}_original_${originalBlob.size}b.${originalMeta.ext}`);
+    stampJobs.push({ blob: originalBlob, ref: originalRef, key: `${index}-orig`, contentType: originalMeta.contentType, role: 'original' });
+    if (!grid) {
+      const thumbMeta = getUploadImageBlobMeta(chatBlob, 'webp');
+      const thumbRef = storage.ref(`${basePath}_thumb_${chatBlob.size}b.${thumbMeta.ext}`);
+      stampJobs.push({ blob: chatBlob, ref: thumbRef, key: `${index}-thumb`, contentType: thumbMeta.contentType, role: 'chatThumb' });
+    }
+    if (smallSource) {
+      const smallMeta = getUploadImageBlobMeta(smallSource, 'webp');
+      const smallRef = storage.ref(`${basePath}_small.webp`);
+      stampJobs.push({
+        blob: smallSource,
+        ref: smallRef,
+        key: `${index}-small`,
+        contentType: smallMeta.contentType || 'image/webp',
+        role: 'small'
+      });
+    }
     const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
       ref, blob, contentType, taskKey, onBytes, timeoutMs
     });
-    // One retry before giving up -- a single failed/timed-out attempt (a brief mobile network
-    // hiccup) used to permanently drop that photo to the low-quality ~600px/48KB base64 fallback
-    // with no second chance, which is exactly what produced reports of meeting/gallery photos
-    // saved at 600x450 / ~33KB. Same fix pattern as loadScriptWithRetry in main.jsx.
     const runUpload = async (blob, ref, taskKey, contentType) => {
       const first = await runUploadOnce(blob, ref, taskKey, contentType);
       if (first) return first;
       return runUploadOnce(blob, ref, taskKey, contentType);
     };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        // Treat the pair as one atomic asset: if either upload fails, remove the successful
-        // half so an orphaned original/thumbnail cannot accumulate in Storage.
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Chat image Storage upload failed (no base64 fallback)');
-        resolve(null);
+    Promise.all(stampJobs.map(job => runUpload(job.blob, job.ref, job.key, job.contentType))).then(async (urls) => {
+      if (urls.every(Boolean)) {
+        const byRole = {};
+        stampJobs.forEach((job, jobIndex) => { byRole[job.role] = urls[jobIndex]; });
+        if (grid) resolve({ imageUrl: byRole.original, thumbUrl: byRole.small, smallThumbUrl: byRole.small });
+        else resolve({ imageUrl: byRole.original, thumbUrl: byRole.chatThumb, smallThumbUrl: byRole.small || '' });
+        return;
       }
+      await Promise.allSettled(stampJobs.map(job => job.ref.delete().catch(() => {})));
+      console.warn('Image Storage upload failed', profile, basePath);
+      resolve(null);
     });
   });
+}
+
+function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const profile = compressed?.variantProfile === 'grid' ? 'grid' : 'chat';
+  const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, profile);
 }
 
 async function dataUrlToBlob(dataUrl) {
@@ -1106,16 +1377,16 @@ const IMAGE_UPLOAD_REUSE_WINDOW_MS = 30 * 60 * 1000;
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
   const reusable = compressed?.uploadedUrls;
   if (reusable && Date.now() - reusable.uploadedAt < IMAGE_UPLOAD_REUSE_WINDOW_MS) {
-    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, metadata: compressed?.metadata || null };
+    return { imageUrl: reusable.imageUrl, thumbUrl: reusable.thumbUrl, smallThumbUrl: reusable.smallThumbUrl || '', metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
   }
   try {
     const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
       if (compressed && typeof compressed === 'object') {
-        compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, uploadedAt: Date.now() };
+        compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, smallThumbUrl: uploaded.smallThumbUrl || '', uploadedAt: Date.now() };
       }
       revokeCompressedObjectUrls(compressed);
-      return { ...uploaded, metadata: compressed?.metadata || null };
+      return { ...uploaded, metadata: compressed?.metadata || null, fingerprint: compressed?.fingerprint || '' };
     }
   } catch (e) {
     if (options.requireStorage) {
@@ -1148,7 +1419,8 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
     return {
       imageUrl: original || thumbnail,
       thumbUrl: thumbnail || original,
-      metadata: compressed?.metadata || null
+      metadata: compressed?.metadata || null,
+      fingerprint: compressed?.fingerprint || ''
     };
   }
   throw new Error('이미지 처리 중 오류가 발생했습니다.');
@@ -1157,20 +1429,30 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
 async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
   await acquireMediaUploadWakeLock();
   try {
-  const uploadIndexes = compressedList
-    .map((c, idx) => ({ c, idx }))
-    .filter(({ c }) => !c.isExisting);
+  await lookupKnownImageFingerprintsForCalendar(calendarId, Array.from(compressedList || [])
+    .filter(item => !item?.isExisting)
+    .map(item => item?.fingerprint));
+  const { accepted, duplicateIndexes } = selectNonDuplicateCompressedImages(calendarId, compressedList);
+  const uploadIndexes = accepted.filter(({ item }) => !item.isExisting);
 
   await checkFirebaseStorageHealth().catch(() => false);
   if (uploadIndexes.length === 0) {
-    if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: compressedList.length, total: compressedList.length });
-    return Promise.all(compressedList.map((c) =>
-      Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
-    ));
+    if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: accepted.length, total: accepted.length });
+    const existingResults = accepted.map(({ item, index }) => ({
+      imageUrl: item.original,
+      thumbUrl: item.thumbnail,
+      metadata: item.metadata || null,
+      fingerprint: item.fingerprint || '',
+      isExisting: true,
+      sourceIndex: Number.isInteger(item.sourceIndex) ? item.sourceIndex : index
+    }));
+    Object.defineProperty(existingResults, 'failed', { value: [], enumerable: false, configurable: true });
+    Object.defineProperty(existingResults, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
+    return existingResults;
   }
 
   const startedAt = Date.now();
-  const total = compressedList.length;
+  const total = accepted.length;
   let compressionDone = 0;
   let currentIndex = 0;
 
@@ -1200,29 +1482,35 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     reportUploadProgress();
   };
 
-  const results = new Array(compressedList.length);
+  const results = new Array(accepted.length);
   let uploadCursor = 0;
-  const UPLOAD_CONCURRENCY = getAdaptiveMediaUploadConcurrency(compressedList.length, typeof navigator !== 'undefined' ? navigator : {});
+  const UPLOAD_CONCURRENCY = getAdaptiveMediaUploadConcurrency(accepted.length, typeof navigator !== 'undefined' ? navigator : {});
   const failed = [];
 
   async function uploadWorker() {
     while (true) {
       const idx = uploadCursor++;
-      if (idx >= compressedList.length) return;
+      if (idx >= accepted.length) return;
       currentIndex = idx + 1;
-      const c = compressedList[idx];
+      const { item: c, index: originalIndex } = accepted[idx];
+      const sourceIndex = Number.isInteger(c?.sourceIndex) ? c.sourceIndex : originalIndex;
       if (c.isExisting) {
         compressionDone++;
         reportCompressionProgress();
-        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail };
+        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail, metadata: c.metadata || null, fingerprint: c.fingerprint || '', isExisting: true, sourceIndex };
       } else {
         let result = null;
         try {
-          result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
-        } catch (error) { if (!options.continueOnError) throw error; failed.push({ index: idx, error }); if (typeof options.onItemError === 'function') options.onItemError({ index: idx, error, item: c }); }
+          result = await resolveImageUrls(calendarId, c, sourceIndex, onBytes, uploadFn, options);
+        } catch (error) {
+          if (!options.continueOnError) throw error;
+          const failure = { index: sourceIndex, file: c?.sourceFile || null, fileName: c?.sourceFile?.name || '', error };
+          failed.push(failure);
+          if (typeof options.onItemError === 'function') options.onItemError({ ...failure, item: c });
+        }
         compressionDone++;
         reportCompressionProgress();
-        results[idx] = result;
+        results[idx] = result ? { ...result, sourceIndex } : null;
       }
     }
   }
@@ -1230,6 +1518,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => uploadWorker()));
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
   Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
+  Object.defineProperty(results, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
   return results;
   } finally {
     releaseMediaUploadWakeLock();
@@ -1237,7 +1526,13 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
 }
 
 async function resolveChatImageBatch(calendarId, compressedList, onProgress, options = {}) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadChatImageAssets, options);
+  const profile = options?.profile === 'grid' ? 'grid' : 'chat';
+  const tagged = Array.from(compressedList || []).map(item => (
+    item && typeof item === 'object' && !item.variantProfile
+      ? { ...item, variantProfile: profile }
+      : item
+  ));
+  return resolveImageBatch(calendarId, tagged, onProgress, uploadChatImageAssets, options);
 }
 
 async function resolveMemoImageBatch(calendarId, compressedList, onProgress) {
@@ -1270,96 +1565,24 @@ function deleteAllChatImagesFromStorage(msg) {
   if (msg.thumbUrl) urls.add(msg.thumbUrl);
   if (Array.isArray(msg.imageUrls)) msg.imageUrls.forEach(u => u && urls.add(u));
   if (Array.isArray(msg.thumbUrls)) msg.thumbUrls.forEach(u => u && urls.add(u));
+  if (msg.smallThumbUrl) urls.add(msg.smallThumbUrl);
+  if (Array.isArray(msg.smallThumbUrls)) msg.smallThumbUrls.forEach(u => u && urls.add(u));
   urls.forEach(url => deleteChatImageFromStorage(url));
 }
 
 // REST fallback helper for uploading memo image assets to Firebase Storage
 function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
-      resolve(null);
-      return;
-    }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
-    // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
-      ref, blob, contentType, taskKey, onBytes, timeoutMs
-    });
-    // One retry before giving up -- see the matching comment in uploadChatImageAssets.
-    const runUpload = async (blob, ref, taskKey, contentType) => {
-      const first = await runUploadOnce(blob, ref, taskKey, contentType);
-      if (first) return first;
-      return runUploadOnce(blob, ref, taskKey, contentType);
-    };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        // Keep memo media atomic as well; a partial pair must never be considered reusable.
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Memo image Storage upload failed');
-        resolve(null);
-      }
-    });
-  });
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
 }
 
-// Same shape/behavior as uploadMemoImageAssets, just its own Storage path -- anniversary photos
-// are a distinct content type from memo attachments even though the upload mechanics are
-// identical.
 function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
-      resolve(null);
-      return;
-    }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
-      ref, blob, contentType, taskKey, onBytes, timeoutMs
-    });
-    const runUpload = async (blob, ref, taskKey, contentType) => {
-      const first = await runUploadOnce(blob, ref, taskKey, contentType);
-      if (first) return first;
-      return runUploadOnce(blob, ref, taskKey, contentType);
-    };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Anniversary image Storage upload failed');
-        resolve(null);
-      }
-    });
-  });
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
 }
 
 async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgress) {
@@ -1367,9 +1590,10 @@ async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgre
 }
 
 export {
-  loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
+  loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, isImageUploadFile, getImageUploadCandidates, limitImageUploadSelection, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
   imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
+  buildImageFingerprint, rememberKnownImageFingerprints, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
   acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
   uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles,

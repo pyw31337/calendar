@@ -18,8 +18,20 @@ export function getInitialAppView(locationLike, parseSharePath) {
 export function buildAppViewUrl(locationLike, view, currentMonthDate) {
   const params = new URLSearchParams(locationLike?.search || '');
   const keepId = params.get('id') || params.get('cal');
-  ['id', 'cal', 'date', 'msg', 'img', 'memo', 'place'].forEach(key => params.delete(key));
+  // Notification and search deep links (?msg=&memo=&comment=) must survive the
+  // view switch that opens them. Leaving the destination drops them.
+  const keepMsg = view === 'chat' ? params.get('msg') : null;
+  const keepImg = view === 'chat' ? params.get('img') : null;
+  const keepMemo = view === 'memo' ? params.get('memo') : null;
+  const keepMemoFocus = view === 'memo' ? params.get('memoFocus') : null;
+  const keepComment = view === 'memo' ? params.get('comment') : null;
+  ['id', 'cal', 'date', 'msg', 'img', 'memo', 'memoFocus', 'comment', 'place'].forEach(key => params.delete(key));
   if (keepId) params.set('id', keepId);
+  if (keepMsg) params.set('msg', keepMsg);
+  if (keepImg) params.set('img', keepImg);
+  if (keepMemo) params.set('memo', keepMemo);
+  if (keepMemoFocus) params.set('memoFocus', keepMemoFocus);
+  if (keepComment) params.set('comment', keepComment);
   if (currentMonthDate instanceof Date && !Number.isNaN(currentMonthDate.getTime())) {
     params.set('year', String(currentMonthDate.getFullYear()));
     params.set('month', String(currentMonthDate.getMonth() + 1).padStart(2, '0'));

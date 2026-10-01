@@ -6,6 +6,33 @@
 // time. photo-asset.js is pure and is the shared asset:v1 identity.
 
 import { canonicalPhotoAssetKey } from './photo-asset.js';
+import { classifyGalleryItem } from './gallery-item-kind.js';
+
+// True for Firebase Storage hosts and inline image bytes. A storage host is
+// not itself a photo — classifyGalleryItem uses mime and extension.
+export function isStoredGalleryMediaUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  if (/^data:image\//i.test(text) || /^blob:/i.test(text)) return true;
+  try {
+    const url = new URL(text);
+    const host = url.hostname.toLowerCase();
+    if (host === 'firebasestorage.googleapis.com' || host.endsWith('.firebasestorage.app')) return true;
+    if (host === 'storage.googleapis.com') return true;
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+// True when this row is a shared webpage. Storage images stay photos; storage
+// documents are files (see classifyGalleryItem) and must not be kept in 사진
+// just because the host is Firebase Storage.
+export function isGalleryWebLinkPhoto(photo) {
+  if (!photo) return true;
+  return classifyGalleryItem(photo) === 'link';
+}
+
 
 export function coerceGalleryImageIndex(value) {
   if (Number.isInteger(value)) return value;
@@ -227,7 +254,11 @@ export function photoBelongsToMemory(entry, memory, options = {}) {
   if (anniversaryId && memoryId && anniversaryId !== memoryId) return false;
 
   const parseDateTokens = typeof options.parseDateTokens === 'function' ? options.parseDateTokens : parseMemoryDateTokens;
-  const taggedDates = (parseDateTokens(entry.tags || '') || []).map(date => String(date).slice(0, 10)).filter(isIsoDate);
+  // HistoryView prepares this tiny per-photo projection once for the active 추억 tab. A full
+  // archive used to re-run the same hashtag regexp for every photo × every anniversary range.
+  // Keep the public shape backwards-compatible and only trust a caller-provided array.
+  const preparedDates = Array.isArray(entry.__gatherMemoryDateTokens) ? entry.__gatherMemoryDateTokens : null;
+  const taggedDates = (preparedDates || parseDateTokens(entry.tags || '') || []).map(date => String(date).slice(0, 10)).filter(isIsoDate);
   if (taggedDates.length) return taggedDates.some(date => date >= start && date <= end);
 
   const meetingDate = String(entry.meetingDate || '').slice(0, 10);
@@ -484,6 +515,8 @@ export function composeGalleryPhotos({
   });
   memos.forEach(memo => {
     if (!memo || (typeof isTombstone === 'function' && isTombstone(memo))) return;
+    const hasPhotos = Boolean(memo.imageUrl || (Array.isArray(memo.imageUrls) && memo.imageUrls.length > 0) || memo.thumbUrl || (Array.isArray(memo.thumbUrls) && memo.thumbUrls.length > 0));
+    if (!hasPhotos) return;
     const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
     const asMessage = {
       id: memo.id,
@@ -502,7 +535,7 @@ export function composeGalleryPhotos({
       getAllDirectMediaImageEntries,
       getPhotoAssetCommentKey,
       isBrokenPhotoValue: broken
-    }).forEach(entry => {
+    }).filter(entry => entry && !entry.directMediaUrl && entry.source !== 'link').forEach(entry => {
       list.push({
         ...entry,
         tags: String(entry.tags || memoImageTags[entry.imageIndex] || ''),
@@ -616,6 +649,7 @@ export function composeGalleryPhotos({
   });
 
   return dedupeGalleryPhotoEntries(list, getPhotoAssetCommentKey)
+    .filter(entry => classifyGalleryItem(entry) === 'photo')
     .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
 }
 

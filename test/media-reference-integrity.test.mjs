@@ -99,3 +99,19 @@ test('overlapping memories: a photo appears only in the most specific one', asyn
   const [trip2] = assignPhotosToSingleMemory([groups[0], { ...groups[1], photos: [] }]);
   assert.equal(trip2.photos.length, 2);
 });
+
+test('prepared memory date tokens avoid reparsing the same photo for every memory range', async () => {
+  const { photoBelongsToMemory } = await import('../src/core/gallery-data.js');
+  let parserCalls = 0;
+  const photo = {
+    tags: 'intentionally-not-a-date',
+    __gatherMemoryDateTokens: ['2026-09-05']
+  };
+  const belongs = photoBelongsToMemory(photo, {
+    id: 'trip', startDate: '2026-09-04', endDate: '2026-09-06'
+  }, {
+    parseDateTokens: () => { parserCalls += 1; return []; }
+  });
+  assert.equal(belongs, true);
+  assert.equal(parserCalls, 0);
+});

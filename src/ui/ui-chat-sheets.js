@@ -56,6 +56,8 @@ export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }
     calendar: calendar,
     title: "작성자 선택",
     isOptionSelected: id => selectedId === id,
+    selectedLabel: '선택됨',
+    disableSelected: true,
     onSelect: id => { onSelect(id); onClose(); },
     onClose: onClose
   });

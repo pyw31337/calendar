@@ -23,7 +23,7 @@
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  font-size: 0.62rem;
+  font-size:0.75rem;
   font-weight: 800;
   color: #fff;
   padding: 2px 8px;
@@ -88,7 +88,7 @@
 .v2-chat .v2-reply-quote-author,
 .v2-memo .v2-reply-quote-author,
 .v2-design .v2-home-memo-module .v2-reply-quote-author {
-  font-size: 0.6rem;
+  font-size:0.75rem;
   font-weight: 800;
   color: var(--brand, #7C2FE5);
 }
@@ -97,7 +97,7 @@
 .v2-chat .v2-reply-quote-text,
 .v2-memo .v2-reply-quote-text,
 .v2-design .v2-home-memo-module .v2-reply-quote-text {
-  font-size: 0.66rem;
+  font-size:0.75rem;
   color: var(--text-muted, #6B7280);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -108,7 +108,7 @@
 .v2-chat .v2-bubble-meta,
 .v2-memo .v2-bubble-meta,
 .v2-design .v2-home-memo-module .v2-bubble-meta {
-  font-size: 0.6rem;
+  font-size:0.75rem;
   font-weight: 600;
   color: var(--text-light, #9CA3AF);
   line-height: 1.3;
@@ -191,7 +191,7 @@
   background: var(--bg-primary);
   color: var(--brand);
   font: inherit;
-  font-size: .7rem;
+  font-size:0.75rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -207,7 +207,7 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-tag {
   color: var(--brand);
   font-weight: 700;
-  font-size: 0.62rem;
+  font-size:0.75rem;
   font-style: normal;
 }
 
@@ -221,7 +221,7 @@
   padding: 7px 10px;
   border-radius: 10px;
   background: var(--brand-soft, #F3EEFF);
-  font-size: 0.7rem;
+  font-size:0.75rem;
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-list {
   display: flex;
@@ -233,7 +233,7 @@
   align-self: flex-start;
   padding-left: 2px;
   color: #8a8798;
-  font-size: .62rem;
+  font-size:0.75rem;
   font-weight: 600;
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-author {
@@ -257,7 +257,7 @@
   flex-shrink: 0;
   font-style: normal;
   font-weight: 700;
-  font-size: 0.6rem;
+  font-size:0.75rem;
   color: var(--brand);
 }
 
@@ -272,7 +272,7 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-footer > .v2-bubble-comment-count {
   margin-right: auto;
   color: var(--v2-ink-3, #9793a3);
-  font-size: .62rem;
+  font-size:0.75rem;
   font-weight: 500;
 }
 .v2-design .v2-memo .memo-card-comment-count,
@@ -286,7 +286,7 @@
   background: transparent;
   color: var(--brand);
   font: inherit;
-  font-size: .68rem;
+  font-size:0.75rem;
   font-weight: 700;
   padding: 3px 2px;
   cursor: pointer;
@@ -295,38 +295,44 @@
 /* The full V2 memo page uses the same quiet count/action footer without changing V1. */
 .v2-design .v2-memo .memo-card-comment-footer,
 .v2-design .date-modal-memo-list .memo-card-comment-footer,
-.v2-design .v2-home-memo-module .memo-card-comment-footer {
+.v2-design .v2-home-memo-module .memo-card-comment-footer,
+.v2-chat .chat-memo-share-card .memo-card-comment-footer,
+.v2-design .chat-memo-share-card .memo-card-comment-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-top: 8px;
   color: var(--v2-ink-3, #9793a3);
-  font-size: .62rem;
+  font-size:0.75rem;
   font-weight: 500;
 }
 .v2-design .v2-memo .memo-card-comment-count,
 .v2-design .date-modal-memo-list .memo-card-comment-count,
-.v2-design .v2-home-memo-module .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
+.v2-design .v2-home-memo-module .memo-card-comment-count,
+.v2-chat .chat-memo-share-card .memo-card-comment-count,
+.v2-design .chat-memo-share-card .memo-card-comment-count { margin-right: auto; color: var(--v2-ink-3, #9793a3); font-weight: 500; }
 .v2-design .v2-memo .memo-card-comment-footer .memo-card-comment-toggle,
 .v2-design .date-modal-memo-list .memo-card-comment-footer .memo-card-comment-toggle,
-.v2-design .v2-home-memo-module .memo-card-comment-footer .memo-card-comment-toggle {
+.v2-design .v2-home-memo-module .memo-card-comment-footer .memo-card-comment-toggle,
+.v2-chat .chat-memo-share-card .memo-card-comment-footer .memo-card-comment-toggle,
+.v2-design .chat-memo-share-card .memo-card-comment-footer .memo-card-comment-toggle {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   margin-left: 0;
   padding: 3px 2px;
   color: var(--brand);
-  font-size: .68rem;
+  font-size:0.75rem;
   font-weight: 700;
 }
 .v2-design .v2-home-memo-bubble .comment-composer .participant-picker-button {
   height: auto !important;
   padding: 6px 10px !important;
-  font-size: .7rem !important;
+  font-size:0.75rem !important;
 }
 .v2-design .v2-home-memo-bubble .comment-composer-buttons button {
-  font-size: .7rem !important;
+  font-size:0.75rem !important;
 }
 
 /* Memo screen cards wrapped as chat bubbles */
@@ -356,7 +362,10 @@
    this module owns the visual rhythm used by both the home preview and the memo page. */
 .v2-memo .v2-memo-card-wrap > .v2-name-pill, .v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-name-pill { display: none; }
 .v2-memo .v2-memo-card-wrap > .v2-bubble-meta, .v2-design .v2-home-memo-module .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-contract, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-contract,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-contract,
+.v2-chat .chat-memo-share-card .v2-memo-card-contract,
+.v2-design .chat-memo-share-card .v2-memo-card-contract {
   background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-left: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -364,22 +373,34 @@
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   padding: 14px 16px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-title, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-title {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-title,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-title,
+.v2-chat .chat-memo-share-card .v2-memo-card-title,
+.v2-design .chat-memo-share-card .v2-memo-card-title {
   font-size: 1rem !important;
   line-height: 1.25 !important;
   margin-bottom: 3px !important;
   padding-right: 30px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-meta, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-meta,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta,
+.v2-chat .chat-memo-share-card .v2-memo-card-meta,
+.v2-design .chat-memo-share-card .v2-memo-card-meta {
   display: none;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-body, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-body {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-body,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-body,
+.v2-chat .chat-memo-share-card .v2-memo-card-body,
+.v2-design .chat-memo-share-card .v2-memo-card-body {
   font-size: .76rem !important;
   color: var(--v2-ink-2, #6b6580) !important;
   line-height: 1.5 !important;
   margin-bottom: 10px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-tags, .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-tags,
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags,
+.v2-chat .chat-memo-share-card .v2-memo-card-tags,
+.v2-design .chat-memo-share-card .v2-memo-card-tags {
   gap: 5px !important;
   margin-top: 4px !important;
 }
@@ -390,24 +411,34 @@
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle,
 .v2-design .date-modal-memo-list .v2-memo-card-tags > .memo-card-comment-toggle,
-.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle,
+.v2-chat .chat-memo-share-card .v2-memo-card-tags > .memo-card-comment-toggle,
+.v2-design .chat-memo-share-card .v2-memo-card-tags > .memo-card-comment-toggle {
   display: none !important;
 }
 .v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle,
 .v2-design .date-modal-memo-list .memo-card-comment-footer > .memo-card-comment-toggle,
-.v2-design .v2-home-memo-module .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
+.v2-design .v2-home-memo-module .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle,
+.v2-chat .chat-memo-share-card .memo-card-comment-footer > .memo-card-comment-toggle,
+.v2-design .chat-memo-share-card .memo-card-comment-footer > .memo-card-comment-toggle {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   padding: 3px 2px !important;
 }
-.v2-design .v2-memo .comment-composer .participant-picker-button, .v2-design .v2-home-memo-module .comment-composer .participant-picker-button {
+.v2-design .v2-memo .comment-composer .participant-picker-button,
+.v2-design .v2-home-memo-module .comment-composer .participant-picker-button,
+.v2-chat .chat-memo-share-card .comment-composer .participant-picker-button,
+.v2-design .chat-memo-share-card .comment-composer .participant-picker-button {
   height: auto !important;
   padding: 6px 10px !important;
-  font-size: .7rem !important;
+  font-size:0.75rem !important;
 }
-.v2-design .v2-memo .comment-composer-buttons button, .v2-design .v2-home-memo-module .comment-composer-buttons button {
-  font-size: .7rem !important;
+.v2-design .v2-memo .comment-composer-buttons button,
+.v2-design .v2-home-memo-module .comment-composer-buttons button,
+.v2-chat .chat-memo-share-card .comment-composer-buttons button,
+.v2-design .chat-memo-share-card .comment-composer-buttons button {
+  font-size:0.75rem !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle),
 .v2-design .date-modal-memo-list .v2-memo-card-tags > button:not(.memo-card-comment-toggle),
@@ -416,7 +447,7 @@
   background: var(--brand-soft, #f3eeff) !important;
   color: var(--brand, #7c2fe5) !important;
   padding: 3px 8px !important;
-  font-size: .62rem !important;
+  font-size:0.75rem !important;
   font-weight: 700 !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-author-pill,

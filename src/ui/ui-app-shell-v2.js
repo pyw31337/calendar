@@ -8,11 +8,10 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader, prefetchDestinationStyles } from './v2/screens.js';
-import './v2/dest-chrome-late.css';
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
-  V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination,
+  V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination, resolveShellTab,
 } from './v2/shell-nav.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { syncThemeColor } from './v2/theme-color-sync.js';
@@ -34,25 +33,30 @@ function galleryCommentMotion(photo, index) {
   };
 }
 
+import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
+  syncPushSubscriptionParticipant,
   formatDDayLabel, formatConfirmedMeetingLabel, unionActivityLogs,
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
-  getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
+  getTrulyConfirmedMeetings, getNextConfirmedMeeting, getActiveAvailabilities, getActiveParticipants,
   calculateSettlementBalance, formatBalanceBadge,
   getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
+import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
+import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
+import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
 
 /** Legacy 5-tab labels kept for PlaceholderPane; primary IA is V2_PRIMARY side-nav. */
 const TABS = [
@@ -89,17 +93,10 @@ function readTabFromLocation() {
   try {
     const params = new URLSearchParams(window.location.search);
     const view = getInitialAppView(window.location);
-    // Prefer explicit ?tab=; otherwise map data-view → first-class destination.
-    const fromView = ({ memo: 'memo', places: 'places', gallery: 'records', history: 'records', content: 'records', chat: 'chat', settlement: 'settlement' })[view];
-    let raw = params.get('tab') || fromView || view;
-    // Old bookmarks: ?tab=records&sub=memo|places → promote to first-class tabs.
     // Bare records hub (?tab=records / sub=all) is not a V2 destination — treat as calendar
     // so browser Back never resurfaces the mystery "모아엘가 기록" overview.
-    if (raw === 'records') {
-      const sub = params.get('sub');
-      if (sub === 'memo' || sub === 'places') raw = sub;
-      else if (!sub || sub === 'all') raw = DEFAULT_TAB;
-    }
+    // ?view=gallery|history|content still resolves to records (resolveShellTab).
+    const raw = resolveShellTab(params, view);
     return raw === 'search' || TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
   } catch (_) {
     return DEFAULT_TAB;
@@ -138,7 +135,16 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   else url.searchParams.set('sub', subTabId);
   // A home-card focus is meaningful only on the memo destination.  Do not let
   // it follow the user into unrelated screens or a later fresh memo visit.
-  if (tabId !== 'memo') url.searchParams.delete('memoFocus');
+  // Chat/memo notification targets (?msg=&comment=) stay only on their screen.
+  if (tabId !== 'memo') {
+    url.searchParams.delete('memoFocus');
+    url.searchParams.delete('memo');
+    url.searchParams.delete('comment');
+  }
+  if (tabId !== 'chat') {
+    url.searchParams.delete('msg');
+    url.searchParams.delete('img');
+  }
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
   window.history[method](window.history.state, '', url);
@@ -171,8 +177,19 @@ function navigateV2Destination(viewOrId, { push = true, setTab, setSub } = {}) {
     subTabId = DEFAULT_RECORDS_SUBTAB;
   }
   writeLocationState(tabId, subTabId, { push });
-  if (typeof setTab === 'function') setTab(tabId);
-  if (typeof setSub === 'function') setSub(tabId === 'records' ? subTabId : DEFAULT_RECORDS_SUBTAB);
+  const applyState = () => {
+    if (typeof setTab === 'function') setTab(tabId);
+    if (typeof setSub === 'function') setSub(tabId === 'records' ? subTabId : DEFAULT_RECORDS_SUBTAB);
+  };
+  if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function' && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+    try {
+      document.startViewTransition(applyState);
+    } catch (_) {
+      applyState();
+    }
+  } else {
+    applyState();
+  }
   return { tab: tabId, sub: subTabId };
 }
 
@@ -234,18 +251,78 @@ function TabIcon({ id, active, size = 16 }) {
   );
 }
 
+export const MOBILE_BOTTOM_NAV_ITEMS = [
+  { id: 'settlement', label: '정산', icon: 'settlement' },
+  { id: 'memo', label: '메모', icon: 'memo' },
+  { id: 'calendar', label: '캘린더', icon: 'calendar', isCenter: true },
+  { id: 'chat', label: '채팅', icon: 'chat' },
+  { id: 'more', label: '더보기', icon: 'more' },
+];
+
+export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
+  const React = window.React;
+  return React.createElement(
+    'nav',
+    {
+      className: bentoClass('mobile-bottom-nav'),
+      'aria-label': '하단 메뉴',
+    },
+    MOBILE_BOTTOM_NAV_ITEMS.map((item) => {
+      const isActive = isSideNavOpen ? item.id === 'more' : activeTab === item.id;
+      if (item.isCenter) {
+        return React.createElement(
+          'button',
+          {
+            key: item.id,
+            type: 'button',
+            className: bentoClass(`mobile-bottom-nav-item item-${item.id} is-center ${isActive ? 'is-active' : ''}`.trim()),
+            'aria-label': item.label,
+            'aria-current': isActive ? 'page' : undefined,
+            onClick: () => {
+              if (typeof onSelectTab === 'function') onSelectTab(item.id);
+            },
+          },
+          React.createElement(
+            'span',
+            { className: bentoClass('mobile-bottom-nav-center-circle'), 'aria-hidden': 'true' },
+            React.createElement(TabIcon, { id: item.icon, active: true, size: 26 })
+          )
+        );
+      }
+      return React.createElement(
+        'button',
+        {
+          key: item.id,
+          type: 'button',
+          className: bentoClass(`mobile-bottom-nav-item item-${item.id} ${isActive ? 'is-active' : ''}`.trim()),
+          'aria-label': item.label,
+          'aria-current': isActive ? 'page' : undefined,
+          onClick: () => {
+            if (typeof onSelectTab === 'function') onSelectTab(item.id);
+          },
+        },
+        React.createElement('span', { className: bentoClass('mobile-bottom-nav-indicator'), 'aria-hidden': 'true' }),
+        React.createElement(
+          'span',
+          { className: bentoClass('mobile-bottom-nav-icon'), 'aria-hidden': 'true' },
+          React.createElement(TabIcon, { id: item.icon, active: isActive, size: 22 })
+        ),
+        React.createElement('span', { className: bentoClass('mobile-bottom-nav-label') }, item.label)
+      );
+    })
+  );
+}
+
 /**
  * Top header bar -- brand/캘린더명 + 검색 + 더보기, matching the Claude Design 목업 (Mobile320
  * artboard)'s hero-zone brand row. Unlike that mockup, there is no separate 메뉴/hamburger icon
  * here: 더보기 is now one of the 5 tabs (§4.1), so a second, redundant menu affordance in the
  * header would just recreate the duplicate-entry-point problem the master plan calls out
- * (docs/renewal-baseline.md §5). 검색 stays a header action since 검색 has no tab of its own
- * (§4.1: "더보기 탭에 검색, 공유, 기념일, 설정, 도움말을 정리한다" -- it lives inside 더보기,
- * but WP-01 §5.1 also keeps a direct header shortcut: "모바일 헤더에는 브랜드/캘린더명, 검색,
- * 더보기만 둔다"). Shared across all 5 tabs, sitting above wherever each tab's own summary badge
- * (예: 캘린더 tab의 D-day 요약, WP-03) will render.
+ * (docs/renewal-baseline.md §5). 통합검색 stays on the side nav, not as a second magnifier
+ * in this hero title row. Shared across all 5 tabs, sitting above wherever each tab's own
+ * summary badge (예: 캘린더 tab의 D-day 요약, WP-03) will render.
  */
-function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }) {
+function TopHeader({ calendarName, onOpenCalendarSettings, onOpenAnniversaries }) {
   const React = window.React;
   const brandName = String(calendarName || '모여라 캘린더')
     .replace(/^[^\p{L}\p{N}]+/u, '')
@@ -265,12 +342,6 @@ function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenA
       ),
       React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-plain-icon-btn'), 'aria-label': '기념일 설정', title: '기념일 설정', onClick: onOpenAnniversaries },
         React.createElement(TabIcon, { id: 'cake', size: 18 })
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
-        React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
-          React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
-          React.createElement('path', { d: 'm21 21-4.3-4.3' })
-        )
       )
     )
   );
@@ -308,7 +379,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     // nullable so the 더보기 tab can toast "not loaded yet" -- but CalendarGrid has no such guard
     // and reads straight into `calendar.availabilities`, so passing it the nullable one crashes
     // (caught via Playwright: "Cannot read properties of null (reading 'availabilities')").
-    activeCal,
+    activeCal, currentMonthDate, setCurrentMonthAndSync,
     anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability,
     displayChatMessages, memos, customCultureItems,
     handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate,
@@ -329,6 +400,10 @@ export function buildRenewalCalendarContext(calendar, deps) {
   const { visibleConfirmedMeetings, hasVisiblePolls } = buildMainCalendarScreenState({ calendar: activeCal });
   return {
     calendar: activeCal,
+    // V2's calendar card is controlled by CalendarApp's URL-backed month state.
+    // It must not create an unrelated `new Date()` state on every page load.
+    currentMonthDate,
+    setCurrentMonthAndSync,
     displayChatMessages, memos, galleryPhotoIndex, setActiveLightbox,
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
@@ -380,6 +455,72 @@ export function buildRenewalCalendarContext(calendar, deps) {
   };
 }
 
+
+function orderedPlacesForDate(calendar, dateStr) {
+  return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
+    const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+    const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+    return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
+function meetingPlaceWeatherCoords(calendar, dateStr) {
+  const withCoords = orderedPlacesForDate(calendar, dateStr).find(p => p != null && p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+  if (withCoords) {
+    return {
+      lat: Number(withCoords.lat),
+      lon: Number(withCoords.lng),
+      name: String(withCoords.name || withCoords.alias || '').trim(),
+    };
+  }
+  const loc = calendar && calendar.weatherLocation;
+  if (loc && loc.lat != null && loc.lon != null && Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lon))) {
+    return { lat: Number(loc.lat), lon: Number(loc.lon), name: String(loc.name || '').trim() };
+  }
+  return { lat: 37.566, lon: 126.9784, name: '서울' };
+}
+
+
+function DdayParticipantMemoChip({ memo }) {
+  const React = window.React;
+  const textRef = React.useRef(null);
+  const [lineMode, setLineMode] = React.useState('1');
+  const measure = React.useCallback(() => {
+    const el = textRef.current;
+    if (!el || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return;
+    const style = window.getComputedStyle(el);
+    const fontSize = parseFloat(style.fontSize) || 12;
+    const parsedLine = parseFloat(style.lineHeight);
+    const lineHeight = Number.isFinite(parsedLine) ? parsedLine : fontSize * 1.35;
+    const next = fieldLineModeFromBox(el.scrollHeight, lineHeight);
+    setLineMode(prev => (prev === next ? prev : next));
+  }, []);
+  React.useLayoutEffect(() => {
+    measure();
+    const el = textRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(el);
+    if (el.parentElement) observer.observe(el.parentElement);
+    return () => observer.disconnect();
+  }, [memo && memo.note, measure]);
+  return React.createElement('span', {
+    className: 'bp-dday-participant-memo',
+    'data-field-lines': lineMode,
+    title: `${memo.name}: ${memo.fullNote || memo.note}`,
+    style: { borderColor: memo.color },
+  },
+    React.createElement('span', {
+      className: 'bp-dday-participant-memo-name',
+      style: { backgroundColor: memo.color },
+    }, memo.name),
+    React.createElement('span', {
+      className: 'bp-dday-participant-memo-text',
+      ref: textRef,
+    }, memo.note)
+  );
+}
+
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
@@ -391,15 +532,10 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
   const primary = list[0];
   const participants = getActiveParticipants(calendar || {});
 
-  const primaryPlaces = React.useMemo(() => {
-    if (!primary?.date) return [];
-    const allPlaces = getCalendarPlaces(calendar);
-    return allPlaces.filter(p => doesPlaceMatchDate(p, primary.date)).slice().sort((a, b) => {
-      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    });
-  }, [calendar, primary?.date]);
+  const primaryPlaces = React.useMemo(
+    () => (primary?.date ? orderedPlacesForDate(calendar, primary.date) : []),
+    [calendar, primary?.date]
+  );
 
   const formattedDate = React.useMemo(() => {
     if (!primary?.date) return '';
@@ -415,14 +551,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     : (typeof primary?.place === 'string' ? primary.place.trim() : '');
 
   const collapsedLabel = firstPlaceName ? `${formattedDate} / ${firstPlaceName}` : formattedDate;
-  const placesForDate = (dateStr) => {
-    if (!dateStr) return [];
-    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
-      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    });
-  };
+  const placesForDate = (dateStr) => (dateStr ? orderedPlacesForDate(calendar, dateStr) : []);
   const fullDateLabel = (dateValue) => {
     const date = new Date(`${dateValue}T00:00:00`);
     if (Number.isNaN(date.getTime())) return String(dateValue || '');
@@ -479,18 +608,12 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     };
   };
 
-  const weatherCoordsFor = (places) => {
-    const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
-    if (withCoords) return { lat: Number(withCoords.lat), lon: Number(withCoords.lng), name: String(withCoords.name || withCoords.alias || '').trim() };
-    const loc = calendar && calendar.weatherLocation;
-    if (loc && loc.lat != null && loc.lon != null) return { lat: Number(loc.lat), lon: Number(loc.lon), name: loc.name || '' };
-    return { lat: 37.566, lon: 126.9784, name: '서울' };
-  };
+  const weatherCoordsFor = (dateStr) => meetingPlaceWeatherCoords(calendar, dateStr);
 
   const renderExpandedCard = (meeting, onClose, extraClass, open) => {
     const places = placesForDate(meeting.date);
     const DailyWeatherIcon = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DailyWeatherIcon;
-    const weatherCoords = open && DailyWeatherIcon ? weatherCoordsFor(places) : null;
+    const weatherCoords = open && DailyWeatherIcon ? weatherCoordsFor(meeting.date) : null;
     const placeName = places[0]
       ? String(places[0].name || places[0].alias || '').trim()
       : (typeof meeting.place === 'string' ? meeting.place.trim() : '');
@@ -528,20 +651,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
         React.createElement('span', { className: bentoClass('dday-expanded-tag') }, meeting.note.trim())
       ),
       memos.length ? React.createElement('div', { className: bentoClass('dday-participant-memos'), 'aria-label': '참여자 일정 메모' },
-        memos.map(m => React.createElement('span', {
-          key: m.id,
-          className: bentoClass('dday-participant-memo'),
-          title: `${m.name}: ${m.fullNote || m.note}`,
-          style: { borderColor: m.color },
-        },
-          React.createElement('span', {
-            className: bentoClass('dday-participant-memo-name'),
-            style: { backgroundColor: m.color }
-          }, m.name),
-          React.createElement('span', {
-            className: bentoClass('dday-participant-memo-text')
-          }, m.note)
-        ))
+        memos.map(m => React.createElement(DdayParticipantMemoChip, { key: m.id, memo: m }))
       ) : null
     );
   };
@@ -697,10 +807,45 @@ function computeFestivalBars(days, anniversariesList) {
 
 function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const React = window.React;
-  const [monthDate, setMonthDate] = React.useState(() => new Date());
+  const normalizeMonthDate = value => {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+    return new Date(value.getFullYear(), value.getMonth(), 1);
+  };
+  // CalendarApp restores `year`/`month` from the URL before V2 mounts. Keep a
+  // local fallback only for isolated component use, then route every mutation
+  // back through the shared URL/state setter.
+  const [fallbackMonthDate, setFallbackMonthDate] = React.useState(() => new Date());
+  const sharedMonthDate = normalizeMonthDate(calendarContext?.currentMonthDate);
+  const monthDate = sharedMonthDate || fallbackMonthDate;
+  const setMonthDate = nextValue => {
+    const requested = typeof nextValue === 'function' ? nextValue(monthDate) : nextValue;
+    const nextDate = normalizeMonthDate(requested);
+    if (!nextDate) return;
+    setFallbackMonthDate(nextDate);
+    if (typeof calendarContext?.setCurrentMonthAndSync === 'function') {
+      calendarContext.setCurrentMonthAndSync(nextDate);
+    }
+  };
   const [monthPickerOpen, setMonthPickerOpen] = React.useState(false);
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
+  const [pickerYear, setPickerYear] = React.useState(year);
+  const [pickerMonth, setPickerMonth] = React.useState(month);
+  const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+  // The initial V2 card temporarily replaced the app's shared year/month backdrop with a
+  // native <input type="month">. Apart from looking unlike the rest of V2, Safari presents
+  // that control as a tiny browser-owned popover (the UI in the report). Keep the selection
+  // state in React and render the same backdrop sheet used by the other calendar surfaces.
+  const openMonthPicker = () => {
+    setPickerYear(year);
+    setPickerMonth(month);
+    setMonthPickerOpen(true);
+  };
+  const applyMonthPicker = () => {
+    setMonthDate(new Date(pickerYear, pickerMonth, 1));
+    setMonthPickerOpen(false);
+  };
 
   // Drag-to-move a participant's availability badge onto a different date -- ported from
   // ui-calendar-core.js's CalendarGrid (HTML5 drag-and-drop for desktop, long-press-then-drag
@@ -816,6 +961,14 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     endTouchDrag(null);
   };
 
+  // Month navigation is independent from the long-press availability drag. A normal horizontal
+  // sweep on the calendar advances the month, while an active long-press keeps owning the gesture
+  // so moving a participant dot can never accidentally change the displayed month.
+  const calendarSwipe = useCalendarMonthSwipe({
+    onMonthDelta: delta => setMonthDate(date => new Date(date.getFullYear(), date.getMonth() + delta, 1)),
+    isInteractionLocked: () => isTouchDragging || Boolean(touchDragRef.current?.dragging)
+  });
+
   const calendar = calendarContext?.calendar || {};
   // Use the same normalized active participant list for both calendar dots and
   // the legend.  The raw calendar array can contain archived/stale color
@@ -927,8 +1080,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     // Month nav
     React.createElement('div', { className: bentoClass('cal-month-nav-row'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
       React.createElement('button', {
-        onClick: () => setMonthPickerOpen(value => !value),
+        onClick: openMonthPicker,
         'aria-expanded': monthPickerOpen,
+        'aria-haspopup': 'dialog',
         className: bentoClass('ghost-btn cal-month-title'),
         style: { gap: '4px', fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)', padding: '2px 0' },
         type: 'button',
@@ -938,15 +1092,12 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
         )
       ),
-      monthPickerOpen && React.createElement('div', { className: 'bp-month-picker' },
-        React.createElement('input', { type: 'month', 'aria-label': '이동할 연월', value: `${year}-${String(month + 1).padStart(2, '0')}`, onChange: event => { const [y, m] = event.target.value.split('-').map(Number); if (y && m) { setMonthDate(new Date(y, m - 1, 1)); setMonthPickerOpen(false); } } })
-      ),
       React.createElement('div', { className: bentoClass('cal-month-nav'), style: { display: 'flex', gap: '0px' } },
         React.createElement('button', {
           className: bentoClass('ghost-btn cal-nav-btn'),
           'aria-label': '이전달',
           type: 'button',
-          onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
+          onClick: () => calendarSwipe.navigateByMonth(-1),
         },
           React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { transform: 'rotate(90deg)' } },
             React.createElement('path', { d: 'M6 9l6 6l6 -6' })
@@ -954,7 +1105,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         ),
         React.createElement('button', {
           className: bentoClass('ghost-btn cal-today-btn'),
-          style: { fontWeight: 700, fontSize: '0.72rem', padding: '6px 8px' },
+          style: { fontWeight: 700, fontSize: '0.75rem', padding: '6px 8px' },
           type: 'button',
           onClick: () => setMonthDate(new Date()),
         }, '오늘'),
@@ -962,7 +1113,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           className: bentoClass('ghost-btn cal-nav-btn'),
           'aria-label': '다음달',
           type: 'button',
-          onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
+          onClick: () => calendarSwipe.navigateByMonth(1),
         },
           React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { transform: 'rotate(-90deg)' } },
             React.createElement('path', { d: 'M6 9l6 6l6 -6' })
@@ -971,6 +1122,16 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       )
     ),
 
+    // Weekdays and month grid share one swipe surface. The inner content follows a finger while
+    // dragging, then exits/enters as a whole so the weekday labels never visually lag the dates.
+    React.createElement('div', {
+      className: 'calendar-month-swipe-surface',
+      'aria-label': '캘린더 월 이동: 좌우로 쓸어 이전 또는 다음 달 보기',
+      ...calendarSwipe.surfaceProps
+    }, React.createElement('div', {
+      className: calendarSwipe.contentClassName,
+      style: calendarSwipe.contentStyle
+    },
     // Weekdays
     React.createElement('div', { className: bentoClass('cal-weekdays'), style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '2px' } },
       React.createElement('div', { className: bentoClass('weekday-label'), style: { color: '#EF4444' } }, '일'),
@@ -1061,7 +1222,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             ...(rowDepth > 0 ? { '--ann-lanes': rowDepth } : {}),
             ...(isTouchDropTarget ? { outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' } : {}),
           },
-          onClick: () => { if (!justTouchDraggedRef.current) onSelectDate?.(dateStr); },
+          onClick: () => { if (!justTouchDraggedRef.current && !calendarSwipe.justSwipedRef.current) onSelectDate?.(dateStr); },
           onDragOver: event => { event.preventDefault(); },
           onDrop: event => {
             event.preventDefault();
@@ -1146,7 +1307,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         React.createElement('span', { className: bentoClass('dot'), style: { background: p.color || '#A78BFA' } }),
         p.name
       ))
-    )
+    )))
   );
 
   // Floating badge that follows the finger while a touch drag is active -- portaled to <body>
@@ -1158,49 +1319,432 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     }, touchDragBadge.name), document.body)
     : null;
 
-  return touchDragIndicator
-    ? React.createElement(React.Fragment, null, cardTree, touchDragIndicator)
-    : cardTree;
+  const monthPickerSheet = monthPickerOpen
+    ? React.createElement('div', {
+      className: 'bottom-sheet-overlay bp-month-picker-overlay',
+      role: 'presentation',
+      onClick: () => setMonthPickerOpen(false),
+      style: { zIndex: 12000 },
+    }, React.createElement('section', {
+      className: 'bottom-sheet',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-label': '연월 선택',
+      onClick: event => event.stopPropagation(),
+    },
+      React.createElement('div', { className: 'bottom-sheet-header' },
+        React.createElement('h4', null, '연월 선택'),
+        React.createElement('button', {
+          type: 'button',
+          className: 'bp-month-picker-close',
+          'aria-label': '연월 선택 닫기',
+          onClick: () => setMonthPickerOpen(false),
+        }, '✕')
+      ),
+      React.createElement('div', { className: 'bottom-sheet-body' },
+        React.createElement('div', { className: 'bp-month-picker-field' },
+          React.createElement('span', { className: 'bp-month-picker-label' }, '년도'),
+          React.createElement('div', { className: 'bp-month-picker-year' },
+            React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-secondary',
+              'aria-label': '이전 연도',
+              onClick: () => setPickerYear(value => value - 1),
+            }, '‹'),
+            React.createElement('strong', null, `${pickerYear}년`),
+            React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-secondary',
+              'aria-label': '다음 연도',
+              onClick: () => setPickerYear(value => value + 1),
+            }, '›')
+          )
+        ),
+        React.createElement('div', { className: 'bp-month-picker-field' },
+          React.createElement('span', { className: 'bp-month-picker-label' }, '월'),
+          React.createElement('div', { className: 'bp-month-picker-months' },
+            monthNames.map((name, index) => React.createElement('button', {
+              key: name,
+              type: 'button',
+              className: index === pickerMonth ? 'is-selected' : undefined,
+              'aria-pressed': index === pickerMonth,
+              onClick: () => setPickerMonth(index),
+            }, name))
+          )
+        ),
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn btn-primary bp-month-picker-apply',
+          onClick: applyMonthPicker,
+        }, `${pickerYear}년 ${pickerMonth + 1}월로 이동`)
+      )
+    ))
+    : null;
+  const portaledMonthPickerSheet = monthPickerSheet && typeof document !== 'undefined' && window.ReactDOM?.createPortal
+    ? window.ReactDOM.createPortal(monthPickerSheet, document.body)
+    : monthPickerSheet;
+
+  return React.createElement(React.Fragment, null, cardTree, touchDragIndicator, portaledMonthPickerSheet);
 }
 
 
 /** Destinations for the hero quick-nav row above the D-day badge.
  * Mobile (<768): icon stacked over label. Tablet (768–1199): icon + label in a row.
  * Desktop (>=1200) keeps the persistent side rail, so the row is hidden there. */
-const HERO_QUICK_NAV_ITEMS = [
-  { id: 'chat', label: '채팅', icon: 'chat' },
-  { id: 'settlement', label: '정산', icon: 'settlement' },
-  { id: 'memo', label: '메모', icon: 'memo' },
-  { id: 'gallery', label: '갤러리', icon: 'gallery' },
-  { id: 'content', label: '컨텐츠', icon: 'content' },
-];
-
-function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
+function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeetings }) {
   const React = window.React;
-  return React.createElement('div', { className: bentoClass('hero-quick-nav'), role: 'navigation', 'aria-label': '빠른 이동' },
-    HERO_QUICK_NAV_ITEMS.map(item => React.createElement('button', {
-      type: 'button',
-      key: item.id,
-      className: bentoClass('hero-quick-nav-item'),
-      'aria-label': item.label,
-      title: item.label,
-      onClick: () => onChangeView?.(item.id),
+
+  // 1. 사용자 지역 설정 우선순위: localStorage -> weatherLocation -> 서울특별시
+  const readSavedUserLocation = () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('gather_weather_user_location');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.name && parsed.lat != null && parsed.lon != null) {
+            const lat = Number(parsed.lat);
+            const lon = Number(parsed.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return {
+              name: String(parsed.name).trim(),
+              lat,
+              lon,
+              regionName: String(parsed.regionName || '').trim(),
+              areaName: String(parsed.areaName || '').trim(),
+              needsReverseGeocode: Boolean(parsed.needsReverseGeocode)
+            };
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const [savedUserLoc, setSavedUserLoc] = React.useState(() => readSavedUserLocation());
+  const effectiveBaseLocation = savedUserLoc
+    || weatherLocation
+    || { name: '서울특별시', lat: 37.566, lon: 126.9784 };
+
+  const handleSaveLocation = (loc) => {
+    if (loc && loc.lat != null && loc.lon != null) {
+      setSavedUserLoc(loc);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('gather_weather_user_location', JSON.stringify(loc));
+        }
+      } catch (_) {}
+    }
+  };
+
+  const lat = effectiveBaseLocation.lat || 37.566;
+  const lon = effectiveBaseLocation.lon || 126.9784;
+  const [selectedWeatherDate, setSelectedWeatherDate] = React.useState(null);
+
+  // 2. 모임확정 일자 집합 (D-day 뱃지 타깃)
+  const confirmedMeetingDates = React.useMemo(() => {
+    const dates = new Set();
+    if (Array.isArray(upcomingMeetings)) {
+      upcomingMeetings.forEach(m => {
+        if (m?.date) dates.add(m.date);
+        if (Array.isArray(m?.dates)) m.dates.forEach(d => dates.add(d));
+      });
+    }
+    const truly = getTrulyConfirmedMeetings(calendar);
+    truly.forEach(m => {
+      if (m?.date) dates.add(m.date);
+      if (Array.isArray(m?.dates)) m.dates.forEach(d => dates.add(d));
+    });
+    return dates;
+  }, [calendar, upcomingMeetings]);
+
+  const days = React.useMemo(() => {
+    const res = [];
+    const labels = ['어제', '오늘', '내일', '모레'];
+    const now = new Date();
+    // Mobile baseline caps at offset <= 3 (5 days), while extended layout generates up to offset <= 8 (10 days) for PC/tablet.
+    for (let offset = -1; offset <= 8; offset += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      res.push({
+        offset,
+        label: labels[offset + 1] || `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
+        dateStr,
+        isToday: offset === 0,
+      });
+    }
+    return res;
+  }, []);
+
+  const [weatherData, setWeatherData] = React.useState(() => readFourDayWeatherMem(lat, lon));
+
+  React.useEffect(() => {
+    let active = true;
+    fetchFourDayForecast(lat, lon)
+      .then(data => {
+        if (active && data) setWeatherData(data);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [lat, lon]);
+
+  // Confirmed columns use the meeting place, not the saved home region. The D-day
+  // badge calls the same resolver, so both paint one daily max and weather code.
+  const placeCoordsByDate = React.useMemo(() => {
+    const map = {};
+    days.forEach(day => {
+      if (!confirmedMeetingDates.has(day.dateStr)) return;
+      map[day.dateStr] = meetingPlaceWeatherCoords(calendar, day.dateStr);
+    });
+    return map;
+  }, [days, confirmedMeetingDates, calendar]);
+  const [placeForecasts, setPlaceForecasts] = React.useState({});
+
+  React.useEffect(() => {
+    let active = true;
+    const entries = Object.entries(placeCoordsByDate);
+    if (!entries.length) {
+      setPlaceForecasts({});
+      return undefined;
+    }
+    Promise.all(entries.map(([dateStr, coords]) => (
+      resolveDailyForecast(coords.lat, coords.lon, dateStr)
+        .then(value => [dateStr, value])
+        .catch(() => [dateStr, null])
+    ))).then(rows => {
+      if (!active) return;
+      const next = {};
+      rows.forEach(([dateStr, value]) => { if (value) next[dateStr] = value; });
+      setPlaceForecasts(next);
+    });
+    return () => { active = false; };
+  }, [placeCoordsByDate]);
+
+  // 3. 모달 오픈 시 위치 결정: 모임확정 일자이면 등록된 장소 우선, 그 외는 사용자 기본 위치
+  const modalWeatherLocation = React.useMemo(() => {
+    if (!selectedWeatherDate) return effectiveBaseLocation;
+    if (confirmedMeetingDates.has(selectedWeatherDate)) {
+      const places = orderedPlacesForDate(calendar, selectedWeatherDate);
+      const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
+      if (withCoords) {
+        const placeAreaName = String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim();
+        return {
+          lat: Number(withCoords.lat),
+          lon: Number(withCoords.lng),
+          name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim(),
+          areaName: placeAreaName,
+          isMeetingPlace: true,
+          needsReverseGeocode: !placeAreaName
+        };
+      }
+      const firstPlace = places[0];
+      const meeting = (Array.isArray(upcomingMeetings) ? upcomingMeetings : [])
+        .find(m => m?.date === selectedWeatherDate || (Array.isArray(m?.dates) && m.dates.includes(selectedWeatherDate)))
+        || getTrulyConfirmedMeetings(calendar).find(m => m?.date === selectedWeatherDate || (Array.isArray(m?.dates) && m.dates.includes(selectedWeatherDate)));
+      const placeName = firstPlace ? String(firstPlace.name || firstPlace.alias || firstPlace.address || '').trim() : (typeof meeting?.place === 'string' ? meeting.place.trim() : '');
+      if (placeName) {
+        return {
+          lat: effectiveBaseLocation.lat,
+          lon: effectiveBaseLocation.lon,
+          name: placeName,
+          areaName: String(firstPlace?.address || firstPlace?.roadAddress || firstPlace?.addressName || '').trim(),
+          isMeetingPlace: true,
+          needsGeocode: true,
+          needsReverseGeocode: false
+        };
+      }
+    }
+    return effectiveBaseLocation;
+  }, [selectedWeatherDate, confirmedMeetingDates, calendar, upcomingMeetings, effectiveBaseLocation]);
+
+  const WeatherDetailModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal) || null;
+
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', {
+      className: 'bp-hero-weather-row',
+      role: 'region',
+      'aria-label': `${effectiveBaseLocation.name || '지역'} 날씨`
     },
-      React.createElement('span', { className: bentoClass('hero-quick-nav-icon'), 'aria-hidden': 'true' },
-        React.createElement(TabIcon, { id: item.icon, size: 24 })
-      ),
-      React.createElement('span', { className: bentoClass('hero-quick-nav-label') }, item.label),
-      item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
-        className: bentoClass('hero-quick-nav-badge'),
-        style: { backgroundColor: settlementBalanceBadge.bgColor || '#EF4444' },
-        title: '정산 잔액',
-      }, settlementBalanceBadge.text)
-    ))
+      days.map(day => {
+        const isConfirmed = confirmedMeetingDates.has(day.dateStr);
+        const placeCoords = isConfirmed ? placeCoordsByDate[day.dateStr] : null;
+        const cachedPlace = placeCoords ? readFourDayWeatherMem(placeCoords.lat, placeCoords.lon) : null;
+        const forecast = isConfirmed
+          ? (placeForecasts[day.dateStr] || (cachedPlace && cachedPlace[day.dateStr]) || null)
+          : (weatherData ? weatherData[day.dateStr] : null);
+        const code = forecast?.code ?? 1;
+        const maxTemp = forecast?.max != null ? Math.round(forecast.max) : null;
+        const minTemp = forecast?.min != null ? Math.round(forecast.min) : null;
+        const tempText = maxTemp != null ? `${maxTemp}°` : (weatherData ? '-' : '...');
+
+        const ddayText = isConfirmed ? formatDDayLabel(day.dateStr) : null;
+        const fullTitle = `${day.label}${ddayText ? ` (${ddayText} 모임확정)` : ''} (${day.dateStr})${maxTemp != null ? `: ${maxTemp}°` : ''}${minTemp != null ? ` / ${minTemp}°` : ''} - 일기예보 상세 보기`;
+
+        const isPast = day.offset < 0;
+
+        return React.createElement('button', {
+          type: 'button',
+          key: day.dateStr,
+          className: `bp-hero-weather-col${day.isToday ? ' is-today' : ''}${isConfirmed ? (isPast ? ' has-past-dday' : ' has-dday') : ''}`,
+          title: fullTitle,
+          'aria-label': fullTitle,
+          onClick: () => setSelectedWeatherDate(day.dateStr),
+        },
+          isConfirmed && ddayText
+            ? (isPast
+                ? React.createElement('span', { className: 'bp-hero-weather-day bp-hero-weather-past-dday' }, ddayText)
+                : React.createElement('span', { className: 'bp-hero-weather-day bp-hero-weather-dday-badge' }, ddayText))
+            : React.createElement('span', { className: 'bp-hero-weather-day' }, day.label),
+          React.createElement('span', { className: 'bp-hero-weather-icon', 'aria-hidden': 'true' },
+            getWeatherIcon(code, 22)
+          ),
+          React.createElement('span', { className: 'bp-hero-weather-temp' }, tempText)
+        );
+      })
+    ),
+    selectedWeatherDate && WeatherDetailModal && React.createElement(WeatherDetailModal, {
+      dateStr: selectedWeatherDate,
+      weatherLocation: modalWeatherLocation,
+      days,
+      onClose: () => setSelectedWeatherDate(null),
+      onSaveLocation: handleSaveLocation,
+      onSelectDate: (targetDate) => {
+        setSelectedWeatherDate(null);
+        onSelectDate?.(targetDate);
+      }
+    })
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
+function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   const React = window.React;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const todayMeeting = React.useMemo(() => {
+    const fromUpcoming = Array.isArray(upcomingMeetings) ? upcomingMeetings.find(m => m.date === todayStr) : null;
+    if (fromUpcoming) return fromUpcoming;
+    const all = getTrulyConfirmedMeetings(calendar);
+    return all.find(m => m.date === todayStr || (Array.isArray(m?.dates) && m.dates.includes(todayStr))) || null;
+  }, [calendar, upcomingMeetings, todayStr]);
+
+  const todayAnniversary = React.useMemo(() => {
+    const list = getAnniversariesForDate(calendar?.anniversaries || [], todayStr);
+    return list && list.length > 0 ? list[0] : null;
+  }, [calendar?.anniversaries, todayStr]);
+
+  const todayPlace = React.useMemo(() => {
+    const allPlaces = getCalendarPlaces(calendar);
+    const matched = allPlaces.filter(p => doesPlaceMatchDate(p, todayStr));
+    return matched[0] || null;
+  }, [calendar, todayStr]);
+
+  const todaySchedule = todayMeeting || todayAnniversary;
+
+  const todayMemos = React.useMemo(() => {
+    const participants = calendar?.participants || [];
+    return getActiveAvailabilities(calendar || {})
+      .filter(e => e.date === todayStr && e.note && String(e.note).trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
+      .map(e => {
+        const p = participants.find(part => part.id === e.participantId);
+        const rawNote = String(e.note).trim().replace(/\s+/g, ' ');
+        const cleanNote = rawNote.replace(/https?:\/\/[^\s]+/gi, '').trim().replace(/\s{2,}/g, ' ');
+        if (!cleanNote) return null;
+        const fullName = p?.name || '참여자';
+        const shortName = shortParticipantName(fullName);
+        return {
+          id: e.participantId || e.id,
+          name: shortName,
+          color: p?.color || '#A78BFA',
+          note: cleanNote,
+          fullNote: rawNote,
+        };
+      })
+      .filter(Boolean);
+  }, [calendar, todayStr]);
+
+  const hasTodayContent = todaySchedule || (todayMemos && todayMemos.length > 0);
+
+  let todayBox = null;
+  if (hasTodayContent) {
+    const isMeeting = !!todayMeeting;
+    const placeName = todayPlace?.name || (typeof todayMeeting?.place === 'string' ? todayMeeting.place.trim() : '');
+    const meetingTitle = (todayMeeting?.title && todayMeeting.title !== '모임확정') ? todayMeeting.title.trim() : '';
+    const meetingNote = (todayMeeting?.note && todayMeeting.note !== meetingTitle) ? todayMeeting.note.trim() : '';
+    const timeStr = todayMeeting?.time ? String(todayMeeting.time).trim() : '';
+
+    const title = meetingTitle
+      || placeName
+      || todayAnniversary?.title
+      || (todayMemos.length > 0 ? '오늘의 일정' : (isMeeting ? '오늘 확정된 모임' : '오늘의 일정'));
+
+    const subtitleParts = [];
+    if (placeName && placeName !== title) subtitleParts.push(`📍 ${placeName}`);
+    if (timeStr) subtitleParts.push(timeStr);
+    if (meetingNote && meetingNote !== title && meetingNote !== placeName) subtitleParts.push(meetingNote);
+    if (todayAnniversary && !isMeeting && todayAnniversary.title !== title) subtitleParts.push('기념일');
+
+    const subtitle = subtitleParts.join(' · ');
+
+    todayBox = React.createElement('div', {
+      className: 'bp-hero-today-box',
+      role: 'button',
+      tabIndex: 0,
+      'aria-label': `오늘 일정: ${title}${todayMemos.length ? `, 참여자 메모 ${todayMemos.length}건` : ''}`,
+      onClick: () => onSelectDate?.(todayStr),
+      onKeyDown: (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectDate?.(todayStr);
+        }
+      }
+    },
+      React.createElement('div', { className: 'bp-hero-today-main-row' },
+        React.createElement('div', { className: 'bp-hero-today-left' },
+          React.createElement('span', { className: 'bp-hero-today-badge' }, 'TODAY'),
+          React.createElement('div', { className: 'bp-hero-today-text' },
+            React.createElement('span', { className: 'bp-hero-today-title' }, title),
+            subtitle ? React.createElement('span', { className: 'bp-hero-today-subtitle' }, subtitle) : null
+          )
+        ),
+        React.createElement('span', { className: 'bp-hero-today-arrow', 'aria-hidden': 'true' },
+          React.createElement('svg', {
+            width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+            strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round'
+          }, React.createElement('path', { d: 'M9 18l6-6-6-6' }))
+        )
+      ),
+      todayMemos.length > 0 ? React.createElement('div', {
+        className: 'bp-dday-participant-memos bp-hero-today-memos',
+        'aria-label': '오늘 참여자 메모'
+      },
+        todayMemos.map(m => React.createElement(DdayParticipantMemoChip, { key: m.id, memo: m }))
+      ) : null
+    );
+  }
+
+  // 날씨 정보는 항상 상시 노출되며, 오늘 일정이 있을 경우 투데이 박스 아래에 함께 배치됩니다.
+  const weatherElement = React.createElement(HeroWeatherBox, {
+    weatherLocation: calendar?.weatherLocation,
+    onSelectDate,
+    calendar,
+    upcomingMeetings
+  });
+
+  if (!todayBox) {
+    return weatherElement;
+  }
+
+  return React.createElement(React.Fragment, null,
+    todayBox,
+    weatherElement
+  );
+}
+
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
+  const React = window.React;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
   const mergedCalendar = React.useMemo(() => {
     const base = calendarContext?.calendar || {};
     const recPlaces = recordsContext?.placesProps?.calendar?.places;
@@ -1209,12 +1753,33 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
     }
     return base;
   }, [calendarContext?.calendar, recordsContext?.placesProps?.calendar?.places]);
+
+  const todayMeeting = React.useMemo(() => {
+    const fromUpcoming = Array.isArray(calendarContext?.upcomingMeetings)
+      ? calendarContext.upcomingMeetings.find(m => m.date === todayStr)
+      : null;
+    if (fromUpcoming) return fromUpcoming;
+    const all = getTrulyConfirmedMeetings(mergedCalendar);
+    return all.find(m => m.date === todayStr || (Array.isArray(m?.dates) && m.dates.includes(todayStr))) || null;
+  }, [calendarContext?.upcomingMeetings, mergedCalendar, todayStr]);
+
+  const remainingUpcomingMeetings = React.useMemo(() => {
+    const all = calendarContext?.upcomingMeetings || [];
+    return todayMeeting ? all.filter(m => m.date !== todayStr) : all;
+  }, [calendarContext?.upcomingMeetings, todayMeeting, todayStr]);
+
+  const hasUpcomingMeeting = (todayMeeting || remainingUpcomingMeetings.length > 0);
+
   return React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'bp-hero-zone' },
+    React.createElement('div', { className: `bp-hero-zone${hasUpcomingMeeting ? '' : ' bp-hero-zone--no-dday'}` },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
-      React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }),
-      React.createElement(HeroQuickNav, { onChangeView, settlementBalanceBadge }),
-      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: mergedCalendar, onSelectDate: onOpenDate })
+      React.createElement(TopHeader, { calendarName, onOpenCalendarSettings, onOpenAnniversaries }),
+      React.createElement(HeroTodayOrWeather, {
+        calendar: mergedCalendar,
+        upcomingMeetings: calendarContext?.upcomingMeetings,
+        onSelectDate: onOpenDate,
+      }),
+      React.createElement(RenewalHero, { meetings: remainingUpcomingMeetings, calendar: mergedCalendar, onSelectDate: onOpenDate })
     ),
     React.createElement('button', {
       type: 'button',
@@ -1227,18 +1792,24 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
     React.createElement(HomeActivitySummary, {
       calendarContext: {
         ...calendarContext,
-        displayChatMessages: recordsContext?.mediaProps?.chatMessages,
-        memos: recordsContext?.memoProps?.memos,
-        places: recordsContext?.placesProps?.calendar?.places,
+        displayChatMessages: (Array.isArray(calendarContext?.displayChatMessages) && calendarContext.displayChatMessages.length > 0)
+          ? calendarContext.displayChatMessages
+          : (recordsContext?.mediaProps?.chatMessages || []),
+        memos: (Array.isArray(recordsContext?.memoProps?.memos) && recordsContext.memoProps.memos.length > 0)
+          ? recordsContext.memoProps.memos
+          : (calendarContext?.memos || []),
+        places: (Array.isArray(mergedCalendar?.places) && mergedCalendar.places.length > 0)
+          ? mergedCalendar.places
+          : (recordsContext?.placesProps?.calendar?.places || calendarContext?.places || []),
         galleryPhotoIndex: {
-          items: Array.isArray(recordsContext?.mediaProps?.indexedPhotos)
+          items: Array.isArray(recordsContext?.mediaProps?.indexedPhotos) && recordsContext.mediaProps.indexedPhotos.length > 0
             ? recordsContext.mediaProps.indexedPhotos
-            : [],
-          status: recordsContext?.mediaProps?.indexedPhotoStatus,
-          loading: !!recordsContext?.mediaProps?.indexedPhotoLoading,
+            : (Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items : []),
+          status: recordsContext?.mediaProps?.indexedPhotoStatus || calendarContext?.galleryPhotoIndex?.status,
+          loading: !!(recordsContext?.mediaProps?.indexedPhotoLoading ?? calendarContext?.galleryPhotoIndex?.loading),
         },
-        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
-        onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
+        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox || calendarContext?.setActiveLightbox,
+        onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange || calendarContext?.onMemoCommentsChange,
         // HomeActivitySummary always passes the complete memo record.  Keep
         // the legacy callback compatible by converting it back to an id only
         // when the V2 shell has not supplied its focused-navigation handler.
@@ -1288,6 +1859,76 @@ function HomeSummarySection({ title, kind, children, onMore, delay }) {
       React.createElement('span', { className: bentoClass('bento-card-title') }, title),
       onMore && React.createElement('button', { type: 'button', className: bentoClass('more-link'), onClick: onMore }, '전체보기')
     ), children);
+}
+
+/**
+ * Home cards intentionally page their already-loaded data instead of starting another Firestore
+ * read. The gesture is shared by every support section; controls remain available to keyboard
+ * and mouse users and the moving page is clipped to its card while it transitions.
+ */
+function HomeSummaryPager({ items, renderPage, label }) {
+  const React = window.React;
+  const pages = Array.isArray(items) ? items.filter(Boolean) : [];
+  const [pageIndex, setPageIndex] = React.useState(0);
+  React.useEffect(() => {
+    setPageIndex(previous => Math.min(Math.max(0, pages.length - 1), previous));
+  }, [pages.length]);
+  const swipe = useHomeSummarySwipe({
+    pageCount: pages.length,
+    pageIndex,
+    onPageChange: setPageIndex,
+  });
+  if (!pages.length) return null;
+  const current = pages[Math.min(pageIndex, pages.length - 1)];
+  return React.createElement('div', {
+    className: 'home-summary-pager',
+    'aria-label': `${label} ${pageIndex + 1} / ${pages.length}`,
+    ...swipe.surfaceProps,
+    onClickCapture: event => {
+      if (!swipe.justSwipedRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  },
+    React.createElement('div', {
+      className: swipe.contentClassName,
+      style: swipe.contentStyle,
+    }, renderPage(current, pageIndex)),
+    pages.length > 1 ? React.createElement('div', {
+      className: 'home-summary-pager-nav',
+      'aria-label': `${label} 페이지`,
+      onPointerDown: e => e.stopPropagation(),
+      onTouchStart: e => e.stopPropagation(),
+      onClick: e => e.stopPropagation(),
+    },
+      React.createElement('button', {
+        type: 'button',
+        className: 'home-summary-pager-arrow is-previous',
+        onClick: e => {
+          e.preventDefault();
+          e.stopPropagation();
+          swipe.changePage(-1);
+        },
+        disabled: pageIndex <= 0,
+        'aria-label': `${label} 이전`,
+      }, '‹'),
+      React.createElement('span', { className: 'home-summary-pager-dots', 'aria-hidden': 'true' }, pages.map((_, index) => React.createElement('i', {
+        key: index,
+        className: index === pageIndex ? 'is-active' : '',
+      }))),
+      React.createElement('button', {
+        type: 'button',
+        className: 'home-summary-pager-arrow is-next',
+        onClick: e => {
+          e.preventDefault();
+          e.stopPropagation();
+          swipe.changePage(1);
+        },
+        disabled: pageIndex >= pages.length - 1,
+        'aria-label': `${label} 다음`,
+      }, '›')
+    ) : null
+  );
 }
 
 const PLACE_CATEGORY_FALLBACK = { restaurant: '식당', food: '식당', cafe: '카페', play: '놀이', lodging: '숙박', shopping: '쇼핑', other: '기타' };
@@ -1371,7 +2012,48 @@ function HomePlaceCard({ place, calendar, onOpen }) {
   );
 }
 
-/** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
+/** 데이터가 오기 전, 실제 목록과 비슷한 뼈대를 먼저 보여 준다. */
+function HomeLoadingRows({ label, count = 3, variant = 'row' }) {
+  const React = window.React;
+  if (variant === 'card') {
+    return React.createElement('div', {
+      className: 'bp-skel-list',
+      role: 'status',
+      'aria-label': label,
+    }, Array.from({ length: count }, (_, index) => React.createElement('div', {
+      key: index,
+      className: 'bp-skel-block is-card',
+      'aria-hidden': 'true',
+    })));
+  }
+  if (variant === 'bubble') {
+    return React.createElement('div', {
+      className: 'bp-skel-list',
+      role: 'status',
+      'aria-label': label,
+    }, Array.from({ length: count }, (_, index) => React.createElement('div', {
+      key: index,
+      className: `bp-skel-bubble ${index % 2 ? 'is-self' : 'is-other'}`,
+      'aria-hidden': 'true',
+    })));
+  }
+  return React.createElement('div', {
+    className: 'bp-skel-list',
+    role: 'status',
+    'aria-label': label,
+  }, Array.from({ length: count }, (_, index) => React.createElement('div', {
+    key: index,
+    className: 'bp-skel-row',
+    'aria-hidden': 'true',
+  },
+    React.createElement('span', { className: 'bp-skel-avatar' }),
+    React.createElement('span', { className: 'bp-skel-copy' },
+      React.createElement('span', { className: 'bp-skel-line' }),
+      React.createElement('span', { className: 'bp-skel-line is-short' })
+    )
+  )));
+}
+
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1391,7 +2073,9 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   );
   const messages = React.useMemo(() => {
     const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
-    return visibleMessages.slice(-3);
+    // latestRows returns newest-first; .slice(0, 3) keeps the three most recent.
+    // Index 0 is the newest message so it appears on the first slide (1번째) in the home chat section.
+    return latestRows(visibleMessages).slice(0, 3);
   }, [allMessages, meetingPhotoMessageIds]);
   const memoItems = calendarContext?.memos;
   const memos = React.useMemo(() => {
@@ -1408,22 +2092,14 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         ? memo.comments.reduce((latest, comment) => Math.max(latest, timestampMs(comment?.updatedAt ?? comment?.createdAt)), 0)
         : 0;
     };
-    const recentFirst = (a, b) => memoUpdatedAt(b) - memoUpdatedAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
+    const memoActivityAt = memo => Math.max(memoUpdatedAt(memo), latestCommentAt(memo));
+    const recentFirst = (a, b) => memoActivityAt(b) - memoActivityAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
     const pinned = rows.filter(memo => memo.isPinned).sort(recentFirst);
-    const selected = pinned.slice(0, 2);
-    if (selected.length >= 2) return selected;
+    const selected = pinned.slice(0, 4);
+    if (selected.length >= 4) return selected;
 
-    const remaining = rows.filter(memo => !selected.includes(memo));
-    const commented = remaining
-      .filter(memo => latestCommentAt(memo) > 0)
-      .sort((a, b) => latestCommentAt(b) - latestCommentAt(a) || recentFirst(a, b));
-    selected.push(...commented.slice(0, 2 - selected.length));
-
-    // Preserve a recent-memo fallback when there are fewer commented memos than slots.
-    if (selected.length < 2) {
-      const fallback = latestRows(remaining.filter(memo => !selected.includes(memo)));
-      selected.push(...fallback.slice(0, 2 - selected.length));
-    }
+    const remaining = rows.filter(memo => !selected.includes(memo)).sort(recentFirst);
+    selected.push(...remaining.slice(0, 4 - selected.length));
     return selected;
   }, [memoItems]);
   const photoItems = calendarContext?.galleryPhotoIndex?.items;
@@ -1461,7 +2137,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       items: photoItems,
       status: photoIndexStatus,
       loading: photoIndexLoading,
-      limit: 9,
+      limit: 18,
       isBroken: isBrokenThumb,
     }),
     [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
@@ -1469,7 +2145,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const photos = homeGalleryStrip.photos;
   const placeItems = calendarContext?.places;
   const places = React.useMemo(
-    () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 2) : []),
+    () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 4) : []),
     [placeItems]
   );
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
@@ -1488,7 +2164,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
     ),
     React.createElement(HomeSummarySection, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
-      messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
+      messages.length ? React.createElement(HomeSummaryPager, {
+        items: messages,
+        label: '최근 채팅',
+        renderPage: (m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
         const goChat = event => {
           // Link cards, file cards, players and images inside the bubble keep their own tap.
@@ -1502,7 +2181,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const sharedBody = typeof renderBody === 'function'
           ? renderBody(m, calendarContext?.setActiveLightbox, { maxWidth: '200px', maxHeight: '160px', isMiniChat: true }, '', null, null, true)
           : null;
-        return React.createElement('div', {
+        return React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, React.createElement('div', {
           role: 'button',
           tabIndex: 0,
           className: 'v2-home-chat-row',
@@ -1552,11 +2231,17 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           React.createElement('div', { className: 'v2-home-chat-meta' },
             React.createElement('span', { className: 'v2-home-chat-time' }, formatTime(m.timestamp ?? m.createdAt))
           )
-        );
-      })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
+        ));
+      }
+      }) : (calendarContext?.isLoading
+        ? React.createElement(HomeLoadingRows, { label: '최근 대화 불러오는 중', variant: 'bubble' })
+        : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.'))
     ),
     React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
-      memos.length ? React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-home-memo-module` }, memos.map((memo, i) => {
+      memos.length ? React.createElement(HomeSummaryPager, {
+        items: memos,
+        label: '최근 메모',
+        renderPage: (memo, i) => {
         const MemoCard = window.GATHER_UI_COMPONENTS?.MemoCard;
         const openMemo = () => {
           // The app's jump helper carries the memo id through to MemoView and applies the
@@ -1567,7 +2252,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const color = displayColor(memo);
         // Same module, same frame and same classes as the memo page (screens.js MemoScreen), so
         // images, link/video previews, files, tags and the comment fold all render identically.
-        return React.createElement(ChatBubbleFrame, {
+        return React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-home-memo-module` }, React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
           name: null,
           color,
@@ -1591,8 +2276,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             setActiveLightbox: calendarContext?.setActiveLightbox,
             effectivePinned: !!memo.isPinned,
           })
-          : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모'));
-      })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
+          : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모')));
+      }
+      }) : (calendarContext?.isLoading
+        ? React.createElement(HomeLoadingRows, { label: '최근 메모 불러오는 중', variant: 'card', count: 2 })
+        : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.'))
     ),
     sharingMemo && MemoShareModal && ReactDOM?.createPortal
       ? ReactDOM.createPortal(React.createElement(MemoShareModal, {
@@ -1606,6 +2294,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       homeGalleryStrip.state === 'loading'
         ? React.createElement('div', {
           className: bentoClass('renewal-home-photo-strip thumb-grid is-loading'),
+          role: 'status',
           'aria-busy': 'true',
           'aria-label': '갤러리 불러오는 중',
         }, Array.from({ length: 9 }, (_, i) => React.createElement('div', {
@@ -1614,14 +2303,18 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           'aria-hidden': 'true',
         })))
         : photos.length
-          ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => {
+          ? React.createElement(HomeSummaryPager, {
+            items: Array.from({ length: Math.ceil(photos.length / 9) }, (_, page) => photos.slice(page * 9, page * 9 + 9)),
+            label: '최근 사진',
+            renderPage: (pagePhotos, pageIndex) => React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, pagePhotos.map((photo, i) => {
+            const photoIndex = pageIndex * 9 + i;
             return React.createElement('button', {
               type: 'button',
               className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
-              key: photo.assetKey || photo.id || photo.mediaKey || i,
+              key: photo.assetKey || photo.id || photo.mediaKey || photoIndex,
               onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
-              style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
-              'aria-label': `사진 ${i + 1} 크게 보기`
+              style: photo.commentCount > 0 ? galleryCommentMotion(photo, photoIndex) : undefined,
+              'aria-label': `사진 ${photoIndex + 1} 크게 보기`
             },
               React.createElement(PhotoAssetThumb, {
                 photo,
@@ -1633,18 +2326,31 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                 onBroken: (_e, info) => markBrokenThumb(info?.src, info?.fallbackSrc, info?.currentSrc),
                 style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
               }),
-              photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
+              photo.commentCount > 0 ? (() => {
+                const isMulti = String(photo.commentCount).length > 1;
+                return React.createElement('span', {
+                  className: `${bentoClass('comment-badge')} ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
+                  'data-digits': isMulti ? 'multi' : 'single',
+                }, photo.commentCount);
+              })() : null
             );
           }))
+          })
           : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),
     React.createElement(HomeSummarySection, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
-      places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement(HomePlaceCard, {
-        key: place.id || i,
-        place,
-        calendar: calendarContext?.calendar,
-        onOpen: () => onChangeView?.('places'),
-      }))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
+      places.length ? React.createElement(HomeSummaryPager, {
+        items: places,
+        label: '최근 장소',
+        renderPage: (place, i) => React.createElement('div', { className: bentoClass('renewal-home-place-list') }, React.createElement(HomePlaceCard, {
+          key: place.id || i,
+          place,
+          calendar: calendarContext?.calendar,
+          onOpen: () => onChangeView?.('places'),
+        }))
+      }) : (calendarContext?.isLoading
+        ? React.createElement(HomeLoadingRows, { label: '최근 장소 불러오는 중' })
+        : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.'))
     )
   );
 }
@@ -1715,7 +2421,14 @@ export function buildRenewalChatContext(calendar, deps) {
     onJumpToChatMessage: handleJumpToChatMessage,
     onSelectChatParticipant: id => {
       setChatParticipantId?.(id);
-      if (activeCalId) setStoredChatParticipantId?.(activeCalId, id);
+      if (activeCalId) {
+        setStoredChatParticipantId?.(activeCalId, id);
+        try {
+          if (typeof syncPushSubscriptionParticipant === 'function') {
+            syncPushSubscriptionParticipant(activeCalId, id);
+          }
+        } catch (_) {}
+      }
     },
     editingMessage,
     onSaveEditMessage: handleSaveEditMessage,
@@ -1760,7 +2473,7 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav,
     () => window.__gatherLoadChatUi?.(),
     () => chatContext.showToast?.('채팅 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'chat' });
   const { ChatRoomView, ShareModal } = bindUiComponentAliases(React);
   if (typeof ChatRoomView !== 'function') {
     return React.createElement(EmptyState, { title: '채팅 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -1870,7 +2583,7 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
     () => window.__gatherLoadEventUi?.(),
     () => settlementContext.showToast?.('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'settlement' });
   const { SettlementSummaryModal, ShareModal, CreateSettlementModal } = bindUiComponentAliases(React);
   if (typeof SettlementSummaryModal !== 'function') {
     return React.createElement(EmptyState, { title: '정산 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -1915,8 +2628,12 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
 function EmptyState({ icon, title, subtitle }) {
   const React = window.React;
   const isLoading = /불러오는 중|로딩/.test(String(title || ''));
+  if (isLoading) {
+    return React.createElement('div', { className: 'renewal-shell-placeholder is-loading' },
+      React.createElement(HomeLoadingRows, { label: '불러오는 중', count: 4 })
+    );
+  }
   return React.createElement('div', { className: 'renewal-shell-placeholder' },
-    isLoading && React.createElement('span', { className: 'renewal-shell-loading-spinner', role: 'status', 'aria-label': '불러오는 중' }),
     icon && React.createElement('div', { className: 'renewal-shell-placeholder-icon' }, icon),
     React.createElement('div', { className: 'renewal-shell-placeholder-title' }, title),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub' }, subtitle)
@@ -1925,13 +2642,33 @@ function EmptyState({ icon, title, subtitle }) {
 
 const lazyUiReady = Object.create(null);
 
-function DestinationLoadingSurface() {
+function DestinationLoadingSurface({ shape = 'page' }) {
   const React = window.React;
+  const blocks = {
+    chat: ['is-search', 'bubble', 'bubble', 'bubble', 'bubble'],
+    memo: ['is-search', 'is-tabs', 'card', 'card', 'card'],
+    places: ['is-search', 'is-hero', 'row', 'row', 'row'],
+    gallery: ['is-tabs', 'photo', 'photo'],
+    settlement: ['is-tabs', 'is-hero', 'row', 'row', 'row'],
+    page: ['is-title', 'is-card', 'row', 'row', 'row', 'row'],
+  }[shape] || ['is-title', 'is-card', 'row', 'row', 'row', 'row'];
   return React.createElement('div', {
-    className: 'renewal-shell-loading-surface',
+    className: `renewal-shell-loading-surface bp-skel-page is-${shape}`,
     'aria-busy': 'true',
     'aria-label': '화면 준비 중',
-  });
+  }, blocks.map((kind, index) => {
+    if (kind === 'row') return React.createElement(HomeLoadingRows, { key: index, label: '내용 불러오는 중', count: 1 });
+    if (kind === 'bubble') {
+      return React.createElement('div', { key: index, className: `bp-skel-bubble ${index % 2 ? 'is-self' : 'is-other'}`, 'aria-hidden': 'true' });
+    }
+    if (kind === 'card') return React.createElement('div', { key: index, className: 'bp-skel-block is-card', 'aria-hidden': 'true' });
+    if (kind === 'photo') {
+      return React.createElement('div', { key: index, className: 'bp-skel-photo-grid', 'aria-hidden': 'true' },
+        Array.from({ length: 6 }, (_, cell) => React.createElement('span', { key: cell, className: 'bp-skel-thumb' }))
+      );
+    }
+    return React.createElement('div', { key: index, className: `bp-skel-block ${kind}`, 'aria-hidden': 'true' });
+  }));
 }
 
 function useLazyUi(key, isReadyFn, loadFn, onError) {
@@ -1991,46 +2728,11 @@ function PlaceholderPane({ tabId, calendarName }) {
   });
 }
 
-/** 기록 > 전체: 이미 로드된 데이터만 사용하는 빠른 요약 허브. */
-function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab, onChangeView }) {
-  const React = window.React;
-  const memoCount = Array.isArray(recordsContext?.memoProps?.memos) ? recordsContext.memoProps.memos.length : 0;
-  const mediaCount = Array.isArray(recordsContext?.mediaProps?.indexedPhotos) ? recordsContext.mediaProps.indexedPhotos.length : 0;
-  const placeCount = Array.isArray(recordsContext?.placesProps?.calendar?.places) ? recordsContext.placesProps.calendar.places.length : 0;
-  const cards = [
-    { id: 'memo', label: '메모', count: memoCount, icon: '📝', hint: '날짜와 태그로 정리된 메모', firstClass: true },
-    { id: 'media', label: '사진·영상', count: mediaCount, icon: '🖼️', hint: '모임과 대화에 연결된 미디어' },
-    { id: 'places', label: '장소', count: placeCount, icon: '📍', hint: '저장한 장소와 방문 기록', firstClass: true },
-    { id: 'archive', label: '보관함', count: Array.isArray(recordsContext?.historyProps?.anniversaries) ? recordsContext.historyProps.anniversaries.length : 0, icon: '🗂️', hint: '기념일과 추억 모음' },
-  ];
-  const openCard = (card) => {
-    if (card.firstClass && typeof onChangeView === 'function') onChangeView(card.id);
-    else onSelectSubTab(card.id);
-  };
-  return React.createElement('section', { className: 'renewal-records-overview v2-records-overview', 'aria-label': '기록 요약' },
-    React.createElement('div', { className: 'renewal-shell-section-title' }, calendarName ? `${calendarName} 기록` : '기록 요약'),
-    React.createElement('p', { className: 'renewal-records-overview-subtitle' }, '메모·장소는 독립 페이지, 사진·보관함은 기록 허브에서 이어집니다.'),
-    React.createElement('div', { className: 'renewal-records-overview-grid' }, cards.map(card =>
-      React.createElement('button', { key: card.id, type: 'button', className: 'renewal-records-overview-card', onClick: () => openCard(card) },
-        React.createElement('span', { className: 'renewal-records-overview-icon', 'aria-hidden': 'true' }, card.icon),
-        React.createElement('span', { className: 'renewal-records-overview-card-main' },
-          React.createElement('span', { className: 'renewal-records-overview-card-label' }, card.label),
-          React.createElement('span', { className: 'renewal-records-overview-card-count' }, `${card.count}개`),
-          React.createElement('span', { className: 'renewal-records-overview-card-hint' }, card.hint)
-        ),
-        React.createElement('span', { className: 'renewal-records-overview-arrow', 'aria-hidden': 'true' }, React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 16, direction: 'right' }))
-      )
-    ))
-  );
-}
+/** 기록 > 전체 is not a destination. Bare ?tab=records / sub=all is rewritten to the calendar. */
 
 /**
- * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
- * EmptyState, keyed by sub-tab so switching filters visibly changes something even before WP-06
- * wires real data in. This is the one tab with a second level of navigation because it alone
- * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
- */
-/**
+ * 기록 tab body: gallery, archive, and content. The old "전체" overview is gone;
+ * a bare records URL is rewritten to the calendar before this pane stays up.
  * Builds the 기록 tab's real ingredients (WP-06 continuation, 사진·영상 + 보관함 + 장소 + 메모
  * subtabs). Straight pass-through of the same values/handlers `app-main.js`'s own
  * `activeView === 'gallery'` / `activeView === 'history'` / `activeView === 'places'` /
@@ -2049,7 +2751,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     activeCal, galleryChatMessages, galleryMemos, showToast, showConfirmDialog,
     handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles,
     handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos,
-    activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex,
+    activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex,
     hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages,
     hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE,
     isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
@@ -2058,7 +2760,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isHistoryShareOpen, setIsHistoryShareOpen,
     handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag,
     anniversaries, historyMemosSnapshot,
-    handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag,
+    handlePromoteInlineChatImage, handleSaveImageTags, handleBulkSaveImageTags, handleSearchTag,
     handleReplacePhoto,
     handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
@@ -2074,6 +2776,12 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isMemoShareOpen, setIsMemoShareOpen,
     preloadedPhotoComments, preloadedPhotoCommentsReady,
   } = deps || {};
+  const bulkSaveImageTags = handleBulkSaveImageTags || window.__gatherBulkSaveImageTags || null;
+  // This is a cheap calendar-record count used only until the 장소 tab finishes its own
+  // photo grouping. Do not mount the O(photo × place) classifier just to draw a header badge.
+  const historyPlaceCount = Array.isArray(activeCal?.places)
+    ? activeCal.places.filter(place => place && !place.deletedAt).length
+    : 0;
   const requireLoadedCalendar = (message) => {
     if (activeCal) return true;
     if (typeof showToast === 'function') showToast(message, 'error');
@@ -2099,7 +2807,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onDeleteGalleryLinks: handleDeleteGalleryLinks,
       onRequestConfirm: showConfirmDialog,
       onPasteGatherPhoto: handlePasteGatherPhoto, onPasteGatherPhotos: handlePasteGatherPhotos,
-      setActiveLightbox, onDeletePhoto: handleDeletePhoto, photoCommentCounts,
+      setActiveLightbox, onDeletePhoto: handleDeletePhoto, onSaveImageTags: handleSaveImageTags, onBulkSaveImageTags: bulkSaveImageTags, photoCommentCounts,
       indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
         ? galleryPhotoIndex.items
         : (galleryPhotoIndex && galleryPhotoIndex.status === 'fallback' ? null : []),
@@ -2133,8 +2841,8 @@ export function buildRenewalRecordsContext(calendar, deps) {
       syncStatus,
       onAddPersonTag: handleAddPersonTag, onRenamePersonTag: handleRenamePersonTag, onDeletePersonTag: handleDeletePersonTag,
       anniversaries, chatMessages: galleryChatMessages, memos: historyMemosSnapshot, setActiveLightbox,
-      showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags, onSearchTag: handleSearchTag,
-      onDeletePhoto: handleDeletePhoto, onReplacePhoto: handleReplacePhoto,
+      showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags, onBulkSaveImageTags: bulkSaveImageTags, onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto, onDeletePhotos: handleBulkDeletePhotos, onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage, onJumpToMemo: handleJumpToMemo, onJumpToMeetingDate: handleJumpToMeetingDate,
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal, onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
       onRequestConfirm: showConfirmDialog,
@@ -2143,8 +2851,13 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
       onFetchPhotoComments: handleFetchPhotoComments, onSavePhotoComments: handleSavePhotoComments,
       onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
-      indexedPhotos: galleryPhotoIndex ? galleryPhotoIndex.items : [],
+      placeCount: historyPlaceCount,
+      indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
+        ? galleryPhotoIndex.items
+        : (galleryPhotoIndex && galleryPhotoIndex.status === 'fallback' ? null : []),
+      indexedPhotoStatus: galleryPhotoIndex ? galleryPhotoIndex.status : undefined,
       indexedPhotoComplete: galleryPhotoIndex ? galleryPhotoIndex.complete : false,
+      onIndexedPhotoPageChange: galleryPhotoIndex ? galleryPhotoIndex.loadPage : undefined,
       onIndexedPhotoLoadAll: galleryPhotoIndex ? galleryPhotoIndex.loadAll : undefined,
       photoCommentCounts,
     },
@@ -2218,6 +2931,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
  */
 function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
+  const [gallerySearchQuery, setGallerySearchQuery] = React.useState('');
   const galleryActionsRef = React.useRef({});
   const registerGalleryActions = React.useCallback((actions) => {
     galleryActionsRef.current = actions || {};
@@ -2229,7 +2943,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     () => window.__gatherLoadChatUi?.(),
     () => recordsContext.showToast?.('갤러리 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'gallery' });
   const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
   if (typeof ChatGalleryModal !== 'function') {
     return React.createElement(EmptyState, { title: '갤러리 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -2240,6 +2954,8 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     onOpenShare: recordsContext.onOpenGalleryShare,
     onOpenAppSettings,
     v2Embed: true,
+    v2SearchQuery: gallerySearchQuery,
+    onV2SearchQuery: setGallerySearchQuery,
     onRegisterMenuActions: registerGalleryActions,
   });
   return React.createElement(React.Fragment, null,
@@ -2251,7 +2967,9 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
         onMenu: onOpenSideNav || onOpenAppSettings,
-        onSearch: () => clickLegacyAriaButton('갤러리 검색', '.v2-gallery'),
+        searchQuery: gallerySearchQuery,
+        onSearchQuery: setGallerySearchQuery,
+        searchPlaceholder: '사진·링크·파일 통합 검색 (태그, 텍스트, URL)',
         onUploadFiles: () => galleryActionsRef.current.uploadMixed?.(),
         onUploadLink: () => galleryActionsRef.current.uploadLink?.(),
         slots: {},
@@ -2265,21 +2983,12 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
 }
 
 
-/** Click still-mounted legacy header search (parent may be display:none under V2 PageHeader).
- * Scope to legacy page headers so we do not re-click the V2 PageHeader IconButton (same aria-label).
- * Content/Archive use .places-view-header; Gallery uses .gallery-page-header. */
-function clickLegacyAriaButton(ariaLabel, scopeSelector) {
-  const scope = (scopeSelector && document.querySelector(scopeSelector)) || document;
-  const btn = scope.querySelector(`.places-view-header button[aria-label="${ariaLabel}"]`)
-    || scope.querySelector(`.gallery-page-header button[aria-label="${ariaLabel}"]`);
-  if (btn) btn.click();
-}
-
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
 function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const contentActionsRef = React.useRef({});
   const [contentGridCols, setContentGridCols] = React.useState('2');
+  const [contentSearchQuery, setContentSearchQuery] = React.useState('');
   const registerContentActions = React.useCallback((actions) => {
     contentActionsRef.current = actions || {};
     if (actions && (actions.gridCols === '1' || actions.gridCols === '2')) {
@@ -2293,6 +3002,8 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     onBack: () => onChangeView('calendar'),
     onOpenAppSettings,
     v2Embed: true,
+    v2SearchQuery: contentSearchQuery,
+    onV2SearchQuery: setContentSearchQuery,
     onRegisterMenuActions: registerContentActions,
   });
   return renderContentScreen({
@@ -2301,7 +3012,9 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     subtitle: calendarName || undefined,
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
-    onSearch: () => clickLegacyAriaButton('컨텐츠 검색', '.v2-content'),
+    searchQuery: contentSearchQuery,
+    onSearchQuery: setContentSearchQuery,
+    searchPlaceholder: '제목으로 검색...',
     onOpenRegion: () => contentActionsRef.current.openRegion?.(),
     onOpenRegister: () => contentActionsRef.current.register?.(),
     onSetGridCols: (cols) => {
@@ -2327,6 +3040,12 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
 function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
+  const [archiveSearchQuery, setArchiveSearchQuery] = React.useState('');
+  const historyActionsRef = React.useRef({});
+  const registerHistoryActions = React.useCallback((actions) => {
+    historyActionsRef.current = actions || {};
+    if (typeof onRegisterMenuActions === 'function') onRegisterMenuActions(actions);
+  }, [onRegisterMenuActions]);
   const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
   const historyView = React.createElement(HistoryView, {
     ...recordsContext.historyProps,
@@ -2335,7 +3054,9 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
     onOpenShare: recordsContext.onOpenHistoryShare,
     onOpenAppSettings,
     v2Embed: true,
-    onRegisterMenuActions,
+    v2SearchQuery: archiveSearchQuery,
+    onV2SearchQuery: setArchiveSearchQuery,
+    onRegisterMenuActions: registerHistoryActions,
   });
   return React.createElement(React.Fragment, null,
     renderArchiveScreen({
@@ -2345,7 +3066,9 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
       onMenu: onOpenSideNav || onOpenAppSettings,
-      onSearch: () => clickLegacyAriaButton('보관함 검색', '.v2-archive'),
+      searchQuery: archiveSearchQuery,
+      onSearchQuery: setArchiveSearchQuery,
+      searchPlaceholder: '추억·인물·장소·날짜·태그 검색...',
       slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
@@ -2387,7 +3110,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
     () => recordsContext.showToast?.('장소 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
   const [placeDateModalDate, setPlaceDateModalDate] = React.useState(null);
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'places' });
   const { PlacesView, ShareModal, DateModal } = bindUiComponentAliases(React);
   if (typeof PlacesView !== 'function') {
     return React.createElement(EmptyState, { title: '장소 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -2438,7 +3161,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideN
     () => window.__gatherLoadViewUi?.('memo'),
     () => recordsContext.showToast?.('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface);
+  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'memo' });
   const { MemoView, ShareModal } = bindUiComponentAliases(React);
   if (typeof MemoView !== 'function') {
     return React.createElement(EmptyState, { title: '메모 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
@@ -2467,36 +3190,17 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
     if (subTab === 'memo') onChangeView('memo');
     else if (subTab === 'places') onChangeView('places');
   }, [subTab]);
-  // Gallery/Content/Archive are selected from the side-nav — the records subtab strip
-  // (전체/사진·영상/보관함/콘텐츠) is redundant IA when those destinations are already active.
-  // Keep the strip only for the 전체 hub overview.
-  const hideSubtabStrip = subTab === 'media' || subTab === 'content' || subTab === 'archive';
-  return React.createElement('div', { className: `v2-records-frame${hideSubtabStrip ? ' v2-records-no-subtab' : ''}`.trim() },
-    hideSubtabStrip
-      ? null
-      : React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
-          RECORDS_SUBTABS.map(t => React.createElement('button', {
-            key: t.id,
-            type: 'button',
-            role: 'tab',
-            'aria-selected': subTab === t.id,
-            className: `renewal-shell-subtab-item ${subTab === t.id ? 'is-active' : ''}`.trim(),
-            onClick: () => onSelectSubTab(t.id),
-          }, t.label))
-        ),
+  // Gallery, content, and archive are their own side-nav destinations. The records
+  // "전체" hub is not a page — bare ?tab=records is rewritten to the calendar.
+  return React.createElement('div', { className: 'v2-records-frame v2-records-no-subtab' },
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
       : subTab === 'content'
       ? React.createElement(ContentPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
-      : subTab === 'all'
-      ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab, onChangeView })
       : subTab === 'archive'
       ? React.createElement(HistoryPane, { recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions })
-      : React.createElement(EmptyState, {
-        title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
-        subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
-      })
+      : null
     )
   );
 }
@@ -2890,6 +3594,23 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // bypassed here.  It preserves the exact home memo selected during the tab
   // handoff, even before the outer app has a chance to rebuild its contexts.
   const [homeFocusedMemo, setHomeFocusedMemo] = React.useState(null);
+  // Keep the side-navigation D-day fresh for an installed app that stays open
+  // across midnight; otherwise it would only update after another interaction.
+  const [sideNavDayStamp, setSideNavDayStamp] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    let timer = null;
+    const scheduleNextDay = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timer = window.setTimeout(() => {
+        setSideNavDayStamp(Date.now());
+        scheduleNextDay();
+      }, Math.max(1000, nextMidnight.getTime() - now.getTime() + 100));
+    };
+    scheduleNextDay();
+    return () => { if (timer) window.clearTimeout(timer); };
+  }, []);
 
   // Status-bar tint follows theme + page (theme-color-sync.js).
   React.useEffect(() => syncThemeColor(activeTab === DEFAULT_TAB), [activeTab]);
@@ -3029,9 +3750,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const shakeElement = (el) => {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.remove('chat-search-focused-bubble');
+    const innerBubble = el.querySelector('.v2-bubble-surface, .v2-memo-card-contract') || el;
+    innerBubble.classList.remove('chat-search-focused-bubble');
     void el.offsetWidth;
     el.classList.add('chat-search-focused-bubble');
-    setTimeout(() => el.classList.remove('chat-search-focused-bubble'), 2200);
+    if (innerBubble !== el) innerBubble.classList.add('chat-search-focused-bubble');
+    setTimeout(() => {
+      el.classList.remove('chat-search-focused-bubble');
+      if (innerBubble !== el) innerBubble.classList.remove('chat-search-focused-bubble');
+    }, 2200);
   };
   // Polls until `find()` returns an element (the destination tab mounts lazily), then shakes it.
   const focusWhenMounted = (find, { timeoutMs = 3000 } = {}) => new Promise(resolve => {
@@ -3119,10 +3846,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         // Not in the loaded page: the legacy helper fetches it by id into sharedMemo, which the
         // memo page shows (MemoScreen adds a focused memo outside the current page to the list).
         recordsContext?.memoProps?.onOpenMemo?.(id);
+        const url = new URL(window.location.href);
+        url.searchParams.set('memoFocus', id);
+        window.history.replaceState(window.history.state, '', url);
         setActiveTab('memo');
       }
-      focusWhenMounted(() => [...document.querySelectorAll('[data-v2-memo-id]')]
-        .find(el => el.getAttribute('data-v2-memo-id') === String(id)), { timeoutMs: 5000 });
+      focusWhenMounted(() => [...document.querySelectorAll('[data-v2-memo-id], [data-memo-id]')]
+        .find(el => el.getAttribute('data-v2-memo-id') === String(id) || el.getAttribute('data-memo-id') === String(id) || el.id === 'memo-' + String(id)), { timeoutMs: 5000 });
     });
   };
   const jumpToGalleryFromLightbox = (messageId, imageIndex, imageUrl) => {
@@ -3420,6 +4150,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const settlementBalanceBadge = calendar
     ? formatBalanceBadge(calculateSettlementBalance(calendar))
     : null;
+  const nextConfirmedMeeting = getNextConfirmedMeeting(calendar, new Date(sideNavDayStamp));
+  const calendarDdayBadge = nextConfirmedMeeting ? formatDDayLabel(nextConfirmedMeeting.date) : '';
   const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: settlementBalanceBadge?.text || '' };
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
@@ -3489,6 +4221,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       BENTO_MAIN_ITEMS.map(item => {
         const active = isSideItemActive(item.id);
         const metaVal = item.id === 'chat' ? shortParticipantName(sideMeta[item.id]) : sideMeta[item.id];
+        // Gallery, places and memo are destinations, not compact status widgets.  Their
+        // trailing date/title/place labels made the navigation rail uneven and could collide
+        // with the menu title. Keep only the intentional live status for chat, settlement,
+        // and the nearest future confirmed meeting on the calendar item.
+        const showMeta = item.id === 'calendar'
+          ? Boolean(calendarDdayBadge)
+          : item.id === 'chat' || item.id === 'settlement';
         return React.createElement('button', {
           key: item.id,
           type: 'button',
@@ -3498,8 +4237,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         },
           React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon, active })),
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label),
-          metaVal && (
-            item.isPill
+          showMeta && (
+            item.id === 'calendar'
+              ? React.createElement('span', {
+                  className: bentoClass('side-nav-item-meta side-nav-calendar-dday-badge'),
+                  title: formatConfirmedMeetingLabel(nextConfirmedMeeting.date),
+                  'aria-label': `가장 가까운 모임확정 ${calendarDdayBadge}`,
+                }, calendarDdayBadge)
+              : metaVal && (item.isPill
               ? React.createElement('span', {
                   className: bentoClass('side-nav-item-meta chat-dot'),
                   style: {
@@ -3514,7 +4259,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
                     marginLeft: 'auto',
                     flexShrink: 0,
                     display: 'inline-block',
-                    boxShadow: '0 0 0 1px rgba(30,27,46,0.08)',
                   },
                   title: lastChatAuthor,
                   'aria-label': lastChatAuthor,
@@ -3528,7 +4272,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
                   style: item.id === 'settlement'
                     ? { color: settlementBalanceBadge?.bgColor || '#EF4444', fontWeight: 700 }
                     : undefined,
-                }, metaVal)
+                }, metaVal))
           )
         );
       })
@@ -3608,7 +4352,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
@@ -3632,7 +4376,19 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           onSelectDate: (d) => { setDateModalTab(null); setDateModalSearchFocus(null); setDateModalDate(d); },
           onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
         })
-      )
+      ),
+      React.createElement(MobileBottomNav, {
+        activeTab,
+        isSideNavOpen,
+        onSelectTab: (tabId) => {
+          if (tabId === 'more') {
+            setIsSideNavOpen(prev => !prev);
+          } else {
+            setIsSideNavOpen(false);
+            selectSideItem(tabId);
+          }
+        },
+      })
     ),
     React.createElement(MoreModalsHost, {
       openModal: openMoreModal, onClose: () => setOpenMoreModal(null),

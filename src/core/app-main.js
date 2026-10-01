@@ -19,27 +19,29 @@ import {
   getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
 } from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
-import { createImageTagSaveHandler } from './app-image-tag-save.js';
+import { createBulkImageTagSaveHandler, createImageTagSaveHandler, MAX_MEDIA_TAGS, MAX_MEDIA_TAG_TEXT_LENGTH } from './app-image-tag-save.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
-import { buildImageGeoMap, persistImageGeoMap } from './photo-geo.js';
+import { buildImageGeoMap } from './photo-geo.js';
 import { syncAssetTagsInMeetings } from './media-reference-integrity.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
 import { fetchLinkPreview, useLinkPreview, shouldFetchLinkPreviewForChatUrl } from './app-link-preview.js';
+import { isExternalServiceUrl } from './memo-share-link.js';
+import { isChatImageUpload } from './image-variants.js';
 import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from './app-chat-render.js';
 import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCategoryMarkerContent, buildPlaceMarkerHtml, panMapToFitMarkerPopup, centerMapOnMarkerAndPopup } from './app-place-map.js';
 import {
-  isHeicFile,
   buildMetadataTags,
   forgetPreprocessedImages,
+  rememberKnownImageFingerprints,
   processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles,
   uploadInlineChatImageToStorage, readClipboardImageFiles,
   migrateBase64ChatImagesForCalendar, backfillMeetingUploadSourcesForCalendar,
   resolveChatImageBatch, resolveMemoImageBatch, deleteAllChatImagesFromStorage,
-  resolveAnniversaryImageBatch
+  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION, limitImageUploadSelection
 } from './app-image-pipeline.js';
 import {
   computeKoreanHolidaysForYear,
@@ -275,6 +277,7 @@ import {
   fetchAnniversariesRest,
   fetchCustomCultureItemsRest,
   fetchMemePoolRest,
+  getCachedMemePool,
   writeCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
@@ -634,7 +637,7 @@ function CalendarApp() {
   };
 
   const [cloudReloadToken, setCloudReloadToken] = React.useState(0);
-  const [currentMonthDate] = React.useState(() => {
+  const [currentMonthDate, setCurrentMonthDate] = React.useState(() => {
     const requestedMonth = getCalendarMonthFromURL();
     return requestedMonth
       ? new Date(requestedMonth.year, requestedMonth.month - 1, 1)
@@ -712,11 +715,13 @@ function CalendarApp() {
   // A memo shared via its own ?view=memo&memo=<id> link (see MemoShareModal) may be older than
   // the paginated `memos` window above, so it needs its own direct-by-id fetch rather than
   // relying on it already being present in that list.
+  // locationSearch changes on popstate (notification tap on an already-open tab included).
+  const [locationSearch, setLocationSearch] = React.useState(() => (typeof window === 'undefined' ? '' : window.location.search));
   const [sharedMemo, setSharedMemo] = React.useState(null);
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const share = parseSharePathFromLocation();
-    const memoParam = (share && share.memoId) || params.get('memo');
+    const memoParam = (share && share.memoId) || params.get('memo') || params.get('memoFocus');
     if (!memoParam || !activeCalId) {
       setSharedMemo(null);
       return;
@@ -736,7 +741,7 @@ function CalendarApp() {
       }
     })();
     return () => { isMounted = false; };
-  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, firebaseDb, firebaseConnectionVersion, locationSearch]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [customCultureItems, setCustomCultureItems] = React.useState([]);
   // 밈 키보드용 이미지 풀. calendarId로 나뉘지 않는 전역 컬렉션이라(모든 캘린더가 같은 해시태그
@@ -744,21 +749,28 @@ function CalendarApp() {
   // 어드민이 다른 탭에서 태그를 편집하는 동안 이 세션은 그 변경을 영영 못 본다 -- 탭을 다시
   // 활성화할 때마다(포커스/가시성 복귀) 재조회해서, 새로고침 없이도 몇 분 안에 반영되게 한다.
   // 너무 잦은 재조회를 막기 위해 최소 재조회 간격을 둔다.
-  const [memePool, setMemePool] = React.useState([]);
+  const [memePool, setMemePool] = React.useState(() => {
+    try {
+      if (typeof getCachedMemePool === 'function') return getCachedMemePool();
+    } catch (_) {}
+    return [];
+  });
   React.useEffect(() => {
     let cancelled = false;
     let lastFetchAt = 0;
-    const MIN_REFETCH_INTERVAL_MS = 20000;
-    const load = () => {
+    const MIN_REFETCH_INTERVAL_MS = 10 * 60 * 1000; // 10분 주기 메타 검사 (탭 전환 시 불필요한 1,035건 재조회 방지)
+    const load = (force = false) => {
       const now = Date.now();
-      if (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS) return;
+      if (!force && (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS)) return;
       lastFetchAt = now;
-      fetchMemePoolRest().then(list => { if (!cancelled) setMemePool(list); }).catch(() => {});
+      fetchMemePoolRest().then(list => {
+        if (!cancelled && Array.isArray(list) && list.length > 0) setMemePool(list);
+      }).catch(() => {});
     };
-    load();
+    load(true);
     const onVisibilityOrFocus = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      load();
+      load(false);
     };
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityOrFocus);
     if (typeof window !== 'undefined') window.addEventListener('focus', onVisibilityOrFocus);
@@ -884,6 +896,18 @@ function CalendarApp() {
     React, activeCalId, activeView, isGlobalSearchOpen,
     firebaseDb, getFirebaseDb: () => firebaseDb, firebaseConnectionVersion
   });
+  // Persisted fingerprints cover already-rendered media immediately; the image pipeline also
+  // hydrates the full, field-masked archive before a new upload, so pagination cannot make an
+  // older duplicate look new.
+  React.useEffect(() => {
+    const activeCalendar = (calendars || []).find(calendar => calendar?.id === activeCalId);
+    const fingerprints = [
+      ...(allChatMessages || []).flatMap(message => Array.isArray(message?.imageFingerprints) ? message.imageFingerprints : []),
+      ...(memos || []).flatMap(memo => Array.isArray(memo?.imageFingerprints) ? memo.imageFingerprints : []),
+      ...(activeCalendar?.anniversaries || []).flatMap(anniversary => (anniversary?.photos || []).map(photo => photo?.fingerprint))
+    ];
+    rememberKnownImageFingerprints(activeCalId, fingerprints);
+  }, [activeCalId, allChatMessages, memos, calendars]);
   const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
     allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
@@ -913,23 +937,52 @@ function CalendarApp() {
     const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
     if (!el) return false;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const targetBubble = el.querySelector('.chat-search-focused-bubble')
+      || el.querySelector('[key="bubble-wrapper"] > div')
+      || el.querySelector('.message-bubble')
+      || el;
+    targetBubble.classList.remove('chat-search-focused-bubble');
+    void targetBubble.offsetWidth;
+    targetBubble.classList.add('chat-search-focused-bubble');
+    setTimeout(() => targetBubble.classList.remove('chat-search-focused-bubble'), 2200);
+
     if (externalFocusTimeoutRef.current) clearTimeout(externalFocusTimeoutRef.current);
     // Clear first so re-targeting the same message a second time still re-triggers the shake
     // animation (ChatRoomView keys the focused bubble off this value flipping to a new state).
     setExternalFocusMsgId(null);
     requestAnimationFrame(() => {
       setExternalFocusMsgId(messageId);
-      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 1700);
+      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 2200);
     });
     return true;
   };
 
   React.useEffect(() => {
     const handleUrlChange = () => {
+      setLocationSearch(window.location.search);
       setActiveView(getInitialAppView(window.location, parseSharePathFromLocation));
     };
     window.addEventListener('popstate', handleUrlChange);
     return () => window.removeEventListener('popstate', handleUrlChange);
+  }, []);
+
+  // A push click on an already-open calendar tab cannot rely on a full reload.
+  // The service worker posts the same URL a cold load would open.
+  React.useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker || !navigator.serviceWorker.addEventListener) return undefined;
+    const onMessage = (event) => {
+      const data = event && event.data;
+      if (!data || data.type !== 'notification-open' || !data.url) return;
+      let next;
+      try { next = new URL(String(data.url), window.location.href); } catch (_) { return; }
+      if (next.origin !== window.location.origin) return;
+      const target = `${next.pathname}${next.search}${next.hash}`;
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (target !== current) window.history.pushState(window.history.state, '', target);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, []);
 
   // Deep-link support: ?date=YYYY-MM-DD auto-opens that date's DateModal on load. Used by the
@@ -994,6 +1047,23 @@ function CalendarApp() {
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     }
     window.history.pushState({}, '', buildAppViewUrl(window.location, view, currentMonthDate));
+  };
+  const syncCurrentMonthInUrl = nextDate => {
+    if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return;
+    const params = new URLSearchParams(window.location.search);
+    const keepId = params.get('id') || params.get('cal');
+    params.delete('id');
+    params.delete('cal');
+    if (keepId) params.set('id', keepId);
+    params.set('year', String(nextDate.getFullYear()));
+    params.set('month', String(nextDate.getMonth() + 1).padStart(2, '0'));
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  };
+  const setCurrentMonthAndSync = nextDate => {
+    setCurrentMonthDate(nextDate);
+    syncCurrentMonthInUrl(nextDate);
   };
   const restoreActiveCalendarFromCache = React.useCallback(() => {
     if (!isAllowedCalendarId(activeCalId)) return false;
@@ -1288,10 +1358,14 @@ function CalendarApp() {
 
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
-    if (activeCal) {
-      setChatParticipantId(((window.GATHER_APP_NOTIFICATIONS||{}).getStoredChatParticipantId||(()=>undefined))(activeCalId, activeCal));
+    if (activeCal && activeCalId) {
+      const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      const resolved = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
+      if (resolved && resolved !== chatParticipantIdRef.current) {
+        setChatParticipantId(resolved);
+      }
     }
-  }, [activeCalId, calendars]);
+  }, [activeCalId, activeCal]);
 
   // Live chat window, gallery live window and the stalled-listener watchdog: useChatMessageWindow.
 
@@ -1338,19 +1412,17 @@ function CalendarApp() {
       }).catch(() => {});
       return () => { isMounted = false; };
     }
-    // A years-old family calendar's anniversaries collection only ever grows, and the plain
-    // subscribeAnniversaries() listener below has no limit -- every single reconnect (a phone
-    // waking up, a network handoff, a fresh tab) re-reads the ENTIRE collection from scratch,
-    // regardless of how little actually changed. Same fix already applied to customCultureItems:
-    // hydrate the complete archive once via REST, then attach a listener bounded to just the
-    // newest documents to catch live edits/additions, merging (never replacing) into local state
-    // so older entries hydrated via REST are never dropped.
-    fetchAnniversariesRest(activeCalId).then(list => {
-      if (Array.isArray(list) && list.length > 0) applyList(list);
-    }).catch(err => console.warn('Anniversaries archive hydration failed:', err));
-    // orderBy(createdAt) is safe ONLY for this bounded recent-window listener -- legacy docs
-    // missing createdAt (excluded by this orderBy) are already covered by the REST hydration
-    // above, which sorts client-side instead of relying on the field being present.
+    // 200개 이하인 일반적인 캘린더는 onSnapshot 하나로 전체 데이터가 즉시 수신되므로,
+    // 매 로드마다 REST 전체 조회를 동시 실행하던 중복 읽기를 제거한다.
+    // 스냅샷이 200건 한도에 도달한 대규모 캘린더이거나 에러 발생 시에만 REST 아카이브를 보충한다.
+    let hydratedArchive = false;
+    const maybeHydrateArchive = (count) => {
+      if (hydratedArchive || count < 200) return;
+      hydratedArchive = true;
+      fetchAnniversariesRest(activeCalId).then(list => {
+        if (isMounted && Array.isArray(list) && list.length > 0) applyList(list);
+      }).catch(err => console.warn('Anniversaries archive hydration failed:', err));
+    };
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
       .orderBy('createdAt', 'desc').limit(200)
       .onSnapshot(snapshot => {
@@ -1358,6 +1430,7 @@ function CalendarApp() {
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         applyList(list, true);
+        maybeHydrateArchive(snapshot.size);
       }, err => {
         console.warn(`Firestore anniversaries subscription error:`, err);
         fetchAnniversariesRest(activeCalId).then(list => {
@@ -1854,21 +1927,23 @@ function CalendarApp() {
       });
       return () => { isMounted = false; };
     }
-    // Keep the realtime window bounded. The REST fallback above remains the authoritative
-    // archive path, while the listener only tracks the newest registrations and prevents an
-    // ever-growing collection from being re-sent on every reconnect.
-    // Hydrate the complete archive once, then keep only a bounded recent listener attached.
-    // This preserves older individually registered cards without making every reconnect stream
-    // the entire collection.
-    fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
-      console.warn('Custom culture archive hydration failed:', err);
-    });
+    // 200개 이하인 일반적인 캘린더는 onSnapshot 하나로 전체 데이터가 즉시 수신되므로,
+    // 매 로드마다 REST 전체 조회를 동시 실행하던 중복 읽기를 제거한다.
+    let hydratedArchive = false;
+    const maybeHydrateArchive = (count) => {
+      if (hydratedArchive || count < 200) return;
+      hydratedArchive = true;
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+        console.warn('Custom culture archive hydration failed:', err);
+      });
+    };
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
       .orderBy('createdAt', 'desc').limit(200)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         applyList(list, true);
+        maybeHydrateArchive(snapshot.size);
       }, err => {
         console.warn('Firestore customCultureItems subscription error:', err);
         // A transient listener failure must never replace a previously received authoritative
@@ -1959,11 +2034,16 @@ function CalendarApp() {
       (Array.isArray(incomingList) ? incomingList : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
       return Array.from(byId.values());
     };
-    fetchPlacesFromFirestore(activeCalId).then(list => {
-      if (isMounted && Array.isArray(list) && list.length > 0) {
-        setPlacesSubcollection(prev => mergePlacesById(prev, list));
-      }
-    }).catch(err => console.warn('Places archive hydration failed:', err));
+    let hydratedPlacesArchive = false;
+    const maybeHydratePlacesArchive = (count) => {
+      if (hydratedPlacesArchive || count < 200) return;
+      hydratedPlacesArchive = true;
+      fetchPlacesFromFirestore(activeCalId).then(list => {
+        if (isMounted && Array.isArray(list) && list.length > 0) {
+          setPlacesSubcollection(prev => mergePlacesById(prev, list));
+        }
+      }).catch(err => console.warn('Places archive hydration failed:', err));
+    };
     const unsubPlaces = subscribePlaces(activeCalId, { orderBy: 'updatedAt', direction: 'desc', limit: 200 }, snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -1973,6 +2053,7 @@ function CalendarApp() {
           return;
         }
         setPlacesSubcollection(prev => mergePlacesById(prev, list));
+        maybeHydratePlacesArchive(snapshot.size);
       }, err => {
         console.warn(`Firestore places subscription error:`, err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `places:${String(err?.code || 'unknown')}`, getClientAuditContext());
@@ -2070,20 +2151,24 @@ function CalendarApp() {
   // Photo comment counts / preloaded comments subscription: useGalleryIndexBindings.
 
   // Memo pagination, the needsMemoCollection gate and the memo listeners: useMemoCollections.
-  // 보관함 인물/추억 탭의 사진 목록용 memo 스냅샷 -- 위 needsMemoCollection에 'history'를 넣어 실시간
-  // 구독을 타게 하면 캘린더<->보관함을 오갈 때마다 리스너가 추가로 붙었다 떨어지는 처치(churn)가
-  // 늘어나는데, 이 리스너 처치가 실사용자 콘솔에서 반복 관찰된 "FIRESTORE INTERNAL ASSERTION
-  // FAILED: Unexpected state" 크래시의 유력한 방아쇠라 이미 위 주석에서 경고하고 있다. 사진 모아보기는
-  // 실시간일 필요가 없으므로, 보관함에 들어갈 때 한 번만 REST로 읽어와 별도 상태에 담는다(구독 없음).
+  // 보관함의 레거시 사진 폴백용 memo 스냅샷. 정상적인 photoIndex 캘린더에서는 사진 메타가 이미
+  // 인덱스 한 페이지에 있으므로 여기서 별도로 memo 200건을 읽을 이유가 없다. 그 읽기와 상태 반영이
+  // 보관함 첫 프레임의 네트워크/GC 부담을 키웠다. 인덱스가 실제로 없는 캘린더만 제한적으로 폴백한다.
+  // (실시간 listener는 쓰지 않는다. listener churn은 FIRESTORE INTERNAL ASSERTION의 방아쇠가 된다.)
   const [historyMemosSnapshot, setHistoryMemosSnapshot] = React.useState([]);
   React.useEffect(() => {
-    if (!activeCalId || activeView !== 'history') return;
+    const needsLegacyMemoFallback = activeCalId && activeView === 'history'
+      && galleryPhotoIndex.status === 'fallback';
+    if (!needsLegacyMemoFallback) {
+      setHistoryMemosSnapshot(previous => (previous.length ? [] : previous));
+      return undefined;
+    }
     let cancelled = false;
-    fetchMemosRest(activeCalId, 200).then(list => {
+    fetchMemosRest(activeCalId, 100).then(list => {
       if (!cancelled) setHistoryMemosSnapshot(Array.isArray(list) ? list : []);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [activeCalId, activeView]);
+  }, [activeCalId, activeView, galleryPhotoIndex.status]);
 
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo, places,
@@ -2111,28 +2196,50 @@ function CalendarApp() {
   // the admin 통합검색결과 page so 채팅/태그 search results open a new tab landing on the actual
   // message instead of just the chat room's bottom. Re-runs as chatMessages streams in (the
   // message may not be in the DOM yet on first paint) but only acts once via the ref guard.
-  const chatDeepLinkHandledRef = React.useRef(false);
+  const chatDeepLinkHandledRef = React.useRef('');
   React.useEffect(() => {
-    if (chatDeepLinkHandledRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const msgParam = params.get('msg');
-    if (!msgParam) return;
-    if (activeView !== 'chat') { changeView('chat'); return; }
-    if (!focusChatMessage(msgParam)) return;
-    chatDeepLinkHandledRef.current = true;
+    if (!msgParam) return undefined;
+    const onChat = activeView === 'chat' || params.get('view') === 'chat' || params.get('tab') === 'chat';
+    if (!onChat) { changeView('chat'); return undefined; }
+    if (chatDeepLinkHandledRef.current === msgParam) return undefined;
+    let cancelled = false;
     const imgParam = params.get('img');
-    if (imgParam !== null) {
-      const msg = chatMessages.find(m => m.id === msgParam);
-      if (msg) {
+    (async () => {
+      const openImage = () => {
+        if (imgParam === null) return;
+        const msg = (chatMessagesRef.current || []).find(m => m.id === msgParam);
+        if (!msg) return;
         const entries = getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
           meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
           index: Number(imgParam) || 0
         });
+      };
+      for (let i = 0; i < 24 && !cancelled; i += 1) {
+        if (focusChatMessage(msgParam)) {
+          chatDeepLinkHandledRef.current = msgParam;
+          openImage();
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
-    }
-  }, [activeView, chatMessages]);
+      for (let i = 0; i < 40 && !cancelled && hasMoreOlderChatRef.current; i += 1) {
+        const loadOlder = loadOlderChatMessagesRef.current;
+        if (typeof loadOlder !== 'function') break;
+        await Promise.resolve(loadOlder());
+        await new Promise(resolve => setTimeout(resolve, 80));
+        if (focusChatMessage(msgParam)) {
+          chatDeepLinkHandledRef.current = msgParam;
+          openImage();
+          return;
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeView, chatMessages, locationSearch]);
 
   // Activity logs only when settings AdminModal opens recovery/logs tabs (not on every settings open).
   const adminActivityLogsLoadedForRef = React.useRef(null);
@@ -2594,7 +2701,15 @@ function CalendarApp() {
     const hasText = !!chatInput.trim();
     const imageCount = chatImages.length;
     const fileCount = Array.isArray(chatFileAttachments) ? chatFileAttachments.length : 0;
-    if (!chatParticipantId) {
+    let effectiveParticipantId = chatParticipantId;
+    if (!effectiveParticipantId && activeCal && activeCalId) {
+      const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      effectiveParticipantId = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
+      if (effectiveParticipantId) {
+        setChatParticipantId(effectiveParticipantId);
+      }
+    }
+    if (!effectiveParticipantId) {
       showToast('참여자를 선택해 주세요.', 'error');
       return;
     }
@@ -2649,11 +2764,11 @@ function CalendarApp() {
           type: 'media-chat-send',
           calendarId: activeCalId,
           payload: {
-            participantId: chatParticipantId,
+            participantId: effectiveParticipantId,
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, metadata: image.metadata || null })),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
@@ -2674,7 +2789,7 @@ function CalendarApp() {
       if (imageCount === 0) {
         const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const messageData = {
-          participantId: chatParticipantId,
+          participantId: effectiveParticipantId,
           text: chatInput.trim(),
           timestamp: Date.now(),
           uploadSource: 'chat'
@@ -2698,6 +2813,12 @@ function CalendarApp() {
         // unavailable) keep their full quality -- instead the batch is split across multiple
         // chat messages if needed so no single message can exceed Firestore's 1MiB/doc limit.
         const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
+        if (resolvedImages.duplicateIndexes?.length) {
+          showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
+        }
+        if (resolvedImages.length === 0) {
+          throw new Error('이미 업로드된 사진입니다. 새 사진을 선택해 주세요.');
+        }
         const chunks = chunkResolvedImagesForMessages(resolvedImages);
         const baseTimestamp = Date.now();
         for (let i = 0; i < chunks.length; i++) {
@@ -2709,16 +2830,21 @@ function CalendarApp() {
             total: imageCount
           });
           const chunkImages = chunks[i];
+          // Store GPS with the message itself. A separate post-save update could be cancelled when
+          // iOS suspended the PWA just after an otherwise successful image upload.
+          const imageGeoMap = buildImageGeoMap(chunkImages);
           const messageOperationId = `chat_${activeCalId}_${baseTimestamp}_${i}_${Math.random().toString(36).slice(2, 8)}`;
           const messageData = {
-            participantId: chatParticipantId,
+            participantId: effectiveParticipantId,
             text: i === 0 ? chatInput.trim() : '',
             imageUrl: chunkImages[0].imageUrl,
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
+            imageFingerprints: chunkImages.map(r => r.fingerprint || ''),
             // Always persist the upload-date tag when optional metadata parsing returns no tags.
             imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions()) || withUploadDateTag('')),
+            ...(Object.keys(imageGeoMap).length ? { imageGeoMap } : {}),
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
@@ -2731,8 +2857,6 @@ function CalendarApp() {
           if (i === 0) firstSentMessageId = sent.id || null;
           if (sent.id) sentMessagesForOptimisticInsert.push({ ...messageData, id: sent.id });
           if (sent.queued) sendWasQueued = true;
-          // GPS per photo (보관함 > 장소), best effort after the message is saved -- photo-geo.js.
-          else if (sent.id) void persistImageGeoMap({ db: firebaseDb, calendarId: activeCalId, docId: sent.id, geoMap: buildImageGeoMap(chunkImages) });
         }
         ok = true;
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
@@ -2780,12 +2904,20 @@ function CalendarApp() {
   // 업로드/오프라인 큐잉 로직이 전혀 필요 없다 -- 그 URL만 그대로 참조하는 메시지 한 건을 쓴다.
   const handleSendMemeImage = async (meme) => {
     if (!meme || (!meme.fullUrl && !meme.thumbUrl)) return;
-    if (!chatParticipantId) { showToast('참여자를 선택해 주세요.', 'error'); return; }
+    let effectiveParticipantId = chatParticipantId;
+    if (!effectiveParticipantId && activeCal && activeCalId) {
+      const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      effectiveParticipantId = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
+      if (effectiveParticipantId) {
+        setChatParticipantId(effectiveParticipantId);
+      }
+    }
+    if (!effectiveParticipantId) { showToast('참여자를 선택해 주세요.', 'error'); return; }
     const url = meme.fullUrl || meme.thumbUrl;
     const thumb = meme.thumbUrl || meme.fullUrl;
     const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const messageData = {
-      participantId: chatParticipantId,
+      participantId: effectiveParticipantId,
       text: '',
       imageUrl: url,
       thumbUrl: thumb,
@@ -2815,13 +2947,12 @@ function CalendarApp() {
   };
 
   const prepareGalleryImageUploads = async (files, title = '사진 업로드 준비 중...') => {
-    const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+    const { candidates: imageFiles, selected: limitedFiles, omittedCount } = limitImageUploadSelection(files);
     if (imageFiles.length === 0) {
       showToast('업로드할 이미지가 없습니다.', 'error');
       return [];
     }
-    const limitedFiles = imageFiles.slice(0, 50);
-    if (imageFiles.length > limitedFiles.length) showToast('최대 50장까지 업로드됩니다.', 'info');
+    if (omittedCount > 0) showToast(`이번에는 ${MAX_IMAGE_UPLOADS_PER_ACTION}장까지 업로드됩니다. ${omittedCount}장은 선택에서 제외되었습니다.`, 'info');
     setChatUploadProgress({ pct: 2, remainingSec: null, label: title, current: 0, total: limitedFiles.length });
     const { succeeded, failed } = await processImageFilesSequentially(limitedFiles, progress => {
       const total = Math.max(1, progress.total || limitedFiles.length);
@@ -2858,7 +2989,8 @@ function CalendarApp() {
           payload: {
             participantId: fallbackParticipantId,
             text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
-            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, metadata: image.metadata || null }))
+            variantProfile: 'grid',
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null }))
           }
         });
         if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');
@@ -2871,18 +3003,28 @@ function CalendarApp() {
           ...progress,
           label: '갤러리 사진 업로드 중...'
         });
-      });
+      }, { profile: 'grid' });
+      if (resolvedImages.duplicateIndexes?.length) {
+        showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
+      }
+      if (resolvedImages.length === 0) {
+        showToast('새로 업로드할 사진이 없습니다. 기존 사진과 동일한 파일입니다.', 'info', 5000);
+        return false;
+      }
       const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
       let anyQueued = false;
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
+        // Keep gallery GPS in the first durable write for the same iOS lifecycle reason as chat.
+        const imageGeoMap = buildImageGeoMap(chunkImages);
         const messageOperationId = `gallery_${activeCal.id}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+        const savedCount = chunks.slice(0, i + 1).reduce((count, batch) => count + batch.length, 0);
         setChatUploadProgress({
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
           label: '갤러리 기록 저장 중...',
-          current: Math.min(resolvedImages.length, i + 1),
+          current: Math.min(resolvedImages.length, savedCount),
           total: resolvedImages.length
         });
         const messageData = {
@@ -2892,7 +3034,9 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
+          imageFingerprints: chunkImages.map(r => r.fingerprint || ''),
           imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions()) || withUploadDateTag('')),
+          ...(Object.keys(imageGeoMap).length ? { imageGeoMap } : {}),
           timestamp: now + i,
           // Distinguishes gallery uploads so the Lightbox can show their source accurately.
           uploadSource: 'gallery'
@@ -2901,7 +3045,6 @@ function CalendarApp() {
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
         if (sent.queued) anyQueued = true;
-        else if (sent.id) void persistImageGeoMap({ db: firebaseDb, calendarId: activeCal.id, docId: sent.id, geoMap: buildImageGeoMap(chunkImages) });
         // Same reasoning as handleSendChatMessage's optimistic insert -- the gallery grid reads
         // from this same chatMessages state, and waiting on the realtime listener alone left a
         // freshly-pasted/uploaded photo invisible in the grid until a manual reload.
@@ -2938,6 +3081,10 @@ function CalendarApp() {
     const cleanUrl = String(url || '').trim();
     if (!cleanUrl) {
       showToast('올바른 링크를 입력해 주세요.', 'error');
+      return false;
+    }
+    if (!isExternalServiceUrl(cleanUrl)) {
+      showToast('외부 서비스의 링크(URL)만 추가할 수 있습니다.', 'error');
       return false;
     }
     const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
@@ -3055,8 +3202,8 @@ function CalendarApp() {
     }
     const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
     const messageOperationId = `gather_photo_paste_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
-    const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+    const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, MAX_MEDIA_TAGS);
+    const cleanTags = sanitizeText(tagTokens.join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
     const messageData = {
       participantId: fallbackParticipantId,
       text: '',
@@ -3100,8 +3247,8 @@ function CalendarApp() {
     try {
       for (let i = 0; i < list.length; i++) {
         const cleanUrl = String(list[i].url).trim();
-        const tagTokens = String(list[i].tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
-        const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+        const tagTokens = String(list[i].tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, MAX_MEDIA_TAGS);
+        const cleanTags = sanitizeText(tagTokens.join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
         const messageOperationId = `gather_photos_paste_${activeCal.id}_${baseTs}_${i}_${Math.random().toString(36).slice(2, 8)}`;
         const messageData = {
           participantId: fallbackParticipantId,
@@ -3244,7 +3391,8 @@ function CalendarApp() {
       // result still doesn't fit in one document (inline base64 fallback with many images),
       // the edited message keeps the first chunk and any remainder is appended as new messages
       // right after it, same as the compose flow -- quality is never degraded to force a fit.
-      const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null);
+      const editProfile = isChatImageUpload({ uploadSource: editingMessage.uploadSource, channel: 'message' }) ? 'chat' : 'grid';
+      const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null, { profile: editProfile });
       const chunks = resolvedImages.length > 0 ? chunkResolvedImagesForMessages(resolvedImages) : [[]];
       const firstChunk = chunks[0];
       const extraChunks = chunks.slice(1);
@@ -3261,9 +3409,11 @@ function CalendarApp() {
         ? editingMessage.imageUrls
         : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []);
       const originalTags = Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [];
+      const originalFingerprints = Array.isArray(editingMessage.imageFingerprints) ? editingMessage.imageFingerprints : [];
       const consumedOriginalIndexes = new Set();
-      const nextImageTags = (newImages || []).map(img => {
-        if (!img.isExisting) return '';
+      const nextImageTags = resolvedImages.map(resolved => {
+        const img = (newImages || [])[resolved.sourceIndex];
+        if (!img?.isExisting) return '';
         // Two intentionally duplicated uploads can have the same URL. Match each occurrence
         // once in source order instead of repeatedly taking indexOf's first slot, otherwise the
         // first photo's tag gets copied to every duplicate while editing.
@@ -3271,6 +3421,19 @@ function CalendarApp() {
         if (originalIdx >= 0) consumedOriginalIndexes.add(originalIdx);
         return originalIdx >= 0 ? (originalTags[originalIdx] || '') : '';
       });
+      const nextImageFingerprints = resolvedImages.map(resolved => {
+        if (resolved.fingerprint) return resolved.fingerprint;
+        const source = (newImages || [])[resolved.sourceIndex];
+        if (!source?.isExisting) return '';
+        const originalIdx = originalUrls.findIndex(url => url === source.original);
+        return originalIdx >= 0 ? (originalFingerprints[originalIdx] || '') : '';
+      });
+      // chunkResolvedImagesForMessages returns slices of these exact resolved-image objects.
+      // Retain per-image tags/fingerprints by object identity when an edit has to be split into
+      // several Firestore documents; otherwise every photo after the first document loses its
+      // tag payload and can subsequently inherit a neighbour's tag during another edit.
+      const tagByResolvedImage = new Map(resolvedImages.map((resolved, index) => [resolved, nextImageTags[index] || '']));
+      const fingerprintByResolvedImage = new Map(resolvedImages.map((resolved, index) => [resolved, nextImageFingerprints[index] || '']));
 
       const incomingFiles = Array.isArray(nextFileAttachments) ? nextFileAttachments : (editingMessage.fileAttachments || []);
       let uploadedFileAttachments = incomingFiles.filter(f => f && f.url && !f.file);
@@ -3286,7 +3449,8 @@ function CalendarApp() {
         thumbUrl: firstChunk[0]?.thumbUrl || '',
         imageUrls: firstChunk.map(r => r.imageUrl),
         thumbUrls: firstChunk.map(r => r.thumbUrl),
-        imageTags: nextImageTags.slice(0, firstChunk.length),
+        imageTags: firstChunk.map(resolved => tagByResolvedImage.get(resolved) || ''),
+        imageFingerprints: firstChunk.map(resolved => fingerprintByResolvedImage.get(resolved) || ''),
         linkPreview: linkPreview || null,
         fileAttachments: uploadedFileAttachments
       };
@@ -3300,6 +3464,7 @@ function CalendarApp() {
         imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
         thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
         imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
+        imageFingerprints: Array.isArray(editingMessage.imageFingerprints) ? editingMessage.imageFingerprints : [],
         imageTagMap: editingMessage.imageTagMap && typeof editingMessage.imageTagMap === 'object' && !Array.isArray(editingMessage.imageTagMap) ? editingMessage.imageTagMap : {},
         linkPreview: editingMessage.linkPreview || null,
         participantId: editingMessage.participantId
@@ -3333,10 +3498,12 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
+            imageTags: chunkImages.map(resolved => tagByResolvedImage.get(resolved) || ''),
+            imageFingerprints: chunkImages.map(resolved => fingerprintByResolvedImage.get(resolved) || ''),
             imageTagMap: reconcileMessageImageTagMap({
               imageUrls: chunkImages.map(r => r.imageUrl),
               thumbUrls: chunkImages.map(r => r.thumbUrl),
-              imageTags: chunkImages.map(() => '')
+              imageTags: chunkImages.map(resolved => tagByResolvedImage.get(resolved) || '')
             }),
             timestamp: baseTimestamp + i
           }, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
@@ -3607,23 +3774,11 @@ function CalendarApp() {
     }
     const parseTagTokens = text => Array.from(new Set(
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
-    )).slice(0, 10);
-    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+    )).slice(0, MAX_MEDIA_TAGS);
+    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
     const saved = await commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
-    if (!saved) return false;
-    // Confirm the subcollection write before reporting success. The calendar document and its
-    // confirmedMeetings mirror can briefly diverge when a fallback request races a realtime
-    // snapshot; silently keeping the optimistic local tag makes it disappear on re-entry.
-    const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
-    const serverPhoto = Array.isArray(serverMeetings)
-      ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
-      : null;
-    if (!serverPhoto || String(serverPhoto.tags || '') !== cleanTags) {
-      showToast('태그 저장 확인에 실패했습니다. 다시 시도해 주세요.', 'error', 5000);
-      return false;
-    }
-    return true;
+    return Boolean(saved);
   };
 
   // Persist hashtags onto anniversary.photos[i].tags (anniversary docs live in the
@@ -3644,8 +3799,8 @@ function CalendarApp() {
     }
     const parseTagTokens = text => Array.from(new Set(
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
-    )).slice(0, 10);
-    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+    )).slice(0, MAX_MEDIA_TAGS);
+    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
     const nextPhotos = photos.map((p, i) => i === imageIndex ? { ...p, tags: cleanTags } : p);
     const annData = preserveAnniversaryCurationFields(ann, { ...ann, photos: nextPhotos, updatedAt: Date.now() });
     try {
@@ -3676,6 +3831,18 @@ function CalendarApp() {
       return commitConfirmedMeetings(meetings, null, [], 'write', 'success');
     }
   });
+  const handleBulkSaveImageTags = createBulkImageTagSaveHandler({
+    activeCalId,
+    projectId: firebaseConfig.projectId,
+    galleryPhotoIndex,
+    invalidatePhotoIndexCache,
+    rememberPhotoIndexTags,
+    schedulePhotoIndexTagReload,
+  });
+  // The V2 shell is constructed through a deliberately slim adapter object. Keep this handler
+  // available to that lazy UI boundary without making an already-large compatibility call site
+  // rebuild its whole argument list for every render.
+  window.__gatherBulkSaveImageTags = handleBulkSaveImageTags;
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
     if (rawId && !isAllowedCalendarId(rawId)) {
@@ -4269,9 +4436,9 @@ function CalendarApp() {
     try {
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
-      }, { requireStorage: true, continueOnError: true });
+      }, { requireStorage: true, continueOnError: true, profile: 'grid' });
       const failedCount = (resolvedImages.failed || []).length;
-      const failedFiles = (resolvedImages.failed || []).map(({ index }) => files?.[index]).filter(Boolean);
+      const failedFiles = (resolvedImages.failed || []).map(({ file, index }) => file || Array.from(files || [])[index]).filter(Boolean);
       const successfulImages = resolvedImages.filter(Boolean);
       if (successfulImages.length === 0) throw new Error('모든 일정 사진 업로드에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
       const chunks = chunkResolvedImagesForMessages(successfulImages);
@@ -4280,12 +4447,15 @@ function CalendarApp() {
       const newRefs = [];
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
+        // Meeting photos use the same atomic GPS contract as chat and gallery photos.
+        const imageGeoMap = buildImageGeoMap(chunkImages);
         const messageOperationId = `meeting_${activeCal.id}_${dateStr}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+        const savedCount = chunks.slice(0, i + 1).reduce((count, batch) => count + batch.length, 0);
         setChatUploadProgress({
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
           label: '일정 사진 저장 중...',
-          current: Math.min(successfulImages.length, i + 1),
+          current: Math.min(successfulImages.length, savedCount),
           total: successfulImages.length
         });
         const messageData = {
@@ -4295,7 +4465,9 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
+          imageFingerprints: chunkImages.map(r => r.fingerprint || ''),
           imageTags: chunkImages.map(img => buildMetadataTags(img.metadata, dateStr)),
+          ...(Object.keys(imageGeoMap).length ? { imageGeoMap } : {}),
           timestamp: now + i,
           uploadSource: 'meeting'
         };
@@ -4303,7 +4475,6 @@ function CalendarApp() {
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장', { documentId: messageOperationId });
         if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
         const newMessageId = sent.id;
-        if (!sent.queued) void persistImageGeoMap({ db: firebaseDb, calendarId: activeCal.id, docId: newMessageId, geoMap: buildImageGeoMap(chunkImages) });
         const photoIdPrefix = `photo_${activeCal.id}_${dateStr}_${now}_${i}`;
         chunkImages.forEach((img, idx) => {
           const photoId = `${photoIdPrefix}_${idx}_${Math.random().toString(36).slice(2, 7)}`;
@@ -4412,7 +4583,7 @@ function CalendarApp() {
   // over this render's values exactly as before (and stay after every value they read).
   const {
     handleDeleteMeetingPhoto, unlinkMeetingPhotoReferences,
-    handleSavePhotoComments, findMemoById, handleDeletePhoto, handleReplacePhoto,
+    handleSavePhotoComments, findMemoById, handleDeletePhoto, handleBulkDeletePhotos, handleReplacePhoto,
     handleJumpToChatMessage, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
     handleJumpToMemo, handleJumpToGallery,
     handleJumpToMeetingDate
@@ -4428,6 +4599,7 @@ function CalendarApp() {
     galleryChatMessagesRef, memosRef, findChatMessageById, handleFetchPhotoComments,
     getFirebaseDb: () => firebaseDb
   });
+  window.__gatherBulkDeletePhotos = handleBulkDeletePhotos;
 
   const handleSavePlace = (placeData) => {
     if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
@@ -4960,7 +5132,11 @@ function CalendarApp() {
   // WP-01: V2 is the only shell (see ui-app-shell-v2.js).
   // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
   window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
-  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE), sharedMemo, setSharedMemo, chatMessages, patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag, isMemoShareOpen, setIsMemoShareOpen }, { chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog, isNotificationHelpOpen, setIsNotificationHelpOpen, onNotificationHelpRetry: handleMainToggleNotifications, showToast }); return renewalShellEl;
+  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: (needed) => setMemosLimit(prev => {
+    const floor = Number(needed);
+    if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));
+    return prev + MEMOS_PAGE_SIZE;
+  }), sharedMemo, setSharedMemo, chatMessages, patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag, isMemoShareOpen, setIsMemoShareOpen }, { chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog, isNotificationHelpOpen, setIsNotificationHelpOpen, onNotificationHelpRetry: handleMainToggleNotifications, showToast }); return renewalShellEl;
 }
 
 
@@ -5075,7 +5251,7 @@ const { ChatParticipantSheet, ConfirmDialog } = uiWrapperAliases;
 // bakes that call's zIndex into it permanently -- later calls with a different zIndex are
 // ignored since the canvas is reused, not recreated. So every call site must pass this same
 // value, or an earlier low-zIndex call (e.g. a chat send burst) locks the canvas behind modals.
-const CONFETTI_Z_INDEX = 999999;
+const CONFETTI_Z_INDEX = 2147483646;
 
 
 const { DateModal } = uiWrapperAliases;

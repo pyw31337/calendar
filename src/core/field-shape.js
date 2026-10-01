@@ -11,6 +11,15 @@
 
 const MEASURE_FONT_FALLBACK = '16px sans-serif';
 
+/** One drawn line is a capsule; two or more is a rounded rectangle. */
+export function fieldLineModeFromBox(contentHeight, lineHeight) {
+  const height = Number(contentHeight);
+  const line = Number(lineHeight);
+  if (!(height > 0) || !(line > 0)) return '1';
+  const lines = Math.max(1, Math.round(height / line));
+  return lines <= 1 ? '1' : 'multi';
+}
+
 export function countPlaceholderLines(text, contentWidth, measureWidth) {
   if (!text || !(contentWidth > 0)) return 1;
   return String(text).split(/\r?\n/).reduce((total, line) => {
@@ -34,8 +43,21 @@ export function installFieldShape(doc = typeof document !== 'undefined' ? docume
     return text => ctx.measureText(text).width;
   };
 
+  const resizeObserver = typeof ResizeObserver !== 'undefined'
+    ? new ResizeObserver(entries => {
+      if (!isEnabled()) return;
+      for (const entry of entries) {
+        if (entry.target && entry.target.tagName === 'TEXTAREA') apply(entry.target);
+      }
+    })
+    : null;
+
   const apply = (el) => {
     if (!el || el.tagName !== 'TEXTAREA' || !el.isConnected) return;
+    if (resizeObserver && !el._fieldShapeObserved) {
+      el._fieldShapeObserved = true;
+      try { resizeObserver.observe(el); } catch (_) {}
+    }
     const cs = view.getComputedStyle(el);
     const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
     const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
@@ -96,5 +118,6 @@ export function installFieldShape(doc = typeof document !== 'undefined' ? docume
     doc.removeEventListener('input', onInput, true);
     view.removeEventListener('resize', schedule);
     if (observer) observer.disconnect();
+    if (resizeObserver) resizeObserver.disconnect();
   };
 }

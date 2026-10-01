@@ -1,6 +1,7 @@
 /* Chat file attachment helpers — documents upload beside the existing chat image pipeline. */
 
 import { uploadBlobWithWatchdog } from './app-media-upload.js';
+import { dedupeGalleryFiles } from './gallery-item-kind.js';
 
 export const MAX_CHAT_FILE_BYTES = 20 * 1024 * 1024;
 export const MAX_CHAT_FILE_ATTACHMENTS = 20;
@@ -427,7 +428,7 @@ export async function uploadChatFileAttachments(calendarId, pendingList, onProgr
   return uploaded;
 }
 
-export function collectChatFileAttachmentsFromMessages(messages) {
+export function collectChatFileAttachmentsFromMessages(messages, memos = []) {
   const list = [];
   (Array.isArray(messages) ? messages : []).forEach(msg => {
     const attachments = Array.isArray(msg?.fileAttachments) ? msg.fileAttachments : [];
@@ -445,8 +446,28 @@ export function collectChatFileAttachmentsFromMessages(messages) {
       });
     });
   });
+  (Array.isArray(memos) ? memos : []).forEach(memo => {
+    const attachments = Array.isArray(memo?.fileAttachments) ? memo.fileAttachments : [];
+    attachments.forEach((attachment, index) => {
+      const clean = sanitizeFileAttachment(attachment);
+      if (!clean) return;
+      list.push({
+        ...clean,
+        memoId: memo.id || '',
+        participantId: memo.author || memo.participantId || '',
+        timestamp: Number(memo.updatedAt || memo.createdAt) || clean.uploadedAt || 0,
+        source: 'memo',
+        uploadSource: memo.uploadSource || 'memo',
+        attachmentIndex: index
+      });
+    });
+  });
   list.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
-  return list;
+  // The same PDF was emitted twice because this concatenated every message and
+  // every memo attachment with no identity check. A shared Storage path (or the
+  // same name+size when the path is missing) is one file, even when two
+  // documents point at it. Message id is the owner, not the duplicate key.
+  return dedupeGalleryFiles(list);
 }
 
 if (typeof window !== 'undefined') {

@@ -48,6 +48,15 @@
   --v2-primary: #7C2FE5;
   --v2-primary-glow: 0 6px 18px rgba(124, 47, 229, 0.40);
   --v2-primary-glow-sm: 0 3px 10px rgba(124, 47, 229, 0.32);
+
+  /* The no-D-day hero remains a deliberate, vertically centred header instead
+   * of inheriting the D-day section's bottom spacer.  Header search geometry
+   * is shared across every viewport so flex compression cannot turn it into
+   * an oval on a narrow phone. */
+  --v2-hero-idle-block-size: 72px;
+  --v2-hero-idle-inline-pad: 16px;
+  --v2-hero-search-control-size: 36px;
+  --v2-hero-search-icon-size: 18px;
   /* Apple-like card chrome */
   --v2-card-border: #eceaf5;
   --v2-card-shadow: 0 1px 3px rgba(30, 27, 46, 0.04), 0 4px 12px rgba(30, 27, 46, 0.03);
@@ -110,36 +119,237 @@
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
 
-/* Mobile-only quick-nav row (채팅/정산/메모/갤러리) between the hero header and the D-day
- * badge -- lets those four destinations stay one tap away when there is no persistent side
- * rail to reach them from (see aurora-theme.css "Mobile: no rail", <768px). >=768px already has
- * the rail for the same destinations, so this row must stay hidden there -- never show both. Each
- * button reuses .bp-icon-btn (circular glass button, reference-home.css) unchanged, so it needs
- * no button-shape CSS of its own; only the row layout and settlement badge overlay are new. */
-.v2-design .bp-hero-quick-nav {
+/* Hero TODAY schedule box */
+.v2-design .bp-hero-today-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: calc(100% - 28px);
+  max-width: none;
+  margin: 0 14px 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.14s ease, box-shadow 0.16s ease;
+  user-select: none;
+}
+@media (min-width: 768px) {
+  .v2-design .bp-hero-today-box {
+    width: calc(100% - 40px);
+    margin: 0 20px 8px;
+  }
+}
+@media (max-width: 359px) {
+  .v2-design .bp-hero-today-box {
+    width: calc(100% - 16px);
+    margin: 0 8px 8px;
+  }
+}
+.v2-design .bp-hero-today-box:hover {
+  background: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.v2-design .bp-hero-today-box:active {
+  transform: scale(0.99);
+}
+.v2-design .bp-hero-today-main-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.v2-design .bp-hero-today-memos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  width: 100%;
+}
+.v2-design .bp-hero-today-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.v2-design .bp-hero-today-badge {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  gap: 0;
-  padding: 0 16px 10px;
+  padding: 4px 10px;
+  font-size:0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-full, 9999px);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--brand, #7C2FE5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
 }
-.v2-design .bp-hero-quick-nav-item { position: relative; }
-.v2-design .bp-hero-quick-nav-badge {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  color: #fff;
-  font-size: 9px;
+.v2-design .bp-hero-today-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.v2-design .bp-hero-today-title {
+  font-size: 0.88rem;
   font-weight: 800;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: var(--radius-full);
-  box-shadow: 0 0 0 2px rgba(124, 47, 229, 0.55);
+  color: #fff;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
 }
-@media (min-width: 1200px) {
-  /* Persistent side rail covers 채팅/정산/메모/갤러리 — hide the hero row on desktop only. */
-  .v2-design .bp-hero-quick-nav { display: none; }
+.v2-design .bp-hero-today-subtitle {
+  font-size:0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.v2-design .bp-hero-today-arrow {
+  color: rgba(255, 255, 255, 0.8);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Hero weather: responsive columns matching D-day badge width and horizontal insets. */
+.v2-design .bp-hero-weather-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 4px;
+  width: calc(100% - 28px);
+  max-width: none;
+  margin: 0 14px 8px;
+  padding: 6px 8px;
+  background: rgba(9, 24, 73, 0.26);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(5, 9, 41, 0.16);
+  box-sizing: border-box;
+}
+@media (min-width: 768px) {
+  .v2-design .bp-hero-weather-row {
+    width: calc(100% - 40px);
+    margin: 0 20px 8px;
+  }
+}
+@media (max-width: 359px) {
+  .v2-design .bp-hero-weather-row {
+    width: calc(100% - 16px);
+    margin: 0 8px 8px;
+  }
+}
+.v2-design .bp-hero-weather-col {
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 2px;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+  font-family: inherit;
+}
+.v2-design .bp-hero-weather-col:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+.v2-design .bp-hero-weather-col:active {
+  transform: scale(0.97);
+}
+.v2-design .bp-hero-weather-col.is-today {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.v2-design .bp-hero-weather-day {
+  font-size:0.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.01em;
+}
+.v2-design .bp-hero-weather-col.is-today .bp-hero-weather-day {
+  font-weight: 900;
+  color: #fff;
+}
+.v2-design .bp-hero-weather-dday-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: var(--v2-accent, #5B4BEB) !important;
+  font-size:0.75rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  padding: 2px 5px !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+  animation: bp-hero-dday-heartbeat 0.75s ease-in-out infinite !important;
+  transform-origin: center !important;
+  letter-spacing: -0.02em;
+  white-space: nowrap !important;
+}
+.v2-design .bp-hero-weather-past-dday {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size:0.75rem !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+  letter-spacing: -0.01em;
+  padding: 0 !important;
+  white-space: nowrap !important;
+}
+@keyframes bp-hero-dday-heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.10); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.12); }
+  70% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .bp-hero-weather-dday-badge {
+    animation: none !important;
+  }
+}
+.v2-design .bp-hero-weather-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  height: 22px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+.v2-design .bp-hero-weather-icon svg {
+  display: block;
+}
+.v2-design .bp-hero-weather-temp {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 /* Hero vivid purple mesh + dramatic aurora blobs — reinforces reference-home under .v2-design */
@@ -147,8 +357,8 @@
   background:
     linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
     linear-gradient(-45deg, #12CDF0 0%, #3604FD 42%, #8019E0 76%, #3604FD 100%) !important;
-  background-size: auto, 300% 300% !important;
-  animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
+  background-size: auto, 100% 100% !important;
+  animation: none !important;
   isolation: isolate;
   /* Home shell sits flush at the very top of .renewal-shell.v2-design (padding:0), so in iOS
    * "Add to Home Screen" standalone mode (status-bar-style black-translucent draws content
@@ -170,8 +380,9 @@
   background-repeat: no-repeat !important;
   mix-blend-mode: normal !important;
   opacity: 0.9 !important;
-  animation: bp-hero-aurora-drift-a 10s ease-in-out infinite alternate !important;
-  will-change: transform, opacity;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
 }
 .v2-design .bp-hero-zone::after {
   content: "" !important;
@@ -187,8 +398,9 @@
   background-repeat: no-repeat !important;
   mix-blend-mode: soft-light !important;
   opacity: 0.85 !important;
-  animation: bp-hero-aurora-drift-b 13s ease-in-out infinite alternate !important;
-  will-change: transform, opacity;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
   position: absolute !important;
@@ -199,8 +411,9 @@
     radial-gradient(ellipse 88% 70% at 50% 8%, rgba(192, 132, 252, 0.45) 0%, transparent 58%),
     linear-gradient(180deg, transparent 50%, rgba(24, 8, 48, 0.26) 80%, rgba(15, 5, 40, 0.5) 100%) !important;
   opacity: 0.95 !important;
-  animation: bp-hero-aurora-pulse 8s ease-in-out infinite alternate !important;
-  will-change: opacity, transform;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
 @keyframes bp-hero-mesh-shift {
@@ -346,9 +559,89 @@
   border-top: 1px solid var(--v2-line, #f0eef5);
   color: var(--v2-ink-3, #8b8499);
 }
-.v2-design .bp-renewal-home-footer { text-align: center; color: var(--text-light, #83798f); font-size: 0.62rem; padding: 18px 14px 28px; }
+.v2-design .bp-renewal-home-footer { text-align: center; color: var(--text-light, #83798f); font-size:0.75rem; padding: 18px 14px 28px; }
 .v2-design .bp-renewal-home-footer-links { display: flex; gap: 12px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
 .v2-design .bp-renewal-home-empty { color: var(--text-muted); font-size: 0.75rem; }
+.v2-design .home-summary-pager {
+  --home-summary-pager-shift: 12%;
+  position: relative;
+  min-width: 0;
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+}
+.v2-design .home-summary-pager-content {
+  min-width: 0;
+  will-change: transform, opacity;
+}
+/* Thumbs and place rows are buttons. Their own touch-action must stay pan-y
+   so a sideways finger pages the card instead of being eaten as a tap. */
+.v2-design .home-summary-pager-content :is(button, a, img) {
+  touch-action: pan-y;
+  -webkit-user-drag: none;
+}
+.v2-design .home-summary-pager-content.is-dragging {
+  transition: none;
+}
+.v2-design .home-summary-pager-content.is-exiting {
+  pointer-events: none;
+  opacity: 0;
+  transition: transform var(--calendar-month-swipe-exit-duration, 140ms) var(--motion-ease-out), opacity var(--calendar-month-swipe-exit-duration, 140ms) ease;
+}
+.v2-design .home-summary-pager-content.is-exiting.is-next {
+  transform: translate3d(calc(var(--home-summary-pager-shift) * -1), 0, 0);
+}
+.v2-design .home-summary-pager-content.is-exiting.is-previous {
+  transform: translate3d(var(--home-summary-pager-shift), 0, 0);
+}
+.v2-design .home-summary-pager-content.is-entering {
+  animation: bp-home-summary-pager-enter var(--calendar-month-swipe-enter-duration, 200ms) var(--motion-ease-out) both;
+}
+.v2-design .home-summary-pager-content.is-entering.is-next {
+  --home-summary-pager-enter-start: var(--home-summary-pager-shift);
+}
+.v2-design .home-summary-pager-content.is-entering.is-previous {
+  --home-summary-pager-enter-start: calc(var(--home-summary-pager-shift) * -1);
+}
+@keyframes bp-home-summary-pager-enter {
+  from { opacity: 0; transform: translate3d(var(--home-summary-pager-enter-start, 0), 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.v2-design .home-summary-pager-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+  margin-top: 8px;
+  position: relative;
+  z-index: 2;
+}
+.v2-design .home-summary-pager-arrow {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  position: relative;
+  z-index: 3;
+}
+.v2-design .home-summary-pager-arrow:disabled { opacity: .3; cursor: default; }
+.v2-design .home-summary-pager-arrow:not(:disabled):hover,
+.v2-design .home-summary-pager-arrow:not(:disabled):focus-visible { color: var(--brand); background: var(--brand-soft); outline: 0; }
+.v2-design .home-summary-pager-dots { display: inline-flex; align-items: center; gap: 4px; }
+.v2-design .home-summary-pager-dots > i { width: 4px; height: 4px; border-radius: var(--radius-full); background: var(--border-hover); }
+.v2-design .home-summary-pager-dots > i.is-active { width: 14px; background: var(--brand); }
 .v2-design .bp-month-picker { position: absolute; z-index: 10; top: 36px; left: 0; padding: 12px; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 12px; background: var(--bg-card); box-shadow: 0 8px 24px #1e1b2e20; }
 .v2-design .bp-month-picker input { font: inherit; padding: 6px; max-width: 180px; }
 .v2-design .v2-destination { padding: 0; min-height: 100dvh; }
@@ -374,7 +667,7 @@
   .v2-design .bp-dday-strip { padding: 0 8px 10px !important; gap: 6px; }
   .v2-design .bp-dday-compact { gap: 6px; padding: 6px 8px 6px 6px; }
   .v2-design .bp-dday-compact-badge { font-size: 0.95rem; padding: 5px 8px; }
-  .v2-design .bp-dday-compact-text { font-size: 0.64rem; }
+  .v2-design .bp-dday-compact-text { font-size:0.75rem; }
   .v2-design .bp-bento-card { padding: 20px 10px; }
   .v2-design .bp-icon-btn,
   .v2-design .bp-renewal-shell-header-icon-btn { padding: 6px; }
@@ -665,7 +958,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 
 @media (min-width: 640px) {
-  .v2-design .bp-day-num { font-size: 0.74rem !important; }
+  .v2-design .bp-day-num { font-size:0.75rem !important; }
 }
 /* .bp-day-num font-size at 768px/1200px is redeclared further down with
  * equal-or-greater importance; removed the dead copies that used to be
@@ -741,7 +1034,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 /* Gallery: 3×3 with larger thumbs on tablet/PC */
 @media (min-width: 640px) {
-  .v2-design .bp-thumb-grid {
+  .v2-design .bp-thumb-grid:not(.bp-renewal-home-photo-strip) {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 8px !important;
   }
@@ -754,7 +1047,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   }
 }
 @media (min-width: 1200px) {
-  .v2-design .bp-thumb-grid {
+  .v2-design .bp-thumb-grid:not(.bp-renewal-home-photo-strip) {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 12px !important;
   }
@@ -773,7 +1066,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   padding: 4px;
   box-sizing: border-box;
   line-height: 1;
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   border-radius: 999px;
   letter-spacing: -0.02em;
 }
@@ -784,7 +1077,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   .v2-design .bp-day-cell.bp-today .bp-day-num {
     width: 32px; height: 32px; min-width: 32px; min-height: 32px;
     padding: 5px;
-    font-size: 0.74rem !important;
+    font-size:0.75rem !important;
   }
 }
 @media (min-width: 1200px) {
@@ -873,7 +1166,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-day-anniversary-label,
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
   /* visibility controlled by progressive media queries */
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   font-weight: 600 !important;
   line-height: 1.15 !important;
   color: var(--cal-anniversary, #F76AAD) !important;
@@ -900,7 +1193,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .bp-day-bar-stack .bp-day-bar-label {
   display: block;
-  font-size: 0.56rem !important;
+  font-size:0.75rem !important;
   font-weight: 800;
   line-height: 1.15;
   color: #fff !important;
@@ -929,12 +1222,12 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 /* Calendar cell type hierarchy — mock denseness + ~8% */
 .v2-design .bp-day-corner-label {
-  font-size: 0.56rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   line-height: 1.15;
 }
 .v2-design .bp-day-event-title {
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   line-height: 1.2;
   white-space: normal;
@@ -954,9 +1247,9 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* Type scale: BentoPinkFinal mock denseness + ~5–10% only (NOT bloated #634/#635).
  * Source: reference-home.css / pc-mock-scale-baseline.png. Remap --font-size-* for screens. */
 .v2-design {
-  --v2-fs-2xs: 0.60rem;   /* mock meta/pill ~0.56–0.60 */
-  --v2-fs-xs: 0.66rem;    /* mock weekday/corner ~0.60–0.66 */
-  --v2-fs-sm: 0.74rem;    /* mock memo summary 0.72 + ~3% */
+  --v2-fs-2xs: max(12px, 0.75rem);   /* never under 12px, even at 80% root scale */
+  --v2-fs-xs: max(12px, 0.75rem);
+  --v2-fs-sm: max(12px, 0.75rem);
   --v2-fs-md: 0.90rem;    /* tested V2 chat body scale */
   --v2-fs-base: 0.94rem;  /* mock nav item 0.82 + ~15%; keep the tested V2 type scale */
   --v2-fs-lg: 0.94rem;    /* mock memo title 0.86 + ~9% */
@@ -978,11 +1271,11 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-bento-card .bp-more-link,
 .v2-design .bp-more-link { font-size: var(--v2-fs-sm) !important; font-weight: 700 !important; }
 .v2-design .bp-weekday-label { font-size: var(--v2-fs-2xs) !important; font-weight: 700 !important; }
-.v2-design .bp-day-num { font-size: 0.72rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-num { font-size:0.75rem !important; font-weight: 800 !important; }
 .v2-design .bp-cal-legend { font-size: var(--v2-fs-xs) !important; }
-.v2-design .bp-day-corner-label { font-size: 0.56rem !important; font-weight: 800 !important; }
-.v2-design .bp-day-event-title { font-size: 0.62rem !important; font-weight: 800 !important; }
-.v2-design .bp-day-anniversary-label { font-size: 0.7rem !important; font-weight: 600 !important; }
+.v2-design .bp-day-corner-label { font-size:0.75rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-event-title { font-size:0.75rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-anniversary-label { font-size:0.75rem !important; font-weight: 600 !important; }
 
 .v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; font-weight: 900; }
 .v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md) !important; font-weight: 700 !important; }
@@ -1017,8 +1310,11 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 .v2-design .bp-place-name { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
 .v2-design .bp-place-addr { font-size: var(--v2-fs-xs) !important; }
-.v2-design .bp-place-note,
+.v2-design .bp-place-note:not(.bp-renewal-home-place-note),
 .v2-design .bp-place-tag { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
+  font-size: max(12px, 0.8rem) !important;
+}
 
 /* Side-nav type: see mock-parity block (explicit px under .v2-design) --
  * both .bp-side-nav-collapse-btn and .bp-header-title font-size are
@@ -1060,7 +1356,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   border-radius: 999px;
   padding: 2px 8px;
   color: #fff !important;
-  font-size: 0.64rem;
+  font-size:0.75rem;
   font-weight: 800;
   margin-right: 6px;
   opacity: 1;
@@ -1072,7 +1368,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #fff;
-  font-size: 0.68rem;
+  font-size:0.75rem;
   font-weight: 700;
 }
 
@@ -1090,16 +1386,16 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     margin: 0 0 16px !important;
   }
   .v2-design .bp-dday-compact-text {
-    font-size: 0.74rem !important;
+    font-size:0.75rem !important;
     font-weight: 700 !important;
   }
   .v2-design .bp-dday-compact-badge {
     font-size: 1.1rem !important;
     padding: 6px 11px !important;
   }
-  .v2-design .bp-dday-date { font-size: 0.7rem !important; }
+  .v2-design .bp-dday-date { font-size:0.75rem !important; }
   .v2-design .bp-dday-dow,
-  .v2-design .bp-dday-pill { font-size: 0.6rem !important; }
+  .v2-design .bp-dday-pill { font-size:0.75rem !important; }
   .v2-design .bp-dday-chip {
     width: 64px;
     padding: 7px 4px;
@@ -1108,7 +1404,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     padding: 6px 2px 0;
   }
   .v2-design .bp-weekday-label {
-    font-size: 0.64rem !important;
+    font-size:0.75rem !important;
     padding: 4px 0 6px !important;
   }
   .v2-design .bp-day-cell {
@@ -1122,10 +1418,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     font-weight: 800 !important;
   }
   .v2-design .bp-day-corner-label {
-    font-size: 0.58rem !important;
+    font-size:0.75rem !important;
   }
   .v2-design .bp-day-event-title {
-    font-size: 0.64rem !important;
+    font-size:0.75rem !important;
     -webkit-line-clamp: 2;
   }
   .v2-design .bp-p-dot {
@@ -1150,10 +1446,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   }
   .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-label {
-    font-size: 0.58rem !important;
+    font-size:0.75rem !important;
   }
   .v2-design .bp-cal-legend {
-    font-size: 0.66rem !important;
+    font-size:0.75rem !important;
     padding: 10px 2px 6px;
     gap: 8px 12px;
   }
@@ -1166,10 +1462,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     border-radius: 14px !important;
   }
   .v2-design .bp-bento-card-title {
-    font-size: 0.7rem !important;
+    font-size:0.75rem !important;
     letter-spacing: 0.06em;
   }
-  .v2-design .bp-more-link { font-size: 0.68rem !important; }
+  .v2-design .bp-more-link { font-size:0.75rem !important; }
   .v2-design .bp-side-nav {
     width: var(--v2-side-nav-width, 280px) !important;
   }
@@ -1203,7 +1499,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
   .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
     display: block !important;
-    font-size: 0.7rem !important;
+    font-size:0.75rem !important;
     font-weight: 600 !important;
     line-height: 1.15 !important;
     color: var(--cal-anniversary, #F76AAD) !important;
@@ -1228,7 +1524,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     min-height: 1.1rem !important;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
-    font-size: 0.7rem !important;
+    font-size:0.75rem !important;
   }
 }
 
@@ -1240,7 +1536,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
  * visibility instead of relying on that container-scoped toggle. */
 .v2-design .festival-bar-desktop .bp-day-anniversary-label {
   display: block !important;
-  font-size: 0.7rem !important;
+  font-size:0.75rem !important;
   font-weight: 600 !important;
   line-height: 1.15 !important;
   white-space: nowrap;
@@ -1292,7 +1588,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   border-radius: 999px;
   background: var(--brand, #7C2FE5);
   color: var(--on-brand, white);
-  font-size: 0.56rem;
+  font-size:0.75rem;
   font-weight: 800;
   line-height: 1.15;
   white-space: nowrap;
@@ -1373,7 +1669,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   background: var(--brand, #7C2FE5);
   color: var(--on-brand, white);
   font: inherit;
-  font-size: var(--font-size-sm, 0.74rem);
+  font-size: var(--font-size-sm, 0.75rem);
   font-weight: 800;
   text-align: left;
   cursor: pointer;
@@ -1456,7 +1752,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800;
   line-height: 1.3;
   /* Simple solid capsule — no border/inset highlight, matching the other name-style pills. */
@@ -1519,7 +1815,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
 .v2-design .bp-side-nav-item-meta.chat-name-pill {
   color: #fff !important;
-  font-size: 0.62rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   padding: 2px 7px !important;
   border-radius: 9999px !important;
@@ -1532,7 +1828,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   background: none;
   border: none;
   color: var(--v2-ink-2, #6b6580);
-  font-size: 0.6rem !important;
+  font-size:0.75rem !important;
   font-weight: 700;
   padding: 2px 2px !important;
   max-width: none;
@@ -1565,7 +1861,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   line-height: 1.25;
 }
 .v2-design .v2-page-header .bp-header-sub {
-  font-size: 0.66rem !important;
+  font-size:0.75rem !important;
   font-weight: 700 !important;
   color: var(--v2-ink-3, #83798f) !important;
   line-height: 1.3;
@@ -1620,7 +1916,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   line-height: 1.25;
 }
 .v2-design .bp-side-nav-cal-badge {
-  font-size: 0.625rem !important;
+  font-size:0.75rem !important;
   font-weight: 800 !important;
   line-height: 1.3 !important;
   padding: 2px 8px !important;
@@ -1658,24 +1954,24 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .bp-side-nav-item-meta,
 .v2-design .bp-side-nav-item-sub {
-  font-size: 0.6875rem;
+  font-size:0.75rem;
   font-weight: 600;
 }
 /* Same spec as the name-style pills (cal-badge / chat-name-pill) -- was slightly smaller
  * (1px 6px vs 2px 7px), which read as an unrelated, differently-designed badge. */
 .v2-design .bp-side-nav-item-badge {
-  font-size: 0.625rem;
+  font-size:0.75rem;
   font-weight: 800;
   padding: 2px 7px;
   border-radius: 9999px;
 }
 .v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
 .v2-design .bp-side-nav-item-meta.chat-name-pill {
-  font-size: 0.625rem !important;
+  font-size:0.75rem !important;
   padding: 2px 7px !important;
 }
 .v2-design .bp-side-nav-date-chip {
-  font-size: 0.625rem !important;
+  font-size:0.75rem !important;
   padding: 2px 2px !important;
 }
 .v2-design .bp-side-nav-footer {
@@ -1879,7 +2175,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   .v2-design .festival-bar-desktop .bp-day-anniversary-label {
     display: block !important;
     color: var(--cal-anniversary, #F76AAD) !important;
-    font-size: .7rem !important;
+    font-size:0.75rem !important;
     font-weight: 600 !important;
     line-height: 1.15 !important;
     padding: 0 3px !important;
@@ -1960,7 +2256,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   border: 0;
   background: transparent;
   color: var(--text-muted, #8a8798);
-  font-size: .68rem;
+  font-size:0.75rem;
   font-weight: 700;
   line-height: 1;
 }
@@ -1973,7 +2269,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
    * title's own flat, non-responsive 1.3rem) -- only the "전체보기" link stays compact. */
   .v2-design .bp-renewal-home-summary-heading .bp-more-link {
     height: 30px;
-    font-size: .66rem;
+    font-size:0.75rem;
   }
 }
 
@@ -1989,7 +2285,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .global-search-page {
   display: block;
   padding: 0;
-  background: #f4f3f8;
+  background: var(--bg-primary);
 }
 .v2-design .global-search-page-card {
   width: 100%;
@@ -1999,7 +2295,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  background: #f4f3f8;
+  background: var(--bg-primary);
 }
 .v2-design .global-search-page-card .global-search-header {
   display: flex;
@@ -2042,7 +2338,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .global-search-page-card .modal-body {
   padding: 0 20px 28px;
-  background: #f4f3f8;
+  background: var(--bg-primary);
 }
 .v2-design .global-search-page-card .global-search-tabs {
   width: calc(100% + 40px);
@@ -2065,4 +2361,13 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     margin-left: -12px;
     margin-right: -12px;
   }
+}
+
+/* OS-like tactile press micro-interactions */
+.v2-design .bp-cat-chip:active,
+.v2-design .bp-icon-btn:active,
+.v2-design .bp-side-nav-item:active,
+.v2-design .tag-capsule:active {
+  transform: scale(0.96);
+  transition: transform 0.08s cubic-bezier(0.2, 0, 0, 1);
 }

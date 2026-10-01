@@ -5,6 +5,13 @@ import { spawnSync } from 'node:child_process';
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
 
+// This test deliberately creates, reads and deletes many documents against the production
+// project.  It is valuable for an explicitly scheduled load rehearsal, but it must never be a
+// convenient default command: an accidental local/agent run is both noisy and billable.
+if (process.env.ALLOW_PRODUCTION_FIREBASE_WRITES !== '1') {
+  throw new Error('Refusing billable production stress test. Re-run only for a planned rehearsal with ALLOW_PRODUCTION_FIREBASE_WRITES=1.');
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }

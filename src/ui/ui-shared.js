@@ -1,6 +1,7 @@
 /**
  * Shared UI primitives (P4-22)
  */
+import { useTabStripGesture } from './tab-strip-gesture.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -100,6 +101,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
   const dragModeRef = React.useRef(null); // 'se' | 'move' | 'resize-y'
   const startPosRef = React.useRef({ x: 0, y: 0 });
   const startDimRef = React.useRef({ w: 0, h: 0, left: 0, top: 0 });
+  const activePointerCleanupRef = React.useRef(null);
 
   const isPcSheet = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches;
 
@@ -143,6 +145,20 @@ export function ResizableModalContainer({ className, style, children, ...props }
     el.style.setProperty('max-height', 'none', 'important');
   };
 
+  const getVisibleHeight = () => {
+    const syncedHeight = Number.parseFloat(document.documentElement.style.getPropertyValue('--app-vv-height'));
+    if (syncedHeight) return syncedHeight;
+    const vv = window.visualViewport;
+    return vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
+  };
+  const getResizeMaxHeight = () => {
+    const overlay = containerRef.current?.closest('.modal-overlay, .bottom-sheet-overlay');
+    const overlayStyle = overlay ? window.getComputedStyle(overlay) : null;
+    const topClearance = Number.parseFloat(overlayStyle?.paddingTop || '0') || 0;
+    const bottomClearance = Number.parseFloat(overlayStyle?.paddingBottom || '0') || 0;
+    return Math.max(220, Math.floor(getVisibleHeight() - topClearance - bottomClearance));
+  };
+
   const handleMouseDown = e => {
     if (e.button !== 0) return; // Only left-click
     isDraggingRef.current = true;
@@ -172,7 +188,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       return;
     }
     if (dragModeRef.current === 'resize-y') {
-      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      const nextH = Math.max(220, Math.min(getResizeMaxHeight(), startDimRef.current.h - deltaY));
       applyHeightStyle(nextH);
       return;
     }
@@ -192,7 +208,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       return;
     }
     if (dragModeRef.current === 'resize-y') {
-      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      const nextH = Math.max(220, Math.min(getResizeMaxHeight(), startDimRef.current.h - deltaY));
       applyHeightStyle(nextH);
       return;
     }
@@ -278,6 +294,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
     document.addEventListener('mouseup', handleMouseUp);
   };
   const onHandleTouchStart = e => {
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     const t = e.touches && e.touches[0];
     if (!t) return;
@@ -285,25 +302,64 @@ export function ResizableModalContainer({ className, style, children, ...props }
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
   };
+  const onHandlePointerDown = e => {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.cancelable) e.preventDefault();
+    e.stopPropagation();
+    startHandleDrag(e.clientX, e.clientY);
+    const handle = e.currentTarget;
+    const pointerId = e.pointerId;
+    activePointerCleanupRef.current?.();
+    try { handle.setPointerCapture?.(pointerId); } catch (_) {}
+    const onPointerMove = event => {
+      if (!event.isPrimary || event.pointerId !== pointerId) return;
+      if (event.cancelable) event.preventDefault();
+      handleMouseMove(event);
+    };
+    const onPointerEnd = event => {
+      if (!event.isPrimary || event.pointerId !== pointerId) return;
+      cleanupPointer();
+      handleMouseUp();
+    };
+    const cleanupPointer = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerEnd);
+      document.removeEventListener('pointercancel', onPointerEnd);
+      try { handle.releasePointerCapture?.(pointerId); } catch (_) {}
+      if (activePointerCleanupRef.current === cleanupPointer) activePointerCleanupRef.current = null;
+    };
+    activePointerCleanupRef.current = cleanupPointer;
+    document.addEventListener('pointermove', onPointerMove, { passive: false });
+    document.addEventListener('pointerup', onPointerEnd);
+    document.addEventListener('pointercancel', onPointerEnd);
+  };
 
   React.useEffect(() => {
     const root = containerRef.current;
     if (!root) return undefined;
     const handles = root.querySelectorAll('.bp-sheet-handle, .v2-modal-drag-handle');
+    const supportsPointerEvents = typeof window.PointerEvent === 'function';
     handles.forEach(handle => {
-      handle.addEventListener('mousedown', onHandleMouseDown);
-      handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+      if (supportsPointerEvents) handle.addEventListener('pointerdown', onHandlePointerDown, { passive: false });
+      else {
+        handle.addEventListener('mousedown', onHandleMouseDown);
+        handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+      }
     });
     return () => {
       handles.forEach(handle => {
-        handle.removeEventListener('mousedown', onHandleMouseDown);
-        handle.removeEventListener('touchstart', onHandleTouchStart);
+        if (supportsPointerEvents) handle.removeEventListener('pointerdown', onHandlePointerDown);
+        else {
+          handle.removeEventListener('mousedown', onHandleMouseDown);
+          handle.removeEventListener('touchstart', onHandleTouchStart);
+        }
       });
     };
   }, []);
 
   React.useEffect(() => {
     return () => {
+      activePointerCleanupRef.current?.();
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleTouchMove);
@@ -318,14 +374,12 @@ export function ResizableModalContainer({ className, style, children, ...props }
     const apply = () => {
       const vv = window.visualViewport;
       const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
-      const isAdminSettings = containerRef.current && containerRef.current.classList.contains('admin-settings-modal');
+      const vvTop = vv && typeof vv.offsetTop === 'number' ? Math.max(0, vv.offsetTop) : 0;
       const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
       const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
-      const maxPx = Math.max(180, Math.floor(isAdminSettings
-        ? Math.max(180, vvH - 8)
-        : isMemoEdit
-          ? Math.min(780, vvH - reserved)
-        : Math.min(860, vvH - reserved)));
+      const maxPx = Math.max(180, Math.floor(isMemoEdit
+          ? Math.min(780, vvH - vvTop - reserved)
+        : Math.min(860, vvH - vvTop - reserved)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
       if (containerRef.current) {
         containerRef.current.style.maxHeight = `${maxPx}px`;
@@ -350,13 +404,29 @@ export function ResizableModalContainer({ className, style, children, ...props }
   const mergedStyle = {
     ...style,
     position: moved ? 'fixed' : 'relative',
-    ...(moved ? { left: `${moved.left}px`, top: `${moved.top}px`, right: 'auto', bottom: 'auto', margin: 0, transform: 'none' } : {}),
-    ...(dimensions ? { width: `${dimensions.width}px`, height: `${dimensions.height}px`, maxWidth: 'none', maxHeight: 'none' } : {})
+    ...(moved ? {
+      '--sheet-left': `${moved.left}px`,
+      '--sheet-top': `${moved.top}px`,
+      left: `${moved.left}px`,
+      top: `${moved.top}px`,
+      right: 'auto',
+      bottom: 'auto',
+      margin: 0,
+      transform: 'none'
+    } : {}),
+    ...(dimensions ? {
+      '--sheet-height': `${dimensions.height}px`,
+      width: `${dimensions.width}px`,
+      height: `${dimensions.height}px`,
+      maxWidth: 'none',
+      maxHeight: 'none'
+    } : {})
   };
 
-  const hasOwnHandle = React.Children.toArray(children).some(child =>
-    child && child.props && typeof child.props.className === 'string' && child.props.className.includes('bp-sheet-handle')
-  );
+  const hasOwnHandle = React.Children.toArray(children).some(child => {
+    const className = child?.props?.className;
+    return typeof className === 'string' && (className.includes('bp-sheet-handle') || className.includes('v2-modal-drag-handle'));
+  });
 
   return /*#__PURE__*/React.createElement("div", {
     ref: containerRef,
@@ -364,7 +434,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
     // The class is inert in the legacy shell and lets the V2 stylesheet provide
     // one predictable PC-center/mobile-bottom-sheet contract without rewriting
     // each modal implementation.
-    className: ["modal-container", "v2-responsive-modal", moved ? "is-sheet-moved" : "", className].filter(Boolean).join(" "),
+    className: ["modal-container", "v2-responsive-modal", moved ? "is-sheet-moved" : "", dimensions ? "is-sheet-resized" : "", className].filter(Boolean).join(" "),
     style: mergedStyle,
     ...props
   },
@@ -531,11 +601,18 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
 export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = 'var(--v2-primary, #7C3AED)', variant = null }) {
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
+  const { rootRef, gestureProps } = useTabStripGesture({
+    values: list.map(opt => opt.value),
+    value,
+    onChange,
+  });
   // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
   // horizontal padding. The active 2px underline stays inside the tab (margin 0) so it rests
   // on top of the container hairline instead of hanging below it.
   const isFlush = variant === 'flush';
   return /*#__PURE__*/React.createElement('div', {
+    ...gestureProps,
+    ref: rootRef,
     className: `underline-tabs${isFlush ? ' underline-tabs--flush' : ''}${className ? ' ' + className : ''}`,
     role: 'tablist',
     'aria-label': ariaLabel || undefined,
@@ -548,6 +625,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
       boxSizing: 'border-box',
       paddingLeft: isFlush ? 0 : undefined,
       paddingRight: isFlush ? 0 : undefined,
+      touchAction: 'pan-y',
       ...(style || {})
     }
   }, list.map(opt => {
@@ -555,10 +633,18 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
     const isActive = value === id;
     const label = typeof opt.label === 'function' ? opt.label(isActive) : opt.label;
     const badge = opt.badge;
+    const isDotBadge = opt.badgeMode === 'dot';
     // Content search (and similar) fades tabs with 0 hits so empty categories read as inactive
     // without removing them from the bar -- mirrors the muted empty-state copy inside those tabs.
     const isFaded = !!opt.faded;
-    const showBadge = badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0'));
+    const showBadge = badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0')) && (!isDotBadge || Number(badge) > 0);
+    // A tab label is not a badge.  Give it its own hook so event-sheet labels can use the
+    // readable tab type scale while numeric counts retain the compact badge treatment.
+    // The populated-state dot is a CSS pseudo-element; its shared dimensions live in V2
+    // tokens instead of inline pixel values, so every event tab stays in sync.
+    const labelWithOptionalDot = /*#__PURE__*/React.createElement('span', {
+      className: `underline-tabs-label${isDotBadge && showBadge ? ' has-status-dot' : ''}`
+    }, label);
     return /*#__PURE__*/React.createElement('button', {
       key: String(id),
       type: 'button',
@@ -584,21 +670,150 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
         minWidth: 0
       }
     },
-      label,
-      showBadge ? /*#__PURE__*/React.createElement('span', {
-        style: {
-          fontSize: 'var(--font-size-xs)',
-          fontWeight: 800,
-          padding: '1px 7px',
-          borderRadius: 'var(--radius-full)',
-          backgroundColor: isActive ? 'rgba(124, 58, 237, 0.12)' : 'var(--border-subtle)',
-          color: isActive ? activeColor : 'var(--text-muted)',
-          minWidth: '18px',
-          textAlign: 'center'
-        }
-      }, String(badge)) : null
+      labelWithOptionalDot,
+      showBadge && !isDotBadge ? (() => {
+        const badgeStr = String(badge);
+        const isMulti = badgeStr.length > 1;
+        return /*#__PURE__*/React.createElement('span', {
+          className: 'underline-tabs-count' + (isMulti ? ' is-multi-digit' : ' is-single-digit'),
+          'data-digits': isMulti ? 'multi' : 'single',
+          style: {
+            fontSize: 'var(--font-size-xs)',
+            fontWeight: 800,
+            padding: isMulti ? '0 5.5px' : '0',
+            width: isMulti ? 'auto' : '18px',
+            minWidth: '18px',
+            height: '18px',
+            aspectRatio: isMulti ? 'auto' : '1 / 1',
+            borderRadius: '9999px',
+            backgroundColor: isActive ? 'rgba(124, 58, 237, 0.12)' : 'var(--border-subtle)',
+            color: isActive ? activeColor : 'var(--text-muted)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+            textAlign: 'center'
+          }
+        }, badgeStr);
+      })() : null
     );
   }));
+}
+
+function getPaginationWindowInline(currentPage, pageCount, windowSize) {
+  const f = (window.GATHER_APP_UTILS || {}).getPaginationWindow;
+  if (typeof f === 'function') return f(currentPage, pageCount, windowSize);
+  const current = Math.min(pageCount, Math.max(1, Number(currentPage) || 1));
+  const count = Math.max(1, Number(pageCount) || 1);
+  const size = Math.max(1, Number(windowSize) || 10);
+  if (count <= size) return Array.from({ length: count }, (_, i) => i + 1);
+  const half = Math.floor(size / 2);
+  let start = current - half;
+  let end = start + size - 1;
+  if (start < 1) {
+    start = 1;
+    end = Math.min(count, size);
+  } else if (end > count) {
+    end = count;
+    start = Math.max(1, count - size + 1);
+  }
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+export function CommonPagination({
+  currentPage = 1,
+  pageCount = 1,
+  onChange,
+  label = '페이지',
+  isMobile: isMobileProp,
+  loading = false,
+  className = '',
+  style = {}
+} = {}) {
+  const React = window.React;
+  const [internalMobile, setInternalMobile] = React.useState(() => {
+    return typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 640px)').matches : false;
+  });
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const handler = () => setInternalMobile(mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else mq.addListener(handler);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+
+  const isMobile = isMobileProp != null ? Boolean(isMobileProp) : internalMobile;
+  if (pageCount <= 1) return null;
+
+  const windowSize = isMobile ? 5 : 10;
+  const curr = Math.min(pageCount, Math.max(1, Number(currentPage) || 1));
+  const pages = getPaginationWindowInline(curr, pageCount, windowSize);
+
+  const go = page => {
+    if (loading || page < 1 || page > pageCount || page === curr || typeof onChange !== 'function') return;
+    onChange(page);
+  };
+
+  const chevron = (direction, key) => React.createElement('svg', {
+    key,
+    xmlns: 'http://www.w3.org/2000/svg', width: isMobile ? '13' : '16', height: isMobile ? '13' : '16', viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
+    className: 'icon icon-tabler icons-tabler-outline icon-tabler-chevron-down', 'aria-hidden': 'true'
+  },
+    React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+    React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+  );
+
+  const doubleChevron = direction => React.createElement('span', {
+    style: { display: 'inline-flex', alignItems: 'center' }
+  },
+    chevron(direction, `${direction}-a`),
+    React.createElement('span', { style: { display: 'inline-flex', marginLeft: isMobile ? '-9px' : '-10px' } },
+      chevron(direction, `${direction}-b`)
+    )
+  );
+
+  const arrow = (btnLabel, targetPage, disabled, glyph) => React.createElement('button', {
+    key: btnLabel, type: 'button',
+    className: 'gallery-pagination-button gallery-pagination-arrow',
+    'aria-label': btnLabel,
+    disabled: disabled || loading,
+    onClick: () => go(targetPage)
+  }, glyph);
+
+  return React.createElement('nav', {
+    className: `gallery-pagination${isMobile ? ' is-mobile' : ''}${className ? ` ${className}` : ''}`,
+    'aria-label': `${label} 페이지`,
+    ref: (el) => {
+      if (!el) return;
+      // Card rules on grid children use background !important. Inline important
+      // is the one thing that still wins if a stale sheet paints the plate.
+      el.style.setProperty('background', 'transparent', 'important');
+      el.style.setProperty('background-color', 'transparent', 'important');
+      el.style.setProperty('border', '0', 'important');
+      el.style.setProperty('box-shadow', 'none', 'important');
+      el.style.setProperty('border-radius', '0', 'important');
+    },
+    style
+  },
+    arrow('첫 페이지', 1, curr <= 1, doubleChevron('left')),
+    arrow('이전 페이지', curr - 1, curr <= 1, chevron('left')),
+    pages.map(page => React.createElement('button', {
+      key: page,
+      type: 'button',
+      className: `gallery-pagination-button${page === curr ? ' is-active' : ''}`,
+      'aria-current': page === curr ? 'page' : undefined,
+      disabled: loading,
+      onClick: () => go(page)
+    }, String(page))),
+    arrow('다음 페이지', curr + 1, curr >= pageCount, chevron('right')),
+    arrow('마지막 페이지', pageCount, curr >= pageCount, doubleChevron('right'))
+  );
 }
 
 // Edit-mode selection checkbox. Spec taken from gallery 링크/파일 cards:
@@ -731,13 +946,22 @@ export function SegmentedToggle({ options, value, onChange, disabled, style, ari
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const safeOptions = Array.isArray(options) ? options : [];
+  const { rootRef, gestureProps } = useTabStripGesture({
+    values: safeOptions.map(opt => opt.value),
+    value,
+    onChange,
+    disabled,
+  });
   return /*#__PURE__*/React.createElement("div", {
+    ...gestureProps,
+    ref: rootRef,
     role: "tablist",
     className: "segmented-toggle",
     "aria-label": ariaLabel,
     style: {
       display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
       border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', flexShrink: 0,
+      touchAction: 'pan-y',
       ...style
     }
   }, safeOptions.flatMap((opt, i) => [
@@ -834,7 +1058,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null, wrapTitle = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -958,11 +1182,13 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         style: {
           fontSize: 'var(--font-size-md)',
           fontWeight: 700,
-          lineHeight: 1.25,
+          lineHeight: 1.3,
           color: 'var(--text-main)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
+          overflow: wrapTitle ? 'visible' : 'hidden',
+          textOverflow: wrapTitle ? 'clip' : 'ellipsis',
+          whiteSpace: wrapTitle ? 'normal' : 'nowrap',
+          wordBreak: wrapTitle ? 'break-word' : undefined,
+          overflowWrap: wrapTitle ? 'anywhere' : undefined
         }
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
@@ -1391,7 +1617,18 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
 // one(s). ChatParticipantSheet (ui-chat-sheets.js, single-select "\uC791\uC131\uC790 \uC120\uD0DD") and PollVoterSheet
 // (below, multi-voter "\uD22C\uD45C\uC790 \uC120\uD0DD") used to each hand-roll this exact same sheet -- differing only
 // in title text and selection semantics -- so this is the one place their shared chrome lives.
-export function ParticipantSelectSheet({ calendar, participants, title, isOptionSelected, onSelect, onClose }) {
+export function ParticipantSelectSheet({
+  calendar,
+  participants,
+  title,
+  isOptionSelected = () => false,
+  onSelect,
+  onClose,
+  selectedLabel = '선택됨',
+  disableSelected = false,
+  getOptionStatus = null,
+  isOptionDisabled = null
+}) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1427,15 +1664,27 @@ export function ParticipantSelectSheet({ calendar, participants, title, isOption
     style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, null))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
-  }, list.map(participant => /*#__PURE__*/React.createElement("button", {
-    key: participant.id,
-    type: "button",
-    className: "poll-voter-option",
-    onClick: () => onSelect(participant.id)
-  }, /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }),
-  isOptionSelected(participant.id) && /*#__PURE__*/React.createElement("span", {
-    style: { color: '#2563EB', fontWeight: 900 }
-  }, "\u2713")))))), document.body);
+  }, list.map(participant => {
+    const selected = Boolean(isOptionSelected(participant.id));
+    const status = typeof getOptionStatus === 'function'
+      ? getOptionStatus(participant, { selected })
+      : (selected ? selectedLabel : '');
+    const disabled = Boolean((disableSelected && selected) || (typeof isOptionDisabled === 'function' && isOptionDisabled(participant, { selected, status })));
+    return /*#__PURE__*/React.createElement("button", {
+      key: participant.id,
+      type: "button",
+      className: "poll-voter-option",
+      disabled: disabled,
+      "aria-label": `${participant.name}${status ? `, ${status}` : ''}`,
+      onClick: () => {
+        if (!disabled && typeof onSelect === 'function') onSelect(participant.id);
+      },
+      style: disabled ? { cursor: 'not-allowed', opacity: 0.58 } : undefined
+    }, /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }),
+    status && /*#__PURE__*/React.createElement("span", {
+      style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 900 }
+    }, status));
+  })))), document.body);
 }
 
 export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
@@ -1454,6 +1703,7 @@ export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }
     participants: participants,
     title: "\uD22C\uD45C\uC790 \uC120\uD0DD",
     isOptionSelected: id => selectedIds.has(id),
+    selectedLabel: '투표함',
     onSelect: id => {
       setStoredChatParticipantId(calendar?.id, id);
       onSelect(id);
@@ -1618,7 +1868,7 @@ export function MemoTagInputRow({
   tagInput = '',
   onTagInputChange,
   onAddTag,
-  maxTags = 10
+  maxTags = 20
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2023,5 +2273,6 @@ export function ResizableListSection({
     Footer: Footer,
     MemoTagInputRow: MemoTagInputRow,
     ClickToPlayVideoCard: ClickToPlayVideoCard,
+    CommonPagination: CommonPagination,
   });
 }

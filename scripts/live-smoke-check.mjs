@@ -2,6 +2,19 @@ const DEFAULT_BASE_URL = 'https://pyw31337.github.io/calendar/';
 const baseUrl = process.env.CALENDAR_LIVE_BASE_URL || DEFAULT_BASE_URL;
 const cacheBust = process.env.CALENDAR_LIVE_CACHE_BUST || Date.now().toString(36);
 const expectedBuildSha = String(process.env.EXPECTED_BUILD_SHA || '').trim();
+const REQUEST_TIMEOUT_MS = 6_000;
+// Pages' CDN normally updates within a minute, but a freshly published artifact
+// can remain behind an edge cache for more than two minutes.  Keep the live
+// smoke strict about the exact build while allowing enough time for that
+// documented propagation race instead of recording a false failed deployment.
+const DEPLOY_PROPAGATION_RETRY_MS = 10_000;
+const DEFAULT_DEPLOY_PROPAGATION_ATTEMPTS = 25;
+const configuredDeployAttempts = Number.parseInt(process.env.PAGES_DEPLOY_MAX_ATTEMPTS || '', 10);
+const maxDeployAttempts = expectedBuildSha
+  ? (Number.isFinite(configuredDeployAttempts) && configuredDeployAttempts > 0
+      ? configuredDeployAttempts
+      : DEFAULT_DEPLOY_PROPAGATION_ATTEMPTS)
+  : 1;
 
 const pages = [
   '?id=kkot',
@@ -56,8 +69,12 @@ function resolveAssetUrl(path, fallbackBase = baseUrl) {
   return new URL(normalized.startsWith('assets/') ? normalized : path, normalized.startsWith('assets/') ? baseUrl : fallbackBase).toString();
 }
 
+function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+}
+
 async function checkUrl(url, validate) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     redirect: 'follow',
     headers: { 'Cache-Control': 'no-cache' }
   });
@@ -78,7 +95,6 @@ function isClassicHtml(html) {
 
 const indexBaseUrl = new URL('.', baseUrl).toString();
 let indexText = '';
-const maxDeployAttempts = expectedBuildSha ? 13 : 1;
 for (let attempt = 1; attempt <= maxDeployAttempts; attempt += 1) {
   const indexUrl = `${indexBaseUrl}?_v=${cacheBust}-${attempt}`;
   try {
@@ -99,8 +115,8 @@ for (let attempt = 1; attempt <= maxDeployAttempts; attempt += 1) {
   } catch (error) {
     const isDeployRace = expectedBuildSha && String(error?.message || '').includes('Deployed build SHA mismatch');
     if (!isDeployRace || attempt === maxDeployAttempts) throw error;
-    console.log(`[live-smoke] Pages propagation pending (${attempt}/${maxDeployAttempts}); retrying in 10s`);
-    await new Promise(resolve => setTimeout(resolve, 10_000));
+    console.log(`[live-smoke] Pages propagation pending (${attempt}/${maxDeployAttempts}); retrying in ${DEPLOY_PROPAGATION_RETRY_MS / 1_000}s`);
+    await new Promise(resolve => setTimeout(resolve, DEPLOY_PROPAGATION_RETRY_MS));
   }
 }
 
@@ -163,7 +179,7 @@ if (mode === 'vite') {
   let totalBytes = jsBody.length;
   for (const cu of chunkUrls.slice(0, 40)) {
     try {
-      const response = await fetch(cu, { redirect: 'follow' });
+      const response = await fetchWithTimeout(cu, { redirect: 'follow' });
       if (!response.ok) throw new Error(`${response.status} ${cu}`);
       const body = await response.text();
       if (body && body.length) {
@@ -203,7 +219,7 @@ if (mode === 'vite') {
   for (const [file, needle] of criticalChecks) {
     const fromIndex = assetPaths.find(p => p.includes(file));
     const finalUrl = withCacheBust(fromIndex || `assets/${file}`);
-    const body = await (await fetch(finalUrl, { redirect: 'follow' })).text();
+    const body = await (await fetchWithTimeout(finalUrl, { redirect: 'follow' })).text();
     if (!body.includes(needle)) throw new Error(`Marker "${needle}" missing in ${finalUrl}`);
     console.log(`[live-smoke] marker ok ${needle} @ ${fromIndex || file}`);
   }
@@ -217,10 +233,26 @@ const functionProbes = [
   // structured empty result, so the smoke contract must not require the retired 400 response.
   ['kakaoLocalSearchProxy', [200], '"ok":true']
 ];
+const FUNCTION_PROBE_TIMEOUT_MS = 25_000;
 for (const [name, okCodes, needle] of functionProbes) {
   const url = `${FUNCTIONS_BASE}/${name}`;
-  const response = await fetch(url, { redirect: 'follow' });
-  const text = await response.text();
+  let response;
+  let text = '';
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      response = await fetchWithTimeout(url, { redirect: 'follow' }, FUNCTION_PROBE_TIMEOUT_MS);
+      text = await response.text();
+      break;
+    } catch (err) {
+      lastError = err;
+      if (attempt < 2) {
+        console.warn(`[live-smoke] function probe retry ${name} after ${err.message}`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  }
+  if (!response) throw lastError;
   if (response.status === 404) throw new Error(`Cloud Function missing (not deployed): ${name}`);
   if (!okCodes.includes(response.status)) {
     throw new Error(`Cloud Function ${name} unexpected ${response.status}`);
@@ -228,7 +260,7 @@ for (const [name, okCodes, needle] of functionProbes) {
   if (needle && !text.includes(needle)) throw new Error(`Cloud Function ${name} body mismatch`);
   console.log(`[live-smoke] function ok ${name} ${response.status}`);
 }
-const photoIndexTrigger = await fetch(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' });
+const photoIndexTrigger = await fetchWithTimeout(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' }, FUNCTION_PROBE_TIMEOUT_MS);
 if (photoIndexTrigger.status === 404) {
   throw new Error('Cloud Function missing (not deployed): onMessagePhotoIndexWrite');
 }

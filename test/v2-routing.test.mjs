@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { photoLightbox, timestampMs } from '../src/ui/v2/view-data.js';
-import { resolveV2Destination, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
+import { resolveV2Destination, resolveShellTab, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
 
 const location = search => ({ pathname: '/calendar/', search });
 test('V2 is the only shell: tab/sub routing with or without a shell param', () => {
@@ -47,6 +47,25 @@ test('V2 records subs remain for gallery/history/content only', () => {
   }
   assert.equal(getInitialAppView(location('?shell=v2&tab=more')), 'calendar');
 });
+test('chat and memo deep links survive the view switch and drop when leaving', () => {
+  const chat = buildAppViewUrl(location('?id=example&view=chat&msg=msg_1&img=0&comment=cmt'), 'chat');
+  const chatParams = new URL(chat, 'https://example.test').searchParams;
+  assert.equal(chatParams.get('tab'), 'chat');
+  assert.equal(chatParams.get('msg'), 'msg_1');
+  assert.equal(chatParams.get('img'), '0');
+  assert.equal(chatParams.get('comment'), null);
+  const memo = buildAppViewUrl(location('?id=example&view=memo&memo=memo_1&comment=cmt_1&msg=msg_1'), 'memo');
+  const memoParams = new URL(memo, 'https://example.test').searchParams;
+  assert.equal(memoParams.get('tab'), 'memo');
+  assert.equal(memoParams.get('memo'), 'memo_1');
+  assert.equal(memoParams.get('comment'), 'cmt_1');
+  assert.equal(memoParams.get('msg'), null);
+  const home = buildAppViewUrl(location('?id=example&tab=chat&msg=msg_1&memo=memo_1&comment=cmt_1'), 'calendar');
+  const homeParams = new URL(home, 'https://example.test').searchParams;
+  for (const key of ['msg', 'memo', 'comment', 'tab', 'view']) assert.equal(homeParams.has(key), false);
+  assert.equal(homeParams.get('id'), 'example');
+});
+
 test('V2 home clears stale detail routes while retaining calendar identity', () => {
   const result = buildAppViewUrl(location('?shell=v2&id=example&tab=memo&view=memo'), 'calendar');
   const params = new URL(result, 'https://example.test').searchParams;
@@ -63,6 +82,16 @@ test('shell-nav resolves Bento IA to first-class destinations', () => {
   assert.deepEqual(resolveV2Destination('gallery'), { tab: 'records', sub: 'media' });
   assert.equal(V2_PRIMARY.some(i => i.id === 'memo'), true);
   assert.equal(V2_PRIMARY.some(i => i.id === 'places'), true);
+});
+test('shared view links open the records destination instead of the calendar', () => {
+  assert.equal(getInitialAppView(location('?id=example&view=gallery')), 'gallery');
+  assert.equal(resolveShellTab('?id=example&view=gallery', 'gallery'), 'records');
+  assert.equal(resolveShellTab('?id=example&view=history', 'history'), 'records');
+  assert.equal(resolveShellTab('?id=example&view=content', 'content'), 'records');
+  assert.equal(resolveShellTab('?tab=records&sub=media', 'gallery'), 'records');
+  assert.equal(resolveShellTab('?tab=records&sub=memo', 'memo'), 'memo');
+  assert.equal(resolveShellTab('?tab=records', 'calendar'), 'calendar');
+  assert.equal(resolveShellTab('?view=chat', 'chat'), 'chat');
 });
 test('gallery preview uses the shared lightbox URL and identity contract', () => {
   const photos = [{ full: 'https://example.test/a.jpg', messageId: 'm1', imageIndex: 0, assetKey: 'asset-1', thumb: 'thumb-1' }, { url: 'https://example.test/b.jpg', memoId: 'memo2', refKey: 'ref-2' }];
@@ -99,6 +128,9 @@ test('V2 destination panes prefetch lazy UI and never stall on 불러오는 중 
   assert.doesNotMatch(shell, /title: '메모 불러오는 중'/);
   assert.doesNotMatch(shell, /title: '장소 불러오는 중'/);
   assert.match(screens, /export function prefetchDestinationStyles/);
+  assert.match(screens, /import '\.\/dest-chrome-late\.css';/, 'shared destination chrome has one static source of truth');
+  assert.doesNotMatch(screens, /import\('\.\/dest-chrome-late\.css'\)/, 'the shared chrome is not requested again by every destination prefetch');
+  assert.doesNotMatch(shell, /import '\.\/v2\/dest-chrome-late\.css';/, 'the shell does not duplicate the screens chrome import');
 });
 
 test('places map reuses the shared chat composer resize handle', async () => {
@@ -120,6 +152,7 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   const { readFileSync } = await import('node:fs');
   const modal = readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const shellNav = readFileSync(new URL('../src/ui/v2/shell-nav.js', import.meta.url), 'utf8');
   assert.match(modal, /shellChrome\s*=\s*null/);
   assert.match(modal, /shellChrome === 'bento'/);
   assert.match(modal, /bp-event-sheet bp-is-open/);
@@ -131,7 +164,7 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   assert.match(shell, /activeTab === 'places'/);
   assert.match(shell, /resolveV2Destination/);
   // Legacy ?tab=records&sub=memo|places bookmarks promote to first-class tabs; sub is stripped.
-  assert.match(shell, /sub === 'memo' \|\| sub === 'places'/);
+  assert.match(shellNav, /sub === 'memo' \|\| sub === 'places'/);
   assert.match(shell, /Only gallery\/content\/archive \(records\) keep \?sub=/);
 });
 
@@ -144,14 +177,14 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /grid-template-columns:\s*repeat\(3, 1fr\)/);
   assert.match(design, /bp-day-cell\.bp-today \.bp-day-num/);
   assert.match(design, /bp-day-bar-stack/);
-  assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*0\.6rem/);
+  assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*(?:max\(12px,\s*)?0\.75rem/);
   assert.match(design, /\.festival-bar-desktop \.bp-day-anniversary-label/);
   assert.match(design, /--v2-fs-base:\s*0\.94rem/);
   assert.match(design, /--v2-fs-md:\s*0\.90rem/);
   assert.match(design, /--v2-fs-title:\s*1\.2rem/);
 
   assert.match(shell, /resolveHomeGalleryStripState/);
-  assert.match(shell, /limit:\s*9/);
+  assert.match(shell, /limit:\s*18/);
   assert.match(shell, /navigateV2Destination/);
   assert.match(shell, /gallery-thumb/);
   assert.match(shell, /dday-participant-memos/);
@@ -191,7 +224,7 @@ test('V2 destination screens keep live feature entry points', async () => {
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
   const styles = readFileSync(new URL('../src/ui/v2/screens.css', import.meta.url), 'utf8');
   // Search / share / FAB / map / composer remain wired (design is chrome-only).
-  assert.match(screens, /placeholder: '장소 검색'/);
+  assert.match(screens, /searchLabel: '장소 검색'|placeholder: '장소 검색'/);
   assert.match(screens, /placeholder: '메모 검색'|메모 검색/);
   assert.match(screens, /Fab\(/);
   assert.match(screens, /label: '메모 등록'|label: '메모 작성'/);
@@ -206,7 +239,11 @@ test('V2 destination screens keep live feature entry points', async () => {
   // Gallery/media keeps share + lightbox plumbing; v2 wrapper is presentation-only.
   assert.match(shell, /v2-records-media/);
   assert.match(shell, /onOpenGalleryShare/);
-  assert.match(shell, /clickLegacyAriaButton\('갤러리 검색'/);
+  assert.match(shell, /galleryActionsRef\.current\.search|onSearchQuery: setGallerySearchQuery/);
+  assert.match(shell, /contentActionsRef\.current\.search|onSearchQuery: setContentSearchQuery/);
+  assert.match(shell, /historyActionsRef\.current\.search|onSearchQuery: setArchiveSearchQuery/);
+  assert.match(screens, /icon: 'search'/);
+  assert.match(screens, /v2-memo-active-tag/);
   assert.match(screens, /searchLabel: '갤러리 검색'|label: '갤러리 검색'/);
   assert.match(shell, /setActiveLightbox/);
   assert.match(shell, /dday-participant-memos/);
@@ -295,6 +332,21 @@ test('V2 calendar home supports drag-to-move availability like v1\'s CalendarGri
   assert.match(shell, /draggable:\s*true/, 'availability dots must be draggable, same as CalendarGrid\'s ParticipantBadge');
   assert.match(shell, /onDrop:\s*event\s*=>/, 'day cells must accept a drop to complete the move');
   assert.match(shell, /handleBadgeTouchStart/, 'a touch long-press-then-drag equivalent must exist for mobile, where native HTML5 DnD never fires');
+});
+
+test('V2 calendar keeps its selected month in the shared URL-backed month state', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  const date = new Date(2026, 9, 1);
+  const url = buildAppViewUrl(location('?id=example&shell=v2'), 'calendar', date);
+  const params = new URL(url, 'https://example.test').searchParams;
+
+  assert.equal(params.get('year'), '2026');
+  assert.equal(params.get('month'), '10');
+  assert.match(shell, /activeCal, currentMonthDate, setCurrentMonthAndSync/);
+  assert.match(shell, /calendarContext\.setCurrentMonthAndSync\(nextDate\)/);
+  assert.match(appMain, /\{ activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters/);
 });
 
 

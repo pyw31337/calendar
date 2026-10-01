@@ -18,6 +18,14 @@ test('place tags match names and aliases, including longer tags', () => {
   assert.ok(!photoMatchesPlaceTag({ tags: '#서울 #260926' }, places[0]));
 });
 
+test('a legacy-truncated generated place tag still files under its expanded registered place', () => {
+  const place = { name: '다낭 빌라드네일&풋마사지(DaNang Villa De Nail&Foot spa)' };
+  // This is the exact 30-character tag the former place assignment control generated.
+  const legacyTag = '다낭빌라드네일&풋마사지(DaNangVillaDeNail';
+  assert.ok(photoMatchesPlaceTag({ tags: `#${legacyTag} #250626` }, place));
+  assert.ok(!photoMatchesPlaceTag({ tags: '#다낭 #250626' }, place), 'short free-form tags remain conservative');
+});
+
 test('a date with exactly one place claims the photo; several places go to 분류 필요', () => {
   const photos = [
     { id: 'a', tags: '#260926 #260925 아이폰17 서준' },
@@ -46,6 +54,27 @@ test('groups are ordered by most recent visit', () => {
   assert.equal(groups[0].byTag, 1);
 });
 
+test('a reader can take a screenshot out of 분류 필요 without deleting it', async () => {
+  const { withNotAPlaceTag, isDismissedFromPlaces, NOT_A_PLACE_TAG } = await import('../src/ui/archive-place-groups.js');
+  const shot = { id: 'ui', tags: '#260920 아이폰17 서준' };
+  const marked = withNotAPlaceTag(shot.tags);
+  assert.equal(marked.status, 'add');
+  assert.ok(marked.tags.startsWith(NOT_A_PLACE_TAG));
+  const full = Array.from({ length: 20 }, (_, i) => `t${i}`).join(' ');
+  const capped = withNotAPlaceTag(full);
+  assert.equal(capped.status, 'add');
+  assert.ok(capped.tags.startsWith(NOT_A_PLACE_TAG));
+  assert.equal(capped.tags.split(' ').length, 20);
+  const dismissed = { ...shot, tags: marked.tags };
+  assert.equal(isDismissedFromPlaces(dismissed), true);
+  const { unclassifiedCount, groups } = buildPlacePhotoGroups({
+    places, photos: [dismissed], getPhotoDates, doesPlaceMatchDate
+  });
+  assert.equal(unclassifiedCount, 0);
+  assert.equal(groups.length, 0);
+  assert.equal(withNotAPlaceTag(marked.tags).status, 'already');
+});
+
 test('cover photos prefer camera shots over screenshots', async () => {
   const { orderCoverPhotos } = await import('../src/ui/archive-place-groups.js');
   const ordered = orderCoverPhotos([{ id: 'shot', tags: '#260920' }, { id: 'cam', tags: '260920 갤럭시Z폴드2 서준' }, { id: 'ip', tags: '아이폰17' }]);
@@ -67,4 +96,16 @@ test('GPS position files a photo under the nearest registered place, even withou
   assert.deepEqual(byId.g1, ['near'], 'GPS wins over the date rule (g2 is the only place visited that day)');
   assert.deepEqual(byId.g2, ['far'], 'no nearby place: falls back to the date rule');
   assert.equal(groups.find(g => g.place.id === 'g1').byGeo, 1);
+});
+
+test('withPlaceTag prepends the place tag and never drops existing tags', async () => {
+  const { withPlaceTag, placeTagToken } = await import('../src/ui/archive-place-groups.js');
+  const place = { name: '예당호 출렁다리', alias: '' };
+  assert.equal(placeTagToken(place), '예당호출렁다리');
+  assert.deepEqual(withPlaceTag('#260920 서준', place), { status: 'add', tags: '예당호출렁다리 260920 서준' });
+  assert.equal(withPlaceTag('예당호출렁다리야경 260920', place).status, 'already');
+  const twenty = Array.from({ length: 20 }, (_, i) => `t${i}`).join(' ');
+  assert.deepEqual(withPlaceTag(twenty, place), { status: 'full', tags: twenty });
+  assert.equal(withPlaceTag('x', { name: '' }).status, 'invalid');
+  assert.equal(placeTagToken({ name: '서울랜드', alias: '서랜' }), '서랜');
 });

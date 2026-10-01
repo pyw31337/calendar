@@ -38,7 +38,8 @@ export function highlightTextWithYellowMarker(text, keyword) {
     const matchText = remaining.substring(idx, idx + cleanKeyword.length);
     parts.push(
       React.createElement("mark", {
-        key: remaining.length + idx,
+        key: `m-${parts.length}-${idx}`,
+        className: "search-keyword-mark",
         style: { backgroundColor: '#FEF08A', color: '#1E293B', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }
       }, matchText)
     );
@@ -72,7 +73,8 @@ export function highlightKeyword(text, keyword) {
     const matchText = remaining.substring(idx, idx + cleanKeyword.length);
     parts.push(
       React.createElement("mark", {
-        key: remaining.length,
+        key: `m-${parts.length}-${idx}`,
+        className: "search-keyword-mark",
         style: { backgroundColor: '#FEF08A', color: '#1E293B', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }
       }, matchText)
     );

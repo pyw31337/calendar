@@ -39,6 +39,14 @@ export function addDaysIso(iso, days) {
 // cultureSnapshot orphans (see filterAndSortCultureItems in src/ui/ui-summary-gallery.js).
 export const POST_END_GRACE_DAYS = 30;
 
+// A film with only a release day is not an open run. Wide releases leave theaters in about a
+// month; without this, every crawled movie stays 「상영중」 until Culture Flow drops the row.
+export const MOVIE_THEATRICAL_DAYS = 28;
+
+export function movieTheatricalEnd(releaseIso) {
+  return addDaysIso(releaseIso, MOVIE_THEATRICAL_DAYS);
+}
+
 export function isVisible(endDate, startDate, todayIso, { openEnded = false } = {}) {
   // Open-ended / OPEN RUN listings have no parseable end date by design -- keep them while
   // upstream still publishes them (Culture Flow collect is the lifecycle owner for those).
@@ -335,12 +343,17 @@ export function compactItem(item) {
 }
 
 export function normalizeItem(raw) {
-  const openRun = isOpenRunDate(raw.date);
-  const { startDate, endDate } = parseDateRange(raw.date);
   const movie = raw.genre === 'movie';
-  const openEnded = movie || openRun;
-  const normalizedStartDate = openRun ? null : startDate;
-  const normalizedEndDate = openEnded ? null : endDate;
+  const openRun = !movie && isOpenRunDate(raw.date);
+  const { startDate, endDate } = parseDateRange(raw.date);
+  // Dated films get a theatrical window. A real ranged end (different from the release day)
+  // is kept. Undated announcements stay open-ended and render as 개봉 미정.
+  const movieRanged = movie && startDate && endDate && endDate !== startDate;
+  const openEnded = movie ? !startDate : openRun;
+  const normalizedStartDate = openEnded ? null : startDate;
+  const normalizedEndDate = openEnded
+    ? null
+    : (movie ? (movieRanged ? endDate : movieTheatricalEnd(startDate)) : endDate);
   const venue = cleanInlineText(raw.venue || raw.venueKey || '');
   const address = cleanAddress(raw.address);
   const cast = Array.isArray(raw.cast)
@@ -385,10 +398,95 @@ export function normalizeItem(raw) {
       ageRating: cleanInlineText(raw.ageRating),
       audienceCount: raw.audienceCount ?? raw.audience ?? '',
       bookingRate: raw.bookingRate ?? raw.reservationRate ?? '',
+      statsCollectedAt: String(raw.statsCollectedAt || '').trim(),
       runningTime: cleanInlineText(raw.runningTime),
       subGenre: cleanInlineText(raw.subGenre),
       originalTitle: cleanInlineText(raw.originalTitle),
       synopsis: cleanMultilineText(raw.synopsis, 600)
     }
   };
+}
+
+const TIME_TICKET_HOST = /(^|\.)timeticket\.co\.kr$/i;
+const POSTER_ASSET_SKIP = /logo|icon|blank|loading|spacer|sprite|apple-touch|favicon|emoji|badge|daumcdn|kakao|\/map|tile|roadview/i;
+
+export function isTimeTicketHost(url) {
+  try {
+    return TIME_TICKET_HOST.test(new URL(String(url)).hostname);
+  } catch {
+    return false;
+  }
+}
+
+// List API thumbs (…-255x357.jpg, legacy *_wonbon_*) are what Culture Flow stores.
+// TimeTicket retires that filename when the poster is replaced, so the URL 404s and
+// the calendar paints "포스터 없음". The product document is a Vue shell with no <img>;
+// the current file is the og:image (typically …-700x700.jpg).
+export function timeTicketProductUrl(itemOrLink) {
+  const link = typeof itemOrLink === 'string'
+    ? itemOrLink
+    : String(itemOrLink?.link || itemOrLink?.website || '');
+  try {
+    const url = new URL(link.trim());
+    if (!TIME_TICKET_HOST.test(url.hostname)) return '';
+    const path = url.pathname.replace(/\/+$/, '');
+    if (!/^\/product\/\d+$/.test(path)) return '';
+    return `https://timeticket.co.kr${path}`;
+  } catch {
+    return '';
+  }
+}
+
+export function timeTicketPosterNeedsCanonical(item) {
+  if (!timeTicketProductUrl(item)) return false;
+  const image = String(item?.image || '').trim();
+  if (!image) return true;
+  return isTimeTicketHost(image);
+}
+
+function metaAttribute(tag, name) {
+  const match = String(tag).match(new RegExp(`${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+  return match ? (match[1] ?? match[2] ?? match[3] ?? '') : '';
+}
+
+function resolvePosterUrl(raw, pageUrl) {
+  const value = decodeHtmlEntities(raw).replace(/\s+/g, '').trim();
+  if (!value || /^(?:data|javascript):/i.test(value)) return '';
+  try {
+    return new URL(value, pageUrl).href;
+  } catch {
+    return '';
+  }
+}
+
+export function isUsefulPosterUrl(url) {
+  return /^https?:\/\//i.test(String(url || '')) && !POSTER_ASSET_SKIP.test(String(url));
+}
+
+// Read a TimeTicket product document. Prefer og:image (the only poster in the
+// server HTML today). If that is missing, take a real <img> src / data-src /
+// first srcset candidate. Never synthesize a URL that was not in the document.
+export function timeTicketPosterFromHtml(html, pageUrl = 'https://timeticket.co.kr/') {
+  const text = String(html || '');
+  const base = String(pageUrl || 'https://timeticket.co.kr/');
+  const metas = text.match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of metas) {
+    const property = metaAttribute(tag, 'property') || metaAttribute(tag, 'name');
+    if (!/^og:image$/i.test(property)) continue;
+    const url = resolvePosterUrl(metaAttribute(tag, 'content'), base);
+    if (isUsefulPosterUrl(url)) return url;
+  }
+  const images = text.match(/<img\b[^>]*>/gi) || [];
+  for (const tag of images) {
+    const srcset = metaAttribute(tag, 'srcset') || metaAttribute(tag, 'data-srcset');
+    const fromSrcset = srcset.split(',')[0]?.trim().split(/\s+/)[0] || '';
+    const raw = metaAttribute(tag, 'data-src')
+      || metaAttribute(tag, 'data-original')
+      || metaAttribute(tag, 'data-lazy-src')
+      || fromSrcset
+      || metaAttribute(tag, 'src');
+    const url = resolvePosterUrl(raw, base);
+    if (isUsefulPosterUrl(url)) return url;
+  }
+  return '';
 }

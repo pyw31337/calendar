@@ -11,13 +11,13 @@
     .v2-places { margin: 0; font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
     .v2-places button, .v2-places input { font-family: inherit; }
 
-    .v2-places .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
+    .v2-places .bp-app-shell { width: 100%; max-width: none; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
 
     .v2-places .bp-header { position: sticky; top: 0; background: var(--bg-card); z-index: 5; padding: 12px 14px 10px; border-bottom: 1px solid var(--border-subtle); }
     .v2-places .bp-header-row { display: flex; align-items: center; gap: 8px; }
     .v2-places .bp-back-btn { background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
     .v2-places .bp-header-title { font-weight: 800; font-size: 0.96rem; color: var(--text-main); }
-    .v2-places .bp-header-count { font-size: 0.64rem; color: var(--text-light); font-weight: 700; margin-left: 4px; }
+    .v2-places .bp-header-count { font-size:0.75rem; color: var(--text-light); font-weight: 700; margin-left: 4px; }
     .v2-places .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
     .v2-places .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
     .v2-places .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
@@ -28,19 +28,19 @@
     .v2-places .bp-search-row svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-light); }
     .v2-places .bp-cat-filter-row { display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px 0; }
     .v2-places .bp-cat-filter-row::-webkit-scrollbar { display: none; }
-    .v2-places .bp-cat-chip { flex: 0 0 auto; font-size: 0.68rem; font-weight: 800; color: var(--text-muted); background: var(--bg-primary); border: 1.5px solid transparent; border-radius: var(--radius-full); padding: 5px 12px; cursor: pointer; }
+    .v2-places .bp-cat-chip { flex: 0 0 auto; font-size:0.75rem; font-weight: 800; color: var(--text-muted); background: var(--bg-primary); border: 1.5px solid transparent; border-radius: var(--radius-full); padding: 5px 12px; cursor: pointer; }
     .v2-places .bp-cat-chip.bp-is-selected { border-color: currentColor; }
 
     .v2-places .bp-place-grid { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 14px; }
     .v2-places .bp-place-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 14px; box-shadow: 0 2px 8px rgba(30,27,46,0.05); }
     .v2-places .bp-place-tags { display: flex; gap: 4px; margin-bottom: 6px; }
-    .v2-places .bp-place-tag { font-size: 0.6rem; font-weight: 800; padding: 2px 7px; border-radius: var(--radius-full); }
+    .v2-places .bp-place-tag { font-size:0.75rem; font-weight: 800; padding: 2px 7px; border-radius: var(--radius-full); }
     .v2-places .bp-place-name { font-weight: 800; font-size: 0.9rem; color: var(--text-main); }
-    .v2-places .bp-place-addr { font-size: 0.72rem; color: var(--text-muted); margin: 3px 0; }
-    .v2-places .bp-place-note { font-size: 0.7rem; color: var(--text-light); }
+    .v2-places .bp-place-addr { font-size:0.75rem; color: var(--text-muted); margin: 3px 0; }
+    .v2-places .bp-place-note { font-size:0.75rem; color: var(--text-light); }
     .v2-places .bp-place-meta-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
-    .v2-places .bp-place-visit-count { font-size: 0.68rem; font-weight: 700; color: var(--brand); }
-    .v2-places .bp-place-last-visit { font-size: 0.66rem; color: var(--text-light); margin-left: auto; }
+    .v2-places .bp-place-visit-count { font-size:0.75rem; font-weight: 700; color: var(--brand); }
+    .v2-places .bp-place-last-visit { font-size:0.75rem; color: var(--text-light); margin-left: auto; }
     .v2-places .bp-place-map-thumb { width: 100%; height: 90px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--v2-surface-2, #E9E5F7), var(--v2-tint-soft, #F3EEFF)); margin-bottom: 10px; display: flex; align-items: center; justify-content: center; color: var(--brand); opacity: 0.5; }
 
     @media (min-width: 768px) {

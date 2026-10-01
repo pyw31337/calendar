@@ -1423,7 +1423,15 @@ async function fetchChatMessagesRest() {
   return [];
 }
 
-async function fetchAllChatMessagesRest() {
+async function fetchAllChatMessagesRest(calId) {
+  const key = String(calId || '');
+  const cachedIndex = key && calendarSearchIndexCache.get(key);
+  if (cachedIndex) {
+    try {
+      const index = await cachedIndex;
+      if (Array.isArray(index?.chatMessages)) return index.chatMessages;
+    } catch (_) { /* a failed index read should not block the direct message scan */ }
+  }
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchAllChatMessagesRest === 'function' && !svc.isScaffold) {
     return svc.fetchAllChatMessagesRest.apply(null, arguments);
@@ -1432,13 +1440,33 @@ async function fetchAllChatMessagesRest() {
   return [];
 }
 
-async function fetchCalendarSearchIndex() {
+const calendarSearchIndexCache = new Map();
+
+async function fetchCalendarSearchIndex(calId) {
   const svc = window.GATHER_FIREBASE_SERVICES;
-  if (svc && typeof svc.fetchCalendarSearchIndex === 'function' && !svc.isScaffold) {
-    return svc.fetchCalendarSearchIndex.apply(null, arguments);
+  if (!(svc && typeof svc.fetchCalendarSearchIndex === 'function' && !svc.isScaffold)) {
+    console.warn('fetchCalendarSearchIndex: GATHER_FIREBASE_SERVICES missing');
+    return { chatMessages: [], memos: [], customCultureItems: [] };
   }
-  console.warn('fetchCalendarSearchIndex: GATHER_FIREBASE_SERVICES missing');
-  return { chatMessages: [], memos: [], customCultureItems: [] };
+  const key = String(calId || '');
+  if (!key) return { chatMessages: [], memos: [], customCultureItems: [] };
+  const cached = calendarSearchIndexCache.get(key);
+  if (cached) return cached;
+  const pending = Promise.resolve()
+    .then(() => svc.fetchCalendarSearchIndex(key))
+    .then(index => {
+      const value = index && typeof index === 'object'
+        ? index
+        : { chatMessages: [], memos: [], customCultureItems: [] };
+      calendarSearchIndexCache.set(key, Promise.resolve(value));
+      return value;
+    })
+    .catch(err => {
+      calendarSearchIndexCache.delete(key);
+      throw err;
+    });
+  calendarSearchIndexCache.set(key, pending);
+  return pending;
 }
 
 async function fetchRecentChatMessages() {
@@ -1650,32 +1678,147 @@ async function fetchCustomCultureItemsRest(calId) {
   }
 }
 
-// 밈 키보드 이미지 풀(memePool) 전체 목록. 캘린더별 서브컬렉션이 아니라 최상위 컬렉션이다 --
-// 모든 캘린더의 채팅이 같은 해시태그 인덱스를 검색해야 하기 때문(firestore.rules에서 read는
-// 전체 공개, write는 admin-gated Cloud Function으로만 허용). 몇백~몇천 장이어도 REST list는
-// 메타데이터(문서)만 가져오고 실제 이미지 바이트는 각 썸네일 <img>가 필요할 때 따로 받으므로,
-// customCultureItems와 같은 전체 REST-hydrate-once 패턴을 그대로 쓴다.
-async function fetchMemePoolRest() {
+const MEME_POOL_CACHE_KEY = 'gather_memepool_cache_v2';
+const MEME_POOL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes fresh window
+
+function getCachedMemePool() {
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls) return [];
+    const raw = ls.getItem(MEME_POOL_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.items) ? parsed.items : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function getMemePoolCacheRecord() {
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls) return null;
+    const raw = ls.getItem(MEME_POOL_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.items) && parsed.items.length > 0) {
+      return {
+        cachedAt: Number(parsed.cachedAt) || 0,
+        metaUpdatedAt: Number(parsed.metaUpdatedAt) || 0,
+        items: parsed.items
+      };
+    }
+  } catch (_) {}
+  return null;
+}
+
+function saveMemePoolCache(items, metaUpdatedAt = 0) {
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls || !Array.isArray(items)) return;
+    ls.setItem(MEME_POOL_CACHE_KEY, JSON.stringify({
+      cachedAt: Date.now(),
+      metaUpdatedAt: Number(metaUpdatedAt) || 0,
+      items
+    }));
+  } catch (_) {}
+}
+
+async function fetchMemePoolLatestUpdatedAt() {
+  try {
+    // 1. Direct read of _metadata doc (exactly 1 document read)
+    const metaUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/memePool/_metadata`;
+    const res = await fetchFirestoreRequest(metaUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const js = firestoreDocumentToJs(data);
+      if (js && js.updatedAt) return Number(js.updatedAt);
+    }
+  } catch (_) {}
+  try {
+    // 2. Fallback: single-doc runQuery for the newest meme item (1 document read)
+    const queryUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:runQuery`;
+    const res = await fetchFirestoreRequest(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'memePool' }],
+          orderBy: [{ field: { fieldPath: 'updatedAt' }, direction: 'DESCENDING' }],
+          limit: 1
+        }
+      })
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      const first = Array.isArray(rows) && rows[0]?.document;
+      if (first) {
+        const js = firestoreDocumentToJs(first);
+        if (js && js.updatedAt) return Number(js.updatedAt);
+      }
+    }
+  } catch (_) {}
+  return 0;
+}
+
+// 밈 키보드 이미지 풀(memePool) 전체 목록.
+// 메타버전 검사 및 localStorage 캐시(gather_memepool_cache_v2)를 적용하여,
+// 1,035건의 전체 읽기를 매번 수행하지 않고 변경이 있을 때만 갱신한다 (읽기 비용 99.9% 절감).
+async function fetchMemePoolRest(options = {}) {
+  const { forceFresh = false } = options || {};
+  const cache = getMemePoolCacheRecord();
+  const now = Date.now();
+
+  // 1. If cache is very recent (< 5 mins) and not forceFresh, return immediately (0 reads)
+  if (!forceFresh && cache && (now - cache.cachedAt < MEME_POOL_CACHE_TTL_MS)) {
+    return cache.items;
+  }
+
+  // 2. Check remote metadata (1 read)
+  if (!forceFresh && cache && cache.items.length > 0) {
+    const remoteUpdatedAt = await fetchMemePoolLatestUpdatedAt();
+    if (remoteUpdatedAt > 0 && cache.metaUpdatedAt > 0 && remoteUpdatedAt <= cache.metaUpdatedAt) {
+      // Remote has not changed: touch cachedAt and serve from local cache
+      saveMemePoolCache(cache.items, cache.metaUpdatedAt);
+      return cache.items;
+    }
+  }
+
+  // 3. Cache missing, stale, or forceFresh: fetch all items from Firestore REST
   try {
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/memePool`;
     const list = [];
     let pageToken = '';
+    let maxUpdatedAt = 0;
     do {
       const query = new URLSearchParams({ pageSize: '300' });
       if (pageToken) query.set('pageToken', pageToken);
       const res = await fetchFirestoreRequest(`${baseUrl}?${query.toString()}`);
-      if (!res.ok) return list;
+      if (!res.ok) {
+        if (cache?.items?.length) return cache.items;
+        return list;
+      }
       const data = await res.json();
-      (data.documents || []).forEach(doc => list.push({
-        id: doc.name.split('/').pop(),
-        ...firestoreDocumentToJs(doc)
-      }));
+      (data.documents || []).forEach(doc => {
+        const id = doc.name.split('/').pop();
+        if (id.startsWith('_')) return; // ignore metadata docs like _metadata
+        const js = firestoreDocumentToJs(doc);
+        const itemUpdatedAt = Number(js?.updatedAt) || Number(js?.createdAt) || 0;
+        if (itemUpdatedAt > maxUpdatedAt) maxUpdatedAt = itemUpdatedAt;
+        list.push({ id, ...js });
+      });
       pageToken = data.nextPageToken || '';
     } while (pageToken);
+
+    if (list.length > 0) {
+      saveMemePoolCache(list, maxUpdatedAt || Date.now());
+    } else if (cache?.items?.length) {
+      return cache.items;
+    }
     return list;
   } catch (err) {
     console.warn('fetchMemePoolRest error:', err);
-    return [];
+    return cache?.items || [];
   }
 }
 
@@ -2435,7 +2578,7 @@ function normalizeConfirmedMeetingPhoto(photo) {
   const assetKey = sanitizeText(photo.assetKey || '', 220);
   const source = sanitizeText(photo.source || '', 60);
   const uploadSource = sanitizeText(photo.uploadSource || '', 60);
-  const tags = sanitizeText(photo.tags || '', 500);
+  const tags = sanitizeText(photo.tags || '', 640);
   const sourceMessageId = sanitizeText(photo.sourceMessageId || '', 180);
   const sourceImageIndex = Number(photo.sourceImageIndex);
   const imageIndex = Number(photo.imageIndex);
@@ -3977,6 +4120,7 @@ export {
   fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
   fetchMemePoolRest,
+  getCachedMemePool,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,

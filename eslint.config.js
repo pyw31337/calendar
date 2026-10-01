@@ -77,6 +77,20 @@ export default [
     }
   },
   {
+    // Local automation and node:test modules run under the Mac's Node runtime.  The worker uses
+    // built-in fetch/Response APIs (Node 22+) and the tests intentionally mock them.
+    files: ['tools/**/*.mjs', 'test/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser }
+    },
+    rules: {
+      'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+      'no-empty': ['error', { allowEmptyCatch: true }]
+    }
+  },
+  {
     files: ['functions/*.js', 'functions/test/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
