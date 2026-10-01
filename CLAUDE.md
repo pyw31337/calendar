@@ -18,11 +18,12 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 
 ## 지금 가장 중요한 진행 중 작업 (2026-09-23)
 
-**V2 셸이 기본 URL(`?id=cw`)의 기본값이 됐다 (컷오버 완료).** `isRenewalShellEnabled()`는
-이제 `shell !== 'v1'`(부재 시 V2) 이다. `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백
-탈출구다. **Safari 실기기 서명은 사용자가 직접 나중에 진행하기로 하고, 그 게이트를 건너뛰고
-컷오버를 진행하라는 사용자의 명시적 지시로 플립했다** — 이전까지의 "실기기 서명 전엔 금지"
-원칙은 이 특정 지시로 대체됐다. 문제가 발견되면 `?shell=v1`로 즉시 V1로 되돌릴 수 있다.
+**V2 셸이 유일한 화면이다 (2026-10 V1 제거 완료).** 9/23 컷오버 뒤 한 릴리스 동안 두었던
+`?shell=v1` 폴백과 V1 뷰 트리(`app-calendar-views.js`, `withStickyVideo` 등)는 사용자의 명시적
+지시("옛화면은 제거해도 될것 같아")로 제거했다. `isRenewalShellEnabled()`는 항상 `true`이고,
+옛 `?shell=v1` 북마크도 V2로 열린다. **되돌릴 탈출구는 더 이상 없으니**, 문제가 생기면 해당 PR을
+revert하는 것이 롤백 방법이다. **Safari(아이폰) 실기기 검수는 2026-10-01 사용자가 전 페이지 완료했다**고 확인했다
+(부족한 부분은 그 사이 다른 에이전트들이 수정함).
 
 상세·계획·실행한 diff·다음 단계는:
 
@@ -53,7 +54,7 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 - 남은 최상위 REAL 선언은 대부분 부트스트랩 상수/전역(`GATHER_APP_CONSTANTS`,
   `GATHER_APP_UTILS`, `React`/`ReactDOM`, `__gatherStartApp`)이거나, `CalendarApp` 내부와
   강하게 얽혀서 더 쪼갤 수 없다고 판단된 것들이다 (`extractDirectImageUrls`,
-  `getAllDirectMediaImageEntries` 등 — 각 자리에 왜 남았는지 주석으로 설명해뒀다).
+  `extractDirectImageUrls` 등 — 각 자리에 왜 남았는지 주석으로 설명해뒀다).
 
 **아직 손대지 않은 두 가지가 있고, 둘 다 의도적으로 보류 중이다:**
 
@@ -74,7 +75,7 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
    완료됐다** (`src/core/use-memo-collections.js`). **U12(`useGalleryIndexBindings`)도 같은 날 "U12 시작해"로
    완료됐다** (`src/core/use-gallery-index-bindings.js`). **U13(`createCalendarPhotoActions`)은 2026-09-26
    "U13 시작해"로 완료됐다** (`src/core/app-calendar-photo-actions.js`). **U14(뷰 JSX)도 같은 날 "U14 시작해"로
-   완료됐다** (`src/core/app-calendar-views.js`). 이로써 U10~U14 전부 끝났다.
+   완료됐다** (`src/core/app-calendar-views.js` — 이후 V1 제거와 함께 삭제됨). 이로써 U10~U14 전부 끝났다.
 
 이 두 가지를 빼면, 이 리팩터 계획 범위 안에서는 더 옮길 게 없다. **다만 이건 "이 계획이
 다뤘던 것"에 한정된 얘기고, 저장소 전체에 대한 포괄적 코드 감사는 아니다** — 이 계획 밖의
