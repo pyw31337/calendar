@@ -5273,6 +5273,16 @@ html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
     padding-right: 10px !important;
   }
 }
+/* Home gallery: more columns as the card grows, each cell at most ~160px
+   (the stored small webp). Later than the 3-column thumb-grid locks. */
+html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip.bp-thumb-grid {
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important;
+  justify-content: start !important;
+}
+html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip.bp-thumb-grid > .bp-thumb {
+  max-width: 160px;
+}
+
 @media (min-width: 460px) {
   html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
     padding-bottom: 28px !important;

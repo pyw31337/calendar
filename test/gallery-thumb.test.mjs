@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import {
   isGalleryThumbUrl,
   collectGalleryThumbCandidates,
@@ -107,4 +109,14 @@ test('resolveHomeGalleryStripState shows loading until photoIndex is ready', () 
   assert.equal(ready.photos.length, 1);
   const empty = resolveHomeGalleryStripState({ status: 'ready', items: [{ id: 'x', thumb: '' }] });
   assert.equal(empty.state, 'empty');
+});
+
+test('home gallery columns stay within the 160px thumb instead of a fixed 3-up grid', () => {
+  const aurora = readFileSync(new URL('../src/ui/v2/aurora-theme.css', import.meta.url), 'utf8');
+  const late = readFileSync(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8');
+  const design = readFileSync(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
+  assert.match(aurora, /bp-renewal-home-photo-strip\.bp-thumb-grid[\s\S]*repeat\(auto-fill, minmax\(64px, 1fr\)\)/);
+  assert.match(late, /bp-renewal-home-photo-strip\.bp-thumb-grid[\s\S]*max-width: 160px/);
+  assert.match(design, /bp-thumb-grid:not\(\.bp-renewal-home-photo-strip\)/);
+  assert.doesNotMatch(aurora, /home gallery preview is a fixed 3/);
 });

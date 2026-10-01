@@ -320,26 +320,44 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const targetUrl = event.notification.data || './';
-  const absoluteTargetUrl = new URL(targetUrl, self.location.href).href;
+  // data is the push payload url string (./?id=&view=chat&msg= / view=memo&memo=&comment=).
+  // Some browsers hand the same field back as { url }.
+  const raw = event.notification && event.notification.data;
+  const targetUrl = (raw && typeof raw === 'object' && raw.url) || (typeof raw === 'string' ? raw : '') || './';
+  const scopeHref = (self.registration && self.registration.scope) || self.location.href;
+  const absoluteTargetUrl = new URL(targetUrl, scopeHref).href;
+  const target = new URL(absoluteTargetUrl);
+  const inScope = (client) => {
+    try {
+      const url = new URL(client.url);
+      return url.origin === target.origin && url.pathname.indexOf(new URL(scopeHref).pathname) === 0;
+    } catch (_) { return false; }
+  };
+  const sameDocument = (client) => {
+    try {
+      const url = new URL(client.url);
+      return url.origin === target.origin && url.pathname === target.pathname && url.search === target.search;
+    } catch (_) { return false; }
+  };
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      // 1. Try to find a tab matching the target URL exactly
-      for (const client of clientList) {
-        if (client.url === absoluteTargetUrl && 'focus' in client) return client.focus();
-      }
-      // 2. If not found, find any tab on our origin, navigate it to target URL, and focus it
-      for (const client of clientList) {
-        const clientUrl = new URL(client.url);
-        if (clientUrl.origin === self.location.origin && 'focus' in client) {
-          if (client.navigate) {
-            client.navigate(absoluteTargetUrl);
-          }
-          return client.focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {
+      const scoped = clientList.filter(inScope);
+      const exact = scoped.find(sameDocument);
+      if (exact && 'focus' in exact) return exact.focus();
+      const client = scoped[0];
+      if (client) {
+        // An already-open calendar tab ignores a bare focus(). Tell it to apply the
+        // same URL the cold load reads, and navigate when the browser allows it.
+        try { client.postMessage({ type: 'notification-open', url: absoluteTargetUrl }); } catch (_) {}
+        let next = client;
+        if (client.navigate) {
+          try { next = await client.navigate(absoluteTargetUrl) || client; } catch (_) {}
         }
+        if (next && next.focus) return next.focus();
+        return undefined;
       }
-      // 3. Fallback to opening a new tab
       if (self.clients.openWindow) return self.clients.openWindow(absoluteTargetUrl);
+      return undefined;
     })
   );
 });

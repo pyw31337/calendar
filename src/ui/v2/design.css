@@ -1034,7 +1034,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 /* Gallery: 3×3 with larger thumbs on tablet/PC */
 @media (min-width: 640px) {
-  .v2-design .bp-thumb-grid {
+  .v2-design .bp-thumb-grid:not(.bp-renewal-home-photo-strip) {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 8px !important;
   }
@@ -1047,7 +1047,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   }
 }
 @media (min-width: 1200px) {
-  .v2-design .bp-thumb-grid {
+  .v2-design .bp-thumb-grid:not(.bp-renewal-home-photo-strip) {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 12px !important;
   }

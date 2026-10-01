@@ -1042,12 +1042,14 @@
   }
 }
 
-/* The home gallery preview is a fixed 3×3 contact sheet at every breakpoint.
- * HomeActivitySummary already limits the source list to the nine newest
- * user-uploaded photos, so no fourth column or extra row can appear. */
+/* Home gallery cells stay within the stored 160px small thumb. auto-fill
+ * counts columns from a 64px minimum, so phones, tablets, and PCs all use
+ * more than three columns, and a cell only grows until the next column fits
+ * (about 160px at most) instead of stretching with the screen. */
 .v2-design .bp-renewal-home-photo-strip.bp-thumb-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important;
+  grid-auto-rows: auto;
+  justify-content: start;
 }
 /* Home gallery strip: loading skeletons instead of blank grey squares while photoIndex resolves.
  * Broken/missing media is filtered by resolveHomeGalleryStripState — never opacity:0 ghosts. */

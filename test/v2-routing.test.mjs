@@ -50,6 +50,25 @@ test('V2 records subs remain for gallery/history/content only', () => {
   }
   assert.equal(getInitialAppView(location('?shell=v2&tab=more')), 'calendar');
 });
+test('chat and memo deep links survive the view switch and drop when leaving', () => {
+  const chat = buildAppViewUrl(location('?id=example&view=chat&msg=msg_1&img=0&comment=cmt'), 'chat');
+  const chatParams = new URL(chat, 'https://example.test').searchParams;
+  assert.equal(chatParams.get('tab'), 'chat');
+  assert.equal(chatParams.get('msg'), 'msg_1');
+  assert.equal(chatParams.get('img'), '0');
+  assert.equal(chatParams.get('comment'), null);
+  const memo = buildAppViewUrl(location('?id=example&view=memo&memo=memo_1&comment=cmt_1&msg=msg_1'), 'memo');
+  const memoParams = new URL(memo, 'https://example.test').searchParams;
+  assert.equal(memoParams.get('tab'), 'memo');
+  assert.equal(memoParams.get('memo'), 'memo_1');
+  assert.equal(memoParams.get('comment'), 'cmt_1');
+  assert.equal(memoParams.get('msg'), null);
+  const home = buildAppViewUrl(location('?id=example&tab=chat&msg=msg_1&memo=memo_1&comment=cmt_1'), 'calendar');
+  const homeParams = new URL(home, 'https://example.test').searchParams;
+  for (const key of ['msg', 'memo', 'comment', 'tab', 'view']) assert.equal(homeParams.has(key), false);
+  assert.equal(homeParams.get('id'), 'example');
+});
+
 test('V2 home clears stale detail routes while retaining calendar identity', () => {
   const result = buildAppViewUrl(location('?shell=v2&id=example&tab=memo&view=memo'), 'calendar');
   const params = new URL(result, 'https://example.test').searchParams;

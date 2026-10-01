@@ -1690,6 +1690,23 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   // tag-input module's pattern.
   const comments = memo.comments || [];
   const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
+  const [focusedCommentId, setFocusedCommentId] = React.useState('');
+  React.useEffect(() => {
+    const read = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const onMemoScreen = params.get('view') === 'memo' || params.get('tab') === 'memo';
+        const targetMemo = params.get('memo') || params.get('memoFocus') || '';
+        const comment = params.get('comment') || '';
+        setFocusedCommentId(onMemoScreen && targetMemo && String(targetMemo) === String(memo.id) ? String(comment) : '');
+      } catch (_) {
+        setFocusedCommentId('');
+      }
+    };
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, [memo.id]);
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
@@ -2144,11 +2161,20 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     },
       /*#__PURE__*/React.createElement(MemoCommentFold, {
         comments,
-        forceExpanded: isCommentComposerOpen,
+        forceExpanded: isCommentComposerOpen || !!focusedCommentId,
         renderComment: (comment, commentIdx) => {
           const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+          const commentDomId = comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`;
+          const isFocusedComment = !!focusedCommentId && String(comment.id || '') === focusedCommentId;
           return /*#__PURE__*/React.createElement("div", {
-            key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
+            key: commentDomId,
+            "data-comment-id": comment.id || '',
+            className: isFocusedComment ? 'chat-search-focused-bubble' : undefined,
+            ref: isFocusedComment ? (node) => {
+              if (!node || node.dataset.commentFocused === '1') return;
+              node.dataset.commentFocused = '1';
+              try { node.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) { node.scrollIntoView(); }
+            } : undefined,
             onClick: e => e.stopPropagation(),
             style: {
               display: 'flex',

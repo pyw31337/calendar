@@ -92,6 +92,8 @@ function decideMemoNotification(before, after, context = {}) {
 
   return {
     kind,
+    memoId,
+    commentId: comment && comment.id ? String(comment.id) : '',
     claimKey: claimDocId(`memo_${memoId}_${revision}`),
     tag: `memo-${memoId}-${revision}`,
     body,
@@ -99,6 +101,21 @@ function decideMemoNotification(before, after, context = {}) {
     skipParticipantId: skipParticipantId ? String(skipParticipantId) : null,
     renotify: false
   };
+}
+
+// Same query the app already reads (?view=&msg=&memo=). A comment tap adds
+// the existing memo id plus that comment's id; it does not invent a channel.
+function buildPushTargetUrl(calendarDocId, query = {}) {
+  const id = String(calendarDocId || '').replace(/^cal_/, '');
+  const params = new URLSearchParams();
+  if (id) params.set('id', id);
+  if (query.view) params.set('view', String(query.view));
+  ['msg', 'img', 'memo', 'comment'].forEach(key => {
+    const value = query[key];
+    if (value != null && String(value) !== '') params.set(key, String(value));
+  });
+  const qs = params.toString();
+  return qs ? `./?${qs}` : './';
 }
 
 function takeNotificationClaim(claims, key) {
@@ -229,6 +246,7 @@ module.exports = {
   claimDocId,
   visibleMemoSignature,
   decideMemoNotification,
+  buildPushTargetUrl,
   takeNotificationClaim,
   planMemoPush,
   decideChatNotification,
