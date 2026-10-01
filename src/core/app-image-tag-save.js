@@ -4,6 +4,15 @@ import { archivePhotosShareIdentity } from './archive-photo-edits.js';
 export const MAX_MEDIA_TAGS = 20;
 export const MAX_MEDIA_TAG_TEXT_LENGTH = 640;
 
+// The save queues and optimistic snapshots below must outlive a render. CalendarApp rebuilds the
+// handlers on every render, and a fresh Map per render meant a second quick edit (the first one's
+// local patch triggers that render) started its own write in parallel with an older payload --
+// whichever landed last won, so tags "came back" or vanished. CalendarApp keeps one of these in a
+// ref and passes it as `saveState`.
+export function createImageTagSaveState() {
+  return { docSnapshots: new Map(), persistedDocs: new Map(), lanes: new Map(), bulkChain: Promise.resolve() };
+}
+
 // Per-photo tag persistence is deliberately kept out of CalendarApp.  The handler receives its
 // live UI/data dependencies so the app shell stays a composition layer rather than a second
 // source of photo identity logic.
@@ -11,6 +20,8 @@ export function createImageTagSaveHandler(context) {
   const {
     activeCalId,
     chatMessages,
+    getChatMessages,
+    saveState,
     firebaseDb,
     findMemoById,
     writeCollectionDocumentWithFallback,
@@ -39,14 +50,29 @@ export function createImageTagSaveHandler(context) {
     linkTaggedImageToMeetingDates,
     createActivityLog,
     writeActivityLogsToFirestore,
-    syncMeetingCopyTags
+    syncMeetingCopyTags,
+    tagAssetRemote
   } = context;
-  // Meeting albums still hold copies of a photo's tags (docs/data-architecture-v3.md). A save on
-  // the owning message/memo is written through to those copies so 일정/인물/추억 never show an
-  // older tag set than 채팅/갤러리. Best-effort: the owning document is already saved.
-  const writeThroughMeetingCopies = async (asset, tags) => {
-    if (typeof syncMeetingCopyTags !== 'function' || !(asset?.imageUrl || asset?.thumbUrl)) return;
+  // Meeting albums (and a second message/memo holding the same file) still keep their own copy
+  // of a photo's tags (docs/data-architecture-v3.md). A save on the owning message/memo is written
+  // through to every copy so 일정/인물/추억 never show an older tag set than 채팅/갤러리.
+  // The server command (mediaCommand bulkTagAssets) does it in one transaction against the
+  // stored documents; the client fallback rewrites albums from local state, which can be stale.
+  // Best-effort: the owning document is already saved.
+  const writeThroughCopies = async (asset, tags) => {
+    if (!(asset?.imageUrl || asset?.thumbUrl)) return;
+    if (typeof tagAssetRemote === 'function') {
+      try {
+        const result = await tagAssetRemote(asset, tags);
+        if (result?.ok) return;
+      } catch (err) { console.warn('Server tag write-through failed, using local fallback:', err); }
+    }
+    if (typeof syncMeetingCopyTags !== 'function') return;
     try { await syncMeetingCopyTags(asset, tags); } catch (err) { console.warn('Meeting copy tag sync skipped:', err); }
+  };
+  const currentChatMessages = () => {
+    const live = typeof getChatMessages === 'function' ? getChatMessages() : null;
+    return Array.isArray(live) ? live : (chatMessages || []);
   };
   const toIndex = value => {
     if (Number.isInteger(value)) return value;
@@ -84,9 +110,7 @@ export function createImageTagSaveHandler(context) {
     }
   };
 
-  const docSnapshots = new Map();
-  const persistedDocs = new Map();
-  const lanes = new Map();
+  const { docSnapshots, persistedDocs, lanes } = saveState || createImageTagSaveState();
   // Rapid tag edits on one document collapse into the latest payload. The UI
   // already shows that payload; a second in-flight write of an older payload
   // would clobber it, and a write per keystroke would just add round-trips.
@@ -121,7 +145,17 @@ export function createImageTagSaveHandler(context) {
       if (lane.pendingJob) {
         lane.pumping = true;
         void pump();
+        return;
       }
+      // Idle: local state now holds the saved (or rolled back) document, so the next edit reads it
+      // from there -- and picks up edits from other devices -- instead of from this snapshot.
+      // Deferred a task so the caller's own success/rollback step still sees its snapshot.
+      setTimeout(() => {
+        if (lanes.get(docKey) !== lane || lane.pumping || lane.pendingJob) return;
+        lanes.delete(docKey);
+        docSnapshots.delete(docKey);
+        persistedDocs.delete(docKey);
+      }, 0);
     };
     if (!lane.pumping) {
       lane.pumping = true;
@@ -199,9 +233,10 @@ export function createImageTagSaveHandler(context) {
       const ok = await scheduleDocWrite(docKey, async () => {
         const saved = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore(patch), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
         if (!saved?.success || saved?.queued) throw new Error('Memo image tags update failed');
-        writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags).catch(() => {});
         markPersisted(docKey, nextDoc);
         if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
+        // Awaited inside the lane so the next edit of this memo cannot interleave with it.
+        await writeThroughCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '', memoId, source: 'memo' }, tags);
         return true;
       });
       if (!ok) {
@@ -221,7 +256,7 @@ export function createImageTagSaveHandler(context) {
     // the tags the user just added and the next write wipes them.
     const docKey = `messages:${messageId}`;
     let message = docSnapshots.get(docKey) || null;
-    if (!message && !meta?.readFresh) message = (chatMessages || []).find(item => item.id === messageId) || null;
+    if (!message && !meta?.readFresh) message = currentChatMessages().find(item => item.id === messageId) || null;
     if (!message) {
       try {
         if (firebaseDb) {
@@ -281,17 +316,22 @@ export function createImageTagSaveHandler(context) {
       if (logs.length) {
         writeActivityLogsToFirestore(activeCalId, logs).catch(err => console.warn('Image tag activity log write skipped:', err));
       }
+      markPersisted(docKey, nextDoc);
+      if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
+      // Copies first, then the date-album links, one after the other: both rewrite meeting
+      // albums, and running them side by side let the second write put back the first one's
+      // old tags (the audit found album copies stuck on the previous date tag).
       if (!direct) {
-        writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags).catch(() => {});
+        await writeThroughCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '', messageId }, tags);
       }
       const imageUrl = String(meta.imageUrl || meta.directMediaUrl || entry?.full || entry?.thumb || '').trim();
       if (imageUrl) {
-        linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, nextDoc, tags).catch(err => {
+        try {
+          await linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, nextDoc, tags);
+        } catch (err) {
           console.warn('Image tag date link skipped:', err);
-        });
+        }
       }
-      markPersisted(docKey, nextDoc);
-      if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
       return true;
     });
     if (!ok) {
@@ -320,8 +360,9 @@ export function createBulkImageTagSaveHandler(context) {
     galleryPhotoIndex,
     invalidatePhotoIndexCache,
     rememberPhotoIndexTags,
+    saveState,
   } = context;
-  let chain = Promise.resolve();
+  const state = saveState || createImageTagSaveState();
   const probesFor = (list, tagsOf) => list.map(change => ({
     assetKey: change.assetKey,
     mediaKey: change.photo?.mediaKey || change.assetKey,
@@ -381,8 +422,8 @@ export function createBulkImageTagSaveHandler(context) {
         return { ok: false, changed: 0, reason: String(err?.message || err), changes: list };
       }
     };
-    const queued = chain.then(run, run);
-    chain = queued.then(() => {}, () => {});
+    const queued = state.bulkChain.then(run, run);
+    state.bulkChain = queued.then(() => {}, () => {});
     return queued;
   };
 }

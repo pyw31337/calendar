@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBulkImageTagSaveHandler, createImageTagSaveHandler } from '../src/core/app-image-tag-save.js';
+import { createBulkImageTagSaveHandler, createImageTagSaveHandler, createImageTagSaveState } from '../src/core/app-image-tag-save.js';
 
-function tagSaveHarness(writeImpl) {
+function tagSaveHarness(writeImpl, overrides = {}) {
   const patches = [];
   const writes = [];
-  const handler = createImageTagSaveHandler({
+  const make = () => createImageTagSaveHandler({
     activeCalId: 'cal',
     chatMessages: [{ id: 'm1', imageUrls: ['https://cdn.example/a.jpg'], imageTags: ['before'], imageTagMap: {} }],
     firebaseDb: null,
@@ -42,8 +42,9 @@ function tagSaveHarness(writeImpl) {
     createActivityLog: () => null,
     writeActivityLogsToFirestore: async () => {},
     syncMeetingCopyTags: async () => {},
+    ...overrides,
   });
-  return { handler, patches, writes };
+  return { handler: make(), make, patches, writes };
 }
 
 test('image tag edits update local state before the firebase write finishes', async () => {
@@ -120,4 +121,51 @@ test('bulk tag saves patch the gallery index before the remote command and roll 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// CalendarApp rebuilds the handler on every render (the first edit's local patch causes one).
+// Sharing the save state keeps the second edit queued behind the first instead of racing it.
+test('a handler rebuilt by a render keeps queueing behind the in-flight save', async () => {
+  let release = () => {};
+  const gate = new Promise(resolve => { release = resolve; });
+  const saveState = createImageTagSaveState();
+  const { make, writes } = tagSaveHarness(async () => { await gate; return { success: true }; }, { saveState });
+  const meta = { source: 'chat', imageUrl: 'https://cdn.example/a.jpg', silent: true };
+  const first = make()('m1', 0, 'one', meta);
+  await Promise.resolve();
+  await Promise.resolve();
+  const second = make()('m1', 0, 'one two', meta);
+  await Promise.resolve();
+  assert.equal(writes.length, 1, 'the rebuilt handler must not start a parallel write');
+  release();
+  assert.equal(await first, true);
+  assert.equal(await second, true);
+  assert.equal(writes.at(-1).imageTags[0], 'one two');
+});
+
+test('album write-through finishes before the date-album link starts', async () => {
+  const order = [];
+  let releaseCopies = () => {};
+  const copiesGate = new Promise(resolve => { releaseCopies = resolve; });
+  const { handler } = tagSaveHarness(async () => ({ success: true }), {
+    tagAssetRemote: async () => { order.push('copies:start'); await copiesGate; order.push('copies:end'); return { ok: true }; },
+    syncMeetingCopyTags: async () => { order.push('local-fallback'); },
+    linkTaggedImageToMeetingDates: async () => { order.push('link'); },
+  });
+  const pending = handler('m1', 0, '260919', { source: 'chat', imageUrl: 'https://cdn.example/a.jpg', silent: true });
+  for (let i = 0; i < 6; i += 1) await Promise.resolve();
+  assert.deepEqual(order, ['copies:start']);
+  releaseCopies();
+  assert.equal(await pending, true);
+  assert.deepEqual(order, ['copies:start', 'copies:end', 'link']);
+});
+
+test('a failed server write-through falls back to the local album sync', async () => {
+  const calls = [];
+  const { handler } = tagSaveHarness(async () => ({ success: true }), {
+    tagAssetRemote: async () => { throw new Error('offline'); },
+    syncMeetingCopyTags: async (_asset, tags) => { calls.push(tags); },
+  });
+  assert.equal(await handler('m1', 0, 'after', { source: 'chat', imageUrl: 'https://cdn.example/a.jpg', silent: true }), true);
+  assert.deepEqual(calls, ['after']);
 });
