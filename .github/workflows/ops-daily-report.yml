@@ -6,7 +6,8 @@ name: Daily Ops Report
 on:
   workflow_dispatch:
   schedule:
-    - cron: '50 1 * * *'
+    # 04:00 KST (19:00 UTC the previous day).
+    - cron: '0 19 * * *'
 
 permissions:
   contents: read
