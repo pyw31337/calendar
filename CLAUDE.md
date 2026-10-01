@@ -89,6 +89,10 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
   `scripts/check-live-source-guards.mjs`가 차단한다.
 - **`assets/*`를 라이브 배포 변경으로 착각해서 고치지 않는다.**
 - **Firestore/Storage 규칙을 에뮬레이터나 targeted live smoke 없이 바꾸지 않는다.**
+- **V2 CSS에 브랜드 색(보라/라임)을 리터럴로 새로 쓰지 않는다.** 설정 > 컬러 테마(화이트·보라/오렌지/블루,
+  블랙·라임/오렌지/블루)가 `<html data-accent>`로 바꾸는 토큰을 원래 색 fallback과 함께 쓴다:
+  `var(--a-brand, #7C2FE5)`, `rgb(var(--a-brand-rgb, 124 47 229) / 0.1)`, 다크는 `var(--d-brand, #C9FD58)`.
+  팔레트와 규칙은 `src/ui/v2/color-themes.css`, 검사는 `test/color-themes.test.mjs`. 카테고리·참가자·날씨 색은 대상 아님.
 - **데이터 모델을 백업/복구 리허설 없이 바꾸지 않는다.**
 - U10~U14는 모두 완료됐다. 이 영역(CalendarApp 핵심 훅/뷰)을 다시 크게 구조 변경할 때도 같은 원칙(유닛별 명시 승인)을 따른다.
 

@@ -2,6 +2,8 @@
  * Side menu UI (P4-4): SharedSideMenuSettings + MainSideMenu
  */
 
+import { COLOR_THEMES } from '../core/color-themes.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 /* __fb() bridge */
@@ -19,7 +21,9 @@ export function AppSettingsModal({
   calendarId = null,
   calendar = null,
   onRequestConfirm = null,
-  onRequestDataRefresh = null
+  onRequestDataRefresh = null,
+  colorThemeId = '',
+  onSelectColorTheme = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -58,6 +62,9 @@ export function AppSettingsModal({
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
           ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
         ),
+        typeof onSelectColorTheme === 'function' && /*#__PURE__*/React.createElement(ColorThemePicker, {
+          value: colorThemeId, onSelect: onSelectColorTheme
+        }),
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, TextResizeIcon && /*#__PURE__*/React.createElement(TextResizeIcon, null)), "글자크기"),
@@ -113,6 +120,73 @@ export function AppSettingsModal({
       onConfirm: () => { const action = localConfirmDialog.onConfirm; setLocalConfirmDialog(null); action(); },
       onCancel: () => setLocalConfirmDialog(null)
     })
+  );
+}
+
+// Settings > 컬러 테마: one swatch per COLOR_THEMES entry (surface + point color). Picking one
+// sets the mode and the point color together; the 다크모드 switch above keeps the point color.
+function ColorThemePicker({ value, onSelect }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("div", { className: "v2-color-theme-picker", style: { padding: '6px 0 12px' } },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '4px 0 10px' } },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" },
+          /*#__PURE__*/React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" },
+            /*#__PURE__*/React.createElement("path", { d: "M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25" }),
+            /*#__PURE__*/React.createElement("path", { d: "M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" }),
+            /*#__PURE__*/React.createElement("path", { d: "M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" }),
+            /*#__PURE__*/React.createElement("path", { d: "M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" })
+          )
+        ),
+        "컬러 테마"
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      role: "radiogroup", "aria-label": "컬러 테마",
+      className: "v2-color-theme-grid",
+      style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }
+    },
+      COLOR_THEMES.map(theme => {
+        const selected = theme.id === value;
+        return /*#__PURE__*/React.createElement("button", {
+          key: theme.id,
+          type: "button",
+          role: "radio",
+          "aria-checked": selected ? "true" : "false",
+          "data-color-theme": theme.id,
+          className: "v2-color-theme-option" + (selected ? " is-selected" : ""),
+          onClick: () => onSelect(theme.id),
+          style: {
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+            padding: '10px 4px 8px', borderRadius: '12px', cursor: 'pointer',
+            background: 'var(--bg-primary)',
+            border: selected ? '2px solid var(--text-main)' : '2px solid var(--border-subtle)',
+            color: 'var(--text-main)', minWidth: 0
+          }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            "aria-hidden": "true",
+            style: {
+              position: 'relative', width: '44px', height: '28px', borderRadius: '9px', overflow: 'hidden',
+              background: theme.surface, boxShadow: 'inset 0 0 0 1px rgba(127, 127, 127, 0.35)'
+            }
+          },
+            /*#__PURE__*/React.createElement("span", {
+              style: { position: 'absolute', right: '6px', top: '6px', width: '16px', height: '16px', borderRadius: '50%', background: theme.point }
+            }),
+            /*#__PURE__*/React.createElement("span", {
+              style: { position: 'absolute', left: '6px', top: '9px', width: '12px', height: '3px', borderRadius: '2px', background: theme.mode === 'dark' ? '#5A5A5A' : '#D4D4D8' }
+            }),
+            /*#__PURE__*/React.createElement("span", {
+              style: { position: 'absolute', left: '6px', top: '15px', width: '8px', height: '3px', borderRadius: '2px', background: theme.mode === 'dark' ? '#5A5A5A' : '#D4D4D8' }
+            })
+          ),
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: 'var(--font-size-xs)', fontWeight: selected ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }
+          }, theme.label)
+        );
+      })
+    )
   );
 }
 

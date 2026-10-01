@@ -619,7 +619,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
     margin: 8px 10px 4px !important;
     padding: 6px !important;
     border-radius: 14px;
-    background: var(--bg-primary, rgba(124, 47, 229, 0.06));
+    background: var(--bg-primary, rgb(var(--a-brand-rgb, 124 47 229) / 0.06));
     border-top: none !important;
   }
   .v2-design .bp-side-nav.bp-is-open .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
@@ -1339,7 +1339,7 @@ html:has(.renewal-shell.v2-design) :is(
   width: 40px !important;
   height: 40px !important;
   border-radius: 12px !important;
-  background: var(--brand-soft, #f3eeff) !important;
+  background: var(--brand-soft, var(--a-brand-soft, #f3eeff)) !important;
   color: var(--brand, #7C2FE5) !important;
   border: 1px solid color-mix(in srgb, var(--brand, #7C2FE5) 18%, var(--v2-line, #eceaf5)) !important;
 }
@@ -1478,8 +1478,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-body {
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .btn-primary,
 html:has(.renewal-shell.v2-design) .modal-overlay button.btn-primary {
-  background: var(--cta-fill, #7C2FE5) !important;
-  border-color: var(--cta-fill, var(--v2-accent, #7C2FE5)) !important;
+  background: var(--cta-fill, var(--a-brand, #7C2FE5)) !important;
+  border-color: var(--cta-fill, var(--v2-accent, var(--a-brand, #7C2FE5))) !important;
   color: var(--on-cta, white) !important;
   min-height: 44px !important;
   border-radius: 12px !important;
@@ -2427,7 +2427,7 @@ html:has(.renewal-shell.v2-design) .global-search-count-badge.has-count {
   color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge.has-count {
-  background-color: var(--brand, #C9FD58) !important;
+  background-color: var(--brand, var(--d-brand, #C9FD58)) !important;
   color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge:not(.has-count) {
@@ -2526,9 +2526,9 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge
 html:has(.renewal-shell.v2-design) .search-result-focus,
 html:has(.renewal-shell.v2-design) .chat-search-focused-bubble:not([data-v2-memo-id]):not(.v2-memo-card-wrap),
 html:has(.renewal-shell.v2-design) .place-card-row.is-focused {
-  border: 2px solid var(--v2-accent, #7C2FE5) !important;
-  background: rgba(124, 47, 229, 0.14) !important;
-  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.18) !important;
+  border: 2px solid var(--v2-accent, var(--a-brand, #7C2FE5)) !important;
+  background: rgb(var(--a-brand-rgb, 124 47 229) / 0.14) !important;
+  box-shadow: 0 0 0 4px rgb(var(--a-brand-rgb, 124 47 229) / 0.18) !important;
 }
 
 /* Memo focus: no outer rectangle border, no multi-layer borders, clean 1px solid border on the card itself */
@@ -2555,7 +2555,7 @@ html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-con
 html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused .v2-memo-card-contract,
 html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract {
   border: 1px solid var(--brand, #7C3AED) !important;
-  background: var(--brand-soft, #F3EEFF) !important;
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
   box-shadow: none !important;
   border-radius: 14px !important;
 }
@@ -3107,7 +3107,7 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
   justify-content: center !important;
   position: relative !important;
   overflow: hidden !important;
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45), 0 2px 8px rgba(37, 99, 235, 0.35) !important;
+  box-shadow: 0 6px 20px rgb(var(--a-brand-rgb, 124 58 237) / 0.45), 0 2px 8px rgba(37, 99, 235, 0.35) !important;
   flex-shrink: 0 !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
@@ -3117,9 +3117,9 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
   position: absolute !important;
   inset: -65% !important;
   background-image:
-    radial-gradient(circle at 25% 25%, rgba(192, 132, 252, 0.95) 0%, transparent 45%),
+    radial-gradient(circle at 25% 25%, rgb(var(--a-brand-light-rgb, 192 132 252) / 0.95) 0%, transparent 45%),
     radial-gradient(circle at 75% 75%, rgba(6, 182, 212, 0.9) 0%, transparent 45%),
-    linear-gradient(125deg, #9333EA 0%, #6366F1 30%, #2563EB 58%, #06B6D4 82%, #A855F7 100%) !important;
+    linear-gradient(125deg, var(--a-brand-light, #9333EA) 0%, var(--a-brand-2, #6366F1) 30%, #2563EB 58%, #06B6D4 82%, var(--a-brand-light, #A855F7) 100%) !important;
   animation: bp-cal-aurora-wave 3s ease-in-out infinite alternate, bp-cal-aurora-spin 6.5s linear infinite !important;
   border-radius: 42% !important;
 }
@@ -3999,7 +3999,7 @@ html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
   border-radius: 50% !important;
   background: color-mix(in srgb, var(--bg-card) 94%, transparent) !important;
   color: var(--text-main, #2c2740) !important;
-  box-shadow: 0 4px 14px rgba(35, 20, 64, 0.14) !important;
+  box-shadow: 0 4px 14px rgb(var(--a-ink-rgb, 35 20 64) / 0.14) !important;
   cursor: pointer;
   pointer-events: auto !important;
 }
@@ -4341,10 +4341,10 @@ html:has(.renewal-shell.v2-design) .weather-detail-place-icon {
   width: 26px;
   height: 26px;
   place-items: center;
-  color: var(--v2-primary, #7c2fe5);
-  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
+  color: var(--v2-primary, var(--a-brand, #7c2fe5));
+  border: 1px solid var(--v2-glass-purple-border, rgb(var(--a-brand-rgb, 124 47 229) / 0.26));
   border-radius: var(--radius-full, 999px);
-  background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.1));
+  background: var(--v2-glass-purple-fill, rgb(var(--a-brand-rgb, 124 47 229) / 0.1));
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-place-name {
@@ -4393,9 +4393,9 @@ html:has(.renewal-shell.v2-design) .weather-detail-icon-button {
 
 html:has(.renewal-shell.v2-design) .weather-detail-icon-button:hover,
 html:has(.renewal-shell.v2-design) .weather-detail-icon-button:focus-visible {
-  color: var(--v2-primary, #7c2fe5);
-  border-color: var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
-  background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.1));
+  color: var(--v2-primary, var(--a-brand, #7c2fe5));
+  border-color: var(--v2-glass-purple-border, rgb(var(--a-brand-rgb, 124 47 229) / 0.26));
+  background: var(--v2-glass-purple-fill, rgb(var(--a-brand-rgb, 124 47 229) / 0.1));
   outline: none;
 }
 
@@ -4417,9 +4417,9 @@ html:has(.renewal-shell.v2-design) .weather-detail-date-line strong {
 html:has(.renewal-shell.v2-design) .weather-detail-date-eyebrow {
   flex: 0 0 auto;
   padding: 3px 7px;
-  color: var(--v2-primary, #7c2fe5);
+  color: var(--v2-primary, var(--a-brand, #7c2fe5));
   border-radius: var(--radius-full, 999px);
-  background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.1));
+  background: var(--v2-glass-purple-fill, rgb(var(--a-brand-rgb, 124 47 229) / 0.1));
   font-size: var(--v2-fs-2xs, 0.75rem);
   font-weight: 800;
 }
@@ -4451,7 +4451,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-days-strip {
 html:has(.renewal-shell.v2-design) .region-setting-current-location {
   font-size: 0.78rem !important;
   font-weight: 600 !important;
-  color: var(--v2-primary, #7c2fe5) !important;
+  color: var(--v2-primary, var(--a-brand, #7c2fe5)) !important;
   margin-left: 8px !important;
 }
 
@@ -4477,7 +4477,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-day-choice {
 
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice:hover,
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice:focus-visible {
-  color: var(--v2-primary, #7c2fe5);
+  color: var(--v2-primary, var(--a-brand, #7c2fe5));
   background: transparent;
   outline: none;
 }
@@ -4485,8 +4485,8 @@ html:has(.renewal-shell.v2-design) .weather-detail-day-choice:focus-visible {
 html:has(.renewal-shell.v2-design) .weather-detail-day-choice.is-selected {
   color: var(--on-brand);
   border: 0;
-  background: var(--v2-primary, #7c2fe5);
-  box-shadow: 0 6px 14px rgba(124, 47, 229, 0.28);
+  background: var(--v2-primary, var(--a-brand, #7c2fe5));
+  box-shadow: 0 6px 14px rgb(var(--a-brand-rgb, 124 47 229) / 0.28);
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-card {
@@ -4928,7 +4928,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-mark {
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-metric:nth-child(2) .weather-detail-metric-mark { background: #32b588; box-shadow: 0 0 0 3px rgba(50, 181, 136, 0.14); box-shadow: 0 0 0 3px color-mix(in srgb, #32b588 14%, transparent); }
-html:has(.renewal-shell.v2-design) .weather-detail-metric:nth-child(3) .weather-detail-metric-mark { background: #7c2fe5; box-shadow: 0 0 0 3px rgba(124, 47, 229, 0.14); box-shadow: 0 0 0 3px color-mix(in srgb, #7c2fe5 14%, transparent); }
+html:has(.renewal-shell.v2-design) .weather-detail-metric:nth-child(3) .weather-detail-metric-mark { background: var(--a-brand, #7c2fe5); box-shadow: 0 0 0 3px rgb(var(--a-brand-rgb, 124 47 229) / 0.14); box-shadow: 0 0 0 3px color-mix(in srgb, var(--a-brand, #7c2fe5) 14%, transparent); }
 html:has(.renewal-shell.v2-design) .weather-detail-metric:nth-child(4) .weather-detail-metric-mark { background: #f2ae2e; box-shadow: 0 0 0 3px rgba(242, 174, 46, 0.14); box-shadow: 0 0 0 3px color-mix(in srgb, #f2ae2e 14%, transparent); }
 
 html:has(.renewal-shell.v2-design) .weather-detail-metric-value-row {
@@ -5008,9 +5008,9 @@ html:has(.renewal-shell.v2-design) .weather-detail-primary-action {
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-secondary-action {
-  color: var(--v2-primary, #7c2fe5);
-  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
-  background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.1));
+  color: var(--v2-primary, var(--a-brand, #7c2fe5));
+  border: 1px solid var(--v2-glass-purple-border, rgb(var(--a-brand-rgb, 124 47 229) / 0.26));
+  background: var(--v2-glass-purple-fill, rgb(var(--a-brand-rgb, 124 47 229) / 0.1));
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-close-action {
@@ -5021,9 +5021,9 @@ html:has(.renewal-shell.v2-design) .weather-detail-close-action {
 
 html:has(.renewal-shell.v2-design) .weather-detail-primary-action {
   color: var(--on-brand);
-  border: 1px solid var(--v2-primary, #7c2fe5);
-  background: var(--v2-primary, #7c2fe5);
-  box-shadow: var(--v2-primary-glow-sm, 0 3px 10px rgba(124, 47, 229, 0.32));
+  border: 1px solid var(--v2-primary, var(--a-brand, #7c2fe5));
+  background: var(--v2-primary, var(--a-brand, #7c2fe5));
+  box-shadow: var(--v2-primary-glow-sm, 0 3px 10px rgb(var(--a-brand-rgb, 124 47 229) / 0.32));
 }
 
 @media (max-width: 520px) {
@@ -5051,7 +5051,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-day-choice.is-selected {
   color: var(--on-brand, #111);
-  background: var(--v2-primary, #7c2fe5);
+  background: var(--v2-primary, var(--a-brand, #7c2fe5));
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-metric,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .weather-detail-close-action {
@@ -5856,14 +5856,14 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   --bg-surface: var(--bg-card);
 
   /* Theme 2 (reference: black / neon lime / coral, all solid, no gradients). */
-  --brand: #C9FD58;
-  --brand-soft: #1F2A0E;
+  --brand: var(--d-brand, #C9FD58);
+  --brand-soft: var(--d-brand-soft, #1F2A0E);
   --on-brand: #0D0D0D;
-  --cal-schedule: #C9FD58;
+  --cal-schedule: var(--d-brand, #C9FD58);
   --accent-primary: var(--brand);
-  --accent-orange: #FC5545;
-  --accent-secondary: #FC5545;
-  --border-confirmed-soft: #4A5E1C;
+  --accent-orange: var(--d-accent2, #FC5545);
+  --accent-secondary: var(--d-accent2, #FC5545);
+  --border-confirmed-soft: var(--d-brand-line, #4A5E1C);
 
   --v2-glass-dark-fill: #0D0D0D;
   --v2-glass-dark-border: #0D0D0D;
@@ -5879,11 +5879,11 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   --v2-glass-light-hover-fill: #1F1F1F;
   --v2-glass-light-hover-border: #3A3A3A;
 
-  --v2-glass-purple-fill: #1F2A0E;
-  --v2-glass-purple-border: #4A5E1C;
+  --v2-glass-purple-fill: var(--d-brand-soft, #1F2A0E);
+  --v2-glass-purple-border: var(--d-brand-line, #4A5E1C);
   --v2-glass-purple-inset: none;
 
-  --v2-primary: #C9FD58;
+  --v2-primary: var(--d-brand, #C9FD58);
   --v2-primary-glow: none;
   --v2-primary-glow-sm: none;
 
@@ -5899,7 +5899,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
      border/surface tokens below aren't part of that guarded set. */
   --border-subtle: #2C2C2C;
   --border-hover: #3A3A3A;
-  --surface-confirmed: #1F2A0E;
+  --surface-confirmed: var(--d-brand-soft, #1F2A0E);
   --border-confirmed: var(--brand);
 }
 
@@ -5940,7 +5940,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 }
 
 /* Hardcoded purple/white spots the tokens above don't reach: the active side-nav item is a
-   literal rgba(124,47,229,...) in design.css, .btn-action-outline (app.css, shared with V1)
+   literal rgb(var(--a-brand-rgb, 124 47 229) / ...) in design.css, .btn-action-outline (app.css, shared with V1)
    has no dark variant, and Leaflet's zoom controls are white. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-item.bp-is-active {
   background: var(--brand-soft) !important;
@@ -6087,7 +6087,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
    the card color by 80%) -- a soft lime wash at the top fading into the black card, instead of
    one flat tint filling the whole cell. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-confirmed {
-  background: linear-gradient(180deg, rgba(201, 253, 88, 0.32) 0%, var(--bg-card) 80%) !important;
+  background: linear-gradient(180deg, rgb(var(--d-brand-rgb, 201 253 88) / 0.32) 0%, var(--bg-card) 80%) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill *,
@@ -6117,7 +6117,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] body,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
-  --status-green: #C9FD58;
+  --status-green: var(--d-brand, #C9FD58);
   --on-status: #0D0D0D;
   --settlement-hero-text: #0D0D0D;
   --settlement-hero-muted: rgba(13, 13, 13, 0.72);
@@ -6242,7 +6242,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-hero-zone .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-center-circle,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-center-circle {
   background: var(--brand) !important;
-  box-shadow: 0 4px 18px rgba(201, 253, 88, 0.4), 0 2px 6px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 4px 18px rgb(var(--d-brand-rgb, 201 253 88) / 0.4), 0 2px 6px rgba(0, 0, 0, 0.45) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-center-circle::before,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-center-circle::before {
@@ -6256,7 +6256,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bott
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
-  box-shadow: 0 6px 24px rgba(201, 253, 88, 0.55), 0 2px 8px rgba(0, 0, 0, 0.55) !important;
+  box-shadow: 0 6px 24px rgb(var(--d-brand-rgb, 201 253 88) / 0.55), 0 2px 8px rgba(0, 0, 0, 0.55) !important;
 }
 
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-fab {
@@ -6285,6 +6285,9 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay > .modal-co
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 58, 237)"],
+/* Same purple, now written as a color-theme token with its literal fallback (color-themes.css). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: var(--a-brand, #7C3AED)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: var(--a-brand, #7C2FE5)"],
 html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 47, 229)"],
 html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(139, 92, 246)"]:not(svg):not(path) {
   color: var(--brand) !important;
@@ -6476,7 +6479,7 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
 }
 
 /* Dark-mode values for the light theme's hard-coded, purple-tinted neutrals and accents.
-   Those colours were written as bare hex (#6b6580 muted text, #eceaf5 hairlines, #7c2fe5
+   Those colours were written as bare hex (#6b6580 muted text, #eceaf5 hairlines, var(--a-brand, #7c2fe5)
    accents, ...), so the dark theme never reached them: inactive tabs rendered lavender, card
    lines stayed bright. Each such use is now var(--v2-*, <original hex>) -- the light theme
    never defines these, so it keeps the exact original colour; only V2 dark maps them. Set
@@ -6487,9 +6490,9 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] {
   --v2-ink-3: #8A8A8A;
   --v2-line: #2C2C2C;
   --v2-surface-2: #1F1F1F;
-  --v2-tint-soft: #1F2A0E;
-  --v2-accent: #C9FD58;
-  --v2-accent-line: #4A5E1C;
+  --v2-tint-soft: var(--d-brand-soft, #1F2A0E);
+  --v2-accent: var(--d-brand, #C9FD58);
+  --v2-accent-line: var(--d-brand-line, #4A5E1C);
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] {
   --v2-accent-fill: var(--brand);
@@ -6571,7 +6574,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-card-preview-b
   background: var(--bg-primary) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .settlement-card-preview-hero {
-  background: var(--v2-accent, #C9FD58) !important;
+  background: var(--v2-accent, var(--d-brand, #C9FD58)) !important;
   color: #0A0A0A !important;
   box-shadow: none !important;
 }
@@ -6609,15 +6612,15 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
    the Theme 2 dark shell and on <html>, so body-level portals (the "새 버전이 있어요" banner,
    modals) inherit it; everywhere else var(--cta-fill, <original purple>) keeps the light look. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] {
-  --cta-fill: #C9FD58;
-  --cta-fill-hover: #B8EC47;
+  --cta-fill: var(--d-brand, #C9FD58);
+  --cta-fill-hover: var(--d-brand-hover, #B8EC47);
   --on-cta: #0D0D0D;
 }
 
 /* Collapsed rail, dark Theme 2: the brand tile is the lime slab with a black mark (the expanded
    rail keeps the lime glyph on the black rail). */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
-  background: #C9FD58 !important;
+  background: var(--d-brand, #C9FD58) !important;
   animation: none !important;
   color: #0D0D0D !important;
 }

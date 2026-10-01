@@ -206,7 +206,7 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   // 모임확정 stays --cal-schedule. Anniversary bars use per-category colors,
   // not one shared --cal-anniversary fill.
   assert.match(design, /bp-day-meeting-pill/);
-  assert.match(design, /--cal-schedule:\s*#7C2FE5/);
+  assert.match(design, /--cal-schedule:\s*(?:var\(--a-brand, )?#7C2FE5/);
   assert.match(design, /--cal-anniversary:\s*#F76AAD/);
   assert.match(design, /background:\s*var\(--cal-schedule/);
   assert.match(design, /background:\s*var\(--cal-anniversary/);

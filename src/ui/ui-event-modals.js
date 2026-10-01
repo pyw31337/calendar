@@ -1132,7 +1132,7 @@ export function AnniversaryModal({
             existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
               style: {
                 marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto',
-                border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+                border: '1px solid rgb(var(--a-brand-rgb, 79 70 229) / 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgb(var(--a-brand-rgb, 79 70 229) / 0.06)'
               }
             },
               /*#__PURE__*/React.createElement("div", {
@@ -4111,7 +4111,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               style: {
                 padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                background: pickerMonth === idx ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
                 fontWeight: pickerMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }

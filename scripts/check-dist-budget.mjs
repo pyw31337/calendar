@@ -52,7 +52,9 @@ const LAZY_CHUNK_PATTERNS = [
 // eager graph at 1642888. 1.648 MB had no room left once notification taps
 // started carrying the existing chat/memo deep link (1649111 > 1648000).
 // 1.653 MB keeps a few KB of minifier headroom and still catches a real jump.
-const TOTAL_JS_MAX_BYTES = 1_653_000;
+// The settings color-theme picker (src/core/color-themes.js) added ~4 KB eager
+// (1653953 > 1653000); 1.66 MB restores the same few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_660_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

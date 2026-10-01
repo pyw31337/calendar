@@ -7,6 +7,7 @@
 import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
+import './v2/color-themes.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader, prefetchDestinationStyles } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
@@ -3288,6 +3289,7 @@ export function buildRenewalMoreContext(calendar, deps) {
     calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin,
     recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability,
     handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice,
+    selectColorTheme, activeColorThemeId,
     focusChatMessage, chatMessages, memos, globalSearchInitialQuery, openNotificationHelp,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
@@ -3313,6 +3315,7 @@ export function buildRenewalMoreContext(calendar, deps) {
       // doc comment above) while 캘린더 설정/검색 are not.
       'app-settings': {
         isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+        colorThemeId: activeColorThemeId, onSelectColorTheme: selectColorTheme,
         onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
         onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
         isNotifPermissionGranted: mainNotifPermission === 'granted',

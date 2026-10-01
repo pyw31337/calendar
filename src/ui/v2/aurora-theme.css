@@ -3,10 +3,10 @@
  * dependency to the initial bundle. The existing pseudo-elements provide the animated glow. */
 .v2-design .bp-hero-zone {
   background:
-    linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
+    linear-gradient(180deg, rgb(var(--a-hero-shade-rgb, 10 7 38) / 0.12) 0%, rgb(var(--a-hero-shade-rgb, 9 4 31) / 0.42) 100%),
     /* Mirrored back left-to-right: cyan now blooms from the opposite edge while the
        glass controls and all foreground content stay fixed. */
-    linear-gradient(90deg, #8019E0 0%, #3604FD 44%, #12CDF0 100%) !important;
+    linear-gradient(90deg, var(--a-hero-1, #8019E0) 0%, var(--a-hero-2, #3604FD) 44%, var(--a-hero-3, #12CDF0) 100%) !important;
   background-size: auto, 100% 100% !important;
   background-position: 0 0, 50% 50% !important;
   /* Same still frame as phones. The mesh shift was a permanent desktop repaint. */
@@ -20,9 +20,9 @@
   will-change: auto !important;
   mix-blend-mode: normal;
   background:
-    radial-gradient(ellipse 85% 78% at 20% 30%, rgba(128, 25, 224, 0.92) 0%, transparent 58%),
-    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(18, 205, 240, 0.9) 0%, transparent 55%),
-    radial-gradient(ellipse 74% 80% at 42% 88%, rgba(54, 4, 253, 0.92) 0%, transparent 60%) !important;
+    radial-gradient(ellipse 85% 78% at 20% 30%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.92) 0%, transparent 58%),
+    radial-gradient(ellipse 80% 72% at 78% 18%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.9) 0%, transparent 55%),
+    radial-gradient(ellipse 74% 80% at 42% 88%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.92) 0%, transparent 60%) !important;
 }
 .v2-design .bp-hero-zone::after {
   inset: 0 !important;
@@ -32,9 +32,9 @@
   will-change: auto !important;
   mix-blend-mode: normal;
   background:
-    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(18, 205, 240, 0.86) 0%, transparent 56%),
-    radial-gradient(ellipse 28% 26% at 12% 70%, rgba(128, 25, 224, 0.58) 0%, transparent 48%),
-    radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
+    radial-gradient(ellipse 82% 74% at 76% 74%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.86) 0%, transparent 56%),
+    radial-gradient(ellipse 28% 26% at 12% 70%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.58) 0%, transparent 48%),
+    radial-gradient(ellipse 70% 64% at 90% 28%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.84) 0%, transparent 54%) !important;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
   inset: 0 !important;
@@ -44,9 +44,9 @@
   will-change: auto !important;
   opacity: 0.62 !important;
   background:
-    radial-gradient(ellipse 58% 42% at 18% 72%, rgba(128, 25, 224, 0.9) 0%, transparent 64%),
-    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(18, 205, 240, 0.92) 0%, transparent 62%),
-    radial-gradient(ellipse 40% 38% at 56% 54%, rgba(54, 4, 253, 0.8) 0%, transparent 68%) !important;
+    radial-gradient(ellipse 58% 42% at 18% 72%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.9) 0%, transparent 64%),
+    radial-gradient(ellipse 52% 46% at 82% 24%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.92) 0%, transparent 62%),
+    radial-gradient(ellipse 40% 38% at 56% 54%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.8) 0%, transparent 68%) !important;
   mix-blend-mode: normal;
   animation: none !important;
   /* No will-change here (unlike the ::before/::after drift layers) -- transform/opacity already
@@ -66,7 +66,7 @@
   overflow: hidden;
   background: rgba(255, 255, 255, 0.16) !important;
   border: 1px solid rgba(255, 255, 255, 0.52) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgba(25, 8, 85, 0.24) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgb(var(--a-ink-rgb, 25 8 85) / 0.24) !important;
   backdrop-filter: blur(18px) saturate(165%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(165%) !important;
   isolation: isolate;
@@ -94,7 +94,7 @@
   position: relative;
   background: rgba(255, 255, 255, 0.14) !important;
   border: 1px solid rgba(255, 255, 255, 0.42) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.42), 0 4px 14px rgba(25, 8, 85, 0.18) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.42), 0 4px 14px rgb(var(--a-ink-rgb, 25 8 85) / 0.18) !important;
   backdrop-filter: blur(14px) saturate(155%) !important;
   -webkit-backdrop-filter: blur(14px) saturate(155%) !important;
 }
@@ -105,7 +105,7 @@
   color: #fff;
   backdrop-filter: blur(16px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.52), 0 5px 16px rgba(20, 7, 74, 0.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.52), 0 5px 16px rgb(var(--a-ink-rgb, 20 7 74) / 0.22) !important;
 }
 
 /* Commented gallery thumbnails pulse independently. The per-item custom properties are assigned
@@ -128,7 +128,7 @@
   .v2-design .bp-dday-compact {
     backdrop-filter: blur(12px) saturate(145%) !important;
     -webkit-backdrop-filter: blur(12px) saturate(145%) !important;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 5px 14px rgba(25, 8, 85, 0.2) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 5px 14px rgb(var(--a-ink-rgb, 25 8 85) / 0.2) !important;
   }
   .v2-design .bp-dday-chip {
     backdrop-filter: blur(10px) saturate(140%) !important;
@@ -145,7 +145,7 @@
   .v2-design .bp-dday-chip,
   .v2-design .bp-hero-zone .bp-icon-btn,
   .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
-    background: rgba(61, 20, 155, 0.82) !important;
+    background: rgb(var(--a-ink-rgb, 61 20 155) / 0.82) !important;
   }
 }
 
@@ -304,7 +304,7 @@
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
+    background: linear-gradient(-45deg, var(--a-hero-3, #12cdf0) 0%, var(--a-hero-2, #3604fd) 42%, var(--a-hero-1, #8019e0) 76%, var(--a-hero-2, #3604fd) 100%) 0 0 / 300% 300%;
     opacity: 0;
     transform: translate3d(-100%, 0, 0);
     transition: opacity .18s ease, transform .42s cubic-bezier(.22,.61,.36,1);
@@ -863,7 +863,7 @@
   box-sizing: border-box;
 }
 .renewal-shell.v2-design .bp-side-nav-global-search:hover {
-  background: var(--brand-soft, #f3eeff);
+  background: var(--brand-soft, var(--a-brand-soft, #f3eeff));
 }
 .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
   padding-top: 0 !important;
@@ -884,7 +884,7 @@
     height: 64px;
     box-sizing: border-box;
     padding: 12px 16px 12px !important;
-    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 100% 100%;
+    background: linear-gradient(-45deg, var(--a-hero-3, #12cdf0) 0%, var(--a-hero-2, #3604fd) 42%, var(--a-hero-1, #8019e0) 76%, var(--a-hero-2, #3604fd) 100%) 0 0 / 100% 100%;
     animation: none;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
@@ -896,7 +896,7 @@
     border-radius: 10px;
     /* Use the same vivid aurora palette as the calendar hero card so the
      * collapsed brand tile remains a true continuation of the main canvas. */
-    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%);
+    background: linear-gradient(-45deg, var(--a-hero-3, #12cdf0) 0%, var(--a-hero-2, #3604fd) 42%, var(--a-hero-1, #8019e0) 76%, var(--a-hero-2, #3604fd) 100%);
     background-size: 100% 100%;
     animation: none;
     color: #fff;

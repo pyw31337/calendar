@@ -75,7 +75,7 @@
   flex-direction: column;
   gap: 1px;
   border-left: 2.5px solid var(--brand, #7C2FE5);
-  background: var(--brand-soft, #F3EEFF);
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF));
   border-radius: 0 8px 8px 0;
   padding: 6px 10px;
   margin-bottom: 8px;
@@ -220,7 +220,7 @@
   margin-top: 0;
   padding: 7px 10px;
   border-radius: 10px;
-  background: var(--brand-soft, #F3EEFF);
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF));
   font-size:0.75rem;
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-list {
@@ -444,7 +444,7 @@
 .v2-design .date-modal-memo-list .v2-memo-card-tags > button:not(.memo-card-comment-toggle),
 .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
   border-radius: 999px;
-  background: var(--brand-soft, #f3eeff) !important;
+  background: var(--brand-soft, var(--a-brand-soft, #f3eeff)) !important;
   color: var(--brand, #7c2fe5) !important;
   padding: 3px 8px !important;
   font-size:0.75rem !important;
@@ -483,7 +483,7 @@
 .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div,
 .v2-design .date-modal-memo-list .v2-memo-card-comments > div,
 .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-comments > div {
-  background: var(--brand-soft, #f3eeff);
+  background: var(--brand-soft, var(--a-brand-soft, #f3eeff));
   border-radius: 10px !important;
   border-top: 0 !important;
   padding: 7px 10px !important;

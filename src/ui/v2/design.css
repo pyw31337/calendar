@@ -5,9 +5,9 @@
   --renewal-page-max: 1600px;
   --v2-side-nav-width: 280px;
   /* Brand = vivid schedule purple (same family as --cal-schedule) */
-  --brand: #7C2FE5;
-  --brand-soft: #F3EEFF;
-  --cal-schedule: #7C2FE5;
+  --brand: var(--a-brand, #7C2FE5);
+  --brand-soft: var(--a-brand-soft, #F3EEFF);
+  --cal-schedule: var(--a-brand, #7C2FE5);
   --cal-anniversary: #F76AAD;
   /* Every legacy component this shell reuses (chat/gallery/places/event modals/date modal/etc.)
    * reads --accent-primary for its own active/selected/link color -- app.css's own definition
@@ -32,22 +32,22 @@
   --v2-glass-dark-fill: rgba(255, 255, 255, 0.22);
   --v2-glass-dark-border: rgba(255, 255, 255, 0.55);
   --v2-glass-dark-inset: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  --v2-glass-dark-glow: 0 4px 14px rgba(76, 29, 149, 0.22);
+  --v2-glass-dark-glow: 0 4px 14px rgb(var(--a-ink-rgb, 76 29 149) / 0.22);
   /* Light glass (on white / near-white pages) */
   --v2-glass-light-fill: rgba(255, 255, 255, 0.88);
   --v2-glass-light-border: #eceaf5;
   --v2-glass-light-inset: inset 0 1px 0 rgba(255, 255, 255, 0.95);
   --v2-glass-light-shadow: 0 1px 2px rgba(30, 27, 46, 0.04);
-  --v2-glass-light-hover-fill: rgba(243, 238, 255, 0.78);
-  --v2-glass-light-hover-border: #e0d4ff;
+  --v2-glass-light-hover-fill: rgb(var(--a-brand-soft-rgb, 243 238 255) / 0.78);
+  --v2-glass-light-hover-border: var(--a-brand-soft-2, #e0d4ff);
   /* Soft purple glass (side-nav active, tinted chips) */
-  --v2-glass-purple-fill: rgba(124, 47, 229, 0.10);
-  --v2-glass-purple-border: rgba(124, 47, 229, 0.26);
+  --v2-glass-purple-fill: rgb(var(--a-brand-rgb, 124 47 229) / 0.10);
+  --v2-glass-purple-border: rgb(var(--a-brand-rgb, 124 47 229) / 0.26);
   --v2-glass-purple-inset: inset 0 1px 0 rgba(255, 255, 255, 0.72);
   /* Primary action glow */
-  --v2-primary: #7C2FE5;
-  --v2-primary-glow: 0 6px 18px rgba(124, 47, 229, 0.40);
-  --v2-primary-glow-sm: 0 3px 10px rgba(124, 47, 229, 0.32);
+  --v2-primary: var(--a-brand, #7C2FE5);
+  --v2-primary-glow: 0 6px 18px rgb(var(--a-brand-rgb, 124 47 229) / 0.40);
+  --v2-primary-glow-sm: 0 3px 10px rgb(var(--a-brand-rgb, 124 47 229) / 0.32);
 
   /* The no-D-day hero remains a deliberate, vertically centred header instead
    * of inheriting the D-day section's bottom spacer.  Header search geometry
@@ -299,7 +299,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.96) !important;
-  color: var(--v2-accent, #5B4BEB) !important;
+  color: var(--v2-accent, var(--a-brand-2, #5B4BEB)) !important;
   font-size:0.75rem !important;
   font-weight: 900 !important;
   line-height: 1 !important;
@@ -355,8 +355,8 @@
 /* Hero vivid purple mesh + dramatic aurora blobs — reinforces reference-home under .v2-design */
 .v2-design .bp-hero-zone {
   background:
-    linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
-    linear-gradient(-45deg, #12CDF0 0%, #3604FD 42%, #8019E0 76%, #3604FD 100%) !important;
+    linear-gradient(180deg, rgb(var(--a-hero-shade-rgb, 10 7 38) / 0.12) 0%, rgb(var(--a-hero-shade-rgb, 9 4 31) / 0.42) 100%),
+    linear-gradient(-45deg, var(--a-hero-3, #12CDF0) 0%, var(--a-hero-2, #3604FD) 42%, var(--a-hero-1, #8019E0) 76%, var(--a-hero-2, #3604FD) 100%) !important;
   background-size: auto, 100% 100% !important;
   animation: none !important;
   isolation: isolate;
@@ -374,9 +374,9 @@
   z-index: 0 !important;
   pointer-events: none !important;
   background:
-    radial-gradient(ellipse 85% 78% at 20% 30%, rgba(18, 205, 240, 0.92) 0%, transparent 58%),
-    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(128, 25, 224, 0.9) 0%, transparent 55%),
-    radial-gradient(ellipse 74% 80% at 42% 88%, rgba(54, 4, 253, 0.92) 0%, transparent 60%) !important;
+    radial-gradient(ellipse 85% 78% at 20% 30%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.92) 0%, transparent 58%),
+    radial-gradient(ellipse 80% 72% at 78% 18%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.9) 0%, transparent 55%),
+    radial-gradient(ellipse 74% 80% at 42% 88%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.92) 0%, transparent 60%) !important;
   background-repeat: no-repeat !important;
   mix-blend-mode: normal !important;
   opacity: 0.9 !important;
@@ -392,9 +392,9 @@
   z-index: 0 !important;
   pointer-events: none !important;
   background:
-    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(128, 25, 224, 0.86) 0%, transparent 56%),
-    radial-gradient(ellipse 28% 26% at 12% 70%, rgba(18, 205, 240, 0.58) 0%, transparent 48%),
-    radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
+    radial-gradient(ellipse 82% 74% at 76% 74%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.86) 0%, transparent 56%),
+    radial-gradient(ellipse 28% 26% at 12% 70%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.58) 0%, transparent 48%),
+    radial-gradient(ellipse 70% 64% at 90% 28%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.84) 0%, transparent 54%) !important;
   background-repeat: no-repeat !important;
   mix-blend-mode: soft-light !important;
   opacity: 0.85 !important;
@@ -408,7 +408,7 @@
   z-index: 0 !important;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 88% 70% at 50% 8%, rgba(192, 132, 252, 0.45) 0%, transparent 58%),
+    radial-gradient(ellipse 88% 70% at 50% 8%, rgb(var(--a-brand-light-rgb, 192 132 252) / 0.45) 0%, transparent 58%),
     linear-gradient(180deg, transparent 50%, rgba(24, 8, 48, 0.26) 80%, rgba(15, 5, 40, 0.5) 100%) !important;
   opacity: 0.95 !important;
   animation: none !important;
@@ -448,10 +448,10 @@
   border: 1px solid rgba(255, 255, 255, 0.52) !important;
   backdrop-filter: var(--v2-glass-blur-strong) !important;
   -webkit-backdrop-filter: var(--v2-glass-blur-strong) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgba(25, 8, 85, 0.24) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgb(var(--a-ink-rgb, 25 8 85) / 0.24) !important;
 }
 .v2-design .bp-dday-compact-badge {
-  background: linear-gradient(135deg, #7C2FE5 0%, #4F46E5 55%, #2563EB 100%);
+  background: linear-gradient(135deg, var(--a-brand, #7C2FE5) 0%, var(--a-brand-2, #4F46E5) 55%, #2563EB 100%);
   color: #fff;
   border: 1px solid rgba(255,255,255,0.45) !important;
 }
@@ -474,7 +474,7 @@
  * fade instead of the flat --surface-confirmed tint, matching the calendar home's own
  * gradient-forward visual language. */
 .v2-design .bp-day-cell.bp-confirmed {
-  background: linear-gradient(180deg, var(--brand-soft, #f3eeff) 0%, var(--bg-card) 80%);
+  background: linear-gradient(180deg, var(--brand-soft, var(--a-brand-soft, #f3eeff)) 0%, var(--bg-card) 80%);
 }
 /* Participant availability dots sit right under the day number / 모임확정 pill row -- a little
  * more breathing room above them so they don't read as glued to that row. */
@@ -760,7 +760,7 @@
   margin: 0;
   transform: translate(-50%, 0) !important;
   border-radius: 20px 20px 0 0 !important;
-  box-shadow: 0 -16px 44px rgba(76, 29, 149, 0.28) !important;
+  box-shadow: 0 -16px 44px rgb(var(--a-ink-rgb, 76 29 149) / 0.28) !important;
   background: var(--bg-card, var(--bg-card));
   overflow: hidden !important;
   padding: 0 !important;
@@ -1181,7 +1181,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   height: auto;
   min-height: 0.28rem !important;
   border-radius: 999px;
-  background: var(--cal-schedule, #7C2FE5) !important;
+  background: var(--cal-schedule, var(--a-brand, #7C2FE5)) !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1674,7 +1674,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   text-align: left;
   cursor: pointer;
 }
-.v2-design .bp-side-nav-global-search:hover { background: var(--cta-fill-hover, #6d28d9); }
+.v2-design .bp-side-nav-global-search:hover { background: var(--cta-fill-hover, var(--a-brand-deep, #6d28d9)); }
 .v2-design .bp-side-nav-global-search-icon { display: inline-flex; flex: 0 0 auto; }
 .v2-design .bp-side-nav-global-search-icon svg { width: 20px; height: 20px; }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
@@ -1736,7 +1736,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   background: var(--bg-card, var(--bg-card));
   border: 1px solid var(--border, #e8e7f0);
   border-radius: 18px;
-  box-shadow: 0 12px 36px rgba(46, 27, 88, .08);
+  box-shadow: 0 12px 36px rgb(var(--a-ink-rgb, 46 27 88) / .08);
 }
 @media (max-width: 767px) {
   .v2-design .global-search-page { padding: 16px 12px 28px; }
@@ -1796,7 +1796,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* Translucent brand-purple background marks the active item -- both collapsed (icon rail)
  * and expanded rail share this rule, so the highlight stays consistent when the rail toggles. */
 .v2-design .bp-side-nav-item.bp-is-active {
-  background: rgba(124, 47, 229, 0.12);
+  background: rgb(var(--a-brand-rgb, 124 47 229) / 0.12);
   border: none !important;
   box-shadow: none;
   backdrop-filter: none;
@@ -1990,8 +1990,8 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   -webkit-backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%));
 }
 .v2-design .bp-side-nav-collapse-btn:hover {
-  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
-  border-color: var(--v2-glass-light-hover-border, #e0d4ff);
+  background: var(--v2-glass-light-hover-fill, rgb(var(--a-brand-soft-rgb, 243 238 255) / 0.78)) !important;
+  border-color: var(--v2-glass-light-hover-border, var(--a-brand-soft-2, #e0d4ff));
   color: var(--brand, #7C2FE5) !important;
 }
 
@@ -2031,7 +2031,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     margin: 8px 10px;
     padding: 6px !important;
     border-radius: 14px;
-    background: var(--bg-primary, rgba(124, 47, 229, 0.06));
+    background: var(--bg-primary, rgb(var(--a-brand-rgb, 124 47 229) / 0.06));
     border-top: none !important;
   }
   .v2-design .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
@@ -2086,15 +2086,15 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-tag-chip.bp-is-selected,
 .v2-design .bp-cat-chip.bp-is-selected {
   border-color: var(--brand, #7C2FE5) !important;
-  background: var(--brand-soft, #F3EEFF) !important;
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
   color: var(--brand, #7C2FE5) !important;
   box-shadow: var(--v2-glass-purple-inset);
 }
 .v2-design .bp-settlement-card-badge,
 .v2-design .v2-settlement .bp-settlement-card-badge {
   color: var(--brand, #7C2FE5) !important;
-  background: var(--brand-soft, #F3EEFF) !important;
-  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
+  border: 1px solid var(--v2-glass-purple-border, rgb(var(--a-brand-rgb, 124 47 229) / 0.26));
   box-shadow: var(--v2-glass-purple-inset);
 }
 .v2-design .bp-chat-name-pill,

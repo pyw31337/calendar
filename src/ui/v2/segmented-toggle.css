@@ -111,6 +111,6 @@ html:has(.renewal-shell.v2-design) .v2-memo .memo-card-comment-badge,
 }
 
 .renewal-shell.v2-design {
-  --acc-chat: #7C2FE5;
-  --acc-chat-soft: #F3EEFF;
+  --acc-chat: var(--a-brand, #7C2FE5);
+  --acc-chat-soft: var(--a-brand-soft, #F3EEFF);
 }

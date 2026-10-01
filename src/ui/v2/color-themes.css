@@ -1,0 +1,151 @@
+/* Color themes (src/core/color-themes.js): <html data-theme> picks light/dark, <html data-accent>
+ * picks the point color. With no data-accent nothing here applies, so 화이트·보라 and 블랙·라임
+ * render exactly as they did before themes existed.
+ *
+ * How the swap works: every brand literal in the V2 CSS was rewritten as
+ *   var(--a-brand, #7C2FE5)                      (light themes, --a-*)
+ *   rgb(var(--a-brand-rgb, 124 47 229) / 0.12)   (same, with alpha)
+ *   var(--d-brand, #C9FD58)                      (dark themes, --d-*)
+ * with the original color as the fallback. A theme only defines the tokens below on <html>;
+ * the fallbacks keep everything else (category, participant, weather colors) untouched.
+ * test/color-themes.test.mjs checks every token used in the V2 CSS has a fallback and that
+ * every theme defines the full token set. */
+
+/* ---------- 화이트 · 오렌지 ---------- */
+html[data-accent="orange"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) {
+  --a-brand: #EA580C;
+  --a-brand-rgb: 234 88 12;
+  --a-brand-deep: #C2410C;
+  --a-brand-deep-rgb: 194 65 12;
+  --a-brand-2: #F97316;
+  --a-brand-2-rgb: 249 115 22;
+  --a-brand-light: #FB923C;
+  --a-brand-light-rgb: 251 146 60;
+  --a-brand-line: #FDBA74;
+  --a-brand-soft: #FFF1E6;
+  --a-brand-soft-rgb: 255 241 230;
+  --a-brand-soft-2: #FFE0C7;
+  --a-ink: #7C2D12;
+  --a-ink-rgb: 124 45 18;
+  --a-hero-1: #E2400F;
+  --a-hero-1-rgb: 226 64 15;
+  --a-hero-2: #FF7A00;
+  --a-hero-2-rgb: 255 122 0;
+  --a-hero-3: #FFB21A;
+  --a-hero-3-rgb: 255 178 26;
+  --a-hero-shade-rgb: 64 20 0;
+}
+
+/* ---------- 화이트 · 블루 ---------- */
+html[data-accent="blue"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) {
+  --a-brand: #2563EB;
+  --a-brand-rgb: 37 99 235;
+  --a-brand-deep: #1D4ED8;
+  --a-brand-deep-rgb: 29 78 216;
+  --a-brand-2: #0EA5E9;
+  --a-brand-2-rgb: 14 165 233;
+  --a-brand-light: #60A5FA;
+  --a-brand-light-rgb: 96 165 250;
+  --a-brand-line: #93C5FD;
+  --a-brand-soft: #EFF6FF;
+  --a-brand-soft-rgb: 239 246 255;
+  --a-brand-soft-2: #DBEAFE;
+  --a-ink: #1E3A8A;
+  --a-ink-rgb: 30 58 138;
+  --a-hero-1: #1E40AF;
+  --a-hero-1-rgb: 30 64 175;
+  --a-hero-2: #2563EB;
+  --a-hero-2-rgb: 37 99 235;
+  --a-hero-3: #22D3EE;
+  --a-hero-3-rgb: 34 211 238;
+  --a-hero-shade-rgb: 8 20 50;
+}
+
+/* Legacy components embedded in V2 read app.css's own accent tokens, which stay purple, and
+   modals are portaled to <body>, outside .renewal-shell where design.css defines --brand
+   (the dark block in dest-chrome-late.css lists body for the same reason). */
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design),
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) body {
+  --brand: var(--a-brand);
+  --brand-soft: var(--a-brand-soft);
+  --accent-primary: var(--a-brand);
+  --accent-secondary: var(--a-brand);
+  --border-confirmed: var(--a-brand);
+  /* app.css reads these as var(--v2-accent, #7C3AED) etc.; only dark mode defined them. */
+  --v2-accent: var(--a-brand);
+  --v2-accent-line: var(--a-brand-line);
+  --v2-primary: var(--a-brand);
+  --cta-fill: var(--a-brand);
+  --cta-fill-hover: var(--a-brand-deep);
+}
+
+/* app.css literals (it stays byte-for-byte unchanged, see scripts/audit-important.mjs), restated
+   for every point-color theme. --a-* is defined in the light ones, --d-* in the dark ones. */
+html[data-accent]:has(.renewal-shell.v2-design) .btn-primary { box-shadow: 0 4px 12px rgb(var(--a-brand-rgb, var(--d-brand-rgb)) / 0.25); }
+html[data-accent]:has(.renewal-shell.v2-design) .btn-primary:hover { box-shadow: 0 6px 16px rgb(var(--a-brand-rgb, var(--d-brand-rgb)) / 0.35); }
+html[data-accent]:has(.renewal-shell.v2-design) .form-select:focus,
+html[data-accent]:has(.renewal-shell.v2-design) .form-input:focus { box-shadow: 0 0 0 3px rgb(var(--a-brand-rgb, var(--d-brand-rgb)) / 0.15); }
+html[data-accent]:has(.renewal-shell.v2-design) .gallery-comment-heartbeat::before,
+html[data-accent]:has(.renewal-shell.v2-design) .renewal-shell-main.is-calendar .gallery-comment-heartbeat::before { box-shadow: 0 0 0 1px rgb(var(--a-brand-rgb, var(--d-brand-rgb)) / 0.35); }
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .chat-search-focused-bubble { background-color: rgb(var(--a-brand-rgb) / 0.06) !important; }
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .chat-search-match-bubble {
+  border-color: rgb(var(--a-brand-rgb) / 0.35) !important;
+  background-color: rgb(var(--a-brand-rgb) / 0.03) !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .place-card-row.is-focused { background-color: rgb(var(--a-brand-rgb) / 0.08) !important; }
+
+/* Two light-theme gradients mix the brand with fixed blue/cyan stops; restate them per theme
+   rather than leave a blue stripe inside an orange button. */
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle::before {
+  background-image:
+    radial-gradient(circle at 25% 25%, rgb(var(--a-brand-light-rgb) / 0.95) 0%, transparent 45%),
+    radial-gradient(circle at 75% 75%, rgb(var(--a-hero-3-rgb) / 0.85) 0%, transparent 45%),
+    linear-gradient(125deg, var(--a-brand-deep) 0%, var(--a-brand) 35%, var(--a-hero-2) 65%, var(--a-brand-light) 100%) !important;
+}
+/* The default animation swings the hue +36deg (purple -> magenta), which drifts orange into
+   yellow-green; the point-color themes swing a little the other way instead. */
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle::before {
+  animation: bp-cal-aurora-wave 3s ease-in-out infinite alternate, bp-color-theme-aurora-spin 6.5s linear infinite !important;
+}
+@keyframes bp-color-theme-aurora-spin {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(-18deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle {
+  box-shadow: 0 6px 20px rgb(var(--a-brand-rgb) / 0.45), 0 2px 8px rgb(var(--a-brand-deep-rgb) / 0.35) !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
+  box-shadow: 0 8px 26px rgb(var(--a-brand-rgb) / 0.55), 0 3px 10px rgb(var(--a-brand-deep-rgb) / 0.4) !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-dday-compact-badge {
+  background: linear-gradient(135deg, var(--a-brand) 0%, var(--a-brand-2) 100%);
+}
+
+/* ---------- 블랙 · 오렌지 ---------- */
+html[data-theme="dark"][data-accent="orange"]:has(.renewal-shell.v2-design) {
+  --d-brand: #FF7A1A;
+  --d-brand-rgb: 255 122 26;
+  --d-brand-hover: #FF9447;
+  --d-brand-soft: #2E1808;
+  --d-brand-line: #6B3410;
+  --d-accent2: #FF3D71;
+  --d-accent2-rgb: 255 61 113;
+}
+
+/* ---------- 블랙 · 블루 ---------- */
+html[data-theme="dark"][data-accent="blue"]:has(.renewal-shell.v2-design) {
+  --d-brand: #4DA3FF;
+  --d-brand-rgb: 77 163 255;
+  --d-brand-hover: #73B7FF;
+  --d-brand-soft: #0F2236;
+  --d-brand-line: #1F4C7A;
+  --d-accent2: #FC5545;
+  --d-accent2-rgb: 252 85 69;
+}
+
+/* Expanded D-day chips sit on the hero as a dark glass tinted with the hero ink
+   (dest-chrome-late.css keeps the purple literal; test/field-shape.test.mjs pins it). */
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .bp-dday-chip-card {
+  background: linear-gradient(165deg, rgb(var(--a-ink-rgb) / 0.62), rgba(14, 6, 32, 0.74)) !important;
+}

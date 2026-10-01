@@ -1733,7 +1733,7 @@ export function WeatherDetailModal({
                   color: hourlyTab === tab.key ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)',
                   borderRadius: '999px',
                   border: hourlyTab === tab.key ? '1.5px solid var(--v2-primary, #7C2FE5)' : '1px solid var(--border-subtle, rgba(0,0,0,0.12))',
-                  backgroundColor: hourlyTab === tab.key ? 'rgba(124, 47, 229, 0.08)' : 'transparent',
+                  backgroundColor: hourlyTab === tab.key ? 'rgb(var(--a-brand-rgb, 124 47 229) / 0.08)' : 'transparent',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }

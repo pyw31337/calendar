@@ -697,7 +697,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               style: {
                 padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                background: pMonth === idx ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : 'var(--bg-card)',
                 color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
                 fontWeight: pMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }
@@ -731,7 +731,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
                 style: {
                   padding: '6px 0', borderRadius: rangeMode ? rangeRadius : 'var(--radius-sm)',
                   border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : (isInRange ? 'rgba(99, 102, 241, 0.06)' : 'transparent'),
+                  background: isSelected ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : (isInRange ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.06)' : 'transparent'),
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
                   fontWeight: isSelected ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
                 }
