@@ -81,3 +81,49 @@ test('a tag most of an upload batch shares is offered to the rest, device names 
   const { groups } = run(photos);
   assert.deepEqual(groups.map(g => [g.rule, g.tag, g.photos.map(p => p.assetKey)]), [['batch', '바이킹', ['d']]]);
 });
+
+import { buildDuplicateSuggestions, buildPlaceVisitSuggestions } from '../src/ui/archive-tag-suggestions.js';
+
+test('confirmed-meeting attendees join the day\'s person chips, spelled like the tags', () => {
+  const photos = [
+    { assetKey: 'a', tags: '260919 서준' },
+    { assetKey: 'b', tags: '260919' },
+  ];
+  const { personDays } = buildTagSuggestions({
+    photos, places, placeGroups: { groups: [] }, getPhotoDates: p => dateTokens(p.tags),
+    personLabels: ['박서준', '김유리'], attendeesByDate: new Map([['2026-09-19', ['박서준', '김유리']]]),
+  });
+  assert.deepEqual(personDays[0].candidates.map(c => [c.label, c.count, c.attendee]), [['서준', 1, true], ['김유리', 0, true]]);
+});
+
+test('place visits come from tagged photo dates the place memo does not have yet', () => {
+  const place = { id: 'p1', name: '서울랜드', lat: 37.4, lng: 127, memo: '26.09.13 바이킹', visitStatus: 'planned', visitDate: '' };
+  const numeric = { id: 'p2', name: '18', lat: 37, lng: 127 };
+  const photos = [
+    { assetKey: 'a', tags: '260913 서울랜드' },
+    { assetKey: 'b', tags: '260926 서울랜드' },
+    { assetKey: 'c', tags: '260926 서울랜드' },
+    { assetKey: 'd', tags: '261230 서울랜드' },
+    { assetKey: 'e', tags: '260926 18' },
+  ];
+  const visits = buildPlaceVisitSuggestions({ places: [place, numeric], photos, getPhotoDates: p => dateTokens(p.tags), today: '2026-10-01' });
+  assert.equal(visits.length, 1);
+  assert.deepEqual(visits[0].dates, ['2026-09-26']);
+  assert.equal(visits[0].photoCount, 2);
+  assert.equal(visits[0].next.memo, '26.09.13 바이킹 26.09.26 사진');
+  assert.equal(visits[0].next.visitStatus, 'visited');
+  assert.equal(visits[0].next.visitDate, '2026-09-26');
+});
+
+test('duplicates keep one photo with every tag, and copies with comments are not removable', () => {
+  const dup = buildDuplicateSuggestions([{ id: 'x' }], {
+    findDuplicatePhotoGroups: () => [{ candidates: [] }],
+    chooseDedupWinner: () => ({
+      winner: { photo: { assetKey: 'k', tags: '서준 260919' } },
+      losers: [{ photo: { assetKey: 'l', tags: '260919 바이킹' }, commentCount: 0 }, { photo: { assetKey: 'm', tags: '' }, commentCount: 2 }],
+    }),
+  });
+  assert.equal(dup.length, 1);
+  assert.equal(dup[0].mergedTags, '서준 260919 바이킹');
+  assert.equal(dup[0].removable, false);
+});

@@ -86,13 +86,43 @@ function PersonDay({ day, busy, onApply, renderGrid, formatDate, selectKeyOf }) 
           if (ok) setSelected(new Set());
         },
         style: { ...pillStyle(picked.length > 0), opacity: picked.length ? 1 : 0.55 }
-      }, `#${candidate.label} ${candidate.count}`))
+      }, candidate.count ? `#${candidate.label} ${candidate.count}` : `#${candidate.label} · 참석`))
     ),
     renderGrid(day.photos, `suggest_person_${day.date}`, { keys: selected, onToggle: toggle })
   );
 }
 
-export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onApplyAll, renderGrid, formatDate, selectKeyOf }) {
+const sectionTitle = text => h('div', { className: 'archive-detail-title', style: { fontSize: 'var(--font-size-md, 15px)', fontWeight: 800, color: 'var(--text-main)', marginTop: '4px' } }, text);
+
+function DuplicateCard({ dup, busy, onRemove, renderGrid }) {
+  return h('div', { style: cardStyle },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      h('div', { style: titleStyle }, `같은 사진 ${dup.extra.length + 1}장`),
+      dup.removable
+        ? h('button', { type: 'button', disabled: busy, onClick: () => onRemove(dup), style: pillStyle(true) }, '1장만 남기기')
+        : h('span', { style: mutedStyle }, '댓글이 있어 관리자 화면에서 정리')
+    ),
+    renderGrid([dup.keep, ...dup.extra], `suggest_${dup.id}`)
+  );
+}
+
+function PlaceVisitCard({ visit, busy, onApply, formatDate }) {
+  const [saving, setSaving] = React.useState(false);
+  const shown = visit.dates.slice(-4).map(date => formatDate(date) || date).join(', ');
+  return h('div', { style: cardStyle },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      h('div', { style: titleStyle }, `${visit.place.alias || visit.place.name}`),
+      h('button', {
+        type: 'button', disabled: busy || saving,
+        onClick: async () => { setSaving(true); await onApply(visit); setSaving(false); },
+        style: pillStyle(true)
+      }, '기록 추가')
+    ),
+    h('div', { style: mutedStyle }, `${shown}${visit.dates.length > 4 ? ` 외 ${visit.dates.length - 4}일` : ''} · 사진 ${visit.photoCount}장이 있지만 방문 기록에 없는 날짜예요.`)
+  );
+}
+
+export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onApplyAll, renderGrid, formatDate, selectKeyOf, duplicates = [], onRemoveDuplicate, placeVisits = [], onApplyPlaceVisit }) {
   const [personDaysShown, setPersonDaysShown] = React.useState(PERSON_DAYS_PAGE);
   const groups = suggestions?.groups || [];
   const personDays = suggestions?.personDays || [];
@@ -109,12 +139,18 @@ export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onA
       h('div', { style: mutedStyle }, '사진에 이미 있는 위치·날짜·같이 올린 사진 정보로 찾은 태그예요. 적용해도 기존 태그는 지우지 않고, 직후에 되돌릴 수 있어요.')
     ),
     groups.map(group => h(SuggestionCard, { key: group.id, group, busy, onApply, renderGrid, formatDate: fmt })),
-    personDays.length > 0 && h('div', { className: 'archive-detail-title', style: { fontSize: 'var(--font-size-md, 15px)', fontWeight: 800, color: 'var(--text-main)', marginTop: '4px' } }, '인물 추천'),
-    personDays.length > 0 && h('div', { style: mutedStyle }, '같은 날 다른 사진에 태그된 사람들이에요. 사진 속 인물은 직접 골라 주세요.'),
+    personDays.length > 0 && sectionTitle('인물 추천'),
+    personDays.length > 0 && h('div', { style: mutedStyle }, '같은 날 다른 사진에 태그된 사람, 그날 모임에 참석한 사람이에요. 사진 속 인물은 직접 골라 주세요.'),
     personDays.slice(0, personDaysShown).map(day => h(PersonDay, { key: day.date, day, busy, onApply, renderGrid, formatDate: fmt, selectKeyOf })),
     personDays.length > personDaysShown && h('button', {
       type: 'button', onClick: () => setPersonDaysShown(count => count + PERSON_DAYS_PAGE),
       style: { ...pillStyle(false), alignSelf: 'center' }
-    }, `다른 날짜 더 보기 (${personDays.length - personDaysShown})`)
+    }, `다른 날짜 더 보기 (${personDays.length - personDaysShown})`),
+    placeVisits.length > 0 && typeof onApplyPlaceVisit === 'function' && sectionTitle('장소 방문 기록'),
+    placeVisits.length > 0 && typeof onApplyPlaceVisit === 'function' && h('div', { style: mutedStyle }, '이 장소 태그가 붙은 사진의 날짜를 장소 방문 기록에 더해요. 방문 예정 장소는 방문으로 바뀌어요.'),
+    typeof onApplyPlaceVisit === 'function' && placeVisits.map(visit => h(PlaceVisitCard, { key: visit.id, visit, busy, onApply: onApplyPlaceVisit, formatDate: fmt })),
+    duplicates.length > 0 && typeof onRemoveDuplicate === 'function' && sectionTitle(`중복 의심 사진 ${duplicates.length}묶음`),
+    duplicates.length > 0 && typeof onRemoveDuplicate === 'function' && h('div', { style: mutedStyle }, '같은 파일 크기로 몇 분 안에 다시 올라간 사진이에요. 태그를 합쳐 1장만 남겨요.'),
+    typeof onRemoveDuplicate === 'function' && duplicates.slice(0, 12).map(dup => h(DuplicateCard, { key: dup.id, dup, busy, onRemove: onRemoveDuplicate, renderGrid }))
   );
 }

@@ -25,6 +25,7 @@ import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap } from './photo-geo.js';
 import { sharesAsset, syncAssetTagsInMeetings } from './media-reference-integrity.js';
+import { buildSettlementDraftFromMeeting } from './settlement-draft.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -4285,7 +4286,29 @@ function CalendarApp() {
     const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
     const logNote = sanitizeText(note || '', 500) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
     const meetingLog = createActivityLog(activeCal.id, action, dateStr, '', now, logNote);
-    return commitConfirmedMeetings(nextConfirmedMeetings, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', meetingLog ? [meetingLog] : []);
+    // Confirming offers "정산 만들기": the settlement editor opens with that day's attendees and
+    // expenses filled in (settlement-draft.js). Nothing is saved until the editor's 생성.
+    const offerSettlement = !isAlreadyConfirmed && canUseSettlement;
+    const result = commitConfirmedMeetings(nextConfirmedMeetings, offerSettlement ? null : (isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정'), meetingLog ? [meetingLog] : []);
+    if (offerSettlement) {
+      Promise.resolve(result).then(ok => {
+        if (!ok) return;
+        showToast('모임 확정', 'success', 8000, () => {
+          const meeting = (getConfirmedMeetings(activeCalRef.current || activeCal) || []).find(m => m.date === dateStr) || { date: dateStr, note };
+          const draft = buildSettlementDraftFromMeeting(meeting, activeCalRef.current || activeCal);
+          if (!draft) return;
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', 'settlement');
+            url.searchParams.delete('sub');
+            window.history.pushState(window.history.state, '', url);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          } catch (_) {}
+          setEditingSettlementCard(draft);
+        }, null, '정산 만들기');
+      }).catch(() => {});
+    }
+    return result;
   };
   // Confirmed-meeting writes declare their field scope in commitConfirmedMeetings, so unrelated
   // settings saves cannot carry a stale settlement snapshot back over this value.

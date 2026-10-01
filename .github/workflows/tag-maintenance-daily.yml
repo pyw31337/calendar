@@ -1,0 +1,63 @@
+name: Daily Photo Tag Maintenance
+
+# Keeps photo tags consistent and applies the 보관함 추천 tab's batch-safe suggestions every day,
+# so newly uploaded photos get their place / batch / album-date tags without anyone opening the
+# tab (docs/photo-auto-tagging-plan.md). Runs after the daily backup (backup-daily.yml, 10:30 KST).
+#
+#   1. repair-tag-divergence: copies of one photo whose tags disagree are re-aligned (a copy holding
+#      every index tag and more wins, so a just-written tag is never rolled back).
+#   2. apply-tag-suggestions: only ADDS tags (existing tags kept, no duplicates, person tags never).
+#   3. a second repair pass for anything step 2's own writes left half-indexed.
+# Every write goes through the server's mediaCommand bulkTagAssets transaction.
+on:
+  workflow_dispatch:
+  schedule:
+    # 11:20 KST (02:20 UTC), after the 10:30 KST backup.
+    - cron: '20 2 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-maintenance
+  cancel-in-progress: false
+
+env:
+  CALENDAR_IDS: kkot,cw,jhair
+  NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Re-align diverged copies
+        run: REPAIR_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 node scripts/repair-tag-divergence.mjs > repair-1.json
+      - name: Apply automatic tag suggestions
+        run: SUGGEST_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 node scripts/apply-tag-suggestions.mjs > suggest.json
+      - name: Let the photo index catch up
+        run: sleep 60
+      - name: Re-align again
+        run: REPAIR_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 node scripts/repair-tag-divergence.mjs > repair-2.json
+      - name: Summary
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs");
+            const read = f => { try { return JSON.parse(fs.readFileSync(f, "utf8")).reports || []; } catch { return []; } };
+            const lines = ["| 캘린더 | 불일치 정리 | 자동 태그 | 재정리 |", "|---|---|---|---|"];
+            const r1 = read("repair-1.json"), s = read("suggest.json"), r2 = read("repair-2.json");
+            for (const id of process.env.CALENDAR_IDS.split(",")) {
+              const a = r1.find(x => x.calendarId === id) || {}, b = s.find(x => x.calendarId === id) || {}, c = r2.find(x => x.calendarId === id) || {};
+              lines.push(`| ${id} | ${a.applied ?? "-"}/${a.divergent ?? "-"} | ${b.applied ?? "-"}/${b.photosToTag ?? "-"} | ${c.applied ?? "-"}/${c.divergent ?? "-"} |`);
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+            const failed = [...r1, ...s, ...r2].reduce((n, r) => n + (r.failed || 0), 0);
+            if (failed) { console.error(`${failed} writes failed`); process.exit(1); }
+          '

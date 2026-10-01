@@ -6,7 +6,8 @@ import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcl
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { applyPhotoTagOperation, buildBulkPhotoTagChanges, joinPhotoTagTokens } from '../core/bulk-photo-tags.js';
-import { buildTagSuggestions } from './archive-tag-suggestions.js';
+import { buildDuplicateSuggestions, buildPlaceVisitSuggestions, buildTagSuggestions } from './archive-tag-suggestions.js';
+import { chooseDedupWinner, findDuplicatePhotoGroups } from '../core/gallery-dedup.js';
 import { ArchiveTagSuggestions } from './archive-tag-suggestions-view.js';
 import {
   forgetArchiveDeleted,
@@ -1376,7 +1377,7 @@ export function HistoryView({
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
   onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null,
-  onIndexedPhotoLoadAll = null,
+  onIndexedPhotoLoadAll = null, onSavePlace = null,
   photoCommentCounts = {}, onRegisterMenuActions = null
 }) {
   const React = window.React;
@@ -2297,6 +2298,19 @@ export function HistoryView({
       doesPlaceMatchDate
     });
   }, [historyTab, calendar, historyPhotoEntries, q ? 1 : 0]);
+  // 확정 모임 날짜 → 그날 참석(가능)으로 표시한 사람: 추천 탭 인물 후보에 함께 보인다.
+  const suggestionAttendees = React.useMemo(() => {
+    if (historyTab !== 'suggest') return null;
+    const confirmed = new Set(allConfirmedDates);
+    const byDate = new Map();
+    availabilities.forEach(entry => {
+      const name = participantsMap[entry.participantId]?.name;
+      if (!name || !confirmed.has(entry.date)) return;
+      if (!byDate.has(entry.date)) byDate.set(entry.date, []);
+      byDate.get(entry.date).push(name);
+    });
+    return byDate;
+  }, [historyTab, calendar]);
   // 추천 탭 (archive-tag-suggestions.js): 장소/날짜는 묶음으로 바로 적용, 인물은 날짜별로 골라서.
   const tagSuggestions = React.useMemo(() => {
     if (historyTab !== 'suggest') return null;
@@ -2305,9 +2319,46 @@ export function HistoryView({
       places: getCalendarPlaces(calendar),
       placeGroups: placePhotoGroups,
       getPhotoDates: photo => parseHistoryDateTokens(photo?.tags || ''),
-      personLabels: personTagChips.map(chip => chip.label)
+      personLabels: personTagChips.map(chip => chip.label),
+      attendeesByDate: suggestionAttendees
     });
-  }, [historyTab, historyPhotoEntries, calendar, placePhotoGroups, personTagChips]);
+  }, [historyTab, historyPhotoEntries, calendar, placePhotoGroups, personTagChips, suggestionAttendees]);
+  const duplicateSuggestions = React.useMemo(() => (historyTab === 'suggest'
+    ? buildDuplicateSuggestions(historyPhotoEntries, { findDuplicatePhotoGroups, chooseDedupWinner })
+    : []), [historyTab, historyPhotoEntries]);
+  const placeVisitSuggestions = React.useMemo(() => (historyTab === 'suggest' && typeof onSavePlace === 'function'
+    ? buildPlaceVisitSuggestions({ places: getCalendarPlaces(calendar), photos: historyPhotoEntries, getPhotoDates: photo => parseHistoryDateTokens(photo?.tags || ''), today: todayStr })
+    : []), [historyTab, historyPhotoEntries, calendar, onSavePlace, todayStr]);
+  const applyPlaceVisit = async visit => {
+    try {
+      const ok = await Promise.resolve(onSavePlace(visit.next));
+      if (ok === false) throw new Error('save');
+      showToast?.(`${visit.place.alias || visit.place.name} 방문 기록 ${visit.dates.length}건을 추가했어요.`, 'success');
+      return true;
+    } catch (_) {
+      showToast?.('방문 기록을 저장하지 못했습니다.', 'error');
+      return false;
+    }
+  };
+  // Keep one copy: the others' tags move onto it first, then the extra copies are removed through
+  // the regular photo delete (reference-checked, so a file another document still uses is kept).
+  const removeDuplicateCopies = async dup => {
+    const deleteFn = onDeletePhotos || window.__gatherBulkDeletePhotos;
+    if (typeof deleteFn !== 'function' || !dup.removable) return false;
+    const tagged = await applySuggestedTags([{ photos: [dup.keep], tag: dup.mergedTags }]);
+    if (!tagged) return false;
+    hideArchivePhotos(dup.extra);
+    try {
+      const res = await deleteFn(dup.extra, {});
+      if (!Number(res?.deleted || 0) && Number(res?.failed || 0)) throw new Error('delete');
+      showToast?.(`중복 사진 ${dup.extra.length}장을 정리했어요.`, 'success');
+      return true;
+    } catch (_) {
+      restoreArchivePhotos(dup.extra);
+      showToast?.('중복 사진을 정리하지 못했습니다.', 'error');
+      return false;
+    }
+  };
   const [isApplyingSuggestion, setIsApplyingSuggestion] = React.useState(false);
   // One bulk command (server transaction) for every photo, then an undo toast -- the same
   // contract 분류 필요 → 장소 지정 uses. `plan` is [{ photos, tag }]; a photo named by several
@@ -3813,7 +3864,15 @@ export function HistoryView({
       },
       renderGrid: renderArchivePhotoGrid,
       formatDate: formatHistoryDate,
-      selectKeyOf: archivePhotoSelectKey
+      selectKeyOf: archivePhotoSelectKey,
+      duplicates: duplicateSuggestions,
+      onRemoveDuplicate: dup => {
+        const run = () => { void removeDuplicateCopies(dup); };
+        if (typeof onRequestConfirm === 'function') onRequestConfirm('중복 사진 정리', `같은 사진 ${dup.extra.length + 1}장 중 1장만 남길까요? 다른 사진의 태그는 남기는 사진으로 합쳐요.`, run);
+        else run();
+      },
+      placeVisits: placeVisitSuggestions,
+      onApplyPlaceVisit: applyPlaceVisit
     })),
 
     historyLightbox && Lightbox && /*#__PURE__*/React.createElement(Lightbox, {

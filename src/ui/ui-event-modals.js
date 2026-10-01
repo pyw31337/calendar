@@ -1793,7 +1793,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   );
 
   const cardToEdit = initialData || null;
-  const isEditing = !!cardToEdit;
+  // A draft (모임 확정 → 정산 만들기, settlement-draft.js) only pre-fills the form: it is still a
+  // new card -- 정산 생성 title, no 삭제/마감, a fresh id on save.
+  const isEditing = !!cardToEdit && !cardToEdit.isDraft;
 
   const activeParticipants = getActiveParticipants(calendar);
   const participantOptions = React.useMemo(() => {

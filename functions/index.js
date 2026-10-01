@@ -21,6 +21,7 @@ const {
   decideScheduleNotification,
   selectDeliverableSubscriptions
 } = require('./push-notify-policy');
+const { planSettlementReminders } = require('./settlement-reminders');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -1119,6 +1120,32 @@ exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
 
   if (promises.length === 0) {
     console.log('No eve schedule reminders for', tomorrowKey);
+    return null;
+  }
+  await Promise.all(promises);
+  return null;
+});
+
+// Monday evening: settlement cards still 진행중 a few days after they were opened
+// (settlement-reminders.js). Uses the schedule channel, like the meeting reminders above.
+exports.sendSettlementReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('10 19 * * 1').timeZone('Asia/Seoul').onRun(async () => {
+  ensureVapidConfigured();
+  const db = admin.firestore();
+  const snap = await db.collection('calendars').get();
+  const promises = [];
+  snap.forEach(doc => {
+    const calendar = (doc.data() || {}).calendar || {};
+    planSettlementReminders(calendar).forEach(reminder => {
+      promises.push(broadcastCalendarPush(doc.id, {
+        title: '정산 알림',
+        body: reminder.body,
+        url: `./?id=${doc.id.replace('cal_', '')}&tab=settlement`,
+        tag: `settlement-open-${doc.id}-${reminder.id}`
+      }, { channel: 'schedule' }));
+    });
+  });
+  if (!promises.length) {
+    console.log('No open settlement cards to remind');
     return null;
   }
   await Promise.all(promises);
