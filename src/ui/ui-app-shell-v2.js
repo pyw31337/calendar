@@ -1492,16 +1492,17 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     return () => { active = false; };
   }, [lat, lon]);
 
-  // Confirmed columns use the meeting place, not the saved home region. The D-day
-  // badge calls the same resolver, so both paint one daily max and weather code.
+  // A day with a place registered for it (place memo date / visitDate) shows that place's
+  // weather; every other day uses the saved region (or 서울). The D-day badge calls the same
+  // resolver, so both paint one daily max and weather code.
   const placeCoordsByDate = React.useMemo(() => {
     const map = {};
     days.forEach(day => {
-      if (!confirmedMeetingDates.has(day.dateStr)) return;
-      map[day.dateStr] = meetingPlaceWeatherCoords(calendar, day.dateStr);
+      const withCoords = orderedPlacesForDate(calendar, day.dateStr).find(p => p != null && p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+      if (withCoords) map[day.dateStr] = meetingPlaceWeatherCoords(calendar, day.dateStr);
     });
     return map;
-  }, [days, confirmedMeetingDates, calendar]);
+  }, [days, calendar]);
   const [placeForecasts, setPlaceForecasts] = React.useState({});
 
   React.useEffect(() => {
@@ -1524,42 +1525,48 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     return () => { active = false; };
   }, [placeCoordsByDate]);
 
-  // 3. 모달 오픈 시 위치 결정: 모임확정 일자이면 등록된 장소 우선, 그 외는 사용자 기본 위치
-  const modalWeatherLocation = React.useMemo(() => {
-    if (!selectedWeatherDate) return effectiveBaseLocation;
-    if (confirmedMeetingDates.has(selectedWeatherDate)) {
-      const places = orderedPlacesForDate(calendar, selectedWeatherDate);
-      const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
-      if (withCoords) {
-        const placeAreaName = String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim();
-        return {
-          lat: Number(withCoords.lat),
-          lon: Number(withCoords.lng),
-          name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim(),
-          areaName: placeAreaName,
-          isMeetingPlace: true,
-          needsReverseGeocode: !placeAreaName
-        };
-      }
-      const firstPlace = places[0];
-      const meeting = (Array.isArray(upcomingMeetings) ? upcomingMeetings : [])
-        .find(m => m?.date === selectedWeatherDate || (Array.isArray(m?.dates) && m.dates.includes(selectedWeatherDate)))
-        || getTrulyConfirmedMeetings(calendar).find(m => m?.date === selectedWeatherDate || (Array.isArray(m?.dates) && m.dates.includes(selectedWeatherDate)));
-      const placeName = firstPlace ? String(firstPlace.name || firstPlace.alias || firstPlace.address || '').trim() : (typeof meeting?.place === 'string' ? meeting.place.trim() : '');
-      if (placeName) {
-        return {
-          lat: effectiveBaseLocation.lat,
-          lon: effectiveBaseLocation.lon,
-          name: placeName,
-          areaName: String(firstPlace?.address || firstPlace?.roadAddress || firstPlace?.addressName || '').trim(),
-          isMeetingPlace: true,
-          needsGeocode: true,
-          needsReverseGeocode: false
-        };
-      }
+  // 3. 날짜별 날씨 위치: ① 그날 일정에 등록된 장소 → ② 저장해둔 날씨 지역 → ③ 서울.
+  // The modal asks again whenever its own day strip changes date, so one day's place never
+  // sticks to the other days.
+  const resolveWeatherLocationForDate = React.useCallback((dateStr) => {
+    if (!dateStr) return effectiveBaseLocation;
+    const places = orderedPlacesForDate(calendar, dateStr);
+    const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
+    if (withCoords) {
+      const placeAreaName = String(withCoords.address || withCoords.roadAddress || withCoords.addressName || '').trim();
+      return {
+        lat: Number(withCoords.lat),
+        lon: Number(withCoords.lng),
+        name: String(withCoords.name || withCoords.alias || withCoords.address || '모임 장소').trim(),
+        areaName: placeAreaName,
+        isMeetingPlace: true,
+        needsReverseGeocode: !placeAreaName
+      };
+    }
+    const firstPlace = places[0];
+    const meeting = confirmedMeetingDates.has(dateStr)
+      ? ((Array.isArray(upcomingMeetings) ? upcomingMeetings : [])
+        .find(m => m?.date === dateStr || (Array.isArray(m?.dates) && m.dates.includes(dateStr)))
+        || getTrulyConfirmedMeetings(calendar).find(m => m?.date === dateStr || (Array.isArray(m?.dates) && m.dates.includes(dateStr))))
+      : null;
+    const placeName = firstPlace ? String(firstPlace.name || firstPlace.alias || firstPlace.address || '').trim() : (typeof meeting?.place === 'string' ? meeting.place.trim() : '');
+    if (placeName) {
+      return {
+        lat: effectiveBaseLocation.lat,
+        lon: effectiveBaseLocation.lon,
+        name: placeName,
+        areaName: String(firstPlace?.address || firstPlace?.roadAddress || firstPlace?.addressName || '').trim(),
+        isMeetingPlace: true,
+        needsGeocode: true,
+        needsReverseGeocode: false
+      };
     }
     return effectiveBaseLocation;
-  }, [selectedWeatherDate, confirmedMeetingDates, calendar, upcomingMeetings, effectiveBaseLocation]);
+  }, [confirmedMeetingDates, calendar, upcomingMeetings, effectiveBaseLocation]);
+  const modalWeatherLocation = React.useMemo(
+    () => resolveWeatherLocationForDate(selectedWeatherDate),
+    [resolveWeatherLocationForDate, selectedWeatherDate]
+  );
 
   const WeatherDetailModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal) || null;
 
@@ -1571,9 +1578,9 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     },
       days.map(day => {
         const isConfirmed = confirmedMeetingDates.has(day.dateStr);
-        const placeCoords = isConfirmed ? placeCoordsByDate[day.dateStr] : null;
+        const placeCoords = placeCoordsByDate[day.dateStr] || null;
         const cachedPlace = placeCoords ? readFourDayWeatherMem(placeCoords.lat, placeCoords.lon) : null;
-        const forecast = isConfirmed
+        const forecast = placeCoords
           ? (placeForecasts[day.dateStr] || (cachedPlace && cachedPlace[day.dateStr]) || null)
           : (weatherData ? weatherData[day.dateStr] : null);
         const code = forecast?.code ?? 1;
@@ -1609,6 +1616,7 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     selectedWeatherDate && WeatherDetailModal && React.createElement(WeatherDetailModal, {
       dateStr: selectedWeatherDate,
       weatherLocation: modalWeatherLocation,
+      resolveLocationForDate: resolveWeatherLocationForDate,
       days,
       onClose: () => setSelectedWeatherDate(null),
       onSaveLocation: handleSaveLocation,

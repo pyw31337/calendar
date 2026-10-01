@@ -1144,6 +1144,7 @@ export function WeatherDetailModal({
   onClose,
   onSelectDate,
   onSaveLocation,
+  resolveLocationForDate = null,
   days = []
 }) {
   const React = window.React;
@@ -1168,21 +1169,31 @@ export function WeatherDetailModal({
     onSaveLocationRef.current = onSaveLocation;
   }, [onSaveLocation]);
 
+  // Each day resolves its own location (that day's registered place, else the saved region,
+  // else 서울). A region the user just picked for the day on screen wins until they move to
+  // another day. Calendar refreshes re-run this for the day on screen, not the opening day.
+  const resolveLocationRef = React.useRef(resolveLocationForDate);
+  resolveLocationRef.current = resolveLocationForDate;
+  const pickedForDateRef = React.useRef('');
   React.useEffect(() => {
-    if (weatherLocation) {
-      setCurrentLocation(previous => {
-        const sameMeetingCoordinates = previous?.isMeetingPlace
-          && weatherLocation?.isMeetingPlace
-          && Number(previous.lat) === Number(weatherLocation.lat)
-          && Number(previous.lon) === Number(weatherLocation.lon);
-        // The parent reconstructs a meeting-location object on ordinary
-        // calendar renders. Keep an area we already resolved instead of
-        // needlessly discarding it and issuing another reverse lookup.
-        if (sameMeetingCoordinates && previous.areaName && !weatherLocation.areaName) return previous;
-        return weatherLocation;
-      });
-    }
-  }, [weatherLocation]);
+    if (pickedForDateRef.current && pickedForDateRef.current === selectedDate) return;
+    pickedForDateRef.current = '';
+    const resolve = resolveLocationRef.current;
+    const next = (typeof resolve === 'function' ? resolve(selectedDate) : null) || weatherLocation;
+    if (!next) return;
+    setCurrentLocation(previous => {
+      const sameMeetingCoordinates = previous?.isMeetingPlace
+        && next?.isMeetingPlace
+        && Number(previous.lat) === Number(next.lat)
+        && Number(previous.lon) === Number(next.lon);
+      // The parent reconstructs a meeting-location object on ordinary
+      // calendar renders. Keep an area we already resolved instead of
+      // needlessly discarding it and issuing another reverse lookup.
+      if (sameMeetingCoordinates && previous.areaName && !next.areaName) return previous;
+      if (sameMeetingCoordinates && previous.name === next.name && previous.areaName === next.areaName) return previous;
+      return next;
+    });
+  }, [weatherLocation, selectedDate]);
 
   // If a location has a place name but needs geocoding:
   React.useEffect(() => {
@@ -2087,6 +2098,7 @@ export function WeatherDetailModal({
             ...newLoc,
             needsReverseGeocode: Boolean(newLoc.needsReverseGeocode || (!newLoc.areaName && newLoc.regionName === '현재 위치'))
           };
+          pickedForDateRef.current = selectedDate;
           setCurrentLocation(next);
           onSaveLocation?.(next);
         }
