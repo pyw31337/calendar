@@ -4,7 +4,8 @@
 //   REPAIR_CALENDAR_IDS=cw npm run ops:repair-tag-divergence            # report only
 //   REPAIR_CALENDAR_IDS=cw APPLY=1 npm run ops:repair-tag-divergence    # write (after ops:export backup)
 //
-// Which copy is right: the photoIndex row. It is rebuilt from the latest write to any copy, and
+// Which copy is right: the photoIndex row, unless another copy holds every index tag and more
+// (a write the index has not caught up with yet -- see below). It is rebuilt from the latest write to any copy, and
 // in every audited sample it held the newest tag set -- the stale copy was either the chat message
 // (an album-only save never reached it) or an album entry (the date-link commit put back the
 // previous tags). Photos without an index row fall back to the owning message's tags.
@@ -88,7 +89,17 @@ async function repairCalendar(calendarId) {
   const plan = [];
   copies.forEach(list => {
     if (list.length < 2 || new Set(list.map(c => tagSet(c.tags))).size < 2) return;
-    const canonical = list.find(c => c.kind === 'index') || list.find(c => c.kind === 'message') || list.find(c => c.kind === 'memo');
+    const preferred = list.find(c => c.kind === 'index') || list.find(c => c.kind === 'message') || list.find(c => c.kind === 'memo');
+    // The index row is rebuilt asynchronously after a write, so for a short while a source copy
+    // can hold MORE tags than the index (a tag just added). A copy that contains every index tag
+    // and more is that newer write -- never roll it back to the index.
+    const tokensOf = c => new Set(tagSet(c?.tags).split(' ').filter(Boolean));
+    const base = tokensOf(preferred);
+    const superset = list
+      .filter(c => c.kind !== 'index' && c !== preferred)
+      .filter(c => { const t = tokensOf(c); return t.size > base.size && [...base].every(x => t.has(x)); })
+      .sort((x, y) => tokensOf(y).size - tokensOf(x).size)[0];
+    const canonical = superset || preferred;
     if (!canonical) return; // album-only copies: no authority to pick from, leave for a person
     const owner = list.find(c => c.kind === 'message') || null;
     const memo = list.find(c => c.kind === 'memo') || null;

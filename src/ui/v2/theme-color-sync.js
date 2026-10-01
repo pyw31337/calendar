@@ -7,7 +7,7 @@
 // page header (white in light, near-black in dark).
 // The hero color also follows the color theme's point color (<html data-accent>, color-themes.css).
 const THEME_COLORS = {
-  light: { home: '#4F46E5', page: '#FFFFFF', accents: { orange: '#F0601A', blue: '#2257E0', pink: '#F0386B' } },
+  light: { home: '#4F46E5', page: '#FFFFFF', accents: { orange: '#FF5F0F', blue: '#1F6BFF', pink: '#FF2D6F' } },
   dark: { home: '#C9FD58', page: '#1C1C1E', accents: { orange: '#FF7A1A', blue: '#4DA3FF', pink: '#FF4F8B' } }
 };
 

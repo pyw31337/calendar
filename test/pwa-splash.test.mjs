@@ -31,6 +31,16 @@ test('PWA splash screen dismiss logic is integrated into main.jsx boot lifecycle
 
   // Verify fallback cleanup on boot status or error
   assert.match(mainJs, /showBootStatus[\s\S]*?app-splash[\s\S]*?splash\.remove\(\)/, 'showBootStatus cleans up splash overlay');
+  // The normal "loading" status at the start of boot() must leave the splash up; it used to
+  // remove it ~0.2-0.5s after launch, so phones showed a gray loading line instead.
+  assert.match(mainJs, /showBootStatus\('모여라 캘린더 불러오는 중…', \{ keepSplash: true \}\)/);
+});
+
+test('iOS launch images exist for every linked iPhone size', () => {
+  const html = fs.readFileSync('src/index.html', 'utf8');
+  const hrefs = [...html.matchAll(/rel="apple-touch-startup-image"[^>]*href="([^"]+)"/g)].map(m => m[1]);
+  assert.ok(hrefs.length >= 10, 'one launch image per supported iPhone screen');
+  for (const href of hrefs) assert.ok(fs.existsSync(href), `${href} exists`);
 });
 
 test('all PWA manifests have background_color matching splash theme', () => {

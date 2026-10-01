@@ -933,6 +933,25 @@ export function PlacesView({
   const [categoryFilter, setCategoryFilter] = React.useState('all');
   const [visitFilter, setVisitFilter] = React.useState('all'); // 'all', 'visited', 'planned'
   const [mapExpanded, setMapExpanded] = React.useState(false);
+  // The expanded map is position:fixed over the page. top:0/bottom:0 put its top edge (and the
+  // zoom control) under the page header and its bottom under the mobile nav, so it now spans the
+  // gap between the two, re-measured on resize/rotation (the header height includes the
+  // standalone-app status bar inset).
+  const [expandedMapInsets, setExpandedMapInsets] = React.useState({ top: 0, bottom: 0 });
+  React.useLayoutEffect(() => {
+    if (!mapExpanded) return undefined;
+    const measure = () => {
+      const visible = el => el && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
+      const header = Array.from(document.querySelectorAll('.bp-header, .v2-page-header')).find(visible);
+      const nav = Array.from(document.querySelectorAll('.bp-mobile-bottom-nav')).find(visible);
+      const top = header ? Math.max(0, Math.round(header.getBoundingClientRect().bottom)) : 0;
+      const bottom = nav ? Math.max(0, Math.round(window.innerHeight - nav.getBoundingClientRect().top)) : 0;
+      setExpandedMapInsets(prev => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [mapExpanded]);
   // { id, token } for PlaceMapView's focus effect -- token increments on every select so clicking
   // the same list row twice in a row still re-triggers the pan/zoom even though id didn't change.
   const [focusPlace, setFocusPlace] = React.useState(null);
@@ -1562,7 +1581,7 @@ export function PlacesView({
       className: "places-map-sticky-area",
       ref: mapAreaRef,
       style: mapExpanded
-        ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005 }
+        ? { position: 'fixed', top: expandedMapInsets.top, left: 0, right: 0, bottom: expandedMapInsets.bottom, zIndex: 1005 }
         : { position: 'relative', width: '100%', height: `${mapHeight}px`, minHeight: '160px', flexShrink: 0, zIndex: 10 }
     },
       /*#__PURE__*/React.createElement(PlaceMapView, {
