@@ -14,7 +14,7 @@ const v2Css = readdirSync(v2Dir)
 test('stored theme values parse to a mode and an optional point color', () => {
   assert.deepEqual(parseThemeChoice('light'), { mode: 'light', accent: '' });
   assert.deepEqual(parseThemeChoice('dark:orange'), { mode: 'dark', accent: 'orange' });
-  assert.deepEqual(parseThemeChoice('dark:pink'), { mode: 'dark', accent: '' });
+  assert.deepEqual(parseThemeChoice('dark:teal'), { mode: 'dark', accent: '' });
   assert.deepEqual(parseThemeChoice(null), { mode: 'system', accent: '' });
   assert.equal(serializeThemeChoice({ mode: 'light', accent: 'blue' }), 'light:blue');
   assert.equal(serializeThemeChoice({ mode: 'dark', accent: '' }), 'dark');
@@ -59,6 +59,8 @@ test('each point-color theme defines every token the V2 CSS reads', () => {
     'light:blue': block('html[data-accent="blue"]:not([data-theme="dark"]):has(.renewal-shell.v2-design)'),
     'dark:orange': block('html[data-theme="dark"][data-accent="orange"]:has(.renewal-shell.v2-design)'),
     'dark:blue': block('html[data-theme="dark"][data-accent="blue"]:has(.renewal-shell.v2-design)'),
+    'light:pink': block('html[data-accent="pink"]:not([data-theme="dark"]):has(.renewal-shell.v2-design)'),
+    'dark:pink': block('html[data-theme="dark"][data-accent="pink"]:has(.renewal-shell.v2-design)'),
   };
   for (const token of used) {
     for (const [id, body] of Object.entries(blocks)) {

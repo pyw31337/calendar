@@ -149,7 +149,7 @@ function ColorThemePicker({ value, onSelect }) {
     }, group.label),
     /*#__PURE__*/React.createElement("div", {
       className: "v2-color-theme-grid",
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '6px' }
     },
       COLOR_THEMES.filter(theme => theme.mode === group.mode).map(theme => {
         const selected = theme.id === value;
