@@ -19,11 +19,12 @@ import {
   getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
 } from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
-import { createBulkImageTagSaveHandler, createImageTagSaveHandler, MAX_MEDIA_TAGS, MAX_MEDIA_TAG_TEXT_LENGTH } from './app-image-tag-save.js';
+import { createBulkImageTagSaveHandler, createImageTagSaveHandler, createImageTagSaveState, MAX_MEDIA_TAGS, MAX_MEDIA_TAG_TEXT_LENGTH } from './app-image-tag-save.js';
+import { saveBulkPhotoTagsRemote } from './bulk-photo-tags.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap } from './photo-geo.js';
-import { syncAssetTagsInMeetings } from './media-reference-integrity.js';
+import { sharesAsset, syncAssetTagsInMeetings } from './media-reference-integrity.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -3697,13 +3698,18 @@ function CalendarApp() {
     const validDates = Array.from(new Set((Array.isArray(dateStrs) ? dateStrs : []).filter(isValidDateString)));
     const sourceMessageId = sourceMessage.id;
     const sourceImageIndex = Number.isInteger(photo.imageIndex) ? photo.imageIndex : 0;
-    const existingMeetings = getConfirmedMeetings(activeCal);
+    // Latest local albums (the closure's activeCal can be renders old), with this photo's copies
+    // already carrying the new tags: every album this commit rewrites must not put back an older
+    // tag set for it (the server write-through ran just before).
+    const asset = { imageUrl: photo.imageUrl, thumbUrl: photo.thumbUrl || '' };
+    const synced = syncAssetTagsInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), asset, cleanTags || '');
+    const existingMeetings = synced.meetings;
     const byDate = new Map(existingMeetings.map(meeting => [meeting.date, {
       ...meeting,
       photos: Array.isArray(meeting.photos) ? [...meeting.photos] : []
     }]));
     const now = Date.now();
-    let changed = false;
+    let changed = synced.changed;
     byDate.forEach((meeting, dateStr) => {
       if (validDates.includes(dateStr)) return;
       const nextPhotos = meeting.photos.filter(p => !(p?.sourceMessageId === sourceMessageId && p?.sourceImageIndex === sourceImageIndex));
@@ -3723,7 +3729,10 @@ function CalendarApp() {
         photos: []
       };
       const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
-      const alreadyLinked = photos.some(p => p?.sourceMessageId === sourceMessageId && p?.sourceImageIndex === sourceImageIndex);
+      // The same file can already sit in this album under another identity (uploaded straight
+      // into the album, or linked from an older copy) -- adding it again made duplicates whose
+      // tags then drifted apart.
+      const alreadyLinked = photos.some(p => (p?.sourceMessageId === sourceMessageId && p?.sourceImageIndex === sourceImageIndex) || sharesAsset(p, asset));
       if (alreadyLinked) {
         byDate.set(dateStr, meeting);
         return;
@@ -3766,7 +3775,7 @@ function CalendarApp() {
   // tags field, identified by meetingDate+photoId rather than messageId/imageIndex.
   const handleSaveMeetingPhotoTags = async (meetingDate, photoId, tagsText) => {
     if (!activeCal || !meetingDate || !photoId) return false;
-    const existingMeetings = getConfirmedMeetings(activeCal);
+    const existingMeetings = getConfirmedMeetings(activeCalRef.current || activeCal);
     const meeting = existingMeetings.find(m => m.date === meetingDate);
     const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
     const photoIndex = photos.findIndex(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId);
@@ -3778,8 +3787,20 @@ function CalendarApp() {
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
     )).slice(0, MAX_MEDIA_TAGS);
     const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), MAX_MEDIA_TAG_TEXT_LENGTH);
+    // Every album copy of this file gets the tags, not just the tapped one; then the server
+    // command carries them to the chat/gallery message or memo that owns the upload, which this
+    // path never updated (채팅 showed no tags while 일정/갤러리 did).
+    const target = photos[photoIndex];
+    const asset = { imageUrl: target.imageUrl || target.full || target.url || '', thumbUrl: target.thumbUrl || target.thumb || '' };
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
-    const saved = await commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
+    const withTarget = existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m);
+    const saved = await commitConfirmedMeetings(syncAssetTagsInMeetings(withTarget, asset, cleanTags).meetings, '태그 저장완료');
+    if (saved && /^https?:\/\//i.test(asset.imageUrl || asset.thumbUrl)) {
+      saveBulkPhotoTagsRemote({
+        calendarId: activeCal.id, projectId: firebaseConfig.projectId,
+        changes: [{ photo: { ...asset, messageId: target.sourceMessageId || '' }, tags: cleanTags }]
+      }).catch(err => console.warn('Meeting photo tag write-through skipped:', err));
+    }
     return Boolean(saved);
   };
 
@@ -3818,8 +3839,13 @@ function CalendarApp() {
     }
   };
 
+  // One save queue per calendar session, not per render (app-image-tag-save.js).
+  const imageTagSaveStateRef = React.useRef(null);
+  if (!imageTagSaveStateRef.current || imageTagSaveStateRef.current.calId !== activeCalId) {
+    imageTagSaveStateRef.current = { ...createImageTagSaveState(), calId: activeCalId };
+  }
   const handleSaveImageTags = createImageTagSaveHandler({
-    activeCalId, chatMessages, firebaseDb, findMemoById: (...args) => findMemoById(...args), writeCollectionDocumentWithFallback,
+    activeCalId, chatMessages, getChatMessages: () => chatMessagesRef.current, saveState: imageTagSaveStateRef.current, firebaseDb, findMemoById: (...args) => findMemoById(...args), writeCollectionDocumentWithFallback,
     sanitizeMemoForFirestore, setMemos, patchGalleryArchiveMemo, galleryPhotoIndex, fetchMessageRest,
     withTimeout, showToast, handleSaveAnniversaryPhotoTags, handleSaveMeetingPhotoTags,
     getMessageImageEntries, resolveMessagePhotoImageIndex, reconcileMessageImageTagMap,
@@ -3831,10 +3857,14 @@ function CalendarApp() {
       const { meetings, changed } = syncAssetTagsInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), asset, tags);
       if (!changed) return true;
       return commitConfirmedMeetings(meetings, null, [], 'write', 'success');
-    }
+    },
+    tagAssetRemote: (asset, tags) => saveBulkPhotoTagsRemote({
+      calendarId: activeCalId, projectId: firebaseConfig.projectId, changes: [{ photo: asset, tags }]
+    })
   });
   const handleBulkSaveImageTags = createBulkImageTagSaveHandler({
     activeCalId,
+    saveState: imageTagSaveStateRef.current,
     projectId: firebaseConfig.projectId,
     galleryPhotoIndex,
     invalidatePhotoIndexCache,
