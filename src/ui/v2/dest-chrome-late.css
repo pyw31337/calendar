@@ -7224,7 +7224,7 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
    as one unbreakable chunk: nowrap + min-width: max-content so
    "2026.09.05 (토)" cannot ellipsis mid-number or stack one glyph per line.
    Person/place .archive-detail-title stays a single line. */
-.archive-memory-detail-head {
+.renewal-shell.v2-design .archive-memory-detail-head {
   display: flex !important;
   flex-direction: column !important;
   flex-wrap: nowrap !important;
@@ -7233,8 +7233,8 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   min-width: 0;
   gap: 6px;
 }
-.archive-memory-detail-title-row,
-.archive-memory-detail-date-row {
+.renewal-shell.v2-design .archive-memory-detail-title-row,
+.renewal-shell.v2-design .archive-memory-detail-date-row {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -7245,10 +7245,10 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   flex: 0 0 auto !important;
   box-sizing: border-box !important;
 }
-.archive-memory-detail-date-row {
+.renewal-shell.v2-design .archive-memory-detail-date-row {
   padding-left: 40px !important;
 }
-.archive-memory-detail-title {
+.renewal-shell.v2-design .archive-memory-detail-title {
   flex: 1 1 auto !important;
   min-width: 0 !important;
   white-space: normal !important;
@@ -7258,7 +7258,7 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   overflow: visible !important;
   text-overflow: clip !important;
 }
-.archive-memory-detail-date {
+.renewal-shell.v2-design .archive-memory-detail-date {
   flex: 0 0 auto !important;
   width: max-content !important;
   max-width: none !important;
@@ -7271,13 +7271,13 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   overflow: visible !important;
   text-overflow: clip !important;
 }
-.archive-detail-title {
+.renewal-shell.v2-design .archive-detail-title {
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
   writing-mode: horizontal-tb !important;
 }
-.archive-memory-detail-actions {
+.renewal-shell.v2-design .archive-memory-detail-actions {
   flex: 0 0 auto !important;
   width: auto !important;
   max-width: max-content;
@@ -7287,94 +7287,94 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
 /* Mobile tag editor (인물 사진 일괄 태그). Desktop stays the compact bar.
    One-line controls are capsules; the card itself is a rounded rectangle. */
 @media (max-width: 767px) {
-  .v2-photo-bulk-bar {
+  .renewal-shell.v2-design .v2-photo-bulk-bar {
     max-height: min(72dvh, 560px);
     overflow: auto;
     padding: 14px 12px 16px !important;
     gap: 14px !important;
     border-radius: 16px !important;
   }
-  .v2-photo-bulk-bar .bulk-top {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-top {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 10px !important;
   }
-  .v2-photo-bulk-bar .bulk-count {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-count {
     flex-wrap: wrap !important;
     min-width: 0;
     width: 100%;
   }
-  .v2-photo-bulk-bar .bulk-count-total {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-count-total {
     white-space: nowrap !important;
   }
-  .v2-photo-bulk-bar .bulk-select-all {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-select-all {
     flex: 1 1 100%;
     min-height: 44px !important;
     border-radius: 999px !important;
     padding: 0 14px !important;
     font-size: 0.95rem !important;
   }
-  .v2-photo-bulk-bar .bulk-kbd-hint {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-kbd-hint {
     display: none !important;
   }
-  .v2-photo-bulk-bar .bulk-actions {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-actions {
     display: grid !important;
     grid-template-columns: 1fr 1fr;
     gap: 8px !important;
     width: 100%;
   }
-  .v2-photo-bulk-bar .bulk-actions > button,
-  .v2-photo-bulk-bar .bulk-chip,
-  .v2-photo-bulk-bar .bulk-tag-input,
-  .v2-photo-bulk-bar .bulk-add,
-  .v2-photo-bulk-bar .bulk-apply {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-actions > button,
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-chip,
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-tag-input,
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-add,
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-apply {
     min-height: 44px !important;
     height: auto !important;
     box-sizing: border-box;
   }
-  .v2-photo-bulk-bar .bulk-actions > button {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-actions > button {
     width: 100%;
     justify-content: center;
     border-radius: 999px !important;
     padding: 0 12px !important;
   }
-  .v2-photo-bulk-bar .bulk-chip-row {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-chip-row {
     max-height: none !important;
     overflow: visible !important;
     gap: 8px !important;
   }
-  .v2-photo-bulk-bar .bulk-chip {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-chip {
     padding: 0 14px !important;
     border-radius: 999px !important;
     font-size: 0.95rem !important;
   }
-  .v2-photo-bulk-bar .bulk-input-row {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-input-row {
     flex-direction: column !important;
     align-items: stretch !important;
   }
-  .v2-photo-bulk-bar .bulk-input-row > div {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-input-row > div {
     min-width: 0 !important;
     width: 100%;
   }
-  .v2-photo-bulk-bar .bulk-tag-input,
-  .v2-photo-bulk-bar .bulk-add,
-  .v2-photo-bulk-bar .bulk-apply {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-tag-input,
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-add,
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-apply {
     border-radius: 999px !important;
   }
-  .v2-photo-bulk-bar .bulk-apply {
+  .renewal-shell.v2-design .v2-photo-bulk-bar .bulk-apply {
     width: 100%;
     margin-left: 0 !important;
     white-space: normal !important;
     line-height: 1.3;
     padding: 10px 16px !important;
   }
-  .gallery-bulk-tag-panel button,
-  .gallery-bulk-tag-panel .form-input,
-  .v2-archive-place-assign-bar button {
+  .renewal-shell.v2-design .gallery-bulk-tag-panel button,
+  .renewal-shell.v2-design .gallery-bulk-tag-panel .form-input,
+  .renewal-shell.v2-design .v2-archive-place-assign-bar button {
     min-height: 44px !important;
     border-radius: 999px !important;
   }
-  .gallery-bulk-tag-panel strong {
+  .renewal-shell.v2-design .gallery-bulk-tag-panel strong {
     white-space: nowrap;
   }
 }
