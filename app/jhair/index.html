@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="4c133b84d3108147eb06e1912978bbff8b1c5527" />
+    <meta name="build-sha" content="2764c570305310dadad94ed2af9eaceb47787ba9" />
     <meta name="v2-polish" content="2026-09-21-search-page" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
@@ -49,11 +49,8 @@
       })();
       (function () {
         try {
-          // V2 is the default shell everywhere now (isRenewalShellEnabled: absent shell param
-          // = V2, `?shell=v1` is the escape hatch) -- this script no longer needs to force
-          // `shell=v2` itself, and MUST NOT touch the `shell` param at all, or it would silently
-          // clobber an explicit `?shell=v1` opt-out on non-github.io hosts. Its only remaining
-          // job is defaulting `id` for old bookmarked/shared links on custom domains that predate
+          // V2 is the only shell (the V1 tree and `?shell=v1` were removed), so this script never
+          // touches the `shell` param. Its only job is defaulting `id` for old bookmarked/shared links on custom domains that predate
           // the `id`/`cal` param. Production github.io / local preview already carry an explicit
           // `id`, so this only ever fires for other hosts.
           var host = String(location.hostname || '');
@@ -408,7 +405,7 @@
         50% { transform: scale(1.3); opacity: 1; }
       }
     </style>
-    <script type="module" crossorigin src="/calendar/assets/index-p4evX7bn.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-BWyWb1am.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-BlvjZ7S5.js">
