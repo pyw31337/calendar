@@ -3223,8 +3223,11 @@ export function HistoryView({
         onScroll: handleHistoryScroll,
         style: historyScrollStyle
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-        /*#__PURE__*/React.createElement("div", { className: "archive-memory-detail-head", style: { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 } },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
+        /*#__PURE__*/React.createElement("div", { className: "archive-memory-detail-head", style: { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px', minWidth: 0, width: '100%' } },
+          /*#__PURE__*/React.createElement("div", {
+            className: "archive-memory-detail-title-row",
+            style: { display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: '8px', minWidth: 0, width: '100%' }
+          },
             /*#__PURE__*/React.createElement("button", {
               type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
               style: {
@@ -3234,7 +3237,7 @@ export function HistoryView({
             }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
             /*#__PURE__*/React.createElement("span", {
               className: "archive-memory-detail-title",
-              style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' }
+              style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }
             }, group.title),
             !isMemoryEditMode ? /*#__PURE__*/React.createElement("div", {
               className: "archive-memory-detail-actions",
@@ -3246,11 +3249,11 @@ export function HistoryView({
           ),
           /*#__PURE__*/React.createElement("div", {
             className: "archive-memory-detail-date-row",
-            style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingLeft: '40px' }
+            style: { display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', gap: '8px', minWidth: 0, width: '100%', paddingLeft: '40px', boxSizing: 'border-box' }
           },
             /*#__PURE__*/React.createElement("span", {
               className: "archive-memory-detail-date",
-              style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }
+              style: { flex: '0 0 auto', minWidth: 'max-content', width: 'max-content', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'visible', textOverflow: 'clip' }
             }, formatHistoryDateRange(group.startDate, group.endDate)),
             isMemoryEditMode ? /*#__PURE__*/React.createElement("div", {
               className: "archive-memory-detail-actions",
