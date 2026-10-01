@@ -2048,11 +2048,16 @@ export function DateModal({
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      flexWrap: 'wrap',
-      minWidth: 0
+      // Date + holiday badge stay on one row (the badge used to drop to a second line at 320px).
+      flexWrap: 'nowrap',
+      whiteSpace: 'nowrap',
+      minWidth: 0,
+      flex: '1 1 auto',
+      overflow: 'hidden'
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
+      flexShrink: 0,
       fontSize: '1.05rem',
       fontWeight: 800,
       color: 'var(--text-main)',
@@ -2074,8 +2079,14 @@ export function DateModal({
         backgroundColor: '#FEF2F2',
         color: '#EF4444',
         border: '1px solid #FEE2E2',
-        verticalAlign: 'middle'
-      }
+        verticalAlign: 'middle',
+        // A long name ("대체공휴일(개천절)") shrinks with an ellipsis instead of running under the buttons.
+        minWidth: 0,
+        flexShrink: 1,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis'
+      },
+      title: holidayLabelText
     }, holidayLabelText)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -2103,7 +2114,8 @@ export function DateModal({
       minHeight: 34,
       boxSizing: 'border-box'
     },
-    title: "이 날짜로 기념일 등록"
+    title: "이 날짜로 기념일 등록",
+    "aria-label": "이 날짜로 기념일 등록"
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "16",
@@ -2116,7 +2128,7 @@ export function DateModal({
     strokeLinejoin: "round",
     "aria-hidden": "true",
     style: { flexShrink: 0 }
-  }, /*#__PURE__*/React.createElement("path", { d: "M4 4h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M14 4h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M4 14h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M14 17h6" }), /*#__PURE__*/React.createElement("path", { d: "M17 14v6" })), "기념일 등록"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("path", { d: "M4 4h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M14 4h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M4 14h6v6h-6v-6" }), /*#__PURE__*/React.createElement("path", { d: "M14 17h6" }), /*#__PURE__*/React.createElement("path", { d: "M17 14v6" })), /*#__PURE__*/React.createElement("span", { className: "date-modal-anniv-btn-label" }, "기념일 등록")), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: isBentoSheet ? "bp-sheet-close modal-close-btn" : "modal-close-btn",
     onClick: () => {
