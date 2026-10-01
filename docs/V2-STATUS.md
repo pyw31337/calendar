@@ -4,7 +4,7 @@
 
 ## 상태
 
-- **기본 URL 컷오버: 완료.** `?id=cw` 는 이제 V2. `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백 탈출구.
+- **기본 URL 컷오버: 완료.** `?id=cw` 는 V2. **V1 폴백(`?shell=v1`)과 V1 뷰 트리는 2026-10 제거됨** — 옛 `?shell=v1` 주소도 V2로 열린다.
 - **다크모드 P0: 완료.** Phase1–4(#736/#737/#738/#739/#741) 전부 머지됨. Phase4가 근본 원인(`--renewal-*` 토큰 재하드코딩)을 잡았고, 라이브 배포본에서 8개 페이지 + Confirm 다이얼로그·토스트·ShareModal까지 재확인 완료. 재발 방지용 포괄 가드 테스트(`test/v2-dark-tokens-guard.test.mjs`)도 추가됨.
 - **Safari 모바일 채팅 VV: 정적 코드 리뷰 + 관련 자동 테스트 24개 전부 통과, 실기기 서명은 사용자가 추후 직접 진행.** 문제 발견 시 `?shell=v1`로 즉시 V1로 되돌릴 수 있다는 전제로 컷오버 순서를 이 확인보다 앞당겼다.
 - 다크 전용 인수인계: **[`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md)**
@@ -13,7 +13,6 @@
 ## 라이브
 
 - V2(기본): https://pyw31337.github.io/calendar/?id=cw
-- V1(폴백): https://pyw31337.github.io/calendar/?id=cw&shell=v1
 - 다크 강제: `localStorage.setItem('gather_theme_preference_cw_v1','dark'); location.reload()`
 
 ## 컷오버 요약 (2026-09-23)

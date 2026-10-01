@@ -278,7 +278,7 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
     const page = await context.newPage();
     try {
       // Cutover check: the bare URL with no `shell` param must now render V2 by default
-      // (isRenewalShellEnabled: absent shell = V2, `?shell=v1` is the escape hatch).
+      // (V2 is the only shell; the V1 tree and its ?shell=v1 escape hatch were removed).
       await gotoBootReady(page, `${baseUrl}?id=cw`);
       await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
       pass(`[${viewport.name}] 기본 URL(shell 파라미터 없음)도 V2 렌더`);
@@ -426,43 +426,17 @@ async function checkPhotoCommentIsolation(browser, baseUrl) {
   }
 }
 
-async function checkDeferredManual(browser, baseUrl) {
-  const label = '사용자 매뉴얼 메뉴 제거';
-  const context = await browser.newContext(mobileContextOptions());
-  const page = await context.newPage();
-  try {
-    // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
-    // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
-    await page.goto(`${baseUrl}?id=kkot&shell=v1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
-    const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
-    await menuButton.waitFor({ state: 'visible', timeout: 8000 });
-    await menuButton.dispatchEvent('click');
-    const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
-    await menu.waitFor({ state: 'visible', timeout: 8000 });
-    const manualCount = await menu.locator('text=사용자 매뉴얼').count();
-    if (manualCount !== 0) fail(label, '사용자 매뉴얼 항목이 아직 사이드 메뉴에 있습니다.');
-    else pass(label);
-  } catch (err) {
-    fail(label, err.message);
-  } finally {
-    await context.close();
-  }
-}
-
 async function checkMemoTagInput(browser, baseUrl) {
   const label = '메모 작성 태그입력 모듈';
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    // Cutover: default shell is now V2, whose extra chrome around the reused V1 memo
-    // composer makes the '닫기' button selector below match 2 elements instead of 1.
-    // shell=v1 keeps this check scoped to the legacy composer it was written against.
-    await gotoBootReady(page, `${baseUrl}?id=kkot&shell=v1&view=memo`);
+    // V2 memo destination (the V1 shell was removed).
+    await gotoBootReady(page, `${baseUrl}?id=kkot&tab=memo`);
     await page.getByText('새로운 메모를 남겨보세요...', { exact: true }).click();
 
     const participantButton = page.getByRole('button', { name: '작성자 선택' });
-    const tagInput = page.getByPlaceholder('태그 입력 (0/10)', { exact: true });
+    const tagInput = page.getByPlaceholder(/^태그 입력 \(0\/\d+\)$/);
     await participantButton.waitFor({ state: 'visible', timeout: 5000 });
     await tagInput.waitFor({ state: 'visible', timeout: 5000 });
     await tagInput.fill('회귀검사');
@@ -470,7 +444,8 @@ async function checkMemoTagInput(browser, baseUrl) {
     await page.getByText('#회귀검사', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
 
     // Close without saving the memo: this check exercises only the local composer state.
-    await page.getByRole('button', { name: '닫기', exact: true }).click();
+    // V2 keeps its own header 닫기 next to the composer's; the composer's is the last one opened.
+    await page.getByRole('button', { name: '닫기', exact: true }).last().click();
     pass(label);
   } catch (err) {
     fail(label, err.message);
@@ -505,9 +480,7 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       else errors.push(err.message);
     });
     try {
-      // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
-      // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
-      await gotoBootReady(page, `${baseUrl}?id=kkot&shell=v1&view=settlement`);
+      await gotoBootReady(page, `${baseUrl}?id=kkot&tab=settlement`);
 
       const editButton = page.locator('[data-settlement-edit-button="true"]').first();
       // Hosted runners may intentionally have no production settlement fixture. This is a
@@ -523,11 +496,8 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       await editDialog.locator('button').filter({ hasText: '취소' }).first().click();
       await editDialog.waitFor({ state: 'hidden', timeout: 5000 });
 
-      const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
-      await menuButton.click();
-      const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
-      await menu.waitFor({ state: 'visible', timeout: 5000 });
-      await menu.locator('button.admin-side-menu-item').filter({ hasText: '정산 생성' }).first().click();
+      // V2 정산 header: the 정산 생성 icon button (src/ui/v2/screens.js).
+      await page.getByRole('button', { name: '정산 생성', exact: true }).first().click();
       const createDialog = page.locator('[role="dialog"]').filter({ hasText: '정산 생성' }).first();
       await createDialog.waitFor({ state: 'visible', timeout: 5000 });
       await createDialog.locator('button').filter({ hasText: '취소' }).first().click();
@@ -539,84 +509,6 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       fail(label, err.message);
     } finally {
       await context.close();
-    }
-  }
-}
-
-async function checkSideMenuNavigation(browser, baseUrl) {
-  const sources = [
-    ['', '메인'],
-    ['&view=chat', '채팅'],
-    ['&view=gallery', '갤러리'],
-    ['&view=places', '장소'],
-    ['&view=memo', '메모'],
-    ['&view=settlement', '정산']
-  ];
-  const selectedSources = DEPLOY_SCOPE
-    ? sources.filter(([, label]) => ['메인', '채팅', '갤러리'].includes(label))
-    : sources;
-  const destinations = ['채팅', '갤러리', '장소', '메모', '정산'];
-  for (const viewport of VIEWPORTS) {
-    for (const [calId] of CALENDARS) {
-      if (DEPLOY_SCOPE && calId !== 'cw') continue;
-      const label = `[${viewport.name}] ${calId} 사이드메뉴 전환`;
-      for (const [suffix, sourceLabel] of selectedSources) {
-        const context = await browser.newContext({
-          viewport: { width: viewport.width, height: viewport.height },
-          ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: viewport.isMobile }),
-          hasTouch: viewport.hasTouch,
-          deviceScaleFactor: viewport.deviceScaleFactor || 1,
-          ...(BROWSER_NAME === 'chromium' && viewport.userAgent ? { userAgent: viewport.userAgent } : {})
-        });
-        const page = await context.newPage();
-        const consoleErrors = [];
-        const pageErrors = [];
-        const failedRequests = [];
-        const asset404s = [];
-        page.on('console', msg => {
-          if (msg.type() === 'error') {
-            const loc = msg.location();
-            if (isIgnorableConsoleError(msg.text(), loc?.url || '')) return;
-            consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`);
-          }
-        });
-        page.on('pageerror', err => {
-          if (isKnownBrowserPageError(err.message)) {
-            knownExternalWarningCount += 1;
-            return;
-          }
-          pageErrors.push(err.message);
-        });
-        page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
-        page.on('response', response => collectSameOriginAsset404(response, baseUrl, asset404s));
-        try {
-          // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
-          // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
-          await gotoBootReady(page, `${baseUrl}?id=${calId}&shell=v1${suffix}`);
-          const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
-          await menuButton.waitFor({ state: 'visible', timeout: 8000 });
-          // Mobile headers can still be settling after a view transition; dispatch the semantic
-          // click after the visibility check so a transient scroll/animation does not make the
-          // read-only navigation smoke test report a false failure.
-          await page.waitForTimeout(250);
-          await menuButton.dispatchEvent('click');
-          const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
-          await menu.waitFor({ state: 'visible', timeout: 10000 });
-          for (const destination of destinations) {
-            await menu.locator('button.admin-side-menu-item').filter({ hasText: destination }).first().waitFor({ state: 'visible', timeout: 5000 });
-          }
-          if (consoleErrors.length || pageErrors.length || asset404s.length) {
-            const details = [...consoleErrors, ...pageErrors].slice(0, 2).join(' | ');
-            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건: ${details}${asset404s.length ? `; 동일 출처 리소스 404: ${asset404s.slice(0, 2).join(' | ')}` : ''}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
-          } else {
-            pass(`${label}: ${sourceLabel}`);
-          }
-        } catch (err) {
-          fail(`${label}: ${sourceLabel}`, err.message);
-        } finally {
-          await context.close();
-        }
-      }
     }
   }
 }
@@ -725,10 +617,8 @@ async function main() {
     await checkEmojiCategories(browser, baseUrl);
     await checkLightboxZoomControls(browser, baseUrl);
     await checkPhotoCommentIsolation(browser, baseUrl);
-    await checkDeferredManual(browser, baseUrl);
     await checkMemoTagInput(browser, baseUrl);
     await checkSettlementModalEntryPoints(browser, baseUrl);
-    await checkSideMenuNavigation(browser, baseUrl);
 
     if (BROWSER_NAME === 'chromium') {
       console.log('\n-- 저속 네트워크 부팅 경쟁 상태 --');

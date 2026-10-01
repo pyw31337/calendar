@@ -23,7 +23,6 @@ import { createImageTagSaveHandler } from './app-image-tag-save.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap, persistImageGeoMap } from './photo-geo.js';
-import { renderCalendarViews } from './app-calendar-views.js';
 import { syncAssetTagsInMeetings } from './media-reference-integrity.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
@@ -114,16 +113,8 @@ import {
   getClientAuditContext,
   changeAdminPasswordRemote,
   copyTextToClipboard,
-  isNotificationSupported,
-  isChatNotifyEnabledForCalendar,
-  setChatNotifyEnabledForCalendar,
   setStoredChatParticipantId,
-  getBrowserLabelForNotifications,
-  getNotificationPermissionHelpSteps,
-  setNotifGuideSeen,
-  setNotifyChannel,
   ensurePushSubscriptionHealthy,
-  syncPushSubscriptionChannels,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush,
   notifyMeetingReminder,
@@ -134,8 +125,6 @@ import {
   unionConfirmedMeetings,
   getTrulyConfirmedMeetings,
   isDateConfirmedMeeting,
-  calculateSettlementBalance,
-  formatBalanceBadge,
   getPinnedNotices,
   formatChatHeaderTitle,
   isValidCalendarId,
@@ -159,7 +148,6 @@ import {
   getActiveParticipants,
   getActiveAvailabilities,
   getCalendarActivityLogs,
-  unionActivityLogs,
   getCalendarPolls,
   getActivePollOptions,
   mergeDeletedActivityLogIds,
@@ -235,7 +223,6 @@ const {
   LinkPreviewProgressOverlay, AdminLoginGate, DonutChart, ColorSwatchPicker, StickyVideoBox,
   PollVoterSheet, OperationProgressOverlay, ToggleSwitch, Footer, SearchResultLogRow,
   TikTokEmbedWidget, UrlCapsuleBadge, ParticipantPickerButton, DateCapsuleBadge,
-  CapsuleTextBadge
 } = uiWrapperAliases;
 
 
@@ -354,14 +341,6 @@ const {
   AdminDashboard, AdminModal, AdminUnifiedSearchResultsView, AdminCreateCalendarModal,
   AdminRestorePhraseModal, AdminUnifiedSearchModal, CreateSettlementModal
 } = uiWrapperAliases;
-// Kept here (not moved with isNonChatUploadSource/getMeetingOwnedPhotoMessageIds/
-// isChatRenderableMessage to gallery-data.js) because it needs getMessageDirectMediaEntry, which
-// pulls in app-domain-helpers.js's window-dependent module scope -- gallery-data.js must stay
-// importable under plain Node for firebase-safety-tests.mjs's direct unit tests.
-function getAllDirectMediaImageEntries(message) {
-  const direct = getMessageDirectMediaEntry(message);
-  return direct ? [direct] : [];
-}
 function App() {
   // Keep hooks unconditional. The app can switch between the admin route and the regular
   // calendar route through SPA/browser-history navigation; returning before these hooks on only
@@ -403,24 +382,6 @@ function App() {
   );
 }
 
-// localGalleryCount (CalendarApp) walks every photo of every meeting, message and memo. It ran on
-// every CalendarApp render -- every chat keystroke -- so the last result is reused until one of
-// its inputs (by identity) or the broken-photo list changes. A plain cache, not a hook, so
-// CalendarApp's hook order is untouched.
-let localGalleryCountCache = null;
-function cachedLocalGalleryCount(inputs, compute) {
-  const utils = (typeof window !== 'undefined' && window.GATHER_APP_UTILS) || {};
-  const broken = typeof utils.getPersistentBrokenPhotoUrls === 'function' ? utils.getPersistentBrokenPhotoUrls() : null;
-  const brokenSize = broken && typeof broken.size === 'number' ? broken.size : 0;
-  const cache = localGalleryCountCache;
-  if (cache && cache.brokenSize === brokenSize && cache.inputs.length === inputs.length
-    && cache.inputs.every((value, index) => value === inputs[index])) {
-    return cache.value;
-  }
-  const value = compute();
-  localGalleryCountCache = { inputs, brokenSize, value };
-  return value;
-}
 function CalendarApp() {
   const [activeCalId, setActiveCalId] = React.useState(() => {
     const requestedId = getCalendarIdFromURL();
@@ -462,7 +423,7 @@ function CalendarApp() {
   const {
     toast, operationProgress, showToast, dismissToast, showUndoableDeleteToast,
     showRetryableUploadToast, runWithOperationProgress, confirmDialog, setConfirmDialog,
-    showConfirmDialog, showAlert
+    showConfirmDialog
   } = useAppFeedbackState({ React, createToastLifecycle: GATHER_APP_UTILS.createToastLifecycle });
   const flushPendingWrites = React.useCallback(async () => {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
@@ -673,19 +634,18 @@ function CalendarApp() {
   };
 
   const [cloudReloadToken, setCloudReloadToken] = React.useState(0);
-  const [currentMonthDate, setCurrentMonthDate] = React.useState(() => {
+  const [currentMonthDate] = React.useState(() => {
     const requestedMonth = getCalendarMonthFromURL();
     return requestedMonth
       ? new Date(requestedMonth.year, requestedMonth.month - 1, 1)
       : new Date();
   });
-  const [selectedDate, setSelectedDate] = React.useState(null);
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [, setSelectedDate] = React.useState(null);
+  const [, setIsModalOpen] = React.useState(false);
   // Lets a Lightbox "이동" action (from handleJumpToMeetingDate) open DateModal straight on
   // its 사진 tab instead of the default 참여자 tab; null everywhere else.
-  const [dateModalInitialTab, setDateModalInitialTab] = React.useState(null);
-  const [isAdminOpen, setIsAdminOpen] = React.useState(false);
-  const [adminInitialTab, setAdminInitialTab] = React.useState('settings');
+  const [, setDateModalInitialTab] = React.useState(null);
+  const [isAdminOpen] = React.useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
   const [globalSearchInitialQuery, setGlobalSearchInitialQuery] = React.useState('');
 
@@ -704,18 +664,11 @@ function CalendarApp() {
   const [isMemoShareOpen, setIsMemoShareOpen] = React.useState(false);
   const [isGalleryShareOpen, setIsGalleryShareOpen] = React.useState(false);
   const [isHistoryShareOpen, setIsHistoryShareOpen] = React.useState(false);
-  const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
-  const confirmedMeetingAnimationTimersRef = React.useRef(new Map());
-  const [isAppSettingsOpen, setIsAppSettingsOpen] = React.useState(false);
+  const [isMainSideMenuOpen] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
-  const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
-  const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
-  const [isGuideOpen, setIsGuideOpen] = React.useState(false);
-  const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
-  const [anniversaryEditId, setAnniversaryEditId] = React.useState(null);
   const withEventUi = (open, failureLabel = '화면') => {
     const components = window.GATHER_UI_COMPONENTS || {};
     if (typeof components.AnniversaryModal === 'function'
@@ -732,7 +685,6 @@ function CalendarApp() {
   };
   // 일정 팝업의 "+ 기념일 등록" 버튼이 채워 넣는 날짜 -- AnniversaryModal이 이 날짜로 바로
   // 등록 폼을 여는 데 쓴다 (initialEditId와는 별개로, 기존 기념일이 아닌 새 등록 전용).
-  const [anniversaryInitialDate, setAnniversaryInitialDate] = React.useState(null);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => getInitialDataLoadingState({
     firebaseDb,
     activeCalId,
@@ -752,9 +704,9 @@ function CalendarApp() {
   // Chat-related states
   // chatMessages/olderChatMessages/galleryLiveMessages and the live/older windows: useChatMessageWindow (U10).
   const [totalChatCount, setTotalChatCount] = React.useState(null);
-  const [chatPreviewHydrationExhausted, setChatPreviewHydrationExhausted] = React.useState(false);
+  const [, setChatPreviewHydrationExhausted] = React.useState(false);
   const [totalMemoCount, setTotalMemoCount] = React.useState(null);
-  const [totalGalleryCount, setTotalGalleryCount] = React.useState(null);
+  const [, setTotalGalleryCount] = React.useState(null);
   const [galleryPreviewMessages, setGalleryPreviewMessages] = React.useState([]);
   // memos / memosLimit / hasMoreMemos and the memo listeners: useMemoCollections (U11).
   // A memo shared via its own ?view=memo&memo=<id> link (see MemoShareModal) may be older than
@@ -844,7 +796,7 @@ function CalendarApp() {
   const [confirmedMeetingsSubcollection, setConfirmedMeetingsSubcollection] = React.useState([]);
   // Side-menu 정산 badge must not render a fake `0` before the first confirmedMeetings
   // snapshot for this calendar arrives (gallery/chat cold open used to look empty).
-  const [meetingsHydrated, setMeetingsHydrated] = React.useState(false);
+  const [, setMeetingsHydrated] = React.useState(false);
   React.useEffect(() => {
     setMeetingsHydrated(false);
     setConfirmedMeetingsSubcollection([]);
@@ -866,8 +818,6 @@ function CalendarApp() {
     setMainChatNotifyEnabled,
     isNotificationHelpOpen,
     setIsNotificationHelpOpen,
-    isNotifOnboardingOpen,
-    setIsNotifOnboardingOpen,
     notifyChannels,
     setNotifyChannelsState,
     openNotificationHelp,
@@ -892,11 +842,9 @@ function CalendarApp() {
   // reply's quote card shows -- same snapshot-at-reply-time behavior as KakaoTalk/Slack/Discord.
   const [chatReplyTarget, setChatReplyTarget] = React.useState(null);
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
-  const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [placesInitialQuery, setPlacesInitialQuery] = React.useState('');
   const [placesInitialFocusId, setPlacesInitialFocusId] = React.useState(null);
   const [memoInitialTag, setMemoInitialTag] = React.useState('');
-  const [previewSharingMemo, setPreviewSharingMemo] = React.useState(null);
   // Clicking a #해시태그 in the lightbox's image-info panel closes the lightbox and opens the
   // global search prefilled with that tag -- shared by every Lightbox instance in the app.
   // GlobalSearchModal is only mounted in the default (calendar) tree, not in the separate
@@ -908,29 +856,10 @@ function CalendarApp() {
     setIsGlobalSearchOpen(true);
     changeView('calendar');
   };
-  const handleParticipantClick = (name, dateStr) => {
-    if (dateStr) {
-      setSelectedDate(dateStr);
-      setIsModalOpen(true);
-      return;
-    }
-    if (name) {
-      setPlacesInitialQuery(name);
-      changeView('places');
-    }
-  };
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
   const [activeView, setActiveView] = React.useState(() => getInitialAppView(window.location, parseSharePathFromLocation));
   const {
-    isMainHeaderVisible,
-    mainHeaderHeight,
-    mainHeaderRef,
-    calendarSectionRef,
-    pollsSectionRef,
-    pollsExpandSignal,
-    setPollsExpandSignal,
-    scrollToSection,
     resetMainHeader
   } = useMainHeaderState({ React, activeView, isMainSideMenuOpen });
   const {
@@ -1065,23 +994,6 @@ function CalendarApp() {
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     }
     window.history.pushState({}, '', buildAppViewUrl(window.location, view, currentMonthDate));
-  };
-  const syncCurrentMonthInUrl = nextDate => {
-    if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return;
-    const params = new URLSearchParams(window.location.search);
-    const keepId = params.get('id') || params.get('cal');
-    params.delete('id');
-    params.delete('cal');
-    if (keepId) params.set('id', keepId);
-    params.set('year', String(nextDate.getFullYear()));
-    params.set('month', String(nextDate.getMonth() + 1).padStart(2, '0'));
-    const qs = params.toString();
-    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
-  };
-  const setCurrentMonthAndSync = nextDate => {
-    setCurrentMonthDate(nextDate);
-    syncCurrentMonthInUrl(nextDate);
   };
   const restoreActiveCalendarFromCache = React.useCallback(() => {
     if (!isAllowedCalendarId(activeCalId)) return false;
@@ -2511,22 +2423,6 @@ function CalendarApp() {
   const removeLocalMemo = memoId => {
     if (!memoId) return;
     setMemos(prev => (Array.isArray(prev) ? prev.filter(m => m.id !== memoId) : []));
-  };
-  // Mirrors ui-memo-view.js's own handleTogglePin/handleMemoCommentsChange so the main-screen
-  // memo preview (which now renders the real MemoCard, not a bespoke row -- see
-  // MemoPreviewSection) can pin/comment inline instead of crashing: MemoCard calls onTogglePin()
-  // and onCommentsChange() unconditionally, with no typeof guard, so these must be real handlers.
-  const handleTogglePinFromMemoPreview = async (memo) => {
-    const nextPinned = !memo.isPinned;
-    patchLocalMemo(memo.id, { isPinned: nextPinned });
-    try {
-      const updated = await writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, { isPinned: nextPinned }, 'update', '메모 고정 변경');
-      if (!updated?.success) throw new Error('Memo pin update failed');
-    } catch (err) {
-      console.error('Failed to toggle memo pin:', err);
-      patchLocalMemo(memo.id, { isPinned: memo.isPinned });
-      showToast('고정 상태 변경 실패', 'error');
-    }
   };
   const handleMemoCommentsChangeFromMemoPreview = async (memo, nextComments) => {
     let latest = 0;
@@ -4518,7 +4414,7 @@ function CalendarApp() {
     handleDeleteMeetingPhoto, unlinkMeetingPhotoReferences,
     handleSavePhotoComments, findMemoById, handleDeletePhoto, handleReplacePhoto,
     handleJumpToChatMessage, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
-    handleJumpToMemo, handleJumpToMemoTag, handleJumpToPlace, handleJumpToGallery,
+    handleJumpToMemo, handleJumpToGallery,
     handleJumpToMeetingDate
   } = createCalendarPhotoActions({
     activeCalId, showToast, showUndoableDeleteToast, showRetryableUploadToast, setSelectedDate,
@@ -5053,758 +4949,18 @@ function CalendarApp() {
       }
     );
   };
-  // App() early-returns a completely different tree per activeView (see the 5 branches below),
-  // so the persistent video player can't just live inline in one of them -- it has to be included
-  // as a stable sibling in every branch's return, wrapped in the SAME portal element shape each
-  // time, or React would unmount/remount (and restart) it on every tab switch. See StickyVideoBox
-  // for the actual portal player and handleActivateChatVideo above for how a video becomes active.
-  const withStickyVideo = (content) => /*#__PURE__*/React.createElement(React.Fragment, null,
-    content,
-    /*#__PURE__*/React.createElement(StickyVideoBox, {
-      stickyVideo: stickyVideo,
-      onClose: () => setStickyVideo(null),
-      onGoToChat: () => {
-        const messageId = stickyVideo ? stickyVideo.key : null;
-        changeView('chat');
-        // Highlights the bubble the same way in-chat search does (see focusChatMessage) once it's
-        // actually mounted, purely to help the viewer's eye land on the right message in a long
-        // chat history -- the video itself keeps playing in its floating PIP throughout.
-        if (messageId) setTimeout(() => { focusChatMessage(messageId); }, 350);
-      }
-    }),
-    isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
-      anniversaries: anniversariesWithPosters,
-      dateStr: selectedDate,
-      calendar: activeCal,
-      chatMessages: displayChatMessages,
-      memos: memos,
-      customCultureItems: customCultureItems,
-      onSave: handleSaveAvailability,
-      onDelete: handleDeleteAvailability,
-      onReorderAvailability: handleReorderAvailability,
-      onDeleteDate: handleDeleteAllForDate,
-      onConfirmMeeting: handleConfirmMeeting,
-      onSaveExpense: handleSaveExpense,
-      onDeleteExpense: handleDeleteExpense,
-      onReorderExpenses: handleReorderExpenses,
-      onAddMeetingPhotos: handleAddMeetingPhotos,
-      onDeletePhoto: handleDeletePhoto,
-      onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
-      onFindChatMessageById: findChatMessageById,
-      onFetchDateTaggedMessages: handleFetchDateTaggedMessages,
-      onFetchDateTaggedMemos: handleFetchDateTaggedMemos,
-      onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
-      onFetchMeetingAlbum: handleFetchMeetingAlbum,
-      onLoadOlderChat: loadOlderChatMessages,
-      hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
-      loadingOlderChat: loadingOlderChat,
-      setActiveLightbox: setActiveLightbox,
-      initialTab: dateModalInitialTab,
-      onSavePlace: handleSavePlace,
-      onDeletePlace: handleDeletePlace,
-      onReorderPlaces: handleReorderPlaces,
-      showToast: showToast,
-      onRequestConfirm: showConfirmDialog,
-      syncStatus: syncStatus,
-      onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
-      onParticipantClick: handleParticipantClick,
-      onEditAnniversary: (ann) => {
-        if (!ann?.id) return;
-        withEventUi(() => {
-          setAnniversaryEditId(ann.id);
-          setIsAnniversariesOpen(true);
-        }, '기념일 설정');
-      },
-      onAddAnniversaryForDate: (dateStr) => {
-        if (!dateStr) return;
-        setIsModalOpen(false);
-        withEventUi(() => {
-          setAnniversaryInitialDate(dateStr);
-          setIsAnniversariesOpen(true);
-        }, '기념일 설정');
-      },
-      onFocusCultureSource: (ann) => {
-        // cultureSourceId가 있으면 포털에서 등록한(또는 등록 당시의) 항목의 원래 id, 없으면
-        // 기념일 등록으로 직접 만든 항목이라 이 기념일 자신의 id가 곧 컨텐츠 페이지 카드의 id다
-        // (HistoryView의 selfAuthoredCultureItems가 자기 id를 그대로 카드 id로 쓴다).
-        const focusId = ann?.cultureSourceId || ann?.id;
-        if (!focusId) return;
-        // 문화행사/지역축제/스포츠 탭 중 이 기념일의 원래 카테고리에 맞는 탭을 열고, 그 항목의
-        // 상세를 자동으로 펼치도록 ContentView에 전달 -- 실제 매칭/표시는 컨텐츠 페이지 쪽에서.
-        const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports', movie: 'movies' };
-        try {
-          localStorage.setItem('gather_content_tab', tabByCategory[ann.category] || 'festival');
-          localStorage.setItem('gather_content_focus_item_id', focusId);
-          // id-only 매칭의 안전망: 크롤링 스냅샷의 id 생성 규칙이 과거에 바뀐 적이 있어(예:
-          // 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 오래된 기념일은 cultureSourceId가
-          // 오늘자 스냅샷의 어떤 항목과도 더 이상 일치하지 않을 수 있다 -- 그 경우 orphan 카드
-          // 폴백(ui-summary-gallery.js orphanedSourceItems)도 같은 옛 id로만 찾아지므로 여전히
-          // 열리기는 하지만, 제목까지 함께 넘겨두면 컨텐츠 페이지 쪽에서 id 매칭이 실패했을 때
-          // 제목으로 한 번 더 찾아볼 수 있다.
-          if (ann.title) localStorage.setItem('gather_content_focus_title', ann.title);
-          else localStorage.removeItem('gather_content_focus_title');
-        } catch (_) { /* best-effort */ }
-        setIsModalOpen(false);
-        changeView('content');
-      },
-      photoCommentCounts: photoCommentCounts
-    }),
-    confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
-      title: confirmDialog.title,
-      message: confirmDialog.message,
-      onConfirm: confirmDialog.onConfirm,
-      onCancel: () => setConfirmDialog(null),
-      showPasswordInput: confirmDialog.showPasswordInput,
-      alertOnly: confirmDialog.alertOnly
-    }),
-    editingMessage && /*#__PURE__*/React.createElement(EditMessageModal, {
-      message: editingMessage,
-      calendar: activeCal,
-      onSave: handleSaveEditMessage,
-      onDeleteMessage: handleDeleteMessage,
-      onClose: () => setEditingMessage(null),
-      onRequestConfirm: showConfirmDialog,
-      showToast: showToast
-    }),
-    isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
-      initialTab: adminInitialTab,
-      calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
-      allCalendars: calendars,
-      onSelectCalendar: handleSelectCalendar,
-      onLoadActivityLogs: loadAdminActivityLogs,
-      onSave: handleSaveAdmin,
-      recentMessages: recentMessages,
-      chatMessages: displayChatMessages,
-      onDeleteMessage: handleDeleteMessage,
-      onDeleteAvailability: handleDeleteAvailability,
-      onDeleteAllForDate: handleDeleteAllForDate,
-      onRequestConfirm: showConfirmDialog,
-      onClose: () => { setIsAdminOpen(false); setAdminInitialTab('settings'); },
-      showToast: showToast,
-      onDeleteLog: handleDeleteActivityLog,
-      chatParticipantId: chatParticipantId,
-      themeChoice: themeChoice,
-      toggleTheme: toggleTheme,
-      isDarkTheme: isDarkTheme,
-      fontScalePercent: fontScalePercent,
-      setFontScalePercent: setFontScalePercent,
-      onSelectDate: d => {
-        setSelectedDate(d);
-        setIsModalOpen(true);
-      },
-      onOpenChatMessage: messageId => {
-        changeView('chat');
-        setTimeout(() => { focusChatMessage(messageId); }, 350);
-      },
-      onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
-        changeView('chat');
-        setTimeout(() => {
-          const msg = chatMessages.find(m => m.id === messageId);
-          if (!msg) return;
-          const directEntry = getMessageDirectMediaEntry(msg);
-          const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
-          setActiveLightbox({
-            urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
-            index: directMediaUrl ? 0 : imageIndex
-          });
-        }, 350);
-      }
-    }),
-    isGlobalSearchOpen && /*#__PURE__*/React.createElement(GlobalSearchModal, {
-      calendar: activeCal,
-      chatMessages: displayChatMessages,
-      memos: memos,
-      initialQuery: globalSearchInitialQuery,
-      onClose: () => setIsGlobalSearchOpen(false),
-      onOpenMemo: () => changeView('memo'),
-      onSelectDate: d => {
-        setSelectedDate(d);
-        setIsModalOpen(true);
-      },
-      onOpenChatMessage: messageId => {
-        changeView('chat');
-        setTimeout(() => { focusChatMessage(messageId); }, 350);
-      },
-      onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
-        changeView('chat');
-        setTimeout(() => {
-          const msg = chatMessages.find(m => m.id === messageId);
-          if (!msg) return;
-          const directEntry = getMessageDirectMediaEntry(msg);
-          const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
-          setActiveLightbox({
-            urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
-            index: directMediaUrl ? 0 : imageIndex
-          });
-        }, 350);
-      },
-      onNotificationPermissionBlocked: openNotificationHelp
-    }),
-    isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
-      calendar: activeCal,
-      showToast: showToast,
-      onClose: () => setIsShareOpen(false)
-    }),
-    isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
-      calendar: activeCal,
-      shareType: "chat",
-      showToast: showToast,
-      onClose: () => setIsChatShareOpen(false)
-    }),
-    isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
-      calendar: activeCal,
-      poll: editingPoll,
-      onRequestConfirm: showConfirmDialog,
-      onSave: handleSavePoll,
-      onClose: () => {
-        setIsPollModalOpen(false);
-        setEditingPoll(null);
-      },
-      showToast: showToast
-    }),
-    voteTarget && /*#__PURE__*/React.createElement(PollVoterSheet, {
-      calendar: activeCal,
-      pollId: voteTarget.pollId,
-      optionId: voteTarget.optionId,
-      onSelect: participantId => handleVotePoll(voteTarget.pollId, voteTarget.optionId, participantId),
-      onClose: () => setVoteTarget(null)
-    }),
-    isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
-      calendar: activeCal,
-      selectedId: chatParticipantId,
-      onSelect: id => {
-        setChatParticipantId(id);
-        setStoredChatParticipantId(activeCalId, id);
-      },
-      onClose: () => setIsChatSheetOpen(false)
-    }),
-    toast && /*#__PURE__*/React.createElement("div", {
-      className: `toast ${(toast.type === 'delete' || toast.type === 'error') ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "toast-message"
-    }, toast.message), toast.onAction && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => {
-        const action = toast.onAction;
-        dismissToast();
-        Promise.resolve(action()).catch(console.warn);
-      },
-      className: "toast-action"
-    }, toast.actionLabel || "되돌리기")),
 
-    isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
-      onClose: () => setIsAppSettingsOpen(false),
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: toggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
-      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
-      isNotifPermissionGranted: mainNotifPermission === 'granted',
-      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleMasterNotify: async () => {
-        await handleMainToggleNotifications();
-        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
-        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
-      },
-      notifyChannels: notifyChannels,
-      onToggleNotifyChannel: async (key) => {
-        if (typeof setNotifyChannel !== 'function') return;
-        const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
-        setNotifyChannelsState(next);
-        if (key === 'chat' && typeof setChatNotifyEnabledForCalendar === 'function') {
-          setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
-          setMainChatNotifyEnabled(!!(next && next.chat));
-        }
-        // Persist both ON and OFF changes to this browser's subscription document.
-        // The server filters by that document, not by this tab's localStorage copy.
-        try {
-          await syncPushSubscriptionChannels(activeCalId, getCurrentChatParticipantId());
-        } catch (_) {}
-      },
-      calendarId: activeCalId,
-      weatherLocation: activeCal && activeCal.weatherLocation,
-      recentLocations: (activeCal && activeCal.recentLocations) || [],
-      onUpdateWeatherLocation: handleUpdateWeatherLocation,
-      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
-      showToast: showToast,
-      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
-      calendar: activeCalLoaded ? activeCal : null,
-      onRequestConfirm: showConfirmDialog,
-      onRequestDataRefresh: () => setCloudReloadToken(token => token + 1)
-    }),
-    isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
-      onClose: () => {
-        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-        setIsNotifOnboardingOpen(false);
-      },
-      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleMasterNotify: async () => {
-        await handleMainToggleNotifications();
-        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
-        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
-        if (isNotificationSupported() && Notification.permission === 'granted') {
-          setIsNotifOnboardingOpen(false);
-        }
-      },
-      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
-      browserLabel: typeof getBrowserLabelForNotifications === 'function' ? getBrowserLabelForNotifications() : '브라우저'
-    }),
 
-    isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
-      onClose: () => setIsNotificationHelpOpen(false),
-      onRetry: handleMainToggleNotifications,
-      showToast: showToast
-    }),
-    operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress),
-    chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress),
-    // Shared Lightbox host for every activeView (calendar/chat/gallery/settlement/memo/places/history).
-    // DateModal and other callers only setActiveLightbox; without a single mount here, settlement
-    // (and similar early-return views) updated state with nothing to render.
-    activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
-      urls: activeLightbox.urls,
-      index: activeLightbox.index,
-      meta: activeLightbox.meta,
-      calendar: activeCalLoaded ? activeCal : null,
-      onClose: () => setActiveLightbox(null),
-      onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
-      showToast: showToast,
-      onPromoteImageUrl: handlePromoteInlineChatImage,
-      onSaveImageTags: handleSaveImageTags,
-      onSearchTag: handleSearchTag,
-      onDeletePhoto: handleDeletePhoto,
-      onReplacePhoto: handleReplacePhoto,
-      onJumpToChatMessage: handleJumpToChatMessage,
-      onJumpToMemo: handleJumpToMemo,
-      onJumpToMeetingDate: handleJumpToMeetingDate,
-      onJumpToGallery: handleJumpToGallery,
-      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
-      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-      onRequestConfirm: showConfirmDialog,
-      onFetchPhotoComments: handleFetchPhotoComments,
-      onSavePhotoComments: handleSavePhotoComments,
-      preloadedPhotoComments: preloadedPhotoComments,
-      preloadedPhotoCommentsReady: preloadedPhotoCommentsReady
-    }) : null
-  );
-  const localGalleryCount = cachedLocalGalleryCount([activeCal, allChatMessages, chatMessages, memos], () => {
-    const directUrls = new Set();
-    const persistentBroken = (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls)
-      ? window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls()
-      : new Set();
-    const isBroken = val => {
-      const u = String(val || '').trim().split(/[?#]/)[0];
-      return !u || persistentBroken.has(u);
-    };
 
-    getConfirmedMeetings(activeCal).forEach(meeting => {
-      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-      photos.forEach(photo => {
-        const u = photo?.imageUrl || photo?.full || photo?.thumbUrl || photo?.thumb;
-        if (u && !isBroken(u) && !directUrls.has(u)) {
-          directUrls.add(u);
-        }
-      });
-    });
-    const allMsgs = (allChatMessages && allChatMessages.length > 0) ? allChatMessages : (chatMessages || []);
-    allMsgs.forEach(msg => {
-      if (!msg || isTombstone(msg)) return;
-      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
-      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : (typeof getMessageDirectMediaEntry === 'function' ? m => [getMessageDirectMediaEntry(m)].filter(Boolean) : () => []);
-      const entries = getEntries ? [...getEntries(msg), ...getDirect(msg)] : [];
-      if (entries.length > 0) {
-        entries.forEach(e => {
-          const u = e.full || e.thumb || e.imageUrl;
-          if (u && !isBroken(u) && !directUrls.has(u)) {
-            directUrls.add(u);
-          }
-        });
-      } else {
-        const u = msg.imageUrl || msg.thumbUrl;
-        if (u && !isBroken(u) && !directUrls.has(u)) {
-          directUrls.add(u);
-        }
-      }
-    });
-    (memos || []).forEach(memo => {
-      if (!memo || isTombstone(memo)) return;
-      const asMsg = {
-        id: memo.id, text: memo.text || memo.content || memo.body || '',
-        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
-        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
-      };
-      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
-      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : () => [];
-      const entries = getEntries ? [...getEntries(asMsg), ...getDirect(asMsg)] : [];
-      entries.forEach(e => {
-        const u = e.full || e.thumb || e.imageUrl;
-        if (u && !isBroken(u) && !directUrls.has(u)) {
-          directUrls.add(u);
-        }
-      });
-    });
-    return directUrls.size;
-  });
 
-  const navChatCount = (typeof visibleTotalChatCount === 'number' && visibleTotalChatCount >= 0)
-    ? visibleTotalChatCount
-    : visibleChatMessages.length;
-  const navGalleryCount = (localGalleryCount > 0)
-    ? localGalleryCount
-    : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0) ? totalGalleryCount : 0);
-  const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
-  const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
-  const navHistoryCount = activeCal ? getTrulyConfirmedMeetings(activeCal).filter(m => isValidDateString(m?.date)).length : 0;
-  const navSettlementBadge = canUseSettlement && meetingsHydrated && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
-    ? formatBalanceBadge(calculateSettlementBalance(activeCal))
-    : null;
 
-  // Side-menu trailing meta (latest activity snippets)
-  const formatMenuDate = (ts) => {
-    if (ts == null || ts === '') return null;
-    let d = null;
-    if (typeof ts === 'number') d = new Date(ts);
-    else if (typeof ts === 'string') {
-      // "2026-08-24" or ISO
-      const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) return `${m[2]}.${m[3]}`;
-      const md = ts.match(/^(?:\d{2}|\d{4})\.(\d{2})\.(\d{2})/);
-      if (md) return `${md[1]}.${md[2]}`;
-      const parsed = Date.parse(ts);
-      if (!Number.isNaN(parsed)) d = new Date(parsed);
-    } else if (ts && typeof ts.toDate === 'function') {
-      try { d = ts.toDate(); } catch (_) {}
-    } else if (ts && typeof ts.seconds === 'number') {
-      d = new Date(ts.seconds * 1000);
-    }
-    if (!d || Number.isNaN(d.getTime())) return null;
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${mm}.${dd}`;
-  };
 
-  const navChatLastAuthor = (() => {
-    const msgs = visibleChatMessages;
-    if (!msgs.length) return null;
-    const last = msgs[msgs.length - 1];
-    if (!last) return null;
-    const parts = (activeCal && Array.isArray(activeCal.participants)) ? activeCal.participants : [];
-    const p = parts.find(x => x && x.id === last.participantId);
-    const name = (p && p.name) || last.participantName || null;
-    if (!name) return null;
-    return { name: String(name), color: (p && p.color) || '#64748B' };
-  })();
 
-  const navSettlementLastDate = (() => {
-    let bestTs = 0;
-    let bestLabel = null;
-    let latestMeetingTs = 0;
-    let latestMeetingLabel = null;
-    const noteMeetingDate = (raw) => {
-      const label = formatMenuDate(raw);
-      if (!label) return;
-      let ts = 0;
-      if (typeof raw === 'number') ts = raw;
-      else if (raw && typeof raw.seconds === 'number') ts = raw.seconds * 1000;
-      else if (raw && typeof raw.toDate === 'function') {
-        try { ts = raw.toDate().getTime(); } catch (_) {}
-      } else if (typeof raw === 'string') {
-        const p = Date.parse(raw);
-        if (!Number.isNaN(p)) ts = p;
-      }
-      if (!ts) {
-        const p = Date.parse(String(raw).slice(0, 10));
-        if (!Number.isNaN(p)) ts = p;
-      }
-      if (ts > latestMeetingTs) {
-        latestMeetingTs = ts;
-        latestMeetingLabel = label;
-      }
-    };
-    const consider = (raw, fallbackDateStr) => {
-      let ts = 0;
-      if (typeof raw === 'number') ts = raw;
-      else if (raw && typeof raw.seconds === 'number') ts = raw.seconds * 1000;
-      else if (raw && typeof raw.toDate === 'function') {
-        try { ts = raw.toDate().getTime(); } catch (_) {}
-      } else if (typeof raw === 'string') {
-        const p = Date.parse(raw);
-        if (!Number.isNaN(p)) ts = p;
-      }
-      if (!ts && fallbackDateStr) {
-        const p = Date.parse(String(fallbackDateStr).slice(0, 10));
-        if (!Number.isNaN(p)) ts = p;
-      }
-      if (ts > bestTs) {
-        bestTs = ts;
-        bestLabel = formatMenuDate(ts) || formatMenuDate(fallbackDateStr);
-      }
-    };
-    const meetings = [
-      ...(activeCal && Array.isArray(activeCal.confirmedMeeting) ? activeCal.confirmedMeeting : []),
-      ...(Array.isArray(confirmedMeetingsSubcollection) ? confirmedMeetingsSubcollection : [])
-    ];
-    meetings.forEach(m => {
-      if (!m || m.deletedAt) return;
-      noteMeetingDate(m.date || m.confirmedAt);
-      const expenses = Array.isArray(m.expenses) ? m.expenses : [];
-      const incomes = Array.isArray(m.incomes) ? m.incomes : [];
-      if (expenses.length > 0 || incomes.length > 0) {
-        consider(m.date || m.confirmedAt);
-      }
-      expenses.forEach(e => {
-        if (!e || e.deletedAt) return;
-        consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
-      });
-      incomes.forEach(e => {
-        if (!e || e.deletedAt) return;
-        consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
-      });
-    });
-    const topExp = (activeCal && Array.isArray(activeCal.expenses)) ? activeCal.expenses : [];
-    topExp.forEach(e => {
-      if (!e || e.deletedAt) return;
-      consider(e.createdAt || e.timestamp || e.updatedAt, e.date);
-    });
-    return bestLabel || latestMeetingLabel;
-  })();
 
-  const navGalleryLastDate = (() => {
-    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages && allChatMessages.length)
-      ? allChatMessages
-      : (chatMessages || []);
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      const msg = msgs[i];
-      if (!msg) continue;
-      const hasImg = !!(msg.imageUrl || msg.thumbUrl
-        || (Array.isArray(msg.imageUrls) && msg.imageUrls.length)
-        || (Array.isArray(msg.thumbUrls) && msg.thumbUrls.length));
-      if (!hasImg) continue;
-      return formatMenuDate(msg.timestamp || msg.createdAt);
-    }
-    return null;
-  })();
-
-  const navPlaceLastName = (() => {
-    const list = [];
-    if (activeCal && Array.isArray(activeCal.places)) {
-      activeCal.places.forEach(p => { if (p && !p.deletedAt) list.push(p); });
-    }
-    if (Array.isArray(placesSubcollection)) {
-      placesSubcollection.forEach(p => { if (p && !p.deletedAt) list.push(p); });
-    }
-    if (!list.length) return null;
-    const score = (p) => {
-      const raw = p.updatedAt || p.createdAt || p.timestamp || 0;
-      if (typeof raw === 'number') return raw;
-      if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
-      if (raw && typeof raw.toDate === 'function') {
-        try { return raw.toDate().getTime(); } catch (_) { return 0; }
-      }
-      if (typeof raw === 'string') {
-        const n = Date.parse(raw);
-        return Number.isNaN(n) ? 0 : n;
-      }
-      return 0;
-    };
-    list.sort((a, b) => score(b) - score(a));
-    const top = list[0];
-    const name = (top.alias || top.name || top.placeName || top.title || '').trim();
-    return name || null;
-  })();
-
-  const navMemoLastTitleWord = (() => {
-    const list = Array.isArray(memos) ? memos.filter(m => m && !m.deletedAt) : [];
-    if (!list.length) return null;
-    const score = (m) => {
-      const raw = m.createdAt || m.timestamp || m.updatedAt || 0;
-      if (typeof raw === 'number') return raw;
-      if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
-      if (raw && typeof raw.toDate === 'function') {
-        try { return raw.toDate().getTime(); } catch (_) { return 0; }
-      }
-      if (typeof raw === 'string') {
-        const n = Date.parse(raw);
-        return Number.isNaN(n) ? 0 : n;
-      }
-      return 0;
-    };
-    list.sort((a, b) => score(b) - score(a));
-    const top = list[0];
-    const title = String(top.title || top.text || top.content || '').trim();
-    if (!title) return null;
-    const word = title.split(/\s+/)[0];
-    return word ? word.slice(0, 12) : null;
-  })();
-
-  const navMenuProps = {
-    onChangeView: changeView,
-    onOpenCreateSettlement: () => {
-      withEventUi(() => {
-        setEditingSettlementCard(null);
-        setIsCreateSettlementOpen(true);
-      }, '정산');
-    },
-    showSettlement: canUseSettlement,
-    chatCount: navChatCount,
-    settlementBadge: navSettlementBadge,
-    galleryCount: navGalleryCount,
-    placeCount: navPlaceCount,
-    memoCount: navMemoCount,
-    historyCount: navHistoryCount,
-    chatLastAuthor: navChatLastAuthor,
-    settlementLastDate: navSettlementLastDate,
-    galleryLastDate: navGalleryLastDate,
-    placeLastName: navPlaceLastName,
-    memoLastTitleWord: navMemoLastTitleWord
-  };
-  const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
-    isCreateSettlementOpen && !editingSettlementCard && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
-      calendar: activeCal,
-      showToast: showToast,
-      onClose: () => setIsCreateSettlementOpen(false),
-      onSave: handleSaveSettlementCard,
-      onRequestConfirm: showConfirmDialog
-    }),
-    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
-      calendar: activeCal,
-      initialData: editingSettlementCard,
-      showToast: showToast,
-      onClose: () => setEditingSettlementCard(null),
-      onDeleteCard: handleDeleteSettlementCard,
-      onToggleStatus: handleToggleSettlementCardStatus,
-      onSave: handleSaveSettlementCard,
-      onRequestConfirm: showConfirmDialog
-    }),
-    isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
-      onClose: () => setIsAppSettingsOpen(false),
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: toggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
-      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
-      isNotifPermissionGranted: mainNotifPermission === 'granted',
-      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleMasterNotify: async () => {
-        await handleMainToggleNotifications();
-        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
-        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
-      },
-      notifyChannels: notifyChannels,
-      onToggleNotifyChannel: async (key) => {
-        if (typeof setNotifyChannel !== 'function') return;
-        const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
-        setNotifyChannelsState(next);
-        if (key === 'chat' && typeof setChatNotifyEnabledForCalendar === 'function') {
-          setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
-          setMainChatNotifyEnabled(!!(next && next.chat));
-        }
-        try {
-          await syncPushSubscriptionChannels(activeCalId, getCurrentChatParticipantId());
-        } catch (_) {}
-      },
-      calendarId: activeCalId,
-      weatherLocation: activeCal && activeCal.weatherLocation,
-      recentLocations: (activeCal && activeCal.recentLocations) || [],
-      onUpdateWeatherLocation: handleUpdateWeatherLocation,
-      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
-      showToast: showToast,
-      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
-      calendar: activeCalLoaded ? activeCal : null,
-      onRequestConfirm: showConfirmDialog,
-      onRequestDataRefresh: () => setCloudReloadToken(token => token + 1)
-    }),
-    isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
-      onClose: () => {
-        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-        setIsNotifOnboardingOpen(false);
-      },
-      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleMasterNotify: async () => {
-        await handleMainToggleNotifications();
-        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
-        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
-        if (isNotificationSupported() && Notification.permission === 'granted') {
-          setIsNotifOnboardingOpen(false);
-        }
-      },
-      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
-      browserLabel: typeof getBrowserLabelForNotifications === 'function' ? getBrowserLabelForNotifications() : '브라우저'
-    }),
-    isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
-      onClose: () => setIsNotificationHelpOpen(false),
-      onRetry: handleMainToggleNotifications,
-      showToast: showToast
-    })
-  );
-  // WP-01 (V2 is default; ?shell=v1 opts out, see ui-app-shell-v2.js).
+  // WP-01: V2 is the only shell (see ui-app-shell-v2.js).
   // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
-  if (new URLSearchParams(window.location.search).get('shell') !== 'v1') {
-    window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
-  }
-  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE), sharedMemo, setSharedMemo, chatMessages, patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag, isMemoShareOpen, setIsMemoShareOpen }, { chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog, isNotificationHelpOpen, setIsNotificationHelpOpen, onNotificationHelpRetry: handleMainToggleNotifications, showToast }); if (renewalShellEl) return renewalShellEl;
-  // U14: the view JSX (V1 screens + main calendar screen) lives in app-calendar-views.js.
-  return renderCalendarViews({
-    React, activeCalId, showToast, showConfirmDialog, showAlert, currentMonthDate, setSelectedDate,
-    setIsModalOpen, setIsAdminOpen, setAdminInitialTab, setIsGlobalSearchOpen,
-    setGlobalSearchInitialQuery, toggleTheme, isDarkTheme, fontScalePercent, setFontScalePercent,
-    isShareOpen, setIsShareOpen, setIsChatShareOpen, isPlacesShareOpen, setIsPlacesShareOpen,
-    isMemoShareOpen, setIsMemoShareOpen, isGalleryShareOpen, setIsGalleryShareOpen,
-    isHistoryShareOpen, setIsHistoryShareOpen, isMainSideMenuOpen, setIsMainSideMenuOpen,
-    confirmedMeetingAnimationTimersRef, setIsAppSettingsOpen, expandedConfirmedDates,
-    setExpandedConfirmedDates, setIsCreateSettlementOpen, setEditingSettlementCard, isGuideOpen,
-    setIsGuideOpen, isAnniversariesOpen, setIsAnniversariesOpen, anniversaryEditId,
-    setAnniversaryEditId, withEventUi, anniversaryInitialDate, setAnniversaryInitialDate,
-    isInitialDataLoading, chatPreviewHydrationExhausted, totalMemoCount, totalGalleryCount,
-    galleryPreviewMessages, sharedMemo, setSharedMemo, anniversaries, setAnniversaries,
-    customCultureItems, memePool, meetingsHydrated, chatInput, setChatInput, chatParticipantId,
-    setChatParticipantId, mainNotifPermission, mainChatNotifyEnabled, isNotificationHelpOpen,
-    setIsNotificationHelpOpen, handleMainToggleNotifications, isChatSheetOpen, setIsChatSheetOpen,
-    isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments,
-    setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, isGalleryOpen,
-    setIsGalleryOpen, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId,
-    setPlacesInitialFocusId, memoInitialTag, setMemoInitialTag, previewSharingMemo,
-    setPreviewSharingMemo, handleSearchTag, handleParticipantClick, activeView,
-    isMainHeaderVisible, mainHeaderHeight, mainHeaderRef, calendarSectionRef, pollsSectionRef,
-    pollsExpandSignal, setPollsExpandSignal, scrollToSection, photoCommentCounts,
-    galleryPhotoIndex, chatMessages, loadingOlderChat, hasMoreOlderChat, allChatMessages,
-    loadOlderChatMessages, chatMessagesContainerRef, memos, hasMoreMemos, setMemosLimit,
-    galleryChatMessages, galleryMemos, displayChatMessages, fullChatMessages, stickyVideo,
-    handleActivateChatVideo, externalFocusMsgId, changeView, setCurrentMonthAndSync, activeCal,
-    visibleChatMessages, recentMessages, visibleTotalChatCount, canUseSettlement, syncStatus,
-    handleAnniversarySaved, handleAnniversaryDeleted, anniversariesWithPosters,
-    handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo,
-    handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag,
-    handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup,
-    handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleSaveCustomCultureItem,
-    handleFetchMeetingPhotoIndex, historyMemosSnapshot, patchLocalMemo, upsertLocalMemo,
-    removeLocalMemo, handleTogglePinFromMemoPreview, handleMemoCommentsChangeFromMemoPreview,
-    isHeaderVisible, setIsHeaderVisible, toggleChatInputPin, handleChatScroll,
-    handleSendChatMessage, handleSendMemeImage, handleUploadGalleryImages, handleAddGalleryLink,
-    handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks,
-    handlePasteGatherPhoto, handlePasteGatherPhotos, handleDeleteMessage, handleEditMessage,
-    handlePromoteInlineChatImage, handleSaveImageTags, guardLoadedCalendar, handleMoveAvailability,
-    handleBulkRegisterAvailability, handleFetchPhotoComments, handleDeletePhoto,
-    handleReplacePhoto, handleSavePhotoComments, handleJumpToChatMessage,
-    handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleJumpToMemo,
-    handleJumpToMemoTag, handleJumpToGallery, handleJumpToPlace, handleJumpToMeetingDate,
-    handleSavePlace, handleDeletePlace, handleOpenPollCreate, handleOpenPollEdit,
-    handleSaveSettlementCard, handleDeleteSettlementCard, handleToggleSettlementCardStatus,
-    handleOpenVoteSheet, handleCancelVote, handleUpdateWeatherLocation,
-    handleDeleteRecentWeatherLocation, handleAddPinnedNotice, handleRemovePinnedNotice,
-    withStickyVideo, localGalleryCount, navHistoryCount, navChatLastAuthor, navSettlementLastDate,
-    navGalleryLastDate, navPlaceLastName, navMemoLastTitleWord, navMenuProps, sharedAppOverlays,
-    AdminFilledMenuIcon, AnniversaryModal, CalendarGrid, CapsuleTextBadge, ChatGalleryModal,
-    ChatRoomView, CommentsSection, ContentView, Footer, HistoryView, MainSideMenu,
-    MemoPreviewSection, MemoShareModal, MemoView, MenuIcon, NotepadTextIcon,
-    NotificationPermissionHelpModal, PhotoGallery, PlacesSection, PlacesView, PollList,
-    SettlementSummaryModal, ShareModal, SummaryList, UserManualOverlay, WalletIcon
-  });
+  window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
+  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE), sharedMemo, setSharedMemo, chatMessages, patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag, isMemoShareOpen, setIsMemoShareOpen }, { chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog, isNotificationHelpOpen, setIsNotificationHelpOpen, onNotificationHelpRetry: handleMainToggleNotifications, showToast }); return renewalShellEl;
 }
 
 
@@ -5906,7 +5062,7 @@ const { ChatRoomView } = uiWrapperAliases;
 
 
 
-const { ChatParticipantSheet, AppSettingsModal, NotificationOnboardingModal, NotificationPermissionHelpModal, ConfirmDialog } = uiWrapperAliases;
+const { ChatParticipantSheet, ConfirmDialog } = uiWrapperAliases;
 
 
 
@@ -5992,8 +5148,6 @@ const { SectionCountBadge, SectionToggleButton, SearchCategoryTabs, SimpleBottom
 
 
 
-// Share Modal
-const { ShareModal, UserManualOverlay } = uiWrapperAliases;
 
 
 
@@ -6022,7 +5176,7 @@ const { WeatherBadge, WeatherLocationModal } = uiWrapperAliases;
 
 
 
-const { MainSideMenu, UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveButton, InlineSearchBar, MemoShareModal, ChatGalleryModal, MemoView } = uiWrapperAliases;
+const { UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveButton, InlineSearchBar, MemoShareModal, ChatGalleryModal, MemoView } = uiWrapperAliases;
 
 
 
@@ -6159,7 +5313,7 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 // as "domestic" for the main-screen preview map's auto-fit (see preferDomesticBounds below), not
 // as a precise border.
 
-const { PlaceMapView, PlacesView, HistoryView, ContentView } = uiWrapperAliases;
+const { PlaceMapView, PlacesView } = uiWrapperAliases;
 
 
 // Address/업체명 search (Nominatim, same free geocoder the weather feature already uses as a
