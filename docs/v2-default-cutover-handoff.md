@@ -2,7 +2,7 @@
 
 **이 문서의 독자:** Grok / Codex / Claude / Gemini / 사람 — 세션 없이 이 저장소만 보고 V2를 기본 셸로 올리는 작업을 이어갈 수 있어야 한다.  
 **최종 갱신:** 2026-09-23 (Claude, **컷오버 실행 완료** — 사용자의 명시적 지시로 Safari 실기기 서명 게이트를 건너뛰고 진행)  
-**상태 한 줄:** **V2가 기본 셸이다.** `isRenewalShellEnabled()` = `shell !== 'v1'` (부재 시 V2), `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백. §5에 사전 조사해둔 7개 파일 diff를 그대로 적용해 완료: `app-feature-flags.js`/`app-routing-state.js`(2곳)/`ui-app-shell-v2.js`(2곳)/`app-main.js`/`index.html`(host auto-force가 `?shell=v1`을 무시하던 버그 포함 수정)/`test/v2-routing.test.mjs`(신규 케이스 2개)/`scripts/browser-smoke-test.mjs`(기본 URL 검증 추가). `scripts/firebase-safety-tests.mjs`의 낡은 기대값 1건도 같이 수정. **Safari 채팅 VV 실기기 서명은 사용자가 추후 직접 진행** — 정적 코드 리뷰·자동 테스트 24개는 이미 통과했고, 문제 발견 시 `?shell=v1`로 즉시 되돌릴 수 있다는 전제로 이 순서를 바꿨다. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
+**상태 한 줄 (2026-10-01 갱신):** **V2가 유일한 셸이다 — V1 트리와 `?shell=v1`은 사용자 실기기 검수 후 제거됨.** 아래는 컷오버 당시 기록. **V2가 기본 셸이다.** `isRenewalShellEnabled()` = `shell !== 'v1'` (부재 시 V2), `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백. §5에 사전 조사해둔 7개 파일 diff를 그대로 적용해 완료: `app-feature-flags.js`/`app-routing-state.js`(2곳)/`ui-app-shell-v2.js`(2곳)/`app-main.js`/`index.html`(host auto-force가 `?shell=v1`을 무시하던 버그 포함 수정)/`test/v2-routing.test.mjs`(신규 케이스 2개)/`scripts/browser-smoke-test.mjs`(기본 URL 검증 추가). `scripts/firebase-safety-tests.mjs`의 낡은 기대값 1건도 같이 수정. **Safari 채팅 VV 실기기 서명은 사용자가 추후 직접 진행** — 정적 코드 리뷰·자동 테스트 24개는 이미 통과했고, 문제 발견 시 `?shell=v1`로 즉시 되돌릴 수 있다는 전제로 이 순서를 바꿨다. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
 
 관련 문서:
 
@@ -112,7 +112,7 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 3. ~~Safari iPhone 채팅 VV/키보드 검증~~ → **사용자가 추후 직접 진행 (컷오버보다 뒤로 미룸).** 원래 계획은 이 항목이 5번보다 먼저였으나, 사용자가 "사파리 확인은 추후에 내가 할테니 그 부분 스킵하고 끝까지 완수해달라"고 명시적으로 지시해 5번을 먼저 진행했다.
 4. Whale / Edge / Firefox / Android Chrome 스모크 (`?id=cw`, 컷오버 **후**) — 아직 미완, 사람이 직접 여러 브라우저에서 확인 필요.
 5. **기본을 V2로** + 한 릴리스 `?shell=v1` 탈출구 → **완료** (§5 참고, 실제 적용한 diff 전부 기록됨).
-6. 안정화 후 V1 폴백 제거 — **아직 하지 말 것.** 최소 3, 4번(Safari 실기기 + 크로스브라우저)이 사람 손으로 확인되기 전까지는 `?shell=v1` 탈출구를 유지한다.
+6. 안정화 후 V1 폴백 제거 — **진행함 (2026-10-01).** 사용자가 아이폰 Safari 실기기로 전 페이지 검수를 완료했다고 확인한 뒤 `?shell=v1` 탈출구와 V1 트리를 제거했다. 롤백은 해당 PR revert.
 
 알림 권한 도움말은 #734로 §4 사이드 항목이 끝난 상태. 온보딩 모달은 **되살리지 말 것** (호출자 없음).
 
@@ -244,7 +244,7 @@ Phase 4는 Phase 1–3이 놓친 **더 근본적인 원인**이었다: `src/app.
    증상: 깨진 YAML이 `push` 이벤트마다 빨간 X. 해결은 파일 삭제 PR뿐 (#732, #733).
 2. **박스 MCP `create_or_update_file` / `push_files`로 대형 `app-main.js` 한 줄 교체 금지** — path 문자열이 본문으로 들어가 원격 브랜치가 오염됨. Mac에서 `git` + `gh`로만 푸시.
 3. **URL/데이터 규칙·캘린더 격리 깨기 금지** (`CLAUDE.md`, `scripts/check-calendar-isolation.mjs`).
-4. ~~다크 미완 상태에서 기본 shell 플래그 뒤집기 금지~~ → 다크 완료 + 사용자 지시로 컷오버 실행됨. **이제부터는 `?shell=v1` 탈출구를 사람이 Safari/크로스브라우저 확인 전까지 실수로 제거하지 말 것.**
+4. ~~다크 미완 상태에서 기본 shell 플래그 뒤집기 금지~~ → 다크 완료 + 사용자 지시로 컷오버 실행됨. **(2026-10-01) 사용자 실기기 검수 완료 후 `?shell=v1` 탈출구는 제거됐다.**
 5. **NotificationOnboardingModal 부활 금지** (호출자 없음). 권한 도움말만 유지 (#734).
 6. V2 CSS와 컷오버 플래그를 **한 PR에 섞지 말 것** (이번 컷오버 PR은 플래그·라우팅 로직 전용이고 CSS는 건드리지 않았음 — 이 규칙 유지). 다크/디자인 PR은 CSS(+필요 시 최소 토큰 테스트)만.
 
@@ -283,7 +283,7 @@ npm run check:all
 짧은 요약은 [`docs/V2-STATUS.md`](./V2-STATUS.md)에도 한 블록만 미러링한다.  
 유닛 완료 로그는 [`docs/v2-live-progress.md`](./v2-live-progress.md)에 append.
 
-**상태: `DONE — default is V2; ?shell=v1` fallback.** V1 트리 제거(`DONE — V1 removed`)는 Safari 실기기 + 크로스브라우저 확인 후 별도 WP.
+**상태: `DONE — V1 removed` (2026-10-01).** 사용자가 Safari 실기기 검수를 마친 뒤 V1 트리와 `?shell=v1` 탈출구를 제거했다.
 
 ---
 

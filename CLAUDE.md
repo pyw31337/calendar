@@ -22,7 +22,8 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 `?shell=v1` 폴백과 V1 뷰 트리(`app-calendar-views.js`, `withStickyVideo` 등)는 사용자의 명시적
 지시("옛화면은 제거해도 될것 같아")로 제거했다. `isRenewalShellEnabled()`는 항상 `true`이고,
 옛 `?shell=v1` 북마크도 V2로 열린다. **되돌릴 탈출구는 더 이상 없으니**, 문제가 생기면 해당 PR을
-revert하는 것이 롤백 방법이다. Safari 실기기 서명은 여전히 사용자가 직접 진행 예정이다.
+revert하는 것이 롤백 방법이다. **Safari(아이폰) 실기기 검수는 2026-10-01 사용자가 전 페이지 완료했다**고 확인했다
+(부족한 부분은 그 사이 다른 에이전트들이 수정함).
 
 상세·계획·실행한 diff·다음 단계는:
 
