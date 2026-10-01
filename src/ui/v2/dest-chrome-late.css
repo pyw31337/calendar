@@ -7218,28 +7218,70 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   }
 }
 
-/* Archive memory detail: a 100%-wide edit wrap was a flex sibling of the
-   title/date column (min-width: 0), so Korean text collapsed to one
-   character per line and the trash / 취소 buttons sat on top of the date.
-   The date stays one horizontal line; actions stay beside it. */
+/* Archive memory detail header.
+   Line 1 is the back button, the trip name (it may wrap), and the
+   add/edit actions. Line 2 is the date, indented past the back button,
+   as one unbreakable chunk: nowrap + min-width: max-content so
+   "2026.09.05 (토)" cannot ellipsis mid-number or stack one glyph per line.
+   Person/place .archive-detail-title stays a single line. */
 .archive-memory-detail-head {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  width: 100% !important;
   min-width: 0;
+  gap: 6px;
 }
-.archive-memory-detail-title,
-.archive-memory-detail-date,
+.archive-memory-detail-title-row,
+.archive-memory-detail-date-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+}
+.archive-memory-detail-date-row {
+  padding-left: 40px !important;
+}
+.archive-memory-detail-title {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: break-word !important;
+  writing-mode: horizontal-tb !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.archive-memory-detail-date {
+  flex: 0 0 auto !important;
+  width: max-content !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  line-break: auto !important;
+  writing-mode: horizontal-tb !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
 .archive-detail-title {
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
   writing-mode: horizontal-tb !important;
 }
-.archive-memory-detail-date-row {
-  min-width: 0;
-}
 .archive-memory-detail-actions {
   flex: 0 0 auto !important;
   width: auto !important;
   max-width: max-content;
+  margin-left: auto;
 }
 
 /* Mobile tag editor (인물 사진 일괄 태그). Desktop stays the compact bar.
