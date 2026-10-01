@@ -77,7 +77,11 @@ test('confirmed hero columns use the meeting place resolver, and log filters sit
   assert.match(shell, /function meetingPlaceWeatherCoords\(calendar, dateStr\)/);
   assert.match(shell, /weatherCoordsFor = \(dateStr\) => meetingPlaceWeatherCoords\(calendar, dateStr\)/);
   assert.match(shell, /resolveDailyForecast\(coords\.lat, coords\.lon, dateStr\)/);
-  assert.match(shell, /isConfirmed\s*\n\s*\? \(placeForecasts\[day\.dateStr\]/);
+  assert.match(shell, /placeCoords\s*\n\s*\? \(placeForecasts\[day\.dateStr\]/, 'any day with a registered place shows that place\'s forecast');
+  // The weather popup resolves each day on its own: that day's place, else the saved region, else 서울.
+  assert.match(shell, /resolveLocationForDate: resolveWeatherLocationForDate/);
+  assert.match(weatherUi, /resolve\(selectedDate\)/, 'switching days in the popup re-resolves the location');
+  assert.match(weatherUi, /\}, \[weatherLocation, selectedDate\]\);/);
   assert.match(weatherUi, /resolveDailyForecast\(latNum, lonNum, date\)/);
   assert.doesNotMatch(weatherUi, /function fetchDailyForecast/);
 
