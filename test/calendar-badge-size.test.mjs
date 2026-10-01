@@ -38,7 +38,8 @@ test('calendar badges sit just under the day number instead of the 84px cell flo
 
 test('mobile calendar holiday, meeting label, d-day weekday, card padding, and footer clearance', () => {
   const mobile = late.slice(late.indexOf('Mobile calendar type and home footer clearance'));
-  assert.match(mobile, /\.bp-cal-days-grid button\.bp-day-cell \.bp-day-corner-label\.bp-is-holiday \{[\s\S]*?font-size:\s*0\.6rem !important;/);
+  assert.match(mobile, /\.bp-cal-days-grid button\.bp-day-cell \.bp-day-corner-label\.bp-is-holiday,[\s\S]*?\.bp-day-corner-label \{[\s\S]*?font-size:\s*0\.6rem !important;/);
+  assert.match(mobile, /\.bp-day-anniversary > \.bp-day-anniversary-label,[\s\S]*?font-size:\s*0\.6rem !important;/);
   assert.match(mobile, /\.bp-day-head-row > span \{[\s\S]*?font-size:\s*10px !important;/);
   assert.match(mobile, /\.bp-dday-strip button > span \{[\s\S]*?font-weight:\s*700 !important;/);
   assert.match(mobile, /\.bp-renewal-home-summary\.bp-bento-grid > :first-child \{[\s\S]*?padding-top:\s*30px !important;[\s\S]*?padding-bottom:\s*0 !important;/);

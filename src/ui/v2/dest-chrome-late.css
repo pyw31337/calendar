@@ -7189,9 +7189,18 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
    Holiday names (추석 연휴) sit in the day button; 모임/모임확정 is the
    direct span under .bp-day-head-row. The footer is a sibling after the
    bento grid, so the grid's nav padding never lifts it — give the footer
-   its own inset or the bottom nav covers it. */
+   its own inset or the bottom nav covers it.
+   Solar terms (추분, 백로) share the corner-label class but are not
+   .bp-is-holiday, so they stayed at 0.75rem while 추석 was smaller.
+   Anniversary titles (추석, 추석 연휴) follow the same 0.6rem on mobile.
+   The purple 모임 / 모임확정 span stays 10px. */
 @media (max-width: 1199px) {
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid button.bp-day-cell .bp-day-corner-label.bp-is-holiday {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid button.bp-day-cell .bp-day-corner-label.bp-is-holiday,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid button.bp-day-cell .bp-day-corner-label {
+    font-size: 0.6rem !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary > .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-has-label > .bp-day-anniversary-label {
     font-size: 0.6rem !important;
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row > span {
@@ -7206,5 +7215,124 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
   }
   html:has(.renewal-shell.v2-design) main.bp-app-shell > footer {
     padding-bottom: calc(var(--mobile-bottom-nav-total, 58px) + 16px) !important;
+  }
+}
+
+/* Archive memory detail: a 100%-wide edit wrap was a flex sibling of the
+   title/date column (min-width: 0), so Korean text collapsed to one
+   character per line and the trash / 취소 buttons sat on top of the date.
+   The date stays one horizontal line; actions stay beside it. */
+.archive-memory-detail-head {
+  min-width: 0;
+}
+.archive-memory-detail-title,
+.archive-memory-detail-date,
+.archive-detail-title {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+}
+.archive-memory-detail-date-row {
+  min-width: 0;
+}
+.archive-memory-detail-actions {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: max-content;
+}
+
+/* Mobile tag editor (인물 사진 일괄 태그). Desktop stays the compact bar.
+   One-line controls are capsules; the card itself is a rounded rectangle. */
+@media (max-width: 767px) {
+  .v2-photo-bulk-bar {
+    max-height: min(72dvh, 560px);
+    overflow: auto;
+    padding: 14px 12px 16px !important;
+    gap: 14px !important;
+    border-radius: 16px !important;
+  }
+  .v2-photo-bulk-bar .bulk-top {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .v2-photo-bulk-bar .bulk-count {
+    flex-wrap: wrap !important;
+    min-width: 0;
+    width: 100%;
+  }
+  .v2-photo-bulk-bar .bulk-count-total {
+    white-space: nowrap !important;
+  }
+  .v2-photo-bulk-bar .bulk-select-all {
+    flex: 1 1 100%;
+    min-height: 44px !important;
+    border-radius: 999px !important;
+    padding: 0 14px !important;
+    font-size: 0.95rem !important;
+  }
+  .v2-photo-bulk-bar .bulk-kbd-hint {
+    display: none !important;
+  }
+  .v2-photo-bulk-bar .bulk-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+    width: 100%;
+  }
+  .v2-photo-bulk-bar .bulk-actions > button,
+  .v2-photo-bulk-bar .bulk-chip,
+  .v2-photo-bulk-bar .bulk-tag-input,
+  .v2-photo-bulk-bar .bulk-add,
+  .v2-photo-bulk-bar .bulk-apply {
+    min-height: 44px !important;
+    height: auto !important;
+    box-sizing: border-box;
+  }
+  .v2-photo-bulk-bar .bulk-actions > button {
+    width: 100%;
+    justify-content: center;
+    border-radius: 999px !important;
+    padding: 0 12px !important;
+  }
+  .v2-photo-bulk-bar .bulk-chip-row {
+    max-height: none !important;
+    overflow: visible !important;
+    gap: 8px !important;
+  }
+  .v2-photo-bulk-bar .bulk-chip {
+    padding: 0 14px !important;
+    border-radius: 999px !important;
+    font-size: 0.95rem !important;
+  }
+  .v2-photo-bulk-bar .bulk-input-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .v2-photo-bulk-bar .bulk-input-row > div {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .v2-photo-bulk-bar .bulk-tag-input,
+  .v2-photo-bulk-bar .bulk-add,
+  .v2-photo-bulk-bar .bulk-apply {
+    border-radius: 999px !important;
+  }
+  .v2-photo-bulk-bar .bulk-apply {
+    width: 100%;
+    margin-left: 0 !important;
+    white-space: normal !important;
+    line-height: 1.3;
+    padding: 10px 16px !important;
+  }
+  .gallery-bulk-tag-panel button,
+  .gallery-bulk-tag-panel .form-input,
+  .v2-archive-place-assign-bar button {
+    min-height: 44px !important;
+    border-radius: 999px !important;
+  }
+  .gallery-bulk-tag-panel strong {
+    white-space: nowrap;
   }
 }

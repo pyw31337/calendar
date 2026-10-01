@@ -217,9 +217,10 @@ export function PhotoBulkActionBar({
   },
     // Top Row: Count & Quick Selection Controls
     /*#__PURE__*/React.createElement('div', {
+      className: 'bulk-top',
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
     },
-      /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement('div', { className: 'bulk-count', style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
         /*#__PURE__*/React.createElement('span', {
           style: {
             fontSize: 'var(--font-size-sm)',
@@ -239,20 +240,21 @@ export function PhotoBulkActionBar({
               fontSize: 'var(--font-size-xs)'
             }
           }, `${selectedCount}장 선택`),
-          /*#__PURE__*/React.createElement('span', { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
-            allKeys.length > 0 ? `(전체 ${allKeys.length}장 중)` : ''
+          /*#__PURE__*/React.createElement('span', { className: 'bulk-count-total', style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap' } },
+            allKeys.length > 0 ? `전체 ${allKeys.length}장 중` : ''
           )
         ),
         onToggleAll && /*#__PURE__*/React.createElement('button', {
           type: 'button',
+          className: 'bulk-select-all',
           onClick: onToggleAll,
           style: {
             border: 'none', background: 'transparent', color: 'var(--brand, #7C3AED)',
             fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', padding: '2px 6px'
           }
-        }, allSelected ? '전체 해제' : '전체 선택 (Ctrl+A)')
+        }, allSelected ? '전체 해제' : '전체 선택', !allSelected ? /*#__PURE__*/React.createElement('span', { className: 'bulk-kbd-hint' }, ' (Ctrl+A)') : null)
       ),
-      /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      /*#__PURE__*/React.createElement('div', { className: 'bulk-actions', style: { display: 'flex', alignItems: 'center', gap: '6px' } },
         // Copy tags button
         /*#__PURE__*/React.createElement('button', {
           type: 'button',
@@ -330,6 +332,7 @@ export function PhotoBulkActionBar({
         style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--text-muted)' }
       }, '인물 태그 지정 (복수 선택 가능):'),
       /*#__PURE__*/React.createElement('div', {
+        className: 'bulk-chip-row',
         style: { display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '110px', overflowY: 'auto' }
       },
         personCandidates.map(candidate => {
@@ -340,11 +343,12 @@ export function PhotoBulkActionBar({
             type: 'button',
             onClick: () => togglePersonTag(label),
             'aria-pressed': isChecked,
+            className: 'bulk-chip',
             style: {
               display: 'inline-flex', alignItems: 'center', gap: '4px',
               minHeight: '28px', padding: '0 10px', borderRadius: '999px',
-              border: isChecked ? '1px solid var(--brand, #7C3AED)' : '1px solid var(--border-color)',
-              background: isChecked ? 'var(--brand, #7C3AED)' : 'var(--bg-secondary)',
+              border: isChecked ? '1px solid var(--brand, #7C2FE5)' : '1px solid var(--border-color)',
+              background: isChecked ? 'var(--brand, #7C2FE5)' : 'var(--bg-secondary)',
               color: isChecked ? 'var(--on-brand, #fff)' : 'var(--text-main)',
               fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer',
               transition: 'all 0.15s ease'
@@ -365,11 +369,13 @@ export function PhotoBulkActionBar({
         style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--text-muted)' }
       }, '그룹 이동 / 장소 지정:'),
       /*#__PURE__*/React.createElement('div', {
+        className: 'bulk-chip-row',
         style: { display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '80px', overflowY: 'auto' }
       },
         groupOptions.map(opt => /*#__PURE__*/React.createElement('button', {
           key: opt.id || opt.label,
           type: 'button',
+          className: 'bulk-chip',
           onClick: () => onMoveToGroup(opt),
           style: {
             minHeight: '28px', padding: '0 10px', borderRadius: '999px', border: '1px solid var(--border-color)',
@@ -388,6 +394,7 @@ export function PhotoBulkActionBar({
         style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--text-muted)' }
       }, '사물/배경 추천 태그:'),
       /*#__PURE__*/React.createElement('div', {
+        className: 'bulk-chip-row',
         style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
       },
         DEFAULT_OBJECT_TAG_RECOMMENDATIONS.map(tag => {
@@ -396,11 +403,12 @@ export function PhotoBulkActionBar({
             key: tag,
             type: 'button',
             onClick: () => toggleObjectTag(tag),
+            className: 'bulk-chip',
             style: {
               minHeight: '26px', padding: '0 8px', borderRadius: '999px',
-              border: isChecked ? '1px solid #2563EB' : '1px solid var(--border-color)',
-              background: isChecked ? '#2563EB' : 'var(--bg-secondary)',
-              color: isChecked ? '#fff' : 'var(--text-main)',
+              border: isChecked ? '1px solid var(--brand, #7C2FE5)' : '1px solid var(--border-color)',
+              background: isChecked ? 'var(--brand, #7C2FE5)' : 'var(--bg-secondary)',
+              color: isChecked ? 'var(--on-brand, #fff)' : 'var(--text-main)',
               fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer'
             }
           }, isChecked ? `✓ #${tag}` : `#${tag}`);
@@ -410,6 +418,7 @@ export function PhotoBulkActionBar({
 
     // Custom Tag Input & Action Row
     /*#__PURE__*/React.createElement('div', {
+      className: 'bulk-input-row',
       style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
     },
       /*#__PURE__*/React.createElement('div', {
@@ -427,8 +436,9 @@ export function PhotoBulkActionBar({
               handleAddCustomTag();
             }
           },
+          className: 'bulk-tag-input',
           style: {
-            flex: 1, height: '34px', padding: '0 10px', borderRadius: 'var(--radius-sm, 6px)',
+            flex: 1, height: '34px', padding: '0 10px', borderRadius: '999px',
             border: '1px solid var(--border-color)', background: 'var(--bg-primary)',
             color: 'var(--text-main)', fontSize: 'var(--font-size-xs)'
           }
@@ -437,8 +447,9 @@ export function PhotoBulkActionBar({
           type: 'button',
           onClick: handleAddCustomTag,
           disabled: !customTagInput.trim(),
+          className: 'bulk-add',
           style: {
-            height: '34px', padding: '0 12px', borderRadius: 'var(--radius-sm, 6px)',
+            height: '34px', padding: '0 12px', borderRadius: '999px',
             border: 'none', background: 'var(--bg-secondary)', color: 'var(--text-main)',
             fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer',
             opacity: customTagInput.trim() ? 1 : 0.5
@@ -470,11 +481,12 @@ export function PhotoBulkActionBar({
         type: 'button',
         onClick: handleApply,
         disabled: isSaving || allTagsToApply.length === 0,
+        className: 'bulk-apply',
         style: {
           marginLeft: 'auto',
-          height: '34px', padding: '0 18px', borderRadius: 'var(--radius-sm, 6px)',
+          height: '34px', padding: '0 18px', borderRadius: '999px',
           border: 'none',
-          background: allTagsToApply.length > 0 ? 'var(--brand, #7C3AED)' : 'var(--bg-secondary)',
+          background: allTagsToApply.length > 0 ? 'var(--brand, #7C2FE5)' : 'var(--bg-secondary)',
           color: allTagsToApply.length > 0 ? 'var(--on-brand, #fff)' : 'var(--text-muted)',
           fontSize: 'var(--font-size-xs)', fontWeight: 800,
           cursor: allTagsToApply.length > 0 ? 'pointer' : 'default',
