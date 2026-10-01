@@ -168,7 +168,7 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   assert.match(shell, /Only gallery\/content\/archive \(records\) keep \?sub=/);
 });
 
-test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant memos', async () => {
+test('V2 PC polish keeps wider rail, fluid content, 12-photo home gallery pages, and participant memos', async () => {
   const { readFileSync } = await import('node:fs');
   const design = readFileSync(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
@@ -184,7 +184,7 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /--v2-fs-title:\s*1\.2rem/);
 
   assert.match(shell, /resolveHomeGalleryStripState/);
-  assert.match(shell, /limit:\s*18/);
+  assert.match(shell, /limit: HOME_GALLERY_PAGE_SIZE \* 2,/);
   assert.match(shell, /navigateV2Destination/);
   assert.match(shell, /gallery-thumb/);
   assert.match(shell, /dday-participant-memos/);

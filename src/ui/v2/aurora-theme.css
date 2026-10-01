@@ -1042,14 +1042,12 @@
   }
 }
 
-/* Home gallery cells stay within the stored 160px small thumb. auto-fill
- * counts columns from a 64px minimum, so phones, tablets, and PCs all use
- * more than three columns, and a cell only grows until the next column fits
- * (about 160px at most) instead of stretching with the screen. */
+/* Home gallery: 12 photos per page in fixed columns (HOME_GALLERY_PAGE_SIZE in
+ * ui-app-shell-v2.js). Phones 4x3, wide tablets 6x2, PC 3x4 (PC's home card is
+ * the narrowest of the three). The breakpoints live in dest-chrome-late.css. */
 .v2-design .bp-renewal-home-photo-strip.bp-thumb-grid {
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-auto-rows: auto;
-  justify-content: start;
 }
 /* Home gallery strip: loading skeletons instead of blank grey squares while photoIndex resolves.
  * Broken/missing media is filtered by resolveHomeGalleryStripState — never opacity:0 ghosts. */
