@@ -7,7 +7,9 @@
  *      after the upload;
  *   1. a tag naming the place -- typed by hand, or added automatically at upload when the photo's
  *      GPS position is within ~200m of the place (photo-metadata-tags.js, nearestPlaceForCoords);
- *   2. its date: when every date the photo carries (meeting date / date hashtags) points at
+ *   2. its upload batch: another photo of the same message and date was filed by 0/1 to exactly
+ *      one place (iPhone Safari strips GPS, so a batch is often anchored by only a few photos);
+ *   3. its date: when every date the photo carries (meeting date / date hashtags) points at
  *      exactly ONE registered place visited that day, the photo is that place's -- for camera
  *      photos and 일정 uploads only (screenshots shared that day are not photos of the place).
  * Photos whose dates point at several places that day go to "분류 필요" (needs a place tag),
@@ -154,7 +156,7 @@ function placeKey(place, index) {
  * @param {Array} args.photos archive photo entries (each with `tags`, optional `meetingDate`)
  * @param {(photo) => string[]} args.getPhotoDates every YYYY-MM-DD date the photo carries
  * @param {(place, dateStr) => boolean} args.doesPlaceMatchDate
- * @returns {{ groups: Array<{ key, place, photos, byTag, byDate, lastDate }>,
+ * @returns {{ groups: Array<{ key, place, photos, byGeo, byTag, byBatch, byDate, lastDate }>,
  *             unclassified: Array<{ date, candidates, photos }>, unclassifiedCount: number }}
  */
 export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates, doesPlaceMatchDate }) {
@@ -166,6 +168,7 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
     photos: [],
     byGeo: 0,
     byTag: 0,
+    byBatch: 0,
     byDate: 0,
     lastDate: ''
   }));
@@ -183,29 +186,56 @@ export function buildPlacePhotoGroups({ places = [], photos = [], getPhotoDates,
     if (date && date > group.lastDate) group.lastDate = date;
   };
 
-  (Array.isArray(photos) ? photos : []).forEach(photo => {
-    if (!photo || isDismissedFromPlaces(photo)) return;
-    const dates = Array.from(new Set((datesOf(photo) || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')))));
-    const nearest = nearestPlaceForCoords(photo.latitude, photo.longitude, groups.map(group => ({ lat: group.place.lat, lng: group.place.lng, group })));
-    if (nearest) {
-      nearest.group.photos.push(photo);
-      nearest.group.byGeo += 1;
-      dates.forEach(date => noteDate(nearest.group, date));
-      return;
-    }
-    const tagged = groups.filter(group => photoMatchesPlaceTag(photo, group.place));
-    if (tagged.length) {
-      tagged.forEach(group => {
+  const geoPoints = groups.map(group => ({ lat: group.place.lat, lng: group.place.lng, group }));
+  const datesOfPhoto = photo => Array.from(new Set((datesOf(photo) || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')))));
+  // Same-batch rule: photos sent together (one chat/gallery message) on the same date were almost
+  // always taken at the same outing. iPhone Safari strips GPS from uploads, so usually only a few
+  // photos in a batch carry a position or a place tag; when every anchored photo of that batch and
+  // date points at ONE place, the rest of the batch follows it (byBatch). Mixed batches stay as-is.
+  const batchKeys = (photo, dates) => {
+    const batch = String(photo?.messageId || '');
+    return batch ? dates.map(date => `${batch}|${date}`) : [];
+  };
+  const batchPlaces = new Map();
+  const anchors = new Map();
+  const live = (Array.isArray(photos) ? photos : []).filter(photo => photo && !isDismissedFromPlaces(photo));
+  live.forEach(photo => {
+    const dates = datesOfPhoto(photo);
+    const nearest = nearestPlaceForCoords(photo.latitude, photo.longitude, geoPoints);
+    const anchored = nearest ? [nearest.group] : groups.filter(group => photoMatchesPlaceTag(photo, group.place));
+    if (!anchored.length) return;
+    anchors.set(photo, { dates, groups: anchored, byGeo: !!nearest });
+    batchKeys(photo, dates).forEach(key => {
+      if (!batchPlaces.has(key)) batchPlaces.set(key, new Set());
+      anchored.forEach(group => batchPlaces.get(key).add(group));
+    });
+  });
+
+  live.forEach(photo => {
+    const anchor = anchors.get(photo);
+    if (anchor) {
+      anchor.groups.forEach(group => {
         group.photos.push(photo);
-        group.byTag += 1;
-        dates.forEach(date => noteDate(group, date));
+        if (anchor.byGeo) group.byGeo += 1;
+        else group.byTag += 1;
+        anchor.dates.forEach(date => noteDate(group, date));
       });
       return;
     }
-    // The date rule files photos TAKEN at a place, so it skips screenshots: maps, bookings and
-    // chat captures shared that day are not photos of the place. A photo uploaded to the schedule
-    // itself (일정 사진) counts even without camera EXIF. Tagged photos above always count.
+    const dates = datesOfPhoto(photo);
+    // The date and batch rules file photos TAKEN at a place, so they skip screenshots: maps,
+    // bookings and chat captures shared that day are not photos of the place. A photo uploaded to
+    // the schedule itself (일정 사진) counts even without camera EXIF. Tagged photos always count.
     if (!isLikelyCameraPhoto(photo) && !isScheduleUpload(photo)) return;
+    const batchGroups = new Set();
+    batchKeys(photo, dates).forEach(key => (batchPlaces.get(key) || new Set()).forEach(group => batchGroups.add(group)));
+    if (batchGroups.size === 1) {
+      const group = batchGroups.values().next().value;
+      group.photos.push(photo);
+      group.byBatch += 1;
+      dates.forEach(date => noteDate(group, date));
+      return;
+    }
     const candidates = new Map();
     dates.forEach(date => placesOnDate(date).forEach(group => candidates.set(group.key, group)));
     if (candidates.size === 1) {
