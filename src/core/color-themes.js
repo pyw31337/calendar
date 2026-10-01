@@ -11,13 +11,19 @@
 
 export const COLOR_THEME_ACCENTS = ['orange', 'blue'];
 
+// Settings groups the picker by mode: 밝은 테마 / 어두운 테마.
+export const COLOR_THEME_GROUPS = [
+  { mode: 'light', label: '밝은 테마' },
+  { mode: 'dark', label: '어두운 테마' },
+];
+
 export const COLOR_THEMES = [
-  { id: 'light', mode: 'light', accent: '', label: '화이트 · 보라', surface: '#FFFFFF', point: '#7C2FE5' },
-  { id: 'light:orange', mode: 'light', accent: 'orange', label: '화이트 · 오렌지', surface: '#FFFFFF', point: '#EA580C' },
-  { id: 'light:blue', mode: 'light', accent: 'blue', label: '화이트 · 블루', surface: '#FFFFFF', point: '#2563EB' },
-  { id: 'dark', mode: 'dark', accent: '', label: '블랙 · 라임', surface: '#0D0D0D', point: '#C9FD58' },
-  { id: 'dark:orange', mode: 'dark', accent: 'orange', label: '블랙 · 오렌지', surface: '#0D0D0D', point: '#FF7A1A' },
-  { id: 'dark:blue', mode: 'dark', accent: 'blue', label: '블랙 · 블루', surface: '#0D0D0D', point: '#4DA3FF' },
+  { id: 'light', mode: 'light', accent: '', label: '화이트 · 보라', pointLabel: '보라', surface: '#FFFFFF', point: '#7C2FE5' },
+  { id: 'light:orange', mode: 'light', accent: 'orange', label: '화이트 · 오렌지', pointLabel: '오렌지', surface: '#FFFFFF', point: '#EA580C' },
+  { id: 'light:blue', mode: 'light', accent: 'blue', label: '화이트 · 블루', pointLabel: '블루', surface: '#FFFFFF', point: '#2563EB' },
+  { id: 'dark', mode: 'dark', accent: '', label: '블랙 · 라임', pointLabel: '라임', surface: '#0D0D0D', point: '#C9FD58' },
+  { id: 'dark:orange', mode: 'dark', accent: 'orange', label: '블랙 · 오렌지', pointLabel: '오렌지', surface: '#0D0D0D', point: '#FF7A1A' },
+  { id: 'dark:blue', mode: 'dark', accent: 'blue', label: '블랙 · 블루', pointLabel: '블루', surface: '#0D0D0D', point: '#4DA3FF' },
 ];
 
 // "system" | "light" | "dark", optionally ":<accent>". Unknown values read as the system default.

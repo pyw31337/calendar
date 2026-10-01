@@ -7391,3 +7391,64 @@ html:has(.renewal-shell.v2-design) .v2-archive.v2-has-page-header > .places-view
     white-space: nowrap;
   }
 }
+
+/* 더보기 (?tab=more) rows. These lived in design.css until de88c029 ("unify destination page
+   header chrome") dropped them along with the old header rules, which left the page as bare
+   native buttons. Restored here under the html:has() scope the rest of this file uses; brand
+   colors go through the color-theme tokens (color-themes.css). */
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 14px) 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88));
+  border: 1px solid var(--v2-glass-light-border, #eceaf5);
+  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04));
+  color: var(--text-main, #1e1b2e);
+  font-family: inherit;
+  font-size: var(--v2-fs-md);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item:hover {
+  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78));
+  border-color: var(--v2-glass-light-hover-border, var(--a-brand-soft-2, #e0d4ff));
+}
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item.is-active {
+  color: var(--brand, #7C2FE5);
+  border-color: var(--v2-glass-purple-border, rgb(var(--a-brand-rgb, 124 47 229) / 0.26));
+  background: var(--brand-soft, #F3EEFF);
+}
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--brand, #7C2FE5);
+  flex-shrink: 0;
+}
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item-icon svg { width: 18px; height: 18px; }
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item-label { flex: 1; }
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-item-chevron { color: var(--text-light, #83798f); flex-shrink: 0; }
+html:has(.renewal-shell.v2-design) .v2-more .v2-more-note {
+  text-align: center;
+  padding: 4px 20px 20px;
+  font-size: var(--v2-fs-xs);
+  color: var(--text-muted, #6b6580);
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .v2-more .v2-more-list { max-width: 720px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+}

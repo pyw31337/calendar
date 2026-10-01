@@ -2,7 +2,7 @@
  * Side menu UI (P4-4): SharedSideMenuSettings + MainSideMenu
  */
 
-import { COLOR_THEMES } from '../core/color-themes.js';
+import { COLOR_THEMES, COLOR_THEME_GROUPS } from '../core/color-themes.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -57,14 +57,15 @@ export function AppSettingsModal({
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
       /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
-          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
-        ),
-        typeof onSelectColorTheme === 'function' && /*#__PURE__*/React.createElement(ColorThemePicker, {
-          value: colorThemeId, onSelect: onSelectColorTheme
-        }),
+        // Themes replace the dark-mode switch: 밝은/어두운 테마 are picked like any other theme.
+        // The switch only remains for a caller that has no theme picker wired.
+        typeof onSelectColorTheme === 'function'
+          ? /*#__PURE__*/React.createElement(ColorThemePicker, { value: colorThemeId, onSelect: onSelectColorTheme })
+          : /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+              /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
+            ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
+          ),
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, TextResizeIcon && /*#__PURE__*/React.createElement(TextResizeIcon, null)), "글자크기"),
@@ -123,8 +124,8 @@ export function AppSettingsModal({
   );
 }
 
-// Settings > 컬러 테마: one swatch per COLOR_THEMES entry (surface + point color). Picking one
-// sets the mode and the point color together; the 다크모드 switch above keeps the point color.
+// Settings > 테마: one swatch per COLOR_THEMES entry (surface + point color), grouped into
+// 밝은 테마 / 어두운 테마. Picking one sets the mode and the point color together.
 function ColorThemePicker({ value, onSelect }) {
   const React = window.React;
   return /*#__PURE__*/React.createElement("div", { className: "v2-color-theme-picker", style: { padding: '6px 0 12px' } },
@@ -138,21 +139,26 @@ function ColorThemePicker({ value, onSelect }) {
             /*#__PURE__*/React.createElement("path", { d: "M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" })
           )
         ),
-        "컬러 테마"
+        "테마"
       )
     ),
+    /*#__PURE__*/React.createElement("div", { role: "radiogroup", "aria-label": "테마", style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+    COLOR_THEME_GROUPS.map(group => /*#__PURE__*/React.createElement("div", { key: group.mode, className: "v2-color-theme-group" },
     /*#__PURE__*/React.createElement("div", {
-      role: "radiogroup", "aria-label": "컬러 테마",
+      style: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', margin: '0 2px 6px' }
+    }, group.label),
+    /*#__PURE__*/React.createElement("div", {
       className: "v2-color-theme-grid",
       style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }
     },
-      COLOR_THEMES.map(theme => {
+      COLOR_THEMES.filter(theme => theme.mode === group.mode).map(theme => {
         const selected = theme.id === value;
         return /*#__PURE__*/React.createElement("button", {
           key: theme.id,
           type: "button",
           role: "radio",
           "aria-checked": selected ? "true" : "false",
+          "aria-label": theme.label,
           "data-color-theme": theme.id,
           className: "v2-color-theme-option" + (selected ? " is-selected" : ""),
           onClick: () => onSelect(theme.id),
@@ -183,9 +189,10 @@ function ColorThemePicker({ value, onSelect }) {
           ),
           /*#__PURE__*/React.createElement("span", {
             style: { fontSize: 'var(--font-size-xs)', fontWeight: selected ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }
-          }, theme.label)
+          }, theme.pointLabel)
         );
       })
+    )))
     )
   );
 }

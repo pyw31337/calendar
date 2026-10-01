@@ -71,7 +71,8 @@ test('each point-color theme defines every token the V2 CSS reads', () => {
 test('settings offers every color theme and the shell passes the picker through', () => {
   const sideMenu = readFileSync(new URL('../src/ui/ui-side-menu.js', import.meta.url), 'utf8');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
-  assert.match(sideMenu, /COLOR_THEMES\.map/);
+  assert.match(sideMenu, /COLOR_THEME_GROUPS\.map/);
+  assert.match(sideMenu, /typeof onSelectColorTheme === 'function'\s*\? \/\*#__PURE__\*\/React\.createElement\(ColorThemePicker/, 'the theme picker replaces the dark-mode switch');
   assert.match(shell, /onSelectColorTheme: selectColorTheme/);
   assert.match(shell, /import '\.\/v2\/color-themes\.css';/);
 });
