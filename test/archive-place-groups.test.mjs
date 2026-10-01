@@ -109,3 +109,34 @@ test('withPlaceTag prepends the place tag and never drops existing tags', async 
   assert.equal(withPlaceTag('x', { name: '' }).status, 'invalid');
   assert.equal(placeTagToken({ name: '서울랜드', alias: '서랜' }), '서랜');
 });
+
+test('photos from the same upload batch and date follow the batch\'s one anchored place', () => {
+  const geoPlaces = [
+    { id: 'p2', name: '예당호 출렁다리', lat: 36.6, lng: 126.8, visits: ['2026-09-20'] },
+    { id: 'p3', name: '막국수집', lat: 36.7, lng: 126.9, visits: ['2026-09-20'] }
+  ];
+  const camera = '260920 아이폰17 서준';
+  const photos = [
+    { id: 'gps', messageId: 'm1', tags: camera, latitude: 36.6, longitude: 126.8 },
+    { id: 'same-batch', messageId: 'm1', tags: camera },
+    { id: 'other-batch', messageId: 'm2', tags: camera },
+    { id: 'other-day', messageId: 'm1', tags: '260921 아이폰17 서준' },
+    { id: 'shot', messageId: 'm1', tags: '#260920' }
+  ];
+  const { groups, unclassified } = buildPlacePhotoGroups({ places: geoPlaces, photos, getPhotoDates, doesPlaceMatchDate });
+  const yedang = groups.find(g => g.place.id === 'p2');
+  assert.deepEqual(yedang.photos.map(p => p.id).sort(), ['gps', 'same-batch']);
+  assert.equal(yedang.byGeo, 1);
+  assert.equal(yedang.byBatch, 1);
+  assert.deepEqual(unclassified.flatMap(bucket => bucket.photos.map(p => p.id)), ['other-batch'], 'another batch the same day still needs a choice');
+});
+
+test('a batch anchored to two places files nothing by batch', () => {
+  const photos = [
+    { id: 't1', messageId: 'm1', tags: '260920 아이폰17 예당호' },
+    { id: 't2', messageId: 'm1', tags: '260920 아이폰17 막국수집' },
+    { id: 'rest', messageId: 'm1', tags: '260920 아이폰17' }
+  ];
+  const { unclassified } = buildPlacePhotoGroups({ places, photos, getPhotoDates, doesPlaceMatchDate });
+  assert.deepEqual(unclassified.flatMap(bucket => bucket.photos.map(p => p.id)), ['rest']);
+});

@@ -2,11 +2,25 @@
 
 ## 근거
 
-- Taste 계정에는 아직 **취향 프로필이 없다**(저장한 디자인 5개 미만). 프로필이 생기면 이 검토를 다시 돌린다.
-  디자인 5개를 저장하면 Taste가 프로필을 자동으로 만든다: <https://buildwithtaste.com/discover>
-- 사용자 본인 메모 1건: Perplexity 검색 화면 레퍼런스에 **"i like clean design"**(2026-10-01).
+- Taste의 자동 취향 프로필 문서는 아직 비어 있다(저장은 19개 있음 — 아래 "사용자 취향 요약" 참고).
 - Taste의 기본 가드레일(AI 생성 디자인에서 과용되는 패턴 목록)과 실제 코드 수치를 대조했다.
   측정 대상: `src/ui/v2/*.css` + `src/app.css`.
+
+## 사용자 취향 요약 (Taste 저장 19개 + 본인 메모 6개, 2026-10-01 직접 확인)
+
+Taste의 자동 "취향 프로필" 문서는 아직 생성되지 않았지만 저장·메모 데이터는 있다(`search_samples source=saved`).
+디자인 작업 전에는 이 요약과 원본 메모를 기준으로 삼는다.
+
+| 본인 메모 | 레퍼런스 | 해석 |
+|---|---|---|
+| "i like lime-black combination" | ControlPlane 에이전트 대시보드(검정 바탕 + 라임 포인트) | 어두운 테마 기본값 = 블랙·라임 유지가 정답 |
+| "I like lime gradient color." | Finance App(라임 그라데이션 그래프) | 라임은 단색뿐 아니라 부드러운 그라데이션 강조에도 |
+| "i like orange color" | CardCorner3 | 오렌지 포인트 테마 유지·강화 |
+| "i love widget style." | Compact Widget Dashboard(작은 위젯 카드 모음) | 홈을 정보 밀도 높은 위젯 카드(날씨·D-day·정산 잔액·다음 모임) 그리드로 |
+| "I like font size strong contrast ratio." | Apple Fitness 타이머 | 핵심 숫자(D-day, 금액, 날짜)는 크고 굵게, 나머지는 작고 옅게 — 대비로 위계 |
+| "i like clean design" | Perplexity 검색 | 장식(유리 블러, 반짝이, 무한 애니메이션) 덜어내기 |
+
+저장한 디자인 전체의 공통점: 미니멀, 카드형(둥근 모서리), 어두운 모드 대시보드, 큰 숫자 타이포그래피, 포인트 색 1개.
 
 ## 발견 (영향이 큰 순)
 
