@@ -22,6 +22,7 @@ import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 import { CommonPagination } from './ui-shared.js';
+import { getCulturePosterBadge, CULTURE_POSTER_BADGE_COLORS } from './culture-poster-badge.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
@@ -6325,7 +6326,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
-        const isMovieNowShowing = isMovieCard && movieStillShowing(item, todayIsoLocal());
+        const todayIso = todayIsoLocal();
+        const itemKind = getCultureItemKind(item) || (anniversaryCategory === 'festival' ? 'festival' : (anniversaryCategory === 'event' ? 'performance' : ''));
+        const posterBadge = getCulturePosterBadge(item, {
+          today: todayIso,
+          isMovie: isMovieCard,
+          isOngoingKind: !isMovieCard && (itemKind === 'festival' || itemKind === 'performance'),
+          movieNowShowing: isMovieCard && movieStillShowing(item, todayIso),
+        });
         const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
         const posterUrl = culturePosterUrl(item);
         const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
@@ -6372,15 +6380,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 img.style.display = 'none';
               }
             }),
-            isMovieNowShowing && /*#__PURE__*/React.createElement("span", {
+            posterBadge && /*#__PURE__*/React.createElement("span", {
+              className: "culture-poster-badge is-" + posterBadge.tone,
               style: {
-                position: 'absolute', top: '8px', left: '8px', zIndex: 2,
+                position: 'absolute', top: '8px', left: '8px', zIndex: 3,
                 display: 'inline-flex', alignItems: 'center', padding: '4px 9px',
-                borderRadius: 'var(--radius-full)', backgroundColor: '#16A34A', color: '#FFFFFF',
+                borderRadius: 'var(--radius-full)', backgroundColor: CULTURE_POSTER_BADGE_COLORS[posterBadge.tone], color: '#FFFFFF',
                 fontSize: 'var(--font-size-2xs)', fontWeight: 800, lineHeight: 1,
                 boxShadow: '0 1px 4px rgba(0,0,0,0.28)'
               }
-            }, "상영중"),
+            }, posterBadge.label),
             // 스포츠 경기 카드: 포스터(팀 관계없는 종목 기본 이미지) 위에 날짜/양팀 로고/경기장을
             // 오버레이로 얹는다. 로고를 크게 꽉 채우고, 날짜/경기장은 로고 쪽으로 촘촘하게 붙인다
             // (컬처플로우 스포츠 카드 레이아웃 참고).

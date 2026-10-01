@@ -5273,14 +5273,22 @@ html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
     padding-right: 10px !important;
   }
 }
-/* Home gallery: more columns as the card grows, each cell at most ~160px
-   (the stored small webp). Later than the 3-column thumb-grid locks. */
+/* Home gallery: 12 photos per page (HOME_GALLERY_PAGE_SIZE in ui-app-shell-v2.js),
+   columns x rows by width: phones and narrow tablets 4x3, wide tablets
+   (1024-1199px, a ~480-570px card) 6x2, PC (>=1200px, a ~220-380px card) 3x4.
+   Later than the 3-column thumb-grid locks. */
 html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip.bp-thumb-grid {
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important;
-  justify-content: start !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
-html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip.bp-thumb-grid > .bp-thumb {
-  max-width: 160px;
+@media (min-width: 1024px) and (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip.bp-thumb-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip.bp-thumb-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
 }
 
 @media (min-width: 460px) {

@@ -50,6 +50,7 @@ import {
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
+
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { useHomeSummarySwipe } from './home-summary-swipe.js';
@@ -57,6 +58,9 @@ import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../cor
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
+
+// Home gallery: 12 photos per page -- 4x3 on PC, 6x2 at mid widths, 3x4 on phones (dest-chrome-late.css).
+const HOME_GALLERY_PAGE_SIZE = 12;
 
 /** Legacy 5-tab labels kept for PlaceholderPane; primary IA is V2_PRIMARY side-nav. */
 const TABS = [
@@ -2137,7 +2141,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       items: photoItems,
       status: photoIndexStatus,
       loading: photoIndexLoading,
-      limit: 18,
+      limit: HOME_GALLERY_PAGE_SIZE * 2,
       isBroken: isBrokenThumb,
     }),
     [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
@@ -2297,17 +2301,17 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           role: 'status',
           'aria-busy': 'true',
           'aria-label': '갤러리 불러오는 중',
-        }, Array.from({ length: 9 }, (_, i) => React.createElement('div', {
+        }, Array.from({ length: HOME_GALLERY_PAGE_SIZE }, (_, i) => React.createElement('div', {
           key: `gallery-skel-${i}`,
           className: bentoClass('thumb is-skeleton'),
           'aria-hidden': 'true',
         })))
         : photos.length
           ? React.createElement(HomeSummaryPager, {
-            items: Array.from({ length: Math.ceil(photos.length / 9) }, (_, page) => photos.slice(page * 9, page * 9 + 9)),
+            items: Array.from({ length: Math.ceil(photos.length / HOME_GALLERY_PAGE_SIZE) }, (_, page) => photos.slice(page * HOME_GALLERY_PAGE_SIZE, (page + 1) * HOME_GALLERY_PAGE_SIZE)),
             label: '최근 사진',
             renderPage: (pagePhotos, pageIndex) => React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, pagePhotos.map((photo, i) => {
-            const photoIndex = pageIndex * 9 + i;
+            const photoIndex = pageIndex * HOME_GALLERY_PAGE_SIZE + i;
             return React.createElement('button', {
               type: 'button',
               className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),

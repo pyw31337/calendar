@@ -111,12 +111,16 @@ test('resolveHomeGalleryStripState shows loading until photoIndex is ready', () 
   assert.equal(empty.state, 'empty');
 });
 
-test('home gallery columns stay within the 160px thumb instead of a fixed 3-up grid', () => {
+test('home gallery shows 12 per page: phones 4x3, wide tablets 6x2, PC 3x4', () => {
   const aurora = readFileSync(new URL('../src/ui/v2/aurora-theme.css', import.meta.url), 'utf8');
   const late = readFileSync(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8');
   const design = readFileSync(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
-  assert.match(aurora, /bp-renewal-home-photo-strip\.bp-thumb-grid[\s\S]*repeat\(auto-fill, minmax\(64px, 1fr\)\)/);
-  assert.match(late, /bp-renewal-home-photo-strip\.bp-thumb-grid[\s\S]*max-width: 160px/);
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shell, /const HOME_GALLERY_PAGE_SIZE = 12;/);
+  assert.doesNotMatch(shell, /photos\.slice\(page \* 9/);
+  assert.match(aurora, /bp-renewal-home-photo-strip\.bp-thumb-grid \{\s*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(late, /bp-renewal-home-photo-strip\.bp-thumb-grid \{\s*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(late, /min-width: 1024px\) and \(max-width: 1199px\) \{\s*html:has\(\.renewal-shell\.v2-design\) \.bp-renewal-home-photo-strip\.bp-thumb-grid \{\s*grid-template-columns: repeat\(6/);
+  assert.match(late, /min-width: 1200px\) \{\s*html:has\(\.renewal-shell\.v2-design\) \.bp-renewal-home-photo-strip\.bp-thumb-grid \{\s*grid-template-columns: repeat\(3/);
   assert.match(design, /bp-thumb-grid:not\(\.bp-renewal-home-photo-strip\)/);
-  assert.doesNotMatch(aurora, /home gallery preview is a fixed 3/);
 });
