@@ -64,9 +64,13 @@ function dismissSplashScreen() {
   }, remaining);
 }
 
-function showBootStatus(msg) {
+// `keepSplash`: the ordinary "loading" status sits behind the splash (index.html), which
+// dismissSplashScreen() fades out once the app is ready. boot() used to call this first thing
+// and that removed the splash ~0.2-0.5s after launch, so phones saw a gray "불러오는 중…" line
+// instead of the splash. Retry/failure messages still take the splash down so they are seen.
+function showBootStatus(msg, { keepSplash = false } = {}) {
   const splash = document.getElementById('app-splash');
-  if (splash) {
+  if (splash && !keepSplash) {
     try { splash.remove(); } catch (_) {}
   }
   const root = document.getElementById('root');
@@ -297,7 +301,7 @@ window.__gatherLoadViewUi = loadViewUi;
 
 async function boot() {
   try {
-    showBootStatus('모여라 캘린더 불러오는 중…');
+    showBootStatus('모여라 캘린더 불러오는 중…', { keepSplash: true });
     // Loaded and awaited FIRST, before any of the dynamic imports below -- an earlier version
     // kicked this off in parallel with them to save a little latency, but that meant it was
     // competing for bandwidth with ~30 concurrent chunk fetches on a slow/cold mobile connection

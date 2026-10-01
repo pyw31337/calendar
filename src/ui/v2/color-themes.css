@@ -13,6 +13,8 @@
 
 /* ---------- 화이트 · 오렌지 ---------- */
 html[data-accent="orange"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) {
+  /* Solid vivid fill for the big brand surfaces (hero, center button, brand tile). */
+  --a-solid: #FF5F0F;
   --a-brand: #EA580C;
   --a-brand-rgb: 234 88 12;
   --a-brand-deep: #C2410C;
@@ -38,6 +40,8 @@ html[data-accent="orange"]:not([data-theme="dark"]):has(.renewal-shell.v2-design
 
 /* ---------- 화이트 · 블루 ---------- */
 html[data-accent="blue"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) {
+  /* Solid vivid fill for the big brand surfaces (hero, center button, brand tile). */
+  --a-solid: #1F6BFF;
   --a-brand: #2563EB;
   --a-brand-rgb: 37 99 235;
   --a-brand-deep: #1D4ED8;
@@ -63,6 +67,8 @@ html[data-accent="blue"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) 
 
 /* ---------- 화이트 · 핫핑크 ---------- */
 html[data-accent="pink"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) {
+  /* Solid vivid fill for the big brand surfaces (hero, center button, brand tile). */
+  --a-solid: #FF2D6F;
   --a-brand: #F0386B;
   --a-brand-rgb: 240 56 107;
   --a-brand-deep: #C81E50;
@@ -119,34 +125,13 @@ html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .chat-s
 }
 html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .place-card-row.is-focused { background-color: rgb(var(--a-brand-rgb) / 0.08) !important; }
 
-/* Two light-theme gradients mix the brand with fixed blue/cyan stops; restate them per theme
-   rather than leave a blue stripe inside an orange button. */
-html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle::before {
-  background-image:
-    radial-gradient(circle at 25% 25%, rgb(var(--a-brand-light-rgb) / 0.95) 0%, transparent 45%),
-    radial-gradient(circle at 75% 75%, rgb(var(--a-hero-3-rgb) / 0.85) 0%, transparent 45%),
-    linear-gradient(125deg, var(--a-brand-deep) 0%, var(--a-brand) 35%, var(--a-hero-2) 65%, var(--a-brand-light) 100%) !important;
-}
-/* The default animation swings the hue +36deg (purple -> magenta), which drifts orange into
-   yellow-green; the point-color themes swing a little the other way instead. */
-html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle::before {
-  animation: bp-cal-aurora-wave 3s ease-in-out infinite alternate, bp-color-theme-aurora-spin 6.5s linear infinite !important;
-}
-@keyframes bp-color-theme-aurora-spin {
-  0% { filter: hue-rotate(0deg); }
-  50% { filter: hue-rotate(-18deg); }
-  100% { filter: hue-rotate(0deg); }
-}
+/* Center button glow in the point color (the button itself is flat, see the end of this file). */
 html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle {
   box-shadow: 0 6px 20px rgb(var(--a-brand-rgb) / 0.45), 0 2px 8px rgb(var(--a-brand-deep-rgb) / 0.35) !important;
 }
 html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-item.bp-is-center.bp-is-active .bp-mobile-bottom-nav-center-circle {
   box-shadow: 0 8px 26px rgb(var(--a-brand-rgb) / 0.55), 0 3px 10px rgb(var(--a-brand-deep-rgb) / 0.4) !important;
 }
-html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-dday-compact-badge {
-  background: linear-gradient(135deg, var(--a-brand) 0%, var(--a-brand-2) 100%);
-}
-
 /* ---------- 블랙 · 오렌지 ---------- */
 html[data-theme="dark"][data-accent="orange"]:has(.renewal-shell.v2-design) {
   --d-brand: #FF7A1A;
@@ -184,4 +169,34 @@ html[data-theme="dark"][data-accent="pink"]:has(.renewal-shell.v2-design) {
   --d-brand-line: #6B1F3D;
   --d-accent2: #FF7A1A;
   --d-accent2-rgb: 255 122 26;
+}
+
+/* ---------- Light point-color themes are flat ----------
+   화이트·보라 keeps its aurora hero; orange / blue / hot pink use one vivid solid color instead
+   (no mesh, no blobs, no animated gradient) -- the same idea as the dark themes' solid lime. */
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-hero-zone {
+  background: var(--a-solid) !important;
+  background-image: none !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-hero-zone::before,
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-hero-zone::after,
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-hero-zone > .bp-hero-aurora {
+  background: none !important;
+  opacity: 0 !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle {
+  background: var(--a-solid) !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-mobile-bottom-nav-center-circle::before {
+  background: var(--a-solid) !important;
+  background-image: none !important;
+  animation: none !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head,
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand,
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-head::after {
+  background: var(--a-solid) !important;
+}
+html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .v2-design .bp-dday-compact-badge {
+  background: var(--a-solid) !important;
 }
