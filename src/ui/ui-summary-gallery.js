@@ -5,7 +5,9 @@
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
-import { buildBulkPhotoTagChanges } from '../core/bulk-photo-tags.js';
+import { applyPhotoTagOperation, buildBulkPhotoTagChanges, joinPhotoTagTokens } from '../core/bulk-photo-tags.js';
+import { buildTagSuggestions } from './archive-tag-suggestions.js';
+import { ArchiveTagSuggestions } from './archive-tag-suggestions-view.js';
 import {
   forgetArchiveDeleted,
   photoHiddenByArchiveDelete,
@@ -1541,7 +1543,7 @@ export function HistoryView({
     });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions, v2SearchControlled]);
-  const VALID_HISTORY_TABS = ['meetings', 'memories', 'people', 'places'];
+  const VALID_HISTORY_TABS = ['meetings', 'memories', 'people', 'places', 'suggest'];
   // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
   // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
   // 재진입 시 그대로 복원했지만, 그러면 지난모임 탭을 보다 나간 사용자는 계속 지난모임이
@@ -1783,9 +1785,11 @@ export function HistoryView({
   const archivePhotoIndexHasError = indexedPhotoStatus === 'error';
   // 보관함 첫 화면은 최근 한 페이지만 그린다. 검색은 컨텐츠 검색과 같이 그 한 페이지에서
   // 끊기면 안 되므로, 검색어가 있는 동안만 사진 인덱스 전체를 읽어 지난 태그까지 찾는다.
+  // 추천 탭도 같다: 지난 사진까지 봐야 추천이 의미가 있고, 결과(태그 적용)가 남는다.
+  const wantsFullArchiveIndex = historyTab === 'suggest';
   React.useEffect(() => {
     const needle = String(searchQuery || '').trim();
-    if (!needle) {
+    if (!needle && !wantsFullArchiveIndex) {
       setArchiveIndexScan('idle');
       return undefined;
     }
@@ -1803,7 +1807,7 @@ export function HistoryView({
       .then(ok => { if (!cancelled) setArchiveIndexScan(ok === false ? 'error' : 'done'); })
       .catch(() => { if (!cancelled) setArchiveIndexScan('error'); });
     return () => { cancelled = true; };
-  }, [searchQuery.trim() ? 'search' : '', usesCanonicalPhotoIndex, indexedPhotoComplete, onIndexedPhotoLoadAll, calendar && calendar.id]);
+  }, [searchQuery.trim() ? 'search' : '', wantsFullArchiveIndex, usesCanonicalPhotoIndex, indexedPhotoComplete, onIndexedPhotoLoadAll, calendar && calendar.id]);
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
@@ -2281,7 +2285,7 @@ export function HistoryView({
   // 장소 탭 -- 사진을 등록된 장소별로 묶는다(src/ui/archive-place-groups.js): 장소 이름 태그(업로드 때
   // GPS로 자동으로 붙는 것 포함) → 그날 방문한 장소가 한 곳뿐이면 그 장소 → 여러 곳이면 "분류 필요".
   const placePhotoGroups = React.useMemo(() => {
-    if (historyTab !== 'places' && !q) return { groups: [], unclassified: [], unclassifiedCount: 0 };
+    if (historyTab !== 'places' && historyTab !== 'suggest' && !q) return { groups: [], unclassified: [], unclassifiedCount: 0 };
     return buildPlacePhotoGroups({
       places: getCalendarPlaces(calendar),
       photos: historyPhotoEntries,
@@ -2293,6 +2297,63 @@ export function HistoryView({
       doesPlaceMatchDate
     });
   }, [historyTab, calendar, historyPhotoEntries, q ? 1 : 0]);
+  // 추천 탭 (archive-tag-suggestions.js): 장소/날짜는 묶음으로 바로 적용, 인물은 날짜별로 골라서.
+  const tagSuggestions = React.useMemo(() => {
+    if (historyTab !== 'suggest') return null;
+    return buildTagSuggestions({
+      photos: historyPhotoEntries,
+      places: getCalendarPlaces(calendar),
+      placeGroups: placePhotoGroups,
+      getPhotoDates: photo => parseHistoryDateTokens(photo?.tags || ''),
+      personLabels: personTagChips.map(chip => chip.label)
+    });
+  }, [historyTab, historyPhotoEntries, calendar, placePhotoGroups, personTagChips]);
+  const [isApplyingSuggestion, setIsApplyingSuggestion] = React.useState(false);
+  // One bulk command (server transaction) for every photo, then an undo toast -- the same
+  // contract 분류 필요 → 장소 지정 uses. `plan` is [{ photos, tag }]; a photo named by several
+  // entries gets all their tags in one change (the command keeps one entry per file).
+  const applySuggestedTags = async plan => {
+    const save = bulkSaveImageTagsRef.current || window.__gatherBulkSaveImageTags;
+    if (typeof save !== 'function') {
+      showToast?.('일괄 태그 저장 기능을 준비하지 못했습니다.', 'error');
+      return false;
+    }
+    const byKey = new Map();
+    plan.forEach(({ photos, tag }) => buildBulkPhotoTagChanges(photos, 'add', tag).forEach(change => {
+      const prev = byKey.get(change.assetKey);
+      if (!prev) { byKey.set(change.assetKey, change); return; }
+      const merged = applyPhotoTagOperation(prev.tags, 'add', tag);
+      byKey.set(change.assetKey, { ...prev, tags: joinPhotoTagTokens(merged.tags) });
+    }));
+    const changes = Array.from(byKey.values());
+    if (!changes.length) {
+      showToast?.('이미 모두 적용되어 있어요.', 'info');
+      return true;
+    }
+    setIsApplyingSuggestion(true);
+    publishArchiveTags(changes);
+    try {
+      const result = await save(changes);
+      if (!result?.ok) throw new Error('태그 저장 실패');
+      const undoChanges = changes.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
+      showToast?.(`사진 ${changes.length}장에 태그를 붙였어요.`, 'success', 9000, () => {
+        publishArchiveTags(undoChanges);
+        void Promise.resolve(save(undoChanges))
+          .then(undoResult => {
+            if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
+            showToast?.(undoResult?.ok ? '추천 태그를 되돌렸습니다.' : '되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+          })
+          .catch(() => { rollbackArchiveTags(undoChanges); showToast?.('되돌리지 못했습니다.', 'error'); });
+      }, null, '되돌리기');
+      return true;
+    } catch (err) {
+      rollbackArchiveTags(changes);
+      showToast?.(String(err?.message || '태그 저장에 실패했습니다.'), 'error');
+      return false;
+    } finally {
+      setIsApplyingSuggestion(false);
+    }
+  };
   const selectedPlaceGroup = selectedPlaceKey && selectedPlaceKey !== PLACE_UNCLASSIFIED_KEY
     ? placePhotoGroups.groups.find(group => group.key === selectedPlaceKey) || null
     : null;
@@ -3005,7 +3066,8 @@ export function HistoryView({
       { value: 'memories', label: '추억', badge: historyTab === 'memories' ? travelMemoryGroups.length : null },
       { value: 'people', label: '인물', badge: personTagChips.length },
       { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : (placeCount || null) },
-      { value: 'meetings', label: '모임', badge: confirmedDates.length }
+      { value: 'meetings', label: '모임', badge: confirmedDates.length },
+      { value: 'suggest', label: '추천', badge: tagSuggestions ? (tagSuggestions.autoPhotoCount || null) : null }
     ]
   })
   );
@@ -3732,6 +3794,27 @@ export function HistoryView({
             )
           )
     )),
+
+    historyTab === 'suggest' && /*#__PURE__*/React.createElement("div", {
+      key: "archive-suggest",
+      className: "history-page-scroll",
+      onScroll: handleHistoryScroll,
+      style: historyScrollStyle
+    }, /*#__PURE__*/React.createElement(ArchiveTagSuggestions, {
+      suggestions: tagSuggestions,
+      loading: archiveIndexScan === 'loading',
+      busy: isApplyingSuggestion,
+      onApply: (photos, tag) => applySuggestedTags([{ photos, tag }]),
+      onApplyAll: () => {
+        const run = () => { void applySuggestedTags((tagSuggestions?.groups || []).map(group => ({ photos: group.photos, tag: group.tag }))); };
+        const count = tagSuggestions?.autoPhotoCount || 0;
+        if (typeof onRequestConfirm === 'function') onRequestConfirm('추천 태그 모두 적용', `사진 ${count}장에 추천된 장소·날짜 태그를 붙일까요? 기존 태그는 그대로 두고, 직후에 되돌릴 수 있어요.`, run);
+        else run();
+      },
+      renderGrid: renderArchivePhotoGrid,
+      formatDate: formatHistoryDate,
+      selectKeyOf: archivePhotoSelectKey
+    })),
 
     historyLightbox && Lightbox && /*#__PURE__*/React.createElement(Lightbox, {
       urls: historyLightbox.urls,
