@@ -59,7 +59,8 @@ assert(getInitialAppView({ pathname: '/', search: '?view=gallery' }, () => null)
 // V2 is the default shell (cutover): a bare (no shell=v1) route change now also carries the
 // V2 tab/sub mapping (gallery -> tab=records&sub=media), same as an explicit shell=v2 caller.
 assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery&tab=records&sub=media', 'route changes must retain calendar/month, clear stale deep-link state, and default to V2 tab/sub mapping');
-assert(buildAppViewUrl({ pathname: '/calendar/', search: '?shell=v1&id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?shell=v1&id=cw&year=2026&month=09&view=gallery', 'shell=v1 escape hatch must keep legacy route changes free of V2 tab/sub params');
+// The ?shell=v1 escape hatch was removed with the V1 tree: an old shell=v1 URL routes like V2.
+assert(new URLSearchParams(buildAppViewUrl({ pathname: '/calendar/', search: '?shell=v1&id=cw' }, 'gallery', new Date(2026, 8, 1)).split('?')[1]).get('tab') === 'records', 'an old shell=v1 URL must route like V2');
 assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'cached', loadLocalCache: () => [{ id: 'cached', title: 'ready' }], isUsableCalendarRecord: row => row?.title === 'ready' }) === false, 'cached usable calendar must render without a loading shell');
 assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'missing', loadLocalCache: () => [], isUsableCalendarRecord: () => false }) === true, 'missing calendar must retain its initial loading state');
 
@@ -480,7 +481,9 @@ const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.
 const chatWindowSource = fs.readFileSync(new URL('../src/core/use-chat-message-window.js', import.meta.url), 'utf8');
 const galleryIndexSource = fs.readFileSync(new URL('../src/core/use-gallery-index-bindings.js', import.meta.url), 'utf8');
 const photoActionsSource = fs.readFileSync(new URL('../src/core/app-calendar-photo-actions.js', import.meta.url), 'utf8');
-const calendarViewsSource = fs.readFileSync(new URL('../src/core/app-calendar-views.js', import.meta.url), 'utf8');
+// The V1 view JSX (app-calendar-views.js) was removed with the ?shell=v1 fallback; the gallery
+// wiring these asserts guard lives in the V2 shell's records context.
+const calendarViewsSource = fs.readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
@@ -509,7 +512,7 @@ assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must h
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
 assert(galleryIndexSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
-assert(appMainSource.includes('meetingsHydrated'), 'settlement nav badge must wait for meetings hydration');
+assert(calendarViewsSource.includes('formatBalanceBadge(calculateSettlementBalance(calendar))'), 'V2 side-menu settlement badge must use the shared running-balance source');
 assert(galleryIndexSource.includes('enableBulkHydration: true'), 'photo comment badges must bulk-hydrate on gallery too');
 assert(!/needsPlacesData = React\.useMemo\(\s*\(\) => activeView === 'calendar'/.test(appMainSource), 'places/meetings must stay subscribed beyond calendar/places/settlement/history');
 assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'history' \|\| activeView === 'content'/.test(appMainSource), 'custom contents must stay subscribed beyond history/content');

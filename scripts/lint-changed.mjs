@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-const files = execFileSync('git', ['diff', '--name-only', 'HEAD', '--', '*.js', '*.jsx', '*.mjs'], { encoding: 'utf8' })
+const files = execFileSync('git', ['diff', '--name-only', '--diff-filter=d', 'HEAD', '--', '*.js', '*.jsx', '*.mjs'], { encoding: 'utf8' })
   .split(/\r?\n/).map(file => file.trim()).filter(Boolean);
 if (!files.length) {
   console.log('[lint:changed] no changed JavaScript files');

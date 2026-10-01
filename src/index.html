@@ -47,11 +47,8 @@
       })();
       (function () {
         try {
-          // V2 is the default shell everywhere now (isRenewalShellEnabled: absent shell param
-          // = V2, `?shell=v1` is the escape hatch) -- this script no longer needs to force
-          // `shell=v2` itself, and MUST NOT touch the `shell` param at all, or it would silently
-          // clobber an explicit `?shell=v1` opt-out on non-github.io hosts. Its only remaining
-          // job is defaulting `id` for old bookmarked/shared links on custom domains that predate
+          // V2 is the only shell (the V1 tree and `?shell=v1` were removed), so this script never
+          // touches the `shell` param. Its only job is defaulting `id` for old bookmarked/shared links on custom domains that predate
           // the `id`/`cal` param. Production github.io / local preview already carry an explicit
           // `id`, so this only ever fires for other hosts.
           var host = String(location.hostname || '');
