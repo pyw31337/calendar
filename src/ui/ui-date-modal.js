@@ -2060,7 +2060,7 @@ export function DateModal({
     }
   }, titleParts.year, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: isConfirmed ? '#7C3AED' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
+      color: isConfirmed ? 'var(--a-brand, #7C3AED)' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
       marginLeft: '4px'
     }
   }, titleParts.rest)),
@@ -2670,7 +2670,7 @@ export function DateModal({
             backgroundColor: 'rgba(239, 68, 68, 0.06)',
             color: 'rgb(239, 68, 68)'
           } : {
-            border: '1.5px solid var(--v2-accent-line, #C4B5FD)', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: 'var(--v2-accent, #7C3AED)'
+            border: '1.5px solid var(--v2-accent-line, #C4B5FD)', backgroundColor: 'rgb(var(--a-brand-rgb, 124 58 237) / 0.08)', color: 'var(--v2-accent, #7C3AED)'
           })
         }
       }, (!isConfirmed && isAllAvailable)
@@ -2734,7 +2734,7 @@ export function DateModal({
         existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: {
             display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto',
-            border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+            border: '1px solid rgb(var(--a-brand-rgb, 79 70 229) / 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgb(var(--a-brand-rgb, 79 70 229) / 0.06)'
           }
         },
           /*#__PURE__*/React.createElement("div", {
@@ -3097,7 +3097,7 @@ export function DateModal({
                 display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
                 padding: '0 10px', height: '42px', borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-subtle)',
-                backgroundColor: expenseIsSelfPay ? 'rgba(79, 70, 229, 0.08)' : 'var(--bg-card)',
+                backgroundColor: expenseIsSelfPay ? 'rgb(var(--a-brand-rgb, 79 70 229) / 0.08)' : 'var(--bg-card)',
                 color: expenseIsSelfPay ? 'var(--accent-primary)' : 'var(--text-muted)',
                 fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: isSavingExpense ? 'default' : 'pointer',
                 userSelect: 'none'
@@ -3284,8 +3284,8 @@ export function DateModal({
                     alignItems: 'center',
                     padding: '3px 8px',
                     borderRadius: 'var(--radius-full)',
-                    backgroundColor: 'rgba(79, 70, 229, 0.08)',
-                    color: '#4F46E5',
+                    backgroundColor: 'rgb(var(--a-brand-rgb, 79 70 229) / 0.08)',
+                    color: 'var(--a-brand, #4F46E5)',
                     fontSize: 'var(--font-size-xs)',
                     fontWeight: 'bold'
                   }

@@ -1359,7 +1359,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         style: {
           width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box',
           borderRadius: 'var(--radius-md)', padding: '10px',
-          boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
+          boxShadow: '0 6px 18px rgb(var(--a-brand-rgb, 79 70 229) / 0.14)',
           display: 'flex', flexDirection: 'column', gap: '8px'
         }
       },
@@ -1367,7 +1367,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '0 4px' }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }
+            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--a-brand, #4F46E5)', letterSpacing: '0.05em', textTransform: 'uppercase' }
           }, "공유된 메모"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",

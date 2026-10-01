@@ -4,7 +4,7 @@
     .v2-chat {
         
         
-      --brand: #7C3AED; --brand-soft: #F3EEFF;
+      --brand: var(--a-brand, #7C3AED); --brand-soft: var(--a-brand-soft, #F3EEFF);
       --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
       --p-yeongwoo: #F87171; --p-yuri: #FB923C; --p-manshik: #34D399; --p-eunhye: #22D3EE;
       --p-doeun: #A78BFA; --p-seojun: #FBBF24;
@@ -48,7 +48,7 @@
       content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
       animation-duration: 2.8s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-delay: inherit;
     }
-    .v2-chat .bp-gallery-comment-heartbeat::before { border: 2px solid var(--brand); box-shadow: 0 0 0 1px rgba(124,58,237,0.35); animation-name: bp-gallery-comment-border-flash; }
+    .v2-chat .bp-gallery-comment-heartbeat::before { border: 2px solid var(--brand); box-shadow: 0 0 0 1px rgb(var(--a-brand-rgb, 124 58 237) / 0.35); animation-name: bp-gallery-comment-border-flash; }
     .v2-chat .bp-gallery-comment-heartbeat::after { background: #fff; animation-name: bp-gallery-comment-white-flash; }
     @keyframes bp-gallery-comment-heartbeat { 0%,72%,100% { transform: scale(1);} 76%{transform:scale(1.018);} 80%{transform:scale(0.994);} 84%{transform:scale(1.012);} 88%{transform:scale(1);} }
     @keyframes bp-gallery-comment-border-flash { 0%,71%{opacity:0;} 72%{opacity:1;} 80%{opacity:.65;} 90%{opacity:.2;} 100%{opacity:0;} }
@@ -140,7 +140,7 @@
       padding: 7px 10px !important;
       border: 0 !important;
       border-radius: 10px !important;
-      background: var(--brand-soft, #f3eeff) !important;
+      background: var(--brand-soft, var(--a-brand-soft, #f3eeff)) !important;
     }
     .v2-chat .chat-memo-share-card .memo-card-comment-footer {
       display: flex !important;

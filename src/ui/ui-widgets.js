@@ -347,8 +347,8 @@ export function DateCapsuleBadge({ date, style = null }) {
       borderRadius: 'var(--radius-full)',
       fontSize: 'var(--font-size-sm)',
       fontWeight: 700,
-      backgroundColor: 'rgba(99, 102, 241, 0.12)',
-      color: '#4338CA',
+      backgroundColor: 'rgb(var(--a-brand-rgb, 99 102 241) / 0.12)',
+      color: 'var(--a-brand-deep, #4338CA)',
       whiteSpace: 'nowrap',
       ...(style || {})
     }

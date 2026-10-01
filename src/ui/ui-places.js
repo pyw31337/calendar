@@ -1775,11 +1775,11 @@ export function PlacesView({
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: isBulkShareMode ? '10px 12px 10px 36px' : '10px 12px', position: 'relative',
-              border: isChecked ? '2px solid var(--accent-primary)' : (isPlaceFocused ? '1px solid #8B5CF6' : '1px solid var(--border-subtle)'),
+              border: isChecked ? '2px solid var(--accent-primary)' : (isPlaceFocused ? '1px solid var(--a-brand-light, #8B5CF6)' : '1px solid var(--border-subtle)'),
               boxShadow: 'none',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
-              backgroundColor: isChecked ? 'rgba(79, 70, 229, 0.08)' : (isPlaceFocused ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-card)'),
+              backgroundColor: isChecked ? 'rgb(var(--a-brand-rgb, 79 70 229) / 0.08)' : (isPlaceFocused ? 'rgb(var(--a-brand-light-rgb, 139 92 246) / 0.08)' : 'var(--bg-card)'),
               transition: 'border-color 0.15s ease, background-color 0.15s ease'
             }
           },

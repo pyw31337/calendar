@@ -1016,9 +1016,9 @@ export function SummaryList({
     }))), /*#__PURE__*/React.createElement("span", {
       className: `date-item-badge ${isPast ? 'is-past' : isConfirmed ? 'is-confirmed' : 'is-available'}`,
       style: {
-        background: isPast ? '#E2E8F0' : isConfirmed ? '#F3E8FF' : '#DBEAFE',
-        color: isPast ? '#64748B' : isConfirmed ? '#7C3AED' : '#1D4ED8',
-        border: isPast ? 'none' : isConfirmed ? '1px solid #E9D5FF' : '1px solid #BFDBFE'
+        background: isPast ? '#E2E8F0' : isConfirmed ? 'var(--a-brand-soft, #F3E8FF)' : '#DBEAFE',
+        color: isPast ? '#64748B' : isConfirmed ? 'var(--a-brand, #7C3AED)' : '#1D4ED8',
+        border: isPast ? 'none' : isConfirmed ? '1px solid var(--a-brand-soft-2, #E9D5FF)' : '1px solid #BFDBFE'
       }
     }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
   }))), anyBeforeAll && isAllVisible && /*#__PURE__*/React.createElement("div", {

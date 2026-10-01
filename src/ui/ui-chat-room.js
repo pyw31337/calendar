@@ -1523,9 +1523,9 @@ export function ChatRoomView({
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
         borderLeft: isSearchFocused
-          ? '7px solid #7C3AED'
+          ? '7px solid var(--a-brand, #7C3AED)'
           : isSearchMatch
-            ? '7px solid rgba(124,58,237,0.45)'
+            ? '7px solid rgb(var(--a-brand-rgb, 124 58 237) / 0.45)'
             : '7px solid var(--border-subtle)',
         zIndex: 2
       }
@@ -1540,9 +1540,9 @@ export function ChatRoomView({
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
         borderLeft: isSearchFocused
-          ? '6px solid rgba(124,58,237,0.06)'
+          ? '6px solid rgb(var(--a-brand-rgb, 124 58 237) / 0.06)'
           : isSearchMatch
-            ? '6px solid rgba(124,58,237,0.03)'
+            ? '6px solid rgb(var(--a-brand-rgb, 124 58 237) / 0.03)'
             : '6px solid var(--bg-card)',
         zIndex: 3
       }
@@ -1589,9 +1589,9 @@ export function ChatRoomView({
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
         borderRight: isSearchFocused
-          ? '7px solid #7C3AED'
+          ? '7px solid var(--a-brand, #7C3AED)'
           : isSearchMatch
-            ? '7px solid rgba(124,58,237,0.45)'
+            ? '7px solid rgb(var(--a-brand-rgb, 124 58 237) / 0.45)'
             : '7px solid var(--border-subtle)',
         zIndex: 2
       }
@@ -1606,9 +1606,9 @@ export function ChatRoomView({
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
         borderRight: isSearchFocused
-          ? '6px solid rgba(124,58,237,0.06)'
+          ? '6px solid rgb(var(--a-brand-rgb, 124 58 237) / 0.06)'
           : isSearchMatch
-            ? '6px solid rgba(124,58,237,0.03)'
+            ? '6px solid rgb(var(--a-brand-rgb, 124 58 237) / 0.03)'
             : '6px solid var(--bg-card)',
         zIndex: 3
       }

@@ -860,7 +860,7 @@ export function CalendarGrid({
               style: {
                 padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                background: pickerMonth === idx ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
                 fontWeight: pickerMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }
@@ -934,7 +934,7 @@ export function CalendarGrid({
     const cornerText = isHoliday
       ? holidayLabel
       : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
-    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? 'var(--a-brand, #7C3AED)' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
     const cornerTitle = isHoliday
       ? ((lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) + (isConfirmed ? ' · 확정' : ''))
       : (isConfirmed ? '모임 확정' : undefined);
@@ -2989,7 +2989,7 @@ export function GlobalSearchModal({
     options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
     value: activeTab,
     onChange: setActiveTab,
-    activeColor: inline ? 'var(--v2-primary, #7C2FE5)' : '#7C3AED',
+    activeColor: inline ? 'var(--v2-primary, #7C2FE5)' : 'var(--a-brand, #7C3AED)',
     variant: 'flush',
     className: 'global-search-tabs'
   }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))) : null;

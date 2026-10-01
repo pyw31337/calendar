@@ -57,7 +57,7 @@
   width: 44px; height: 44px; align-items: center; justify-content: center;
   border: 1px solid var(--border, #e7e4ef); border-radius: 50%;
   background: rgba(255,255,255,.94); color: var(--text, #2c2740);
-  box-shadow: 0 4px 14px rgba(35, 20, 64, .14);
+  box-shadow: 0 4px 14px rgb(var(--a-ink-rgb, 35 20 64) / .14);
 }
 @media (min-width: 1201px) {
   .renewal-shell.v2-design:not(.is-side-collapsed) .bp-floating-back-btn {
@@ -97,7 +97,7 @@
   width: 52px; height: 52px; border-radius: 50%;
   background: var(--v2-primary, var(--brand, #7C2FE5)); color: var(--on-brand, white);
   border: 1px solid rgba(255,255,255,0.28);
-  box-shadow: var(--v2-primary-glow, 0 6px 18px rgba(124,47,229,0.40)), inset 0 1px 0 rgba(255,255,255,0.28);
+  box-shadow: var(--v2-primary-glow, 0 6px 18px rgb(var(--a-brand-rgb, 124 47 229) / 0.40)), inset 0 1px 0 rgba(255,255,255,0.28);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; z-index: 1060;
 }
@@ -162,7 +162,7 @@
 /* Places */
 .v2-design .v2-visit-filters { display: flex; gap: 6px; padding: 10px 14px 0; }
 .v2-design .v2-visit-filters button { border: 0; background: none; color: var(--v2-ink-3, #83798f); font-size: var(--font-size-2xs); padding: 4px 8px; cursor: pointer; }
-.v2-design .v2-visit-filters button[aria-pressed=true] { color: var(--brand, #7C2FE5); background: var(--v2-tint-soft, #f3eeff); border-radius: 999px; }
+.v2-design .v2-visit-filters button[aria-pressed=true] { color: var(--brand, #7C2FE5); background: var(--v2-tint-soft, var(--a-brand-soft, #f3eeff)); border-radius: 999px; }
 .v2-design .v2-place-title-button { display: block; text-align: left; background: none; padding: 0; border: 0; cursor: pointer; width: 100%; }
 .v2-design .v2-place-title-button > span { display: block; }
 .v2-design .bp-place-note { margin: 3px 0; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
@@ -241,7 +241,7 @@
   background: var(--v2-primary, var(--brand, #7C2FE5)) !important;
   color: var(--on-brand, white) !important;
   border: 1px solid rgba(255,255,255,0.28) !important;
-  box-shadow: var(--v2-primary-glow-sm, 0 3px 10px rgba(124,47,229,0.32)), inset 0 1px 0 rgba(255,255,255,0.28) !important;
+  box-shadow: var(--v2-primary-glow-sm, 0 3px 10px rgb(var(--a-brand-rgb, 124 47 229) / 0.32)), inset 0 1px 0 rgba(255,255,255,0.28) !important;
   display: inline-flex !important; align-items: center; justify-content: center;
 }
 .v2-design .v2-chat-compose-tools { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 4px; }
@@ -448,7 +448,7 @@
   flex-direction: column !important;
   gap: 1px !important;
   border-left: 2.5px solid var(--brand, #7C2FE5) !important;
-  background: var(--brand-soft, #F3EEFF) !important;
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
   border-radius: 0 8px 8px 0 !important;
   padding: 6px 10px !important;
   margin-bottom: 8px !important;
@@ -542,7 +542,7 @@
 
 /* Gallery / records destinations under ?shell=v2 — keep upload/share/lightbox handlers */
 .v2-design .renewal-shell-subtab-item.is-active {
-  background: var(--v2-tint-soft, #f3eeff) !important;
+  background: var(--v2-tint-soft, var(--a-brand-soft, #f3eeff)) !important;
   border-color: var(--brand, #7C2FE5) !important;
   color: var(--brand, #7C2FE5) !important;
 }
@@ -1391,8 +1391,8 @@
 .v2-design .v2-tool-icon-btn:hover,
 .v2-design .v2-tool-icon-btn.is-active {
   color: var(--brand, #7C2FE5) !important;
-  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
-  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
+  border-color: var(--v2-glass-light-hover-border, var(--a-brand-soft-2, #e0d4ff)) !important;
+  background: var(--v2-glass-light-hover-fill, rgb(var(--a-brand-soft-rgb, 243 238 255) / 0.78)) !important;
 }
 .v2-design .v2-chat-participant-missing {
   font-size:0.75rem;
@@ -1451,7 +1451,7 @@
   overflow: hidden;
   border: none;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
-  background: var(--v2-tint-soft, #f3eeff);
+  background: var(--v2-tint-soft, var(--a-brand-soft, #f3eeff));
 }
 .v2-design .v2-places .v2-map-panel .places-map-sticky-area {
   width: 100% !important;
@@ -2090,7 +2090,7 @@ html:has(.renewal-shell.v2-design) .gallery-pagination {
 .v2-design .v2-chat-compose-row > .v2-tool-icon-btn:hover,
 .v2-design .v2-chat-compose-row > .v2-tool-icon-btn.is-active {
   color: var(--brand, #7C2FE5) !important;
-  background: var(--v2-tint-soft, #f3eeff) !important;
+  background: var(--v2-tint-soft, var(--a-brand-soft, #f3eeff)) !important;
 }
 .v2-design .v2-chat-compose-row > .bp-composer-send {
   margin-left: 2px;
@@ -2272,7 +2272,7 @@ html:has(.renewal-shell.v2-design) .gallery-pagination {
 .v2-design .v2-page-header .bp-icon-btn svg { width: 20px; height: 20px; }
 .v2-design .v2-page-header .bp-icon-btn:hover,
 .v2-design .v2-page-header .bp-back-btn:hover {
-  color: var(--v2-accent, #7c2fe5);
+  color: var(--v2-accent, var(--a-brand, #7c2fe5));
   background: transparent;
 }
 @media (min-width: 768px) {

@@ -1,5 +1,12 @@
+import {
+  parseThemeChoice, serializeThemeChoice, toggleThemeChoice, isStoredThemeChoice, findColorTheme,
+  resolveColorThemeId, applyColorThemeAttributes,
+} from './color-themes.js';
+
+// Mode half of a stored choice ("dark:orange" -> "dark"); "system" follows the OS.
 function resolveThemeChoice(choice) {
-  if (choice === 'dark' || choice === 'light') return choice;
+  const { mode } = parseThemeChoice(choice);
+  if (mode === 'dark' || mode === 'light') return mode;
   try {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   } catch (_) {
@@ -8,7 +15,7 @@ function resolveThemeChoice(choice) {
 }
 
 function applyThemeChoice(choice) {
-  document.documentElement.setAttribute('data-theme', resolveThemeChoice(choice));
+  applyColorThemeAttributes(document.documentElement, resolveThemeChoice(choice), choice);
 }
 
 // User-initiated theme switches animate instead of snapping. Where the View Transitions API
@@ -52,7 +59,7 @@ export function useDisplayPreferences({
     if (!calId) return 'system';
     try {
       const saved = getLocalStorage().getItem(`gather_theme_preference_${calId}_v1`);
-      return saved === 'dark' || saved === 'light' ? saved : 'system';
+      return isStoredThemeChoice(saved) ? serializeThemeChoice(parseThemeChoice(saved)) : 'system';
     } catch (_) {
       return 'system';
     }
@@ -64,11 +71,19 @@ export function useDisplayPreferences({
 
   const toggleTheme = React.useCallback(() => {
     if (isAdminDashboardRoute() || !activeCalId) return;
-    const next = resolveThemeChoice(themeChoice) === 'dark' ? 'light' : 'dark';
+    const next = toggleThemeChoice(themeChoice, resolveThemeChoice(themeChoice));
     getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, next);
     applyThemeChoiceAnimated(next);
     setThemeChoice(next);
   }, [activeCalId, getLocalStorage, isAdminDashboardRoute, themeChoice]);
+
+  // Settings > 컬러 테마: pick one of COLOR_THEMES (mode + point color) at once.
+  const selectColorTheme = React.useCallback((themeId) => {
+    if (isAdminDashboardRoute() || !activeCalId || !findColorTheme(themeId)) return;
+    getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, themeId);
+    applyThemeChoiceAnimated(themeId);
+    setThemeChoice(themeId);
+  }, [activeCalId, getLocalStorage, isAdminDashboardRoute]);
 
   const isDarkTheme = !isAdminDashboardRoute() && resolveThemeChoice(themeChoice) === 'dark';
 
@@ -84,7 +99,7 @@ export function useDisplayPreferences({
   }, [activeCalId, isAdminDashboardRoute, readThemeForCalendar]);
 
   React.useEffect(() => {
-    if (isAdminDashboardRoute() || themeChoice === 'dark' || themeChoice === 'light') return undefined;
+    if (isAdminDashboardRoute() || parseThemeChoice(themeChoice).mode !== 'system') return undefined;
     let mediaQuery;
     try {
       mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -137,9 +152,13 @@ export function useDisplayPreferences({
     setFontScalePercent(readFontScaleForCalendar(activeCalId));
   }, [activeCalId, isAdminDashboardRoute, readFontScaleForCalendar]);
 
+  const activeColorThemeId = resolveColorThemeId(themeChoice, isDarkTheme);
+
   return {
     themeChoice,
     toggleTheme,
+    selectColorTheme,
+    activeColorThemeId,
     isDarkTheme,
     fontScalePercent,
     setFontScalePercent

@@ -3139,7 +3139,7 @@ export function ChatGalleryModal({
                 fontWeight: 800,
                 fontSize: 'var(--font-size-sm, 13px)',
                 cursor: isBatchApplying ? 'wait' : 'pointer',
-                boxShadow: '0 2px 6px rgba(124, 47, 229, 0.25)',
+                boxShadow: '0 2px 6px rgb(var(--a-brand-rgb, 124 47 229) / 0.25)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px'
@@ -3785,7 +3785,7 @@ export function ChatGalleryModal({
                               fontWeight: 800,
                               fontSize: 'var(--font-size-sm, 13px)',
                               cursor: isSaving ? 'wait' : 'pointer',
-                              boxShadow: '0 2px 6px rgba(124, 47, 229, 0.25)',
+                              boxShadow: '0 2px 6px rgb(var(--a-brand-rgb, 124 47 229) / 0.25)',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px'
@@ -4340,7 +4340,7 @@ export function ChatGalleryModal({
               style: {
                 padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerGalleryMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                background: pickerGalleryMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                background: pickerGalleryMonth === idx ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : 'var(--bg-card)',
                 color: pickerGalleryMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
                 fontWeight: pickerGalleryMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }

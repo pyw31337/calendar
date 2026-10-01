@@ -686,7 +686,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
             height: '18px',
             aspectRatio: isMulti ? 'auto' : '1 / 1',
             borderRadius: '9999px',
-            backgroundColor: isActive ? 'rgba(124, 58, 237, 0.12)' : 'var(--border-subtle)',
+            backgroundColor: isActive ? 'rgb(var(--a-brand-rgb, 124 58 237) / 0.12)' : 'var(--border-subtle)',
             color: isActive ? activeColor : 'var(--text-muted)',
             display: 'inline-flex',
             alignItems: 'center',
