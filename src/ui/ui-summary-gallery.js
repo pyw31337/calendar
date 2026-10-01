@@ -2743,9 +2743,9 @@ export function HistoryView({
     type: "button", className: "btn btn-action btn-action-dark", onClick: onClick, title: "추가", "aria-label": "추가",
     style: memoryIconBtn
   }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+");
-  const renderMemoryEditButton = onClick => /*#__PURE__*/React.createElement("button", {
+  const renderMemoryEditButton = (onClick, extraStyle) => /*#__PURE__*/React.createElement("button", {
     type: "button", className: "btn btn-action btn-action-outline", onClick: onClick, title: "편집", "aria-label": "편집",
-    style: memoryIconBtn
+    style: { ...memoryIconBtn, ...(extraStyle || {}) }
   }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집");
   const renderMemoryTrashButton = (onClick, disabled) => /*#__PURE__*/React.createElement("button", {
     type: "button", className: "btn btn-action btn-action-danger", onClick: onClick, disabled: !!disabled,
@@ -2756,9 +2756,9 @@ export function HistoryView({
       opacity: disabled ? 0.5 : 1
     }
   }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "삭제");
-  const renderMemoryCancelButton = onClick => /*#__PURE__*/React.createElement("button", {
+  const renderMemoryCancelButton = (onClick, extraStyle) => /*#__PURE__*/React.createElement("button", {
     type: "button", className: "btn btn-action btn-action-outline", onClick: onClick, title: "취소", "aria-label": "취소",
-    style: memoryTextBtn
+    style: { ...memoryTextBtn, ...(extraStyle || {}) }
   }, "취소");
   const groupedMemorySections = React.useMemo(() => {
     const groups = new Map();
@@ -3223,34 +3223,42 @@ export function HistoryView({
         onScroll: handleHistoryScroll,
         style: historyScrollStyle
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
-            style: {
-              width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
-            }
-          }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-              formatHistoryDateRange(group.startDate, group.endDate)
-            )
+        /*#__PURE__*/React.createElement("div", { className: "archive-memory-detail-head", style: { display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
+              style: {
+                width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+              }
+            }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
+            /*#__PURE__*/React.createElement("span", {
+              className: "archive-memory-detail-title",
+              style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' }
+            }, group.title),
+            !isMemoryEditMode ? /*#__PURE__*/React.createElement("div", {
+              className: "archive-memory-detail-actions",
+              style: { display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' }
+            },
+              typeof onAddPhotosBackToMemory === 'function' ? renderMemoryAddButton(() => setIsAddBackModalOpen(true)) : null,
+              canBulkExclude ? renderMemoryEditButton(() => setIsMemoryEditMode(true)) : null
+            ) : null
           ),
           /*#__PURE__*/React.createElement("div", {
-            style: typeof getListEditActionWrapStyle === 'function'
-              ? getListEditActionWrapStyle(isMemoryEditMode, isMobile)
-              : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryEditMode && isMobile ? '100%' : 'auto' }
+            className: "archive-memory-detail-date-row",
+            style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, paddingLeft: '40px' }
           },
-            isMemoryEditMode
-              ? /*#__PURE__*/React.createElement(React.Fragment, null,
-                  renderMemoryTrashButton(() => handleClickExcludeMemoryPhotos(group), selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos),
-                  renderMemoryCancelButton(() => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); })
-                )
-              : /*#__PURE__*/React.createElement(React.Fragment, null,
-                  typeof onAddPhotosBackToMemory === 'function' ? renderMemoryAddButton(() => setIsAddBackModalOpen(true)) : null,
-                  canBulkExclude ? renderMemoryEditButton(() => setIsMemoryEditMode(true)) : null
-                )
+            /*#__PURE__*/React.createElement("span", {
+              className: "archive-memory-detail-date",
+              style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }
+            }, formatHistoryDateRange(group.startDate, group.endDate)),
+            isMemoryEditMode ? /*#__PURE__*/React.createElement("div", {
+              className: "archive-memory-detail-actions",
+              style: { display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' }
+            },
+              renderMemoryTrashButton(() => handleClickExcludeMemoryPhotos(group), selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos),
+              renderMemoryCancelButton(() => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); }, { flex: '0 0 auto' })
+            ) : null
           )
         ),
         renderPhotoThumbGrid(group.photos, {
@@ -3473,7 +3481,7 @@ export function HistoryView({
                 }, "✕")
               )
             : /*#__PURE__*/React.createElement(React.Fragment, null,
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
+                /*#__PURE__*/React.createElement("span", { className: "archive-detail-title", style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' } }, selectedPersonTag),
                 customPersonTags.includes(selectedPersonTag) && /*#__PURE__*/React.createElement("div", {
                   style: { display: 'flex', gap: '6px', marginLeft: 'auto', flexShrink: 0 }
                 },
@@ -3496,23 +3504,22 @@ export function HistoryView({
                 )
               )
           ),
-        photosForPersonTag.length > 0 && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "v2-archive-people-select-toggle",
-          onClick: () => {
-            setPeopleSelectMode(mode => !mode);
-            setPeopleSelectedKeys(new Set());
-            peopleAnchorKeyRef.current = '';
-          },
-          style: {
-            marginLeft: selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'auto' : (customPersonTags.includes(selectedPersonTag) ? '8px' : 'auto'),
-            flexShrink: 0, minHeight: '32px', padding: '0 12px', borderRadius: '999px',
-            border: '1px solid var(--border-color)',
-            background: peopleSelectMode ? 'var(--brand, #7C3AED)' : 'var(--bg-secondary)',
-            color: peopleSelectMode ? 'var(--on-brand, #fff)' : 'var(--text-main)',
-            fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer'
-          }
-        }, peopleSelectMode ? '선택 취소' : '여러 장 선택')
+        photosForPersonTag.length > 0 && (peopleSelectMode
+          ? renderMemoryCancelButton(() => {
+              setPeopleSelectMode(false);
+              setPeopleSelectedKeys(new Set());
+              peopleAnchorKeyRef.current = '';
+            }, {
+              marginLeft: selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'auto' : (customPersonTags.includes(selectedPersonTag) ? '8px' : 'auto'),
+              flex: '0 0 auto'
+            })
+          : renderMemoryEditButton(() => {
+              setPeopleSelectMode(true);
+              setPeopleSelectedKeys(new Set());
+              peopleAnchorKeyRef.current = '';
+            }, {
+              marginLeft: selectedPersonTag === PERSON_UNCLASSIFIED_KEY ? 'auto' : (customPersonTags.includes(selectedPersonTag) ? '8px' : 'auto')
+            }))
       ),
       photosForPersonTag.length === 0
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } },
@@ -3641,18 +3648,10 @@ export function HistoryView({
               /*#__PURE__*/React.createElement("div", { style: { flex: 1, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
                 placeSelectMode
                   ? "옮길 사진을 고른 뒤 아래에서 장소를 누르거나 ‘제거’를 누르세요. 제거해도 사진 파일은 지우지 않아요."
-                  : "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 장소가 아니면 ‘여러 장 선택’ 후 제거하세요. 맞으면 장소를 지정하거나, 사진을 열고 #장소이름 태그를 달아 주세요."),
-              typeof onSaveImageTags === 'function' && /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                className: "v2-archive-place-select-toggle",
-                disabled: !!placeAssignProgress,
-                onClick: () => { setPlaceSelectMode(mode => !mode); setPlaceSelectedKeys(new Set()); },
-                style: {
-                  flexShrink: 0, minHeight: '32px', padding: '0 12px', borderRadius: '999px', border: '1px solid var(--border-color)',
-                  background: placeSelectMode ? 'var(--brand, #7C3AED)' : 'var(--bg-secondary)', color: placeSelectMode ? 'var(--on-brand, #fff)' : 'var(--text-main)',
-                  fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer'
-                }
-              }, placeSelectMode ? '선택 취소' : '여러 장 선택')
+                  : "그날 여러 장소를 방문해서 어느 장소 사진인지 알 수 없는 사진이에요. 장소가 아니면 편집 후 제거하세요. 맞으면 장소를 지정하거나, 사진을 열고 #장소이름 태그를 달아 주세요."),
+              typeof onSaveImageTags === 'function' && (placeSelectMode
+                ? renderMemoryCancelButton(() => { setPlaceSelectMode(false); setPlaceSelectedKeys(new Set()); }, { flex: '0 0 auto' })
+                : renderMemoryEditButton(() => { setPlaceSelectMode(true); setPlaceSelectedKeys(new Set()); }))
             ),
             visiblePlacePhotoGroups.unclassified.map(bucket => {
               const bucketKeys = bucket.photos.map((photo, idx) => archivePhotoSelectKey(photo, idx));
@@ -3661,7 +3660,7 @@ export function HistoryView({
                 key: bucket.date, style: { display: 'flex', flexDirection: 'column', gap: '6px' }
               },
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-                  /*#__PURE__*/React.createElement("div", { style: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)' } },
+                  /*#__PURE__*/React.createElement("div", { className: "archive-detail-title", style: { flex: '1 1 auto', minWidth: 0, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' } },
                     `${formatHistoryDate(bucket.date) || bucket.date} · ${bucket.photos.length}장`),
                   placeSelectMode && /*#__PURE__*/React.createElement("button", {
                     type: "button",
