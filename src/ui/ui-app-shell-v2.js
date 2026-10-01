@@ -2856,6 +2856,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
       onFetchPhotoComments: handleFetchPhotoComments, onSavePhotoComments: handleSavePhotoComments,
       onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
+      onSavePlace: handleSavePlace,
       placeCount: historyPlaceCount,
       indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
         ? galleryPhotoIndex.items

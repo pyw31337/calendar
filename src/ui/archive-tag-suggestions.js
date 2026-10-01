@@ -88,10 +88,11 @@ function peopleIn(photo, matchers) {
  * @param {{ groups: Array }} args.placeGroups buildPlacePhotoGroups() result for the same photos
  * @param {(photo) => string[]} args.getPhotoDates every YYYY-MM-DD date the photo carries in its tags
  * @param {string[]} args.personLabels participant names + 인물 tags
+ * @param {Map<string, string[]>} [args.attendeesByDate] confirmed-meeting date -> names who marked it
  * @returns {{ groups: Array<{ id, kind, rule, rules, dates, tag, title, photos }>, personDays: Array<{ date, photos, candidates }>,
  *             autoPhotoCount: number }}
  */
-export function buildTagSuggestions({ photos = [], places = [], placeGroups = null, getPhotoDates, personLabels = [] }) {
+export function buildTagSuggestions({ photos = [], places = [], placeGroups = null, getPhotoDates, personLabels = [], attendeesByDate = null }) {
   const list = (Array.isArray(photos) ? photos : []).filter(photo => photo && photoSuggestionKey(photo));
   const livePlaces = (Array.isArray(places) ? places : []).filter(place => place && !place.deletedAt && placeTagToken(place));
   const datesOf = photo => Array.from(new Set(((typeof getPhotoDates === 'function' ? getPhotoDates(photo) : []) || [])
@@ -189,7 +190,15 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
     groups.push({ id: `date:${tag}`, kind: 'date', rule: 'album', tag, title: tag, photos: byAlbum.get(tag) });
   });
 
-  // 5. person candidates per day.
+  // 5. person candidates per day: the day's tagged people, plus whoever marked that confirmed
+  // meeting date (참석) -- written the way this calendar's tags usually spell them (서준, not 박서준).
+  const variantUse = new Map();
+  list.forEach(photo => tokensOf(photo).forEach(token => { if (personVariants.has(token)) variantUse.set(token, (variantUse.get(token) || 0) + 1); }));
+  const spellingOf = name => {
+    const matcher = matchers.find(m => m.label === name || m.variants.includes(name));
+    const variants = matcher ? matcher.variants : [name];
+    return variants.slice().sort((a, b) => (variantUse.get(b) || 0) - (variantUse.get(a) || 0))[0];
+  };
   const personDays = [];
   if (matchers.length) {
     Array.from(byDate.keys()).sort().reverse().forEach(date => {
@@ -201,12 +210,14 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
         if (!people.length) { missing.push(photo); return; }
         people.forEach(label => tally.set(label, (tally.get(label) || 0) + 1));
       });
-      if (!missing.length || !tally.size) return;
+      const attendees = Array.from(new Set(((attendeesByDate && attendeesByDate.get(date)) || []).map(spellingOf).filter(Boolean)));
+      if (!missing.length || (!tally.size && !attendees.length)) return;
       const tagged = dayPhotos.length - missing.length;
+      attendees.forEach(label => { if (!tally.has(label)) tally.set(label, 0); });
       const candidates = Array.from(tally.entries())
-        .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+        .sort((a, b) => (b[1] - a[1]) || (Number(attendees.includes(b[0])) - Number(attendees.includes(a[0]))) || a[0].localeCompare(b[0]))
         .slice(0, MAX_PERSON_CANDIDATES)
-        .map(([label, count]) => ({ label, count, share: tagged ? count / tagged : 0 }));
+        .map(([label, count]) => ({ label, count, share: tagged ? count / tagged : 0, attendee: attendees.includes(label) }));
       personDays.push({ date, photos: missing, candidates });
     });
   }
@@ -231,4 +242,79 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
     personDays,
     autoPhotoCount: new Set(cards.flatMap(card => card.photos.map(photoSuggestionKey))).size,
   };
+}
+
+/**
+ * 중복 의심 사진 (gallery-dedup.js: same file size + extension, same second or a retry within
+ * minutes). Each group keeps the photo with tags/comments (chooseDedupWinner) and lists the rest.
+ * `removable` only when no extra copy has comments of its own -- those stay for the admin merge,
+ * which moves comments; here the other copies' tags are merged into the kept one before removal.
+ */
+export function buildDuplicateSuggestions(photos, { findDuplicatePhotoGroups, chooseDedupWinner }) {
+  if (typeof findDuplicatePhotoGroups !== 'function' || typeof chooseDedupWinner !== 'function') return [];
+  return findDuplicatePhotoGroups((Array.isArray(photos) ? photos : []).filter(photo => photo && !photo.mergedInto))
+    .map(group => {
+      const picked = chooseDedupWinner(group);
+      if (!picked || !picked.losers.length) return null;
+      const keep = picked.winner.photo;
+      const extra = picked.losers.map(c => c.photo);
+      const mergedTags = Array.from(new Set([keep, ...extra].flatMap(tokensOf))).join(' ');
+      return {
+        id: `dup:${photoSuggestionKey(keep)}`,
+        keep,
+        extra,
+        mergedTags,
+        removable: picked.losers.every(c => !Number(c.commentCount || 0)),
+      };
+    })
+    .filter(Boolean);
+}
+
+function placeVisitTokens(place) {
+  const tokens = new Set();
+  String(place?.memo || '').replace(/(?:^|[^\d])(\d{2})\.(\d{2})\.(\d{2})(?=$|[^\d])/g, (m, y, mo, d) => { tokens.add(`20${y}-${mo}-${d}`); return m; });
+  const visitDate = String(place?.visitDate || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) tokens.add(visitDate);
+  return tokens;
+}
+
+/**
+ * 장소 방문 기록: dates on which photos tagged with a registered place (by hand, GPS at upload,
+ * or the rules above) were taken, but the place's own visit record (memo "YY.MM.DD …" entries /
+ * visitDate) does not have. Applying appends "YY.MM.DD 사진" entries, marks the place 방문, and
+ * moves visitDate to the latest visit. Future dates are ignored.
+ */
+export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoDates, today = new Date().toISOString().slice(0, 10) }) {
+  const list = Array.isArray(photos) ? photos : [];
+  const datesOf = photo => ((typeof getPhotoDates === 'function' ? getPhotoDates(photo) : []) || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today);
+  return (Array.isArray(places) ? places : [])
+    // A name that is only digits ("18") would match every number tag; such places need a person.
+    .filter(place => place && !place.deletedAt && /[^\d\s]/.test(placeTagToken(place)) && placeTagToken(place).length >= 2
+      && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng)))
+    .map(place => {
+      const known = placeVisitTokens(place);
+      const byDate = new Map();
+      list.forEach(photo => {
+        if (!photoMatchesPlaceTag(photo, place)) return;
+        datesOf(photo).forEach(date => { if (!known.has(date)) byDate.set(date, (byDate.get(date) || 0) + 1); });
+      });
+      if (!byDate.size) return null;
+      const dates = Array.from(byDate.keys()).sort();
+      const latest = [...known, ...dates].sort().pop();
+      const memoAdd = dates.map(date => `${date.slice(2, 4)}.${date.slice(5, 7)}.${date.slice(8, 10)} 사진`).join(' ');
+      return {
+        id: `visit:${place.id || placeTagToken(place)}`,
+        place,
+        dates,
+        photoCount: dates.reduce((n, d) => n + byDate.get(d), 0),
+        next: {
+          ...place,
+          memo: [String(place.memo || '').trim(), memoAdd].filter(Boolean).join(' ').slice(0, 2000),
+          visitStatus: 'visited',
+          visitDate: latest,
+        },
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.dates[b.dates.length - 1].localeCompare(a.dates[a.dates.length - 1]));
 }
