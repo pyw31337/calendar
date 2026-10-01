@@ -61,6 +61,31 @@ html[data-accent="blue"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) 
   --a-hero-shade-rgb: 8 20 50;
 }
 
+/* ---------- 화이트 · 핫핑크 ---------- */
+html[data-accent="pink"]:not([data-theme="dark"]):has(.renewal-shell.v2-design) {
+  --a-brand: #F0386B;
+  --a-brand-rgb: 240 56 107;
+  --a-brand-deep: #C81E50;
+  --a-brand-deep-rgb: 200 30 80;
+  --a-brand-2: #FF5C8A;
+  --a-brand-2-rgb: 255 92 138;
+  --a-brand-light: #FF8FB1;
+  --a-brand-light-rgb: 255 143 177;
+  --a-brand-line: #FFB3C9;
+  --a-brand-soft: #FFF0F4;
+  --a-brand-soft-rgb: 255 240 244;
+  --a-brand-soft-2: #FFD9E4;
+  --a-ink: #781432;
+  --a-ink-rgb: 120 20 50;
+  --a-hero-1: #E8285F;
+  --a-hero-1-rgb: 232 40 95;
+  --a-hero-2: #FF5277;
+  --a-hero-2-rgb: 255 82 119;
+  --a-hero-3: #FF9A7B;
+  --a-hero-3-rgb: 255 154 123;
+  --a-hero-shade-rgb: 70 10 30;
+}
+
 /* Legacy components embedded in V2 read app.css's own accent tokens, which stay purple, and
    modals are portaled to <body>, outside .renewal-shell where design.css defines --brand
    (the dark block in dest-chrome-late.css lists body for the same reason). */
@@ -148,4 +173,15 @@ html[data-theme="dark"][data-accent="blue"]:has(.renewal-shell.v2-design) {
    (dest-chrome-late.css keeps the purple literal; test/field-shape.test.mjs pins it). */
 html[data-accent]:not([data-theme="dark"]):has(.renewal-shell.v2-design) .bp-dday-chip-card {
   background: linear-gradient(165deg, rgb(var(--a-ink-rgb) / 0.62), rgba(14, 6, 32, 0.74)) !important;
+}
+
+/* ---------- 블랙 · 핫핑크 ---------- */
+html[data-theme="dark"][data-accent="pink"]:has(.renewal-shell.v2-design) {
+  --d-brand: #FF4F8B;
+  --d-brand-rgb: 255 79 139;
+  --d-brand-hover: #FF73A3;
+  --d-brand-soft: #2E0F1C;
+  --d-brand-line: #6B1F3D;
+  --d-accent2: #FF7A1A;
+  --d-accent2-rgb: 255 122 26;
 }
