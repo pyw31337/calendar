@@ -10,8 +10,9 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
     readFile(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8')
   ]);
 
-  assert.match(weatherJs, /function WeatherPlaceMarkerIcon/, 'the shared place-marker shape is rendered in the weather header');
-  assert.match(weatherJs, /M17\.657 16\.657l-4\.243 4\.243/, 'the place-marker follows the Places menu SVG path');
+  assert.match(weatherJs, /className: "weather-highlight-setting",\s*onClick: \(\) => setShowLocationPicker\(true\)/, 'the whole 설정위치 row in the highlight card opens the region picker');
+  assert.match(weatherJs, /weather-detail-year-short/, 'the header can shorten 2026년 to 26년 on narrow screens');
+  assert.match(css, /\.weather-highlight-card[\s\S]*?flex-shrink:\s*0/, 'the highlight card never shrinks below its content');
   assert.match(weatherJs, /function WeatherRegionSettingsIcon/, 'the weather-region control has a dedicated icon');
   assert.ok(weatherJs.includes('"aria-label": `날씨 지역 설정. 현재 ${locationAreaLabel}`'), 'region setting announces the active forecast area');
   assert.match(weatherJs, /formatWeatherDayChoice/, 'day labels are formatted inside the detail modal');

@@ -954,24 +954,6 @@ function formatWeatherSettingLocation(location) {
   return `설정위치 : [${short}] ${full}`;
 }
 
-function WeatherPlaceMarkerIcon({ size = 16 }) {
-  const React = window.React;
-  return /*#__PURE__*/React.createElement('svg', {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    'aria-hidden': 'true',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 2,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-    style: { display: 'block', shapeRendering: 'geometricprecision' }
-  },
-  /*#__PURE__*/React.createElement('path', { d: 'M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0' }),
-  /*#__PURE__*/React.createElement('path', { d: 'M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0' }));
-}
-
 function WeatherRegionSettingsIcon({ size = 20 }) {
   const React = window.React;
   return /*#__PURE__*/React.createElement('svg', {
@@ -1465,18 +1447,22 @@ export function WeatherDetailModal({
       }
     }),
 
-    /* Header: schedule place and forecast area are intentionally separate. */
+    /* Header: "내일 2026년 10월 3일 (토)" and the close button share one row. The weather-region
+       control lives on the highlight card's bottom row (tap anywhere on it). */
     /*#__PURE__*/React.createElement("div", {
       className: "weather-detail-header"
     },
+      /*#__PURE__*/React.createElement("div", { className: "weather-detail-date-line" },
+        /*#__PURE__*/React.createElement("span", { className: "weather-detail-date-eyebrow" }, dayBadge || '일일 예보'),
+        /*#__PURE__*/React.createElement("strong", null,
+          isDateValid
+            ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("span", { className: "weather-detail-year-full" }, `${targetDate.getFullYear()}년`),
+                /*#__PURE__*/React.createElement("span", { className: "weather-detail-year-short" }, `${String(targetDate.getFullYear()).slice(2)}년`),
+                ` ${formattedDateTitle.replace(/^\d{4}년 /, '')}`)
+            : formattedDateTitle)
+      ),
       /*#__PURE__*/React.createElement("div", { className: "weather-detail-header-actions" },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setShowLocationPicker(true),
-          className: "weather-detail-icon-button",
-          title: "날씨 지역 설정",
-          "aria-label": `날씨 지역 설정. 현재 ${locationAreaLabel}`
-        }, /*#__PURE__*/React.createElement(WeatherRegionSettingsIcon, { size: 20 })),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: onClose,
@@ -1488,10 +1474,6 @@ export function WeatherDetailModal({
           )
         )
       )
-    ),
-    /*#__PURE__*/React.createElement("div", { className: "weather-detail-date-line" },
-      /*#__PURE__*/React.createElement("span", { className: "weather-detail-date-eyebrow" }, dayBadge || '일일 예보'),
-      /*#__PURE__*/React.createElement("strong", null, formattedDateTitle)
     ),
 
     /* Days Carousel Selector */
@@ -1577,14 +1559,22 @@ export function WeatherDetailModal({
                 maxTemp != null && minTemp != null ? `최고 ${maxTemp}° / 최저 ${minTemp}°` : ""
               ].filter(Boolean).join("  ·  ")
             ),
-            /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting" },
-              /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting-pin", "aria-hidden": "true" },
-                /*#__PURE__*/React.createElement(WeatherPlaceMarkerIcon, { size: 14 })
-              ),
-              /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting-text" }, formatWeatherSettingLocation(currentLocation))
-            )
           ),
-          /*#__PURE__*/React.createElement(WeatherScene, { kind: cardKind })
+          /*#__PURE__*/React.createElement(WeatherScene, { kind: cardKind }),
+          /* Bottom row, full card width, one line: region icon + 설정위치. The whole row opens the
+             weather-region picker. */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "weather-highlight-setting",
+            onClick: () => setShowLocationPicker(true),
+            title: "날씨 지역 설정",
+            "aria-label": `날씨 지역 설정. 현재 ${locationAreaLabel}`
+          },
+            /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting-pin", "aria-hidden": "true" },
+              /*#__PURE__*/React.createElement(WeatherRegionSettingsIcon, { size: 16 })
+            ),
+            /*#__PURE__*/React.createElement("span", { className: "weather-highlight-setting-text" }, formatWeatherSettingLocation(currentLocation))
+          )
         ),
 
         /* 4 Key Indicators Grid */
@@ -1703,7 +1693,8 @@ export function WeatherDetailModal({
         },
           /* Header: Title + Sub-tabs */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }
+            // Title on its own line, the four tabs below it across the full width.
+            style: { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }
           },
             /*#__PURE__*/React.createElement("span", {
               style: { fontSize: 'var(--font-size-sm, 0.88rem)', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
@@ -1712,7 +1703,7 @@ export function WeatherDetailModal({
             /*#__PURE__*/React.createElement("div", {
               className: "weather-hourly-tabs",
               role: "tablist",
-              style: { display: 'flex', gap: '5px', alignItems: 'center' }
+              style: { display: 'flex', gap: '5px', alignItems: 'center', width: '100%', minWidth: 0 }
             },
               [
                 { key: 'weather', label: '날씨' },
@@ -1727,6 +1718,8 @@ export function WeatherDetailModal({
                 className: `weather-hourly-tab-btn${hourlyTab === tab.key ? ' is-active' : ''}`,
                 onClick: () => setHourlyTab(tab.key),
                 style: {
+                  flex: '1 1 0',
+                  minWidth: 0,
                   padding: '4px 10px',
                   fontSize: '0.75rem',
                   fontWeight: hourlyTab === tab.key ? 800 : 600,

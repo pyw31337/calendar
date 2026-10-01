@@ -4315,9 +4315,10 @@ html:has(.renewal-shell.v2-design) .weather-detail-modal-container > .v2-modal-d
 html:has(.renewal-shell.v2-design) .weather-detail-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 8px var(--weather-detail-space) 6px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px var(--weather-detail-space) 10px;
+  border-bottom: 1px solid var(--v2-line, #f0eef5);
   flex: 0 0 auto;
 }
 
@@ -4399,19 +4400,32 @@ html:has(.renewal-shell.v2-design) .weather-detail-icon-button:focus-visible {
   outline: none;
 }
 
+/* "내일 2026년 10월 3일 (토)" sits on the close button's row and never wraps; narrow phones
+   (320-374px) show the year as "26년". */
 html:has(.renewal-shell.v2-design) .weather-detail-date-line {
   display: flex;
-  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
   gap: 8px;
-  padding: 0 var(--weather-detail-space) 12px;
-  border-bottom: 1px solid var(--v2-line, #f0eef5);
+  padding: 0;
   color: var(--v2-ink, var(--text-main, #171426));
+  white-space: nowrap;
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-date-line strong {
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--v2-fs-title, 1.2rem);
   font-weight: 850;
   letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+}
+html:has(.renewal-shell.v2-design) .weather-detail-year-short { display: none; }
+@media (max-width: 374px) {
+  html:has(.renewal-shell.v2-design) .weather-detail-year-full { display: none; }
+  html:has(.renewal-shell.v2-design) .weather-detail-year-short { display: inline; }
+  html:has(.renewal-shell.v2-design) .weather-detail-date-line strong { font-size: 1.08rem; }
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-date-eyebrow {
@@ -4492,6 +4506,10 @@ html:has(.renewal-shell.v2-design) .weather-detail-day-choice.is-selected {
 html:has(.renewal-shell.v2-design) .weather-highlight-card {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
+  /* The modal body is a column flexbox: without this the card shrank to its min-height and the
+     bottom 설정위치 row spilled out over the metric cards. */
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -4625,25 +4643,42 @@ html:has(.renewal-shell.v2-design) .weather-highlight-range {
   font-size: 0.75rem;
   font-weight: 650;
 }
+/* Bottom row across the whole card: region icon + 설정위치 on one line; the row is the button
+   that opens the weather-region picker. */
 html:has(.renewal-shell.v2-design) .weather-highlight-setting {
+  position: relative;
+  z-index: 2;
   display: flex;
-  align-items: flex-start;
+  flex: 1 0 100%;
+  align-items: center;
   gap: 6px;
+  min-width: 0;
   max-width: 100%;
-  margin-top: 2px;
-  color: rgba(255, 255, 255, 0.94);
+  margin: 2px 14px 0 0;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.16);
+  font: inherit;
   font-size: 0.78rem;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
 }
+html:has(.renewal-shell.v2-design) .weather-highlight-setting:active { background: rgba(255, 255, 255, 0.26); }
 html:has(.renewal-shell.v2-design) .weather-highlight-setting-pin {
   display: inline-flex;
   flex: 0 0 auto;
-  margin-top: 1px;
   color: #fff;
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-setting-text {
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 html:has(.renewal-shell.v2-design) .weather-scene {
   position: relative;
@@ -4679,6 +4714,15 @@ html:has(.renewal-shell.v2-design) .weather-sun {
 @media (max-width: 420px) {
   html:has(.renewal-shell.v2-design) .weather-scene { flex-basis: 132px; width: 132px; height: 124px; }
   html:has(.renewal-shell.v2-design) .weather-sun { width: 78px; height: 78px; }
+}
+/* 날씨/강수/바람/습도: one equal-width row from the left margin to the right one. */
+html:has(.renewal-shell.v2-design) .weather-hourly-tabs { width: 100% !important; max-width: none !important; box-sizing: border-box; }
+html:has(.renewal-shell.v2-design) .weather-hourly-tabs .weather-hourly-tab-btn { flex: 1 1 0 !important; min-width: 0; text-align: center; }
+/* 320-374px: the scene shrinks so 체감/최고/최저 stays inside the card. */
+@media (max-width: 374px) {
+  html:has(.renewal-shell.v2-design) .weather-scene { flex-basis: 96px; width: 96px; height: 96px; transform: scale(0.74); transform-origin: right center; }
+  html:has(.renewal-shell.v2-design) .weather-highlight-temp-big { font-size: 2.9rem; }
+  html:has(.renewal-shell.v2-design) .weather-highlight-card { padding: 14px 4px 12px 14px; }
 }
 html:has(.renewal-shell.v2-design) .weather-sun-rays {
   position: absolute;
@@ -7459,4 +7503,21 @@ html:has(.renewal-shell.v2-design) .v2-more .v2-more-note {
 }
 @media (min-width: 768px) {
   html:has(.renewal-shell.v2-design) .v2-more .v2-more-list { max-width: 720px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+}
+
+/* ---------- 320px phones ----------
+   The month grid's columns were sized by content, so a long holiday ("대체공휴일(개천절)") widened
+   its column to twice the others; every column is now an equal share and corner labels clip. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Date sheet header: "26. 10.03(토)" + holiday badge + 기념일 등록 + close on one row; the
+   기념일 등록 button keeps only its icon on narrow phones. */
+@media (max-width: 374px) {
+  html:has(.renewal-shell.v2-design) .date-modal-anniv-btn-label { display: none; }
 }
