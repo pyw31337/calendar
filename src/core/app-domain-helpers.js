@@ -1380,11 +1380,29 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
-    new Notification(participantName || calendar?.title || '모여라 캘린더', {
+    const notice = new Notification(participantName || calendar?.title || '모여라 캘린더', {
       body,
       tag: message?.id ? `chat-cal_${calendar?.id}-${message.id}` : `chat-cal_${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
     });
+    // Foreground notifications do not go through the service worker. Land on the
+    // same ?view=chat&msg= URL a push click uses.
+    if (calendar?.id && message?.id) {
+      notice.onclick = () => {
+        try { window.focus(); } catch (_) {}
+        try {
+          const next = new URL(window.location.href);
+          next.searchParams.set('id', String(calendar.id).replace(/^cal_/, ''));
+          next.searchParams.set('view', 'chat');
+          next.searchParams.set('tab', 'chat');
+          next.searchParams.set('msg', String(message.id));
+          next.searchParams.delete('sub');
+          window.history.pushState(window.history.state, '', next);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        } catch (_) {}
+        try { notice.close(); } catch (_) {}
+      };
+    }
   } catch (e) {
     console.warn('Failed to show chat notification:', e);
   }

@@ -135,9 +135,15 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   else url.searchParams.set('sub', subTabId);
   // A home-card focus is meaningful only on the memo destination.  Do not let
   // it follow the user into unrelated screens or a later fresh memo visit.
+  // Chat/memo notification targets (?msg=&comment=) stay only on their screen.
   if (tabId !== 'memo') {
     url.searchParams.delete('memoFocus');
     url.searchParams.delete('memo');
+    url.searchParams.delete('comment');
+  }
+  if (tabId !== 'chat') {
+    url.searchParams.delete('msg');
+    url.searchParams.delete('img');
   }
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';

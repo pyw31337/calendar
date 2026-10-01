@@ -16,6 +16,7 @@ const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGra
 const {
   decideMemoNotification,
   decideChatNotification,
+  buildPushTargetUrl,
   decidePollNotifications,
   decideScheduleNotification,
   selectDeliverableSubscriptions
@@ -794,7 +795,7 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     const delivery = await broadcastCalendarPush(calendarDocId, {
       title: senderName || calendarTitle,
       body: bodyText,
-      url: `./?id=${calendarDocId.replace('cal_', '')}&view=chat`,
+      url: buildPushTargetUrl(calendarDocId, { view: 'chat', msg: context.params.messageId }),
       tag: `chat-${calendarDocId}-${context.params.messageId}`,
       renotify: false
     }, { skipParticipantId: decision.skipParticipantId || senderId, channel: 'chat' });
@@ -893,7 +894,11 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
     await broadcastCalendarPush(calendarDocId, {
       title,
       body: decision.body,
-      url: `./?id=${calendarDocId.replace('cal_', '')}&view=memo`,
+      url: buildPushTargetUrl(calendarDocId, {
+        view: 'memo',
+        memo: context.params.memoId,
+        comment: decision.kind === 'comment' ? decision.commentId : ''
+      }),
       tag: `memo-${calendarDocId}-${decision.tag}`,
       renotify: false
     }, { skipParticipantId: decision.skipParticipantId, channel: 'memo' });

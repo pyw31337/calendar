@@ -764,11 +764,13 @@ function CalendarApp() {
   // A memo shared via its own ?view=memo&memo=<id> link (see MemoShareModal) may be older than
   // the paginated `memos` window above, so it needs its own direct-by-id fetch rather than
   // relying on it already being present in that list.
+  // locationSearch changes on popstate (notification tap on an already-open tab included).
+  const [locationSearch, setLocationSearch] = React.useState(() => (typeof window === 'undefined' ? '' : window.location.search));
   const [sharedMemo, setSharedMemo] = React.useState(null);
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const share = parseSharePathFromLocation();
-    const memoParam = (share && share.memoId) || params.get('memo');
+    const memoParam = (share && share.memoId) || params.get('memo') || params.get('memoFocus');
     if (!memoParam || !activeCalId) {
       setSharedMemo(null);
       return;
@@ -788,7 +790,7 @@ function CalendarApp() {
       }
     })();
     return () => { isMounted = false; };
-  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, firebaseDb, firebaseConnectionVersion, locationSearch]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [customCultureItems, setCustomCultureItems] = React.useState([]);
   // 밈 키보드용 이미지 풀. calendarId로 나뉘지 않는 전역 컬렉션이라(모든 캘린더가 같은 해시태그
@@ -1029,10 +1031,30 @@ function CalendarApp() {
 
   React.useEffect(() => {
     const handleUrlChange = () => {
+      setLocationSearch(window.location.search);
       setActiveView(getInitialAppView(window.location, parseSharePathFromLocation));
     };
     window.addEventListener('popstate', handleUrlChange);
     return () => window.removeEventListener('popstate', handleUrlChange);
+  }, []);
+
+  // A push click on an already-open calendar tab cannot rely on a full reload.
+  // The service worker posts the same URL a cold load would open.
+  React.useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker || !navigator.serviceWorker.addEventListener) return undefined;
+    const onMessage = (event) => {
+      const data = event && event.data;
+      if (!data || data.type !== 'notification-open' || !data.url) return;
+      let next;
+      try { next = new URL(String(data.url), window.location.href); } catch (_) { return; }
+      if (next.origin !== window.location.origin) return;
+      const target = `${next.pathname}${next.search}${next.hash}`;
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (target !== current) window.history.pushState(window.history.state, '', target);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, []);
 
   // Deep-link support: ?date=YYYY-MM-DD auto-opens that date's DateModal on load. Used by the
@@ -2246,28 +2268,50 @@ function CalendarApp() {
   // the admin 통합검색결과 page so 채팅/태그 search results open a new tab landing on the actual
   // message instead of just the chat room's bottom. Re-runs as chatMessages streams in (the
   // message may not be in the DOM yet on first paint) but only acts once via the ref guard.
-  const chatDeepLinkHandledRef = React.useRef(false);
+  const chatDeepLinkHandledRef = React.useRef('');
   React.useEffect(() => {
-    if (chatDeepLinkHandledRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const msgParam = params.get('msg');
-    if (!msgParam) return;
-    if (activeView !== 'chat') { changeView('chat'); return; }
-    if (!focusChatMessage(msgParam)) return;
-    chatDeepLinkHandledRef.current = true;
+    if (!msgParam) return undefined;
+    const onChat = activeView === 'chat' || params.get('view') === 'chat' || params.get('tab') === 'chat';
+    if (!onChat) { changeView('chat'); return undefined; }
+    if (chatDeepLinkHandledRef.current === msgParam) return undefined;
+    let cancelled = false;
     const imgParam = params.get('img');
-    if (imgParam !== null) {
-      const msg = chatMessages.find(m => m.id === msgParam);
-      if (msg) {
+    (async () => {
+      const openImage = () => {
+        if (imgParam === null) return;
+        const msg = (chatMessagesRef.current || []).find(m => m.id === msgParam);
+        if (!msg) return;
         const entries = getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
           meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
           index: Number(imgParam) || 0
         });
+      };
+      for (let i = 0; i < 24 && !cancelled; i += 1) {
+        if (focusChatMessage(msgParam)) {
+          chatDeepLinkHandledRef.current = msgParam;
+          openImage();
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
-    }
-  }, [activeView, chatMessages]);
+      for (let i = 0; i < 40 && !cancelled && hasMoreOlderChatRef.current; i += 1) {
+        const loadOlder = loadOlderChatMessagesRef.current;
+        if (typeof loadOlder !== 'function') break;
+        await Promise.resolve(loadOlder());
+        await new Promise(resolve => setTimeout(resolve, 80));
+        if (focusChatMessage(msgParam)) {
+          chatDeepLinkHandledRef.current = msgParam;
+          openImage();
+          return;
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeView, chatMessages, locationSearch]);
 
   // Activity logs only when settings AdminModal opens recovery/logs tabs (not on every settings open).
   const adminActivityLogsLoadedForRef = React.useRef(null);

@@ -8,7 +8,8 @@ const {
   planChatPush,
   planPollPushes,
   planSchedulePush,
-  selectDeliverableSubscriptions
+  selectDeliverableSubscriptions,
+  buildPushTargetUrl
 } = require('../functions/push-notify-policy.js');
 
 const memoText = [
@@ -90,4 +91,29 @@ test('the same chat message, regenerated poll, and confirmed meeting do not noti
   assert.equal(planSchedulePush({ confirmed: false }, meeting, claims, { dateId: '2026-10-01', stale: false }), null);
   assert.equal(planSchedulePush({ confirmed: true, note: 'old' }, { ...meeting, note: 'edited' }, claims, { dateId: '2026-10-01' }), null);
   assert.equal(planSchedulePush(null, meeting, new Set(), { dateId: '2026-09-01', stale: true }), null);
+});
+
+test('memo comment notifications name that comment and keep the memo deep link', () => {
+  const before = memo({ comments: [{ id: 'cmt_old', text: '이전', participantId: 'person_author' }] });
+  const after = memo({ comments: [
+    { id: 'cmt_old', text: '이전', participantId: 'person_author' },
+    { id: 'cmt_new', text: '여기 봐', participantId: 'person_other' }
+  ] });
+  const decision = planMemoPush(before, after, new Set(), { memoId: 'memo_place' });
+  assert.equal(decision.kind, 'comment');
+  assert.equal(decision.commentId, 'cmt_new');
+  assert.equal(decision.memoId, 'memo_place');
+  assert.equal(decision.skipParticipantId, 'person_other');
+  assert.equal(
+    buildPushTargetUrl('cal_cw', { view: 'memo', memo: decision.memoId, comment: decision.commentId }),
+    './?id=cw&view=memo&memo=memo_place&comment=cmt_new'
+  );
+  assert.equal(
+    buildPushTargetUrl('cal_cw', { view: 'chat', msg: 'msg_1' }),
+    './?id=cw&view=chat&msg=msg_1'
+  );
+  assert.equal(
+    buildPushTargetUrl('cal_cw', { view: 'memo', memo: 'memo_place' }),
+    './?id=cw&view=memo&memo=memo_place'
+  );
 });

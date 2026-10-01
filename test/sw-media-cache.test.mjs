@@ -85,3 +85,13 @@ test('video range requests and non-storage URLs are left to the network', async 
   assert.equal(await w.dispatch(w.request('https://example.com/a.png')), null);
   assert.equal(w.fetchCalls.length, 0);
 });
+
+test('notification click follows the payload url instead of only focusing the open tab', () => {
+  const source = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  assert.match(source, /notification-open/);
+  assert.match(source, /client\.navigate/);
+  assert.match(source, /postMessage/);
+  const app = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(app, /notification-open/);
+  assert.match(app, /params\.get\('comment'\)|params\.get\("comment"\)|get\('msg'\)/);
+});
