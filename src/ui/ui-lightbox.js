@@ -363,7 +363,10 @@ function LightboxBottomPanel({ children }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "lightbox-info-panel",
     style: {
-      position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
+      // Same width as the comment panel under the photo (92vw): on phones the photo spans the
+      // whole screen, so inset the strip to the panel's edges; a narrower photo keeps its own width.
+      position: 'absolute', left: 'max(0px, calc((100% - 92vw) / 2))', right: 'max(0px, calc((100% - 92vw) / 2))', bottom: 0, minWidth: '190px',
+      boxSizing: 'border-box',
       padding: '34px 14px 12px',
       background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
       borderRadius: '0 0 var(--radius-md) var(--radius-md)',
@@ -1833,9 +1836,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         "aria-label": "100%로 초기화",
         title: "100%로 초기화",
         style: {
-          width: '30px',
+          minWidth: '30px', padding: '0 10px', whiteSpace: 'nowrap',
           height: '30px',
-          borderRadius: '50%',
+          borderRadius: 'var(--radius-full, 999px)',
           border: 'none',
           background: 'rgba(15,23,42,0.62)',
           color: '#FFFFFF',

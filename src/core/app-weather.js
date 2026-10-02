@@ -271,8 +271,8 @@ export function fetchDetailedWeatherForecast(lat, lon) {
     }
   }
 
-  const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
-  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=pm10,pm2_5,european_aqi&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
+  const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index&timezone=Asia%2FSeoul&past_days=1&forecast_days=10`;
+  const airQualityUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${Number(lat).toFixed(3)}&longitude=${Number(lon).toFixed(3)}&hourly=pm10,pm2_5,european_aqi&timezone=Asia%2FSeoul&past_days=1&forecast_days=7`;
 
   return Promise.all([
     fetch(forecastUrl).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -317,6 +317,9 @@ export function fetchDetailedWeatherForecast(lat, lon) {
           precip: forecastData.hourly.precipitation?.[idx] ?? 0,
           code: forecastData.hourly.weather_code?.[idx] ?? 0,
           windSpeed: rawWind != null ? Math.round((rawWind / 3.6) * 10) / 10 : null,
+          uv: forecastData.hourly.uv_index?.[idx] ?? null,
+          pm10: null,
+          pm2_5: null,
         });
       });
     }
@@ -333,6 +336,18 @@ export function fetchDetailedWeatherForecast(lat, lon) {
         const v25 = airData.hourly.pm2_5?.[idx];
         if (v10 != null && !Number.isNaN(v10)) pm10ByDay[dStr].push(v10);
         if (v25 != null && !Number.isNaN(v25)) pm25ByDay[dStr].push(v25);
+      });
+
+      // Hourly 대기 tab: put each hour's PM10/PM2.5 on the matching forecast hour.
+      const hourByIso = {};
+      Object.values(hourlyMap).forEach(list => list.forEach(h => { hourByIso[h.isoTime] = h; }));
+      airData.hourly.time.forEach((isoTime, idx) => {
+        const hour = hourByIso[isoTime];
+        if (!hour) return;
+        const v10 = airData.hourly.pm10?.[idx];
+        const v25 = airData.hourly.pm2_5?.[idx];
+        if (v10 != null && !Number.isNaN(v10)) hour.pm10 = v10;
+        if (v25 != null && !Number.isNaN(v25)) hour.pm2_5 = v25;
       });
 
       Object.keys(pm10ByDay).forEach(dStr => {

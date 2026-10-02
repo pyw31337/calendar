@@ -11,7 +11,7 @@ test('weather detail uses the V2 planning layout with an explicit forecast regio
   ]);
 
   assert.match(weatherJs, /className: "weather-highlight-setting",\s*onClick: \(\) => setShowLocationPicker\(true\)/, 'the whole 설정위치 row in the highlight card opens the region picker');
-  assert.match(weatherJs, /weather-detail-year-short/, 'the header can shorten 2026년 to 26년 on narrow screens');
+  assert.match(weatherJs, /DateTitle, \{ dateStr: selectedDate/, 'the header uses the shared 26.10.03 (토) date title');
   assert.match(css, /\.weather-highlight-card[\s\S]*?flex-shrink:\s*0/, 'the highlight card never shrinks below its content');
   assert.match(weatherJs, /function WeatherRegionSettingsIcon/, 'the weather-region control has a dedicated icon');
   assert.ok(weatherJs.includes('"aria-label": `날씨 지역 설정. 현재 ${locationAreaLabel}`'), 'region setting announces the active forecast area');

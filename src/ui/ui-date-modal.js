@@ -5,6 +5,7 @@
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
+import { DateTitle } from './date-title.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -203,10 +204,6 @@ function resolveMeetingPhotoDisplay(...args) {
 }
 function isDateConfirmedMeeting(...args) {
   const f = __gatherUiDeps().isDateConfirmedMeeting || GATHER_APP_UTILS.isDateConfirmedMeeting;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getShortTitleParts(...args) {
-  const f = __gatherUiDeps().getShortTitleParts || GATHER_APP_UTILS.getShortTitleParts;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function getDirectChatMediaInfo(...args) {
@@ -874,7 +871,6 @@ export function DateModal({
     });
   };
 
-  const titleParts = getShortTitleParts(dateStr);
     const holidayNames = React.useMemo(() => getHolidayNamesForDate(dateStr), [dateStr]);
   const holidayLabelText = holidayNames.length > 0 ? holidayNames.join('·') : '';
   const totalPartCount = activeParticipants.length || 0;
@@ -2055,39 +2051,14 @@ export function DateModal({
       flex: '1 1 auto',
       overflow: 'hidden'
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      flexShrink: 0,
-      fontSize: '1.05rem',
-      fontWeight: 800,
-      color: 'var(--text-main)',
-      margin: 0
-    }
-  }, titleParts.year, /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: isConfirmed ? 'var(--a-brand, #7C3AED)' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
-      marginLeft: '4px'
-    }
-  }, titleParts.rest)),
-  holidayLabelText && /*#__PURE__*/React.createElement("span", {
-      className: "holiday-tag",
-      style: {
-        fontSize: 'var(--font-size-sm)',
-        fontWeight: 'bold',
-        padding: '3px 8px',
-        borderRadius: 'var(--radius-sm)',
-        backgroundColor: '#FEF2F2',
-        color: '#EF4444',
-        border: '1px solid #FEE2E2',
-        verticalAlign: 'middle',
-        // A long name ("대체공휴일(개천절)") shrinks with an ellipsis instead of running under the buttons.
-        minWidth: 0,
-        flexShrink: 1,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis'
-      },
-      title: holidayLabelText
-    }, holidayLabelText)), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(DateTitle, {
+    // Same "내일 26.10.03 (토) 개천절" title as the weather popup (date-title.js).
+    dateStr,
+    isConfirmed,
+    isAllAvailable,
+    holidayText: holidayLabelText,
+    className: 'date-modal-title'
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
