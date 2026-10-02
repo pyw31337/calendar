@@ -25,7 +25,7 @@ if (!password) {
   process.exit(1);
 }
 
-const url = `https://us-central1-${projectId}.cloudfunctions.net/rebuildPhotoIndex`;
+const url = `https://asia-northeast3-${projectId}.cloudfunctions.net/rebuildPhotoIndex`;
 const res = await fetch(url, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },

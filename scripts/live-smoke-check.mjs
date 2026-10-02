@@ -225,7 +225,7 @@ if (mode === 'vite') {
   }
 }
 
-const FUNCTIONS_BASE = 'https://us-central1-metro-live-2918e.cloudfunctions.net';
+const FUNCTIONS_BASE = 'https://asia-northeast3-metro-live-2918e.cloudfunctions.net';
 const functionProbes = [
   ['rebuildPhotoIndex', [405], 'Method not allowed'],
   ['listPublicCalendarSummaries', [200], '"ok":true'],

@@ -350,7 +350,7 @@ def worker_token(config):
 
 def upload(db, calendar, config, suggestions, photo_faces, spelling, quiet=False):
     project = config.get('projectId') or 'metro-live-2918e'
-    endpoint = config.get('endpoint') or f'https://us-central1-{project}.cloudfunctions.net/ingestMediaAnalysis'
+    endpoint = config.get('endpoint') or f'https://asia-northeast3-{project}.cloudfunctions.net/ingestMediaAnalysis'
     previous = {asset: names for asset, names in db.execute('SELECT asset, names FROM uploaded WHERE calendar = ?', (calendar,))}
     items, now = [], int(time.time() * 1000)
     for asset in set(photo_faces) | set(previous):

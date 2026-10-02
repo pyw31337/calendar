@@ -26,10 +26,14 @@ on:
           - none
           - migrate-photo-comments
       delete_us_copies:
-        description: 'Seoul move step 2: delete the us-central1 copies listed in functions/seoul-moved-functions.txt before deploying (docs/functions-seoul-migration.md)'
+        description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
-        default: false
-        type: boolean
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - schedules
+          - triggers
 
 permissions:
   contents: read
@@ -78,13 +82,29 @@ jobs:
           fi
           if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi
           printf 'TOUR_API_SERVICE_KEY="%s"\n' "$tour_key" > functions/.env.metro-live-2918e
-          if [ "${{ inputs.delete_us_copies }}" = "true" ]; then
-            # Only the names in the list, only in us-central1. Their Seoul copies keep running.
-            names=$(grep -v '^#' functions/seoul-moved-functions.txt | tr -s ' \n' ' ')
-            test -n "$names" || { echo "seoul-moved-functions.txt is empty"; exit 1; }
-            echo "Deleting us-central1 copies: $names"
-            npx --yes firebase-tools@14 functions:delete $names --region us-central1 --project metro-live-2918e --force
+          case "${{ inputs.delete_us_copies }}" in
+            schedules) list=functions/seoul-scheduled-functions.txt ;;
+            triggers) list=functions/seoul-moved-functions.txt ;;
+            *) list= ;;
+          esac
+          if [ -n "$list" ]; then
+            # Only the names in the list, only in us-central1. A name that no longer exists there
+            # is skipped, so the step can be re-run.
+            existing=$(npx --yes firebase-tools@14 functions:list --project metro-live-2918e --json | jq -r '.result[] | select(.region=="us-central1") | .id')
+            names=""
+            for name in $(grep -v '^#' "$list"); do
+              if printf '%s\n' "$existing" | grep -qx "$name"; then names="$names $name"; fi
+            done
+            if [ -n "$names" ]; then
+              echo "Deleting us-central1 copies:$names"
+              npx --yes firebase-tools@14 functions:delete $names --region us-central1 --project metro-live-2918e --force
+            else
+              echo "No us-central1 copies left to delete from $list"
+            fi
           fi
+          # Container images of the Seoul functions: keep a cleanup policy like us-central1 has
+          # (without it the deploy reports an error after a successful deploy).
+          npx --yes firebase-tools@14 functions:artifacts:setpolicy --location asia-northeast3 --days 1 --project metro-live-2918e --force
           npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive
       # Photo comments v2 (scripts/migrate-photo-comment-items.mjs): back up, report, then copy the
       # old photoComments threads into photoCommentItems. Create-only and safe to repeat; the old

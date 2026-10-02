@@ -22,7 +22,7 @@ const execFileAsync = promisify(execFile);
 const PROJECT_ID = 'metro-live-2918e';
 const BUCKET = 'metro-live-2918e.firebasestorage.app';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/memePool`;
-const UPSERT_FUNCTION_URL = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/memePoolUpsert`;
+const UPSERT_FUNCTION_URL = `https://asia-northeast3-${PROJECT_ID}.cloudfunctions.net/memePoolUpsert`;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '0602';
 
 const CWEBP_PATH = existsSync('/opt/homebrew/bin/cwebp') ? '/opt/homebrew/bin/cwebp' : 'cwebp';

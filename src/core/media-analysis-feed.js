@@ -58,7 +58,7 @@ export async function fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey 
 
 export async function recordMediaAnalysisFeedback({ calendarId, projectId, assetKey, decision, proposedTags = [], acceptedTags = [], finalTags = [] } = {}) {
   if (!calendarId || !projectId || !assetKey) throw new Error('분석 피드백 대상을 찾을 수 없습니다.');
-  const response = await fetch(`https://us-central1-${encodeURIComponent(projectId)}.cloudfunctions.net/recordMediaAnalysisFeedback`, {
+  const response = await fetch(`https://asia-northeast3-${encodeURIComponent(projectId)}.cloudfunctions.net/recordMediaAnalysisFeedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ calendarId, assetKey, decision, proposedTags, acceptedTags, finalTags })
@@ -116,7 +116,7 @@ export async function rejectFaceSuggestions({ calendarId, projectId, name, asset
   if (!calendarId || !projectId || !name || !keys.length) return 0;
   let updated = 0;
   for (let start = 0; start < keys.length; start += 60) {
-    const response = await fetch(`https://us-central1-${encodeURIComponent(projectId)}.cloudfunctions.net/recordFaceFeedback`, {
+    const response = await fetch(`https://asia-northeast3-${encodeURIComponent(projectId)}.cloudfunctions.net/recordFaceFeedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ calendarId, name, assetKeys: keys.slice(start, start + 60) })

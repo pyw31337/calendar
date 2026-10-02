@@ -69,7 +69,10 @@ function decideMemoNotification(before, after, context = {}) {
   if (before && visibleMemoSignature(before) === nextSignature) return null;
 
   const textChanged = !before || textOf(before) !== textOf(after);
-  const imagesChanged = !before || imageSignature(before) !== imageSignature(after);
+  // Only an added photo is news. Removing or reordering photos (e.g. a 보관함 bulk action that
+  // saved the memo once per removed photo) paged everyone once per write with the same text.
+  const beforeImages = new Set(imageSignature(before).split('\u0001').filter(Boolean));
+  const imagesChanged = !before || imageSignature(after).split('\u0001').some(url => url && !beforeImages.has(url));
   const commentsChanged = !before || commentSignature(before) !== commentSignature(after);
   let kind = 'create';
   if (before) {

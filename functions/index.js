@@ -1,10 +1,11 @@
 // Keep every existing trigger on Cloud Functions 1st gen while using the current SDK.
 const functions = require('firebase-functions/v1');
-// Firestore lives in Seoul (asia-northeast3). Functions that read/write it on the hot path
-// (photo index + comment triggers, mediaCommand) run there too: from us-central1 every
-// transaction step crossed the Pacific, so one tag save took 1-2 s. During the move each of them
-// is deployed in both regions (the Seoul copy takes over, the US copy keeps older app builds
-// working); docs/functions-seoul-migration.md has the second step that drops the US copies.
+// Firestore lives in Seoul (asia-northeast3) and every user is in Korea, so every function runs
+// there: from us-central1 each Firestore read/write crossed the Pacific (a tag save took 1-2 s)
+// and was billed as inter-region egress. During the move triggers and endpoints are deployed in
+// both regions (both copies firing is safe: index rebuilds/recounts are idempotent and every
+// push is claimed once via claimPushDelivery); scheduled jobs, which have no claim, run in Seoul
+// only. docs/functions-seoul-migration.md has the step that drops the US copies.
 const SEOUL_REGION = 'asia-northeast3';
 const SEOUL_MOVE_REGIONS = [SEOUL_REGION, 'us-central1'];
 const seoulFunctions = () => functions.region(...SEOUL_MOVE_REGIONS);
@@ -609,11 +610,11 @@ function makeCalendarCountSyncTrigger() {
   };
 }
 
-exports.onSharedFileWrite = functions.firestore
+exports.onSharedFileWrite = seoulFunctions().firestore
   .document('sharedFiles/{hash}')
   .onWrite(makeCalendarCountSyncTrigger());
 
-exports.onLinkPreviewWrite = functions.firestore
+exports.onLinkPreviewWrite = seoulFunctions().firestore
   .document('linkPreviews/{urlHash}')
   .onWrite(makeCalendarCountSyncTrigger());
 
@@ -788,7 +789,7 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
 }
 
 
-exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onMessageCreate = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onCreate(async (snapshot, context) => {
     ensureVapidConfigured();
@@ -896,7 +897,7 @@ function isAnniversaryToday(ann, y, m, d) {
 
 // Memo created or edited → push (channel: memo). A write trigger is required because
 // memo edits are saved as updates; the old create-only trigger silently missed them.
-exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onMemoWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
@@ -947,7 +948,7 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
 // falsely announced "모임이 확정되었습니다" for those cases. Only a genuine
 // not-confirmed -> confirmed transition (client sets confirmed:true exclusively via
 // handleConfirmMeeting, the actual 확정 button) should page everyone.
-exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onConfirmedMeetingWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
@@ -986,7 +987,7 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
   });
 
 // Calendar document write → detect new polls
-exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onCalendarDocWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}')
   .onUpdate(async (change, context) => {
     const beforeCal = (change.before.data() || {}).calendar || {};
@@ -1013,7 +1014,7 @@ exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] 
     }
   });
 
-exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
+exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const kstParts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -1086,7 +1087,7 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
 // Eve-of schedule push at 18:30 KST: tomorrow's confirmed meetings + tomorrow's matching
 // type:repeat anniversary rules (e.g. 매월 셋째주 수요일). Complements the local D-1 nudge
 // (client only fires when the tab is open after 18:30) and the morning anniversary job.
-exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 18 * * *').timeZone('Asia/Seoul').onRun(async () => {
+exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 18 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const kstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
   const tomorrow = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate() + 1);
@@ -1162,7 +1163,7 @@ exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
 
 // Monday evening: settlement cards still 진행중 a few days after they were opened
 // (settlement-reminders.js). Uses the schedule channel, like the meeting reminders above.
-exports.sendSettlementReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('10 19 * * 1').timeZone('Asia/Seoul').onRun(async () => {
+exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('10 19 * * 1').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const db = admin.firestore();
   const snap = await db.collection('calendars').get();
@@ -1457,7 +1458,7 @@ async function fetchFallbackPreview(link) {
   }
 }
 
-exports.peekalinkProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['PEEKALINK_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.peekalinkProxy = seoulFunctions().runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['PEEKALINK_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -1616,7 +1617,7 @@ async function writeExternalCache(provider, key, payload, ttlMs) {
   } catch (err) { console.warn(`external cache write failed (${provider}):`, err); }
 }
 
-exports.kakaoLocalSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.kakaoLocalSearchProxy = seoulFunctions().runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
@@ -1704,7 +1705,7 @@ async function mapWithConcurrency(items, mapper, concurrency = 4) {
 // image upload. When EXIF GPS did arrive, this trusted server-side backstop completes only the
 // missing administrative tags. It runs only for a newly-added coordinate, so a later user tag
 // deletion is respected and never reintroduced by an unrelated message edit.
-exports.completePhotoLocationTags = functions
+exports.completePhotoLocationTags = seoulFunctions()
   .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'] })
   .firestore.document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite(async change => {
@@ -1800,7 +1801,7 @@ async function incrementGooglePlacesSearchStat() {
   }
 }
 
-exports.googlePlacesSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.googlePlacesSearchProxy = seoulFunctions().runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
@@ -1856,7 +1857,7 @@ const TOUR_API_SERVICE_KEY_PARAM = defineString('TOUR_API_SERVICE_KEY', {
   description: 'Optional Korea TourAPI service key for place enrichment'
 });
 
-exports.tourApiSearchProxy = functions.runWith(PUBLIC_PROXY_RUNTIME).https.onRequest(async (req, res) => {
+exports.tourApiSearchProxy = seoulFunctions().runWith(PUBLIC_PROXY_RUNTIME).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
@@ -1945,7 +1946,7 @@ exports.tourApiSearchProxy = functions.runWith(PUBLIC_PROXY_RUNTIME).https.onReq
 // the recipient even opens the page, so serving it without auth doesn't reopen the enumeration
 // hole listAllCalendars/adminVerifyPassword above were built to close -- this function explicitly
 // never touches participants/messages/expenses/places/polls/etc.
-exports.listPublicCalendarSummaries = functions.https.onRequest(async (req, res) => {
+exports.listPublicCalendarSummaries = seoulFunctions().https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -2057,7 +2058,7 @@ function setAdminCorsHeaders(res) {
 // pseudonymous actor/session and event details; network evidence is captured here, outside the
 // participant-readable calendar documents. IP is stored as a salted hash (not plaintext) so an
 // incident can correlate repeated activity without turning the shared calendar into a tracker.
-exports.auditEvent = functions.https.onRequest(async (req, res) => {
+exports.auditEvent = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2106,7 +2107,7 @@ exports.auditEvent = functions.https.onRequest(async (req, res) => {
 // data -- used by the login screen itself (see AdminLoginGate in index.html), separately from
 // listAllCalendars below so the login check stays cheap even when the dashboard doesn't need
 // a full data reload (e.g. re-validating an existing session).
-exports.adminVerifyPassword = functions.https.onRequest(async (req, res) => {
+exports.adminVerifyPassword = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
@@ -2147,7 +2148,7 @@ function slimCalendarForAdminList(cal, mode) {
   return { ...rest, places: [], activityLogs: [], _placesCount: places.length, _activityLogsCount: activityLogs.length };
 }
 
-exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
+exports.listAllCalendars = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
@@ -2183,7 +2184,7 @@ exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
 
 // Admin-only server audit log reader. Raw network evidence never enters the shared calendar
 // documents; this endpoint returns it only after the same admin password check used elsewhere.
-exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
+exports.listServerAuditLogs = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2231,7 +2232,7 @@ exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
 // reasoning as the photoIndex collection). Reads stay open in firestore.rules since every
 // calendar needs the full hashtag index to search locally.
 const MEME_POOL_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
-exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
+exports.memePoolUpsert = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2282,7 +2283,7 @@ exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
   }
 });
 
-exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
+exports.memePoolDelete = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2318,7 +2319,7 @@ exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
 const CALENDAR_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const PHOTO_ASSET_KEY_RE = /^asset:v1:[A-Za-z0-9-]{1,80}$/;
 
-exports.listUntaggedPhotoIndexEntries = functions.https.onRequest(async (req, res) => {
+exports.listUntaggedPhotoIndexEntries = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2365,7 +2366,7 @@ exports.listUntaggedPhotoIndexEntries = functions.https.onRequest(async (req, re
 // against a full snapshot. Same trust model as listUntaggedPhotoIndexEntries above. Intentionally
 // returns a report only; this endpoint never writes anything -- merge/delete stays a follow-up,
 // separate admin-gated write endpoint once the user has reviewed a report from this one.
-exports.listPhotoIndexEntriesForDedup = functions.https.onRequest(async (req, res) => {
+exports.listPhotoIndexEntriesForDedup = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2414,7 +2415,7 @@ exports.listPhotoIndexEntriesForDedup = functions.https.onRequest(async (req, re
 // onLinkPreviewWrite above have marked as used by 2+ calendars, for the admin dashboard's
 // 데이터풀 tab. `calendarCount` (not `calendarIds.length`, which Firestore can't query directly)
 // is both the filter and the sort key, so this only needs the automatic single-field index.
-exports.listSharedDataPool = functions.https.onRequest(async (req, res) => {
+exports.listSharedDataPool = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2519,7 +2520,7 @@ async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
   return { ok: true };
 }
 
-exports.adminBulkTagPhotos = functions.https.onRequest(async (req, res) => {
+exports.adminBulkTagPhotos = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2571,7 +2572,7 @@ function mergeTagTokens(...tagStrings) {
   return tokens.join(' ').slice(0, 160);
 }
 
-exports.mergeDedupPhotos = functions.https.onRequest(async (req, res) => {
+exports.mergeDedupPhotos = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2627,7 +2628,7 @@ exports.mergeDedupPhotos = functions.https.onRequest(async (req, res) => {
 // Admin-only aggregate health view for Web Push subscriptions. Endpoints and encryption keys
 // are never returned; this is intentionally a diagnostic summary to explain missed pushes and
 // bound fan-out costs without exposing credentials.
-exports.listPushSubscriptionHealth = functions.https.onRequest(async (req, res) => {
+exports.listPushSubscriptionHealth = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2660,7 +2661,7 @@ exports.listPushSubscriptionHealth = functions.https.onRequest(async (req, res) 
 
 // Changes the admin password after verifying the current one server-side -- appConfig/adminAuth
 // no longer accepts a direct client write, so this is the only way to change it now.
-exports.adminChangePassword = functions.https.onRequest(async (req, res) => {
+exports.adminChangePassword = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
@@ -2697,7 +2698,7 @@ exports.adminChangePassword = functions.https.onRequest(async (req, res) => {
 // Both windows are well under a day (15 minutes and 1 hour respectively), so anything with a
 // windowStart older than 24h is unambiguously stale and safe to prune. Runs daily alongside the
 // existing sendAnniversaryReminders schedule.
-exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
+exports.pruneStaleRateLimitDocs = functions.region(SEOUL_REGION).pubsub.schedule('30 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const db = admin.firestore();
   for (const collectionName of ['adminAuthAttempts', 'proxyRateLimits']) {
@@ -2808,7 +2809,7 @@ function sanitizeMacBackupResult(raw = {}) {
   };
 }
 
-exports.macBackupAdmin = functions.https.onRequest(async (req, res) => {
+exports.macBackupAdmin = seoulFunctions().https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2827,7 +2828,7 @@ exports.macBackupAdmin = functions.https.onRequest(async (req, res) => {
   res.status(200).json({ ok: true, state: snap.exists ? snap.data() : {} });
 });
 
-exports.macWorkerSync = functions.runWith({ secrets: [MEDIA_WORKER_TOKEN] }).https.onRequest(async (req, res) => {
+exports.macWorkerSync = seoulFunctions().runWith({ secrets: [MEDIA_WORKER_TOKEN] }).https.onRequest(async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
   if (!hasValidMediaWorkerToken(req)) { res.status(401).json({ ok: false }); return; }
   const ref = MAC_BACKUP_DOC();
@@ -2887,7 +2888,7 @@ async function ingestFaceSuggestions(req, res, calendarId, rawItems, now) {
   }
 }
 
-exports.ingestMediaAnalysis = functions.runWith({
+exports.ingestMediaAnalysis = seoulFunctions().runWith({
   timeoutSeconds: 60,
   memory: '256MB',
   secrets: [MEDIA_WORKER_TOKEN]
@@ -2980,7 +2981,7 @@ function sanitizeMediaAnalysisFeedbackTags(value) {
 // A review is an explicit user action, never a worker write. It remains beside the analysis
 // result for cross-device visibility and is also recorded as a compact calibration signal for a
 // future local-only personalized model. It cannot touch the original photo, tags, or comments.
-exports.recordMediaAnalysisFeedback = functions.runWith({
+exports.recordMediaAnalysisFeedback = seoulFunctions().runWith({
   timeoutSeconds: 30,
   memory: '256MB'
 }).https.onRequest(async (req, res) => {
@@ -3046,7 +3047,7 @@ exports.recordMediaAnalysisFeedback = functions.runWith({
 // "아니에요" on a face suggestion: the family says this person is not in these photos. The name is
 // remembered per photo (faceRejected) and filtered from every later face upload for that photo.
 // It only ever hides a suggestion; it cannot touch the photo, its tags or comments.
-exports.recordFaceFeedback = functions.runWith({
+exports.recordFaceFeedback = seoulFunctions().runWith({
   timeoutSeconds: 30,
   memory: '256MB'
 }).https.onRequest(async (req, res) => {
@@ -3095,7 +3096,7 @@ exports.recordFaceFeedback = functions.runWith({
 
 // The local Mac receives only compact, user-reviewed calibration signals. The same worker secret
 // used for ingestion is required; no browser can enumerate this private feedback collection.
-exports.getMediaAnalysisCalibration = functions.runWith({
+exports.getMediaAnalysisCalibration = seoulFunctions().runWith({
   timeoutSeconds: 30,
   memory: '256MB',
   secrets: [MEDIA_WORKER_TOKEN]
@@ -3219,7 +3220,7 @@ async function sendNaverSmtpMail({ account, appPassword, subject, html, text, da
 // Four scheduled opportunities during the weekday 08:00 hour. Resend accepts the deterministic
 // idempotency key; SMTP receives a stable Message-ID, while Firestore records each state for
 // recovery and prevents all later scheduled slots after a confirmed send.
-exports.sendDailyMediaAnalysisBrief = functions.runWith({
+exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
   timeoutSeconds: 120,
   memory: '256MB',
   secrets: [RESEND_API_KEY, MEDIA_BRIEF_FROM, NAVER_SMTP_APP_PASSWORD]
@@ -3314,7 +3315,7 @@ exports.sendDailyMediaAnalysisBrief = functions.runWith({
 // Nightly reconciliation (invariant I6): rebuild every calendar's photoIndex from its source
 // documents, so owners that incremental triggers missed or processed out of order cannot
 // linger (they were ~2% of owners and every stale 404 row), then sweep the Storage GC queue.
-exports.nightlyMediaMaintenance = functions.runWith({ timeoutSeconds: 540, memory: '1GB' })
+exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 540, memory: '1GB' })
   .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
     const calendars = await admin.firestore().collection('calendars').select().get();
     for (const doc of calendars.docs) {
@@ -3332,7 +3333,7 @@ exports.nightlyMediaMaintenance = functions.runWith({ timeoutSeconds: 540, memor
     return null;
   });
 
-exports.rebuildPhotoIndex = functions.runWith({ timeoutSeconds: 300, memory: '1GB' }).https.onRequest(async (req, res) => {
+exports.rebuildPhotoIndex = seoulFunctions().runWith({ timeoutSeconds: 300, memory: '1GB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
@@ -3486,7 +3487,7 @@ async function prepareMediaIntegrityReview({ calendarId, apply = false, material
 
 // Administrator entry point: dry-run is the default. `apply` only creates review records and
 // optional dual-write graph records; it does not delete legacy documents or Storage objects.
-exports.prepareMediaIntegrityReview = functions.runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onRequest(async (req, res) => {
+exports.prepareMediaIntegrityReview = seoulFunctions().runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }

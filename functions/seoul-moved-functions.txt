@@ -1,5 +1,6 @@
-# Functions moved to asia-northeast3 (functions/index.js SEOUL_MOVE_REGIONS).
-# Step 2 of docs/functions-seoul-migration.md deletes exactly these names in us-central1.
+# Firestore triggers deployed in both regions during the Seoul move (functions/index.js
+# SEOUL_MOVE_REGIONS). Step 2 of docs/functions-seoul-migration.md deletes exactly these names in
+# us-central1 (delete_us_copies: triggers). HTTP endpoints stay in both regions for older app builds.
 onMessagePhotoIndexWrite
 onMemoPhotoIndexWrite
 onMeetingPhotoIndexWrite
@@ -7,4 +8,11 @@ ensureMeetingIdentity
 onAnniversaryPhotoIndexWrite
 onPhotoCommentItemWrite
 onPhotoCommentIndexWrite
+onSharedFileWrite
+onLinkPreviewWrite
 onMessageMeetingPhotoIndexWrite
+onMessageCreate
+onMemoWrite
+onConfirmedMeetingWrite
+onCalendarDocWrite
+completePhotoLocationTags

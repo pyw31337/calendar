@@ -183,7 +183,7 @@ async function searchProvider(provider, query, options) {
 
   const pending = (async () => {
     if (provider === 'kakao') {
-      const base = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
+      const base = `https://asia-northeast3-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
       const response = await fetchWithTimeout(`${base}?query=${encodeURIComponent(query)}`);
       const json = response.ok ? await response.json() : null;
       const result = json?.ok && Array.isArray(json.documents)
@@ -192,7 +192,7 @@ async function searchProvider(provider, query, options) {
     }
 
     if (provider === 'google') {
-      const base = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy`;
+      const base = `https://asia-northeast3-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy`;
       const response = await fetchWithTimeout(`${base}?query=${encodeURIComponent(query)}`);
       const json = response.ok ? await response.json() : null;
       const result = json?.ok && Array.isArray(json.places)
@@ -240,7 +240,7 @@ async function searchPlaces(query, options = {}) {
 }
 
 function getTourApiUrl(firebaseConfig, params = {}) {
-  const base = `https://us-central1-${firebaseConfig?.projectId || ''}.cloudfunctions.net/tourApiSearchProxy`;
+  const base = `https://asia-northeast3-${firebaseConfig?.projectId || ''}.cloudfunctions.net/tourApiSearchProxy`;
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
@@ -285,7 +285,7 @@ async function reverseGeocodeNominatim(lat, lng) {
 async function reverseGeocodeKakao(lat, lng, firebaseConfig) {
   const projectId = firebaseConfig?.projectId;
   if (!projectId) return null;
-  const base = `https://us-central1-${projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
+  const base = `https://asia-northeast3-${projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
   const response = await fetchWithTimeout(`${base}?x=${encodeURIComponent(String(lng))}&y=${encodeURIComponent(String(lat))}`);
   const json = response.ok ? await response.json() : null;
   if (!json?.ok || !Array.isArray(json.documents) || !json.documents[0]) return null;

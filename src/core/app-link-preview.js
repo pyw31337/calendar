@@ -25,7 +25,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 // server-side with it. Cached at module scope (by URL) so re-renders and repeated occurrences of
 // the same link don't refetch, and in-flight requests are deduped across simultaneously-mounting
 // message bubbles.
-const PEEKALINK_PROXY_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/peekalinkProxy`;
+const PEEKALINK_PROXY_URL = `https://asia-northeast3-${firebaseConfig.projectId}.cloudfunctions.net/peekalinkProxy`;
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 const LINK_PREVIEW_CACHE_MAX_ENTRIES = 300;

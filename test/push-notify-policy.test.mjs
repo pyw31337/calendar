@@ -9,7 +9,8 @@ const {
   planPollPushes,
   planSchedulePush,
   selectDeliverableSubscriptions,
-  buildPushTargetUrl
+  buildPushTargetUrl,
+  decideMemoNotification
 } = require('../functions/push-notify-policy.js');
 
 const memoText = [
@@ -116,4 +117,13 @@ test('memo comment notifications name that comment and keep the memo deep link',
     buildPushTargetUrl('cal_cw', { view: 'memo', memo: 'memo_place' }),
     './?id=cw&view=memo&memo=memo_place'
   );
+});
+
+test('memo photos: an added photo notifies, a removed or reordered one does not', () => {
+  const base = { id: 'm1', text: '이용시간', participantId: 'p1', imageUrls: ['a', 'b', 'c'] };
+  assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'c'] }, { memoId: 'm1' }), null);
+  assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['c', 'b', 'a'] }, { memoId: 'm1' }), null);
+  assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'b', 'c', 'd'] }, { memoId: 'm1' })?.kind, 'images');
+  // A removal together with a text edit is still an edit.
+  assert.equal(decideMemoNotification(base, { ...base, text: '새 내용', imageUrls: ['a'] }, { memoId: 'm1' })?.kind, 'edit');
 });

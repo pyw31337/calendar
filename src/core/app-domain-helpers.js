@@ -821,7 +821,7 @@ async function callAdminFunction(name, body, timeoutMs = 25000) {
   const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   let res;
   try {
-    res = await fetch(`https://us-central1-${window.__gatherFirebaseConfig.projectId}.cloudfunctions.net/${name}`, {
+    res = await fetch(`https://asia-northeast3-${window.__gatherFirebaseConfig.projectId}.cloudfunctions.net/${name}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -2108,7 +2108,7 @@ function queueServerAuditEvent(calendarId, action, note, actor) {
   // Audit transport is deliberately best-effort and never blocks or changes the user action.
   try {
     setTimeout(() => {
-      fetch('https://us-central1-metro-live-2918e.cloudfunctions.net/auditEvent', {
+      fetch('https://asia-northeast3-metro-live-2918e.cloudfunctions.net/auditEvent', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload), keepalive: true
       }).catch(() => {});
