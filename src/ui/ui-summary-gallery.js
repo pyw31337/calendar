@@ -27,7 +27,7 @@ import { useTabStripGesture } from './tab-strip-gesture.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
-import { isExcludedFromPeople, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
+import { isExcludedFromPeople, personNameVariants, tagMatchesPerson, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
 import { CommonPagination } from './ui-shared.js';
 import { getCulturePosterBadge, CULTURE_POSTER_BADGE_COLORS } from './culture-poster-badge.js';
 
@@ -2101,13 +2101,6 @@ export function HistoryView({
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
   // 때문 -- 2~3음절 한글 이름이면 첫 글자(성으로 추정)를 뗀 나머지도 매칭 후보에 넣는다.
-  const getPersonNameVariants = name => {
-    const trimmed = String(name || '').trim();
-    if (!trimmed) return [];
-    const variants = new Set([trimmed]);
-    if (/^[가-힣]{2,3}$/.test(trimmed)) variants.add(trimmed.slice(1));
-    return Array.from(variants);
-  };
   // tag는 {label, participantId} -- 한때 participantId가 있으면(실제 캘린더 참여자) "그 사람이
   // 보낸 사진 전부"를 자동으로 그 사람 사진으로 매칭했었다. 하지만 "보낸 사진"과 "그 사람이
   // 등장하는 사진"은 다른 개념이라, 음식/풍경/서류 스캔처럼 본인이 안 나온 사진까지 전부
@@ -2127,7 +2120,7 @@ export function HistoryView({
     if (historyTab !== 'people' && !q) return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
     const matchers = personTagChips.map(tag => ({
       label: tag.label,
-      variants: getPersonNameVariants(tag.label).map(value => value.toLowerCase())
+      variants: personNameVariants(tag.label)
     }));
     historyPhotoEntries.forEach(entry => {
       const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
@@ -2140,7 +2133,7 @@ export function HistoryView({
       }
       let hasPerson = false;
       matchers.forEach(({ label, variants }) => {
-        if (variants.some(value => value.length <= 1 ? tokens.includes(value) : tokens.some(token => token.includes(value)))) {
+        if (tokens.some(token => tagMatchesPerson(token, variants))) {
           buckets.get(label)?.push(entry);
           hasPerson = true;
         }
@@ -2763,7 +2756,7 @@ export function HistoryView({
   const visiblePersonChips = React.useMemo(() => {
     if (!q) return personTagChips;
     return personTagChips.filter(tag => {
-      const variants = getPersonNameVariants(tag.label).map(value => value.toLowerCase());
+      const variants = personNameVariants(tag.label);
       if (variants.some(value => value.includes(q) || (value.length > 1 && q.includes(value)))) return true;
       const photos = personPhotosByLabel.get(tag.label) || [];
       return photos.some(photo => archivePhotoMatchesSearch(photo, q));

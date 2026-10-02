@@ -34,7 +34,7 @@ function normalizeCalendar(raw) {
 // dashboard's cross-calendar view moved to server-side Cloud Functions instead. This script needs
 // the same enumeration, just scoped to the public fields a share link's OG tags already expose.
 async function fetchCalendars() {
-  const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/listPublicCalendarSummaries`;
+  const url = `https://asia-northeast3-${PROJECT_ID}.cloudfunctions.net/listPublicCalendarSummaries`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Calendar summary fetch failed: ${res.status}`);

@@ -115,7 +115,7 @@ async function fetchCalendar(args) {
 }
 
 function workerFunctionUrl(args, functionName) {
-  const ingest = args.endpoint || `https://us-central1-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
+  const ingest = args.endpoint || `https://asia-northeast3-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
   return ingest.replace(/\/[^/]+$/, `/${functionName}`);
 }
 
@@ -350,7 +350,7 @@ async function inspectPhoto(photo, tempRoot, visionBinary) {
 }
 
 async function upload(args, token, runId, items, window, { status = 'completed', error = '' } = {}) {
-  const endpoint = args.endpoint || `https://us-central1-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
+  const endpoint = args.endpoint || `https://asia-northeast3-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
   const { response, payload } = await timedRequest(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

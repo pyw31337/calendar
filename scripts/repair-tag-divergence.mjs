@@ -18,7 +18,7 @@ import { BULK_TAG_CHUNK_SIZE, joinPhotoTagTokens } from '../src/core/bulk-photo-
 
 const PROJECT_ID = 'metro-live-2918e';
 const ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-const COMMAND_URL = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/mediaCommand`;
+const COMMAND_URL = `https://asia-northeast3-${PROJECT_ID}.cloudfunctions.net/mediaCommand`;
 const CALENDAR_IDS = (process.env.REPAIR_CALENDAR_IDS || '')
   .split(',').map(value => value.trim()).filter(value => /^[a-z0-9_-]{1,60}$/i.test(value));
 const APPLY = process.env.APPLY === '1';

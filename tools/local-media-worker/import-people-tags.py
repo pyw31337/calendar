@@ -44,7 +44,7 @@ except Exception:
 
 PROJECT = 'metro-live-2918e'
 ROOT = f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents'
-COMMAND = f'https://us-central1-{PROJECT}.cloudfunctions.net/mediaCommand'
+COMMAND = f'https://asia-northeast3-{PROJECT}.cloudfunctions.net/mediaCommand'
 CACHE = os.path.expanduser('~/Library/Caches/moyeora-people-import')
 MAX_TAGS = 20
 SAME_DAY_DISTANCE = 8     # of 64 bits; thumbnails of the same shot land well under this

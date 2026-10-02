@@ -1,0 +1,9 @@
+# Scheduled jobs that run only in asia-northeast3 (no push claim, so never in two regions).
+# The first Seoul deploy runs with delete_us_copies: schedules, which removes these us-central1
+# copies before the Seoul ones are created.
+sendAnniversaryReminders
+sendEveScheduleReminders
+sendSettlementReminders
+pruneStaleRateLimitDocs
+sendDailyMediaAnalysisBrief
+nightlyMediaMaintenance

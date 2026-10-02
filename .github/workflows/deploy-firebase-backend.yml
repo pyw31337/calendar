@@ -25,6 +25,15 @@ on:
         options:
           - none
           - migrate-photo-comments
+      delete_us_copies:
+        description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - schedules
+          - triggers
 
 permissions:
   contents: read
@@ -73,7 +82,49 @@ jobs:
           fi
           if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi
           printf 'TOUR_API_SERVICE_KEY="%s"\n' "$tour_key" > functions/.env.metro-live-2918e
-          npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive
+          case "${{ inputs.delete_us_copies }}" in
+            schedules) list=functions/seoul-scheduled-functions.txt ;;
+            triggers) list=functions/seoul-moved-functions.txt ;;
+            *) list= ;;
+          esac
+          if [ -n "$list" ]; then
+            # Only the names in the list, only in us-central1. A name that no longer exists there
+            # is skipped, so the step can be re-run.
+            existing=$(npx --yes firebase-tools@14 functions:list --project metro-live-2918e --json | jq -r '.result[] | select(.region=="us-central1") | .id')
+            names=""
+            for name in $(grep -v '^#' "$list"); do
+              if printf '%s\n' "$existing" | grep -qx "$name"; then names="$names $name"; fi
+            done
+            if [ -n "$names" ]; then
+              echo "Deleting us-central1 copies:$names"
+              # firebase functions:delete also deletes each schedule's Pub/Sub topic, which this
+              # service account may not do (403), and then leaves the function in place. gcloud
+              # removes the scheduler job and the function only; an orphan topic costs nothing.
+              gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" --quiet >/dev/null 2>&1
+              for name in $names; do
+                gcloud scheduler jobs delete "firebase-schedule-$name-us-central1" --location us-central1 --project metro-live-2918e --quiet 2>/dev/null || true
+                gcloud functions delete "$name" --no-gen2 --region us-central1 --project metro-live-2918e --quiet
+              done
+            else
+              echo "No us-central1 copies left to delete from $list"
+            fi
+          fi
+          # Container images of the Seoul functions: a cleanup policy keeps them from piling up.
+          # The service account may not be allowed to set it; that only costs a few cents a month.
+          npx --yes firebase-tools@14 functions:artifacts:setpolicy --location asia-northeast3 --days 1 --project metro-live-2918e --force \
+            || echo "::warning::Could not set the asia-northeast3 cleanup policy (run firebase functions:artifacts:setpolicy --location asia-northeast3 once as an owner)"
+          set -o pipefail
+          status=0
+          npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive 2>&1 | tee "$RUNNER_TEMP/deploy.log" || status=$?
+          if [ "$status" -ne 0 ]; then
+            # The only failure that is not a failure: every function deployed, the policy did not.
+            if grep -q 'Functions successfully deployed but could not set up cleanup policy' "$RUNNER_TEMP/deploy.log" \
+              && ! grep -q 'Functions deploy had errors' "$RUNNER_TEMP/deploy.log"; then
+              echo "::warning::Deployed; only the asia-northeast3 cleanup policy is missing"
+            else
+              exit "$status"
+            fi
+          fi
       # Photo comments v2 (scripts/migrate-photo-comment-items.mjs): back up, report, then copy the
       # old photoComments threads into photoCommentItems. Create-only and safe to repeat; the old
       # collection is left untouched.

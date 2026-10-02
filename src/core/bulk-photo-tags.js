@@ -58,6 +58,24 @@ function toCommandItem(change) {
   };
 }
 
+// mediaCommand runs next to Firestore in Seoul. The us-central1 copy stays deployed during the
+// move (functions/index.js SEOUL_MOVE_REGIONS) and is the fallback when Seoul cannot be reached
+// or is not deployed yet. bulkTagAssets sets tags, so sending it twice is harmless.
+const MEDIA_COMMAND_REGIONS = ['asia-northeast3', 'us-central1'];
+async function postMediaCommand(fetchImpl, projectId, body) {
+  let error = null;
+  for (const region of MEDIA_COMMAND_REGIONS) {
+    try {
+      const response = await fetchImpl(`https://${region}-${encodeURIComponent(projectId)}.cloudfunctions.net/mediaCommand`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      if (response.status !== 404 && response.status < 500) return response;
+      error = new Error(response.status);
+    } catch (e) { error = e; }
+  }
+  throw error;
+}
+
 export async function saveBulkPhotoTagsRemote({ calendarId, projectId, changes, fetchImpl = fetch } = {}) {
   const list = (Array.isArray(changes) ? changes : []).map(toCommandItem)
     .filter(item => /^https?:\/\//i.test(item.imageUrl || item.thumbUrl));
@@ -65,11 +83,7 @@ export async function saveBulkPhotoTagsRemote({ calendarId, projectId, changes, 
   const results = [];
   for (let offset = 0; offset < list.length; offset += BULK_TAG_CHUNK_SIZE) {
     const items = list.slice(offset, offset + BULK_TAG_CHUNK_SIZE);
-    const response = await fetchImpl(`https://us-central1-${encodeURIComponent(projectId)}.cloudfunctions.net/mediaCommand`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ calendarId, op: 'bulkTagAssets', items })
-    });
+    const response = await postMediaCommand(fetchImpl, projectId, { calendarId, op: 'bulkTagAssets', items });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload?.ok === false) {
       throw new Error(payload?.message || `사진 태그 일괄 저장 실패 (${response.status})`);
