@@ -86,7 +86,8 @@ def person_labels(calendar_id):
 # ---------- hashing ----------
 def dhash(img):
     g = img.convert('L').resize((9, 8), Image.LANCZOS)
-    px = list(g.getdata())
+    # Pillow 12 deprecates getdata(); get_flattened_data() is the replacement where available.
+    px = list(g.get_flattened_data() if hasattr(g, 'get_flattened_data') else g.getdata())
     bits = 0
     for row in range(8):
         for col in range(8):
@@ -212,15 +213,23 @@ def main():
 
     print('우리 사진 목록을 읽는 중...')
     rows = [r for r in list_all(f'calendars/cal_{args.calendar}/photoIndex') if r.get('thumb') or r.get('full')]
+    print(f'우리 사진 {len(rows)}장의 썸네일을 비교용으로 준비합니다 (처음 한 번은 몇 분 걸리고, 다음부터는 저장해 둔 값을 씁니다)')
+    hashes = []
     with ThreadPoolExecutor(8) as pool:
-        hashes = list(pool.map(lambda r: hash_url(r.get('thumb') or r.get('full')), rows))
+        for i, h in enumerate(pool.map(lambda r: hash_url(r.get('thumb') or r.get('full')), rows), 1):
+            hashes.append(h)
+            if i % 100 == 0 or i == len(rows):
+                print(f'  {i}/{len(rows)}', flush=True)
     ours = [(r, h, date_tokens(r.get('tags'))) for r, h in zip(rows, hashes) if h]
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
     source = from_apple() if args.apple else from_takeout(args.takeout)
-    unknown, plan, seen_src = {}, {}, 0
+    unknown, plan, seen_src, no_image = {}, {}, 0, 0
+    print('원본 사진과 비교하는 중...')
     for item in source:
         seen_src += 1
+        if seen_src % 200 == 0:
+            print(f'  {seen_src}장 확인', flush=True)
         mapped = []
         for n in item['names']:
             label = to_label(n)
@@ -232,6 +241,7 @@ def main():
             continue
         h = next((x for x in (hash_file(p) for p in item['paths']) if x), None)
         if not h:
+            no_image += 1
             continue
         best = None
         for row, rh, dates in ours:
@@ -259,6 +269,8 @@ def main():
             'directMediaUrl': row.get('directMediaUrl') or '', 'tags': tags}})
 
     print(f'\n원본 사진 {seen_src}장 중 이름 있는 사진을 우리 사진 {len(plan)}장과 연결, 새 인물 태그가 붙을 사진 {len(changes)}장')
+    if no_image:
+        print(f'이 맥에 이미지가 없어 비교하지 못한 사진 {no_image}장 -- 사진 앱 > 설정 > iCloud > "이 Mac에 원본 다운로드"를 켜면 늘어납니다.')
     for c in changes[:30]:
         print(f"  {c['assetKey']}: +{' '.join('#' + a for a in c['add'])}")
     if unknown:
