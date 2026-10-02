@@ -79,6 +79,40 @@ function sanitizeAnalysisItem(item = {}, now = Date.now()) {
   };
 }
 
+const MAX_FACE_PEOPLE = 8;
+
+function faceName(value) {
+  return text(value, 80).replace(/^#+/, '').replace(/\s+/g, ' ').trim();
+}
+
+// Face recognition runs only on the family's Mac (tools/local-media-worker/face-tags.py). What
+// reaches the server is a person-name suggestion per photo -- never a face image, crop or
+// embedding. These fields live beside the Vision result on the same mediaAnalysis document and
+// are written with merge, so neither worker overwrites the other's fields. Names the family has
+// rejected for a photo (faceRejected) are never suggested for it again.
+function sanitizeFaceItem(item = {}, rejected = [], now = Date.now()) {
+  const assetKey = text(item.assetKey, 180);
+  if (!/^asset:v1:[A-Za-z0-9-]{1,80}$/.test(assetKey)) return null;
+  const blocked = new Set((Array.isArray(rejected) ? rejected : []).map(faceName));
+  const seen = new Set();
+  const facePeople = [];
+  (Array.isArray(item.facePeople) ? item.facePeople : []).forEach(entry => {
+    const name = faceName(entry?.name);
+    if (!name || seen.has(name) || blocked.has(name) || facePeople.length >= MAX_FACE_PEOPLE) return;
+    seen.add(name);
+    facePeople.push({ name, score: Math.round(Math.max(0, Math.min(1, Number(entry?.score) || 0)) * 1000) / 1000 });
+  });
+  return {
+    id: stableAnalysisId(assetKey),
+    assetKey,
+    sourceKey: assetKey,
+    facePeople,
+    faceSuggested: facePeople.length > 0,
+    faceCount: Math.max(0, Math.min(99, integer(item.faceCount))),
+    faceAnalyzedAt: Math.max(0, integer(item.faceAnalyzedAt, now))
+  };
+}
+
 function summarize(items = []) {
   const successful = items.filter(item => item.status === 'suggested').length;
   return {
@@ -95,7 +129,9 @@ function summarize(items = []) {
 module.exports = {
   MAX_BATCH_ITEMS,
   MAX_TAGS,
+  faceName,
   sanitizeAnalysisItem,
+  sanitizeFaceItem,
   stableAnalysisId,
   summarize
 };

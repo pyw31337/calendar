@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
 const SERVER_WORKER = join(WORKER_DIR, 'run-server-photo-analysis.mjs');
+const FACE_WORKER = join(WORKER_DIR, 'face-tags.py');
 const DEFAULT_HOLIDAY_FEED = 'https://calendar.google.com/calendar/ical/ko.south_korea%23holiday%40group.v.calendar.google.com/public/basic.ics';
 const HOLIDAY_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -93,6 +94,18 @@ async function main() {
       results.push({ calendarId, ok: true, reportFile });
     } catch (error) {
       results.push({ calendarId, ok: false, error: String(error?.message || error).slice(0, 300), reportFile });
+    }
+    // Face suggestions (opt-in: `face-tags.py --enable-schedule` writes facePython). They run after
+    // Vision so a new upload gets both; a face failure is reported but never fails the Vision run.
+    if (config.facePython) {
+      const result = results[results.length - 1];
+      try {
+        await run(config.facePython, [FACE_WORKER, '--calendar', calendarId, '--config', configPath, '--upload', '--quiet', '--max-new', String(config.faceMaxNewPerRun || 400)]);
+        result.faces = { ok: true };
+      } catch (error) {
+        result.faces = { ok: false, error: String(error?.message || error).slice(0, 300) };
+        console.error(`Face suggestions failed for ${calendarId}:`, result.faces.error);
+      }
     }
   }
   await writeJson(reportPath, { status: results.every(result => result.ok) ? 'completed' : 'partial', generatedAt: Date.now(), ...window, results });

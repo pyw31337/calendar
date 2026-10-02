@@ -8,7 +8,8 @@ import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcl
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { applyPhotoTagOperation, buildBulkPhotoTagChanges, joinPhotoTagTokens } from '../core/bulk-photo-tags.js';
-import { buildDuplicateSuggestions, buildPlaceVisitSuggestions, buildTagSuggestions } from './archive-tag-suggestions.js';
+import { buildDuplicateSuggestions, buildFaceSuggestions, buildPlaceVisitSuggestions, buildTagSuggestions } from './archive-tag-suggestions.js';
+import { fetchFaceSuggestions, rejectFaceSuggestions } from '../core/media-analysis-feed.js';
 import { chooseDedupWinner, findDuplicatePhotoGroups } from '../core/gallery-dedup.js';
 import { ArchiveTagSuggestions } from './archive-tag-suggestions-view.js';
 import {
@@ -2353,6 +2354,36 @@ export function HistoryView({
       attendeesByDate: suggestionAttendees
     });
   }, [historyTab, historyPhotoEntries, calendar, placePhotoGroups, personTagChips, suggestionAttendees]);
+  // 얼굴로 찾은 사람: suggestions the Mac face worker uploaded (tools/local-media-worker/face-tags.py).
+  const [faceItems, setFaceItems] = React.useState([]);
+  React.useEffect(() => {
+    if (historyTab !== 'suggest' || !calendar?.id) return undefined;
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    let alive = true;
+    fetchFaceSuggestions({ calendarId: calendar.id, projectId })
+      .then(items => { if (alive) setFaceItems(items); })
+      .catch(error => console.warn('Face suggestions unavailable:', error?.message || error));
+    return () => { alive = false; };
+  }, [historyTab, calendar?.id]);
+  const faceSuggestionKey = photo => String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
+  const faceSuggestions = React.useMemo(() => (historyTab === 'suggest' && faceItems.length
+    ? buildFaceSuggestions({ photos: historyPhotoEntries, faceItems, personLabels: personTagChips.map(chip => chip.label), keyOf: faceSuggestionKey })
+    : []), [historyTab, historyPhotoEntries, faceItems, personTagChips]);
+  const rejectFaces = async (photos, name) => {
+    const assetKeys = photos.map(faceSuggestionKey).filter(Boolean);
+    try {
+      await rejectFaceSuggestions({ calendarId: calendar?.id, projectId: String(window.__gatherFirebaseConfig?.projectId || '').trim(), name, assetKeys });
+      const rejected = new Set(assetKeys);
+      setFaceItems(items => items.map(item => (rejected.has(item.assetKey)
+        ? { ...item, faceRejected: [...(item.faceRejected || []), name] }
+        : item)));
+      showToast?.(`사진 ${assetKeys.length}장은 ${name} 님 추천에서 뺐어요.`, 'success');
+      return true;
+    } catch (error) {
+      showToast?.('저장하지 못했어요. 잠시 후 다시 시도해 주세요.', 'error');
+      return false;
+    }
+  };
   const duplicateSuggestions = React.useMemo(() => (historyTab === 'suggest'
     ? buildDuplicateSuggestions(historyPhotoEntries, { findDuplicatePhotoGroups, chooseDedupWinner })
     : []), [historyTab, historyPhotoEntries]);
@@ -3921,7 +3952,9 @@ export function HistoryView({
         else run();
       },
       placeVisits: placeVisitSuggestions,
-      onApplyPlaceVisit: applyPlaceVisit
+      onApplyPlaceVisit: applyPlaceVisit,
+      faceGroups: faceSuggestions,
+      onRejectFaces: rejectFaces
     })),
 
     historyLightbox && Lightbox && /*#__PURE__*/React.createElement(Lightbox, {

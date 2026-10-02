@@ -318,3 +318,42 @@ export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoD
     .filter(Boolean)
     .sort((a, b) => b.dates[b.dates.length - 1].localeCompare(a.dates[a.dates.length - 1]));
 }
+
+/**
+ * 얼굴로 찾은 사람: one card per person from the Mac face worker's suggestions
+ * (fetchFaceSuggestions). A photo is listed only while it is in the archive, does not carry that
+ * person yet (any spelling: 박서준 / 서준) and the family has not said "아니에요" for it.
+ * Most confident first, so the top of the card is the easy yes.
+ */
+export function buildFaceSuggestions({ photos = [], faceItems = [], personLabels = [], keyOf = photo => photo?.assetKey }) {
+  const byKey = new Map();
+  (Array.isArray(photos) ? photos : []).forEach(photo => {
+    const key = String(keyOf(photo) || '');
+    if (key && !byKey.has(key)) byKey.set(key, photo);
+  });
+  const matchers = personLabelMatchers(personLabels);
+  const variantsOf = name => {
+    const matcher = matchers.find(m => m.label === name || m.variants.includes(name));
+    return matcher ? matcher.variants : (/^[가-힣]{3}$/.test(name) ? [name, name.slice(1)] : [name]);
+  };
+  const cards = new Map();
+  (Array.isArray(faceItems) ? faceItems : []).forEach(item => {
+    const photo = byKey.get(String(item?.assetKey || ''));
+    if (!photo) return;
+    const rejected = new Set(Array.isArray(item.faceRejected) ? item.faceRejected : []);
+    const tokens = tokensOf(photo);
+    (Array.isArray(item.facePeople) ? item.facePeople : []).forEach(entry => {
+      const name = String(entry?.name || '').trim();
+      if (!name || rejected.has(name)) return;
+      if (variantsOf(name).some(variant => tokens.includes(variant))) return;
+      if (!cards.has(name)) cards.set(name, { id: `face:${name}`, kind: 'person', rule: 'face', tag: name, title: name, entries: [] });
+      cards.get(name).entries.push({ photo, score: Number(entry?.score) || 0 });
+    });
+  });
+  return Array.from(cards.values())
+    .map(card => {
+      const entries = card.entries.sort((a, b) => b.score - a.score);
+      return { id: card.id, kind: card.kind, rule: card.rule, tag: card.tag, title: card.title, photos: entries.map(e => e.photo), scores: entries.map(e => e.score) };
+    })
+    .sort((a, b) => b.photos.length - a.photos.length);
+}

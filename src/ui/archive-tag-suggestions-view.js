@@ -5,6 +5,8 @@
  *   - 바로 붙일 수 있는 태그: one card per suggestion (장소/날짜) with [적용], plus [모두 적용].
  *   - 인물 추천: per day, the photos without a person tag and that day's people as chips. The reader
  *     picks photos (or 전체 선택) and taps a name; nothing is applied without a pick.
+ *   - 얼굴로 찾은 사람: per person, the photos the Mac face worker matched. The reader picks photos and
+ *     taps 붙이기, or 아니에요 so those photos are never suggested for that person again.
  */
 const React = window.React;
 const h = React.createElement;
@@ -92,6 +94,54 @@ function PersonDay({ day, busy, onApply, renderGrid, formatDate, selectKeyOf }) 
   );
 }
 
+const FACE_PAGE = 24;
+
+function FacePersonCard({ group, busy, onApply, onReject, renderGrid, selectKeyOf }) {
+  const [shown, setShown] = React.useState(FACE_PAGE);
+  const [selected, setSelected] = React.useState(() => new Set());
+  const [working, setWorking] = React.useState(false);
+  const photos = group.photos.slice(0, shown);
+  const keyOf = (photo, idx) => selectKeyOf(photo, idx);
+  const keys = photos.map(keyOf);
+  const allSelected = keys.length > 0 && keys.every(key => selected.has(key));
+  const picked = photos.filter((photo, idx) => selected.has(keyOf(photo, idx)));
+  const toggle = key => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const run = async action => {
+    setWorking(true);
+    try {
+      const ok = await action(picked, group.tag);
+      if (ok !== false) setSelected(new Set());
+    } finally {
+      setWorking(false);
+    }
+  };
+  const disabled = busy || working || !picked.length;
+  return h('div', { style: cardStyle },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      h('div', { style: titleStyle }, `#${group.tag} · ${group.photos.length}장`),
+      h('button', {
+        type: 'button',
+        onClick: () => setSelected(allSelected ? new Set() : new Set(keys)),
+        style: { border: 'none', background: 'transparent', color: 'var(--brand, #7C3AED)', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', padding: '4px 0' }
+      }, allSelected ? '선택 해제' : '전체 선택')
+    ),
+    h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' } },
+      h('span', { style: { ...mutedStyle, flex: '1 1 auto' } }, picked.length ? `${picked.length}장 선택` : '맞는 사진을 고르세요. 확실한 사진이 앞에 있어요.'),
+      h('button', { type: 'button', disabled, onClick: () => run(onApply), style: { ...pillStyle(picked.length > 0), opacity: picked.length ? 1 : 0.55 } }, `#${group.tag} 붙이기`),
+      typeof onReject === 'function' && h('button', { type: 'button', disabled, onClick: () => run(onReject), style: { ...pillStyle(false), opacity: picked.length ? 1 : 0.55 } }, '아니에요')
+    ),
+    renderGrid(photos, `suggest_face_${group.tag}`, { keys: selected, onToggle: toggle }),
+    group.photos.length > shown && h('button', {
+      type: 'button', onClick: () => setShown(count => count + FACE_PAGE),
+      style: { ...pillStyle(false), alignSelf: 'flex-start' }
+    }, `${group.photos.length - shown}장 더 보기`)
+  );
+}
+
 const sectionTitle = text => h('div', { className: 'archive-detail-title', style: { fontSize: 'var(--font-size-md, 15px)', fontWeight: 800, color: 'var(--text-main)', marginTop: '4px' } }, text);
 
 function DuplicateCard({ dup, busy, onRemove, renderGrid }) {
@@ -122,7 +172,7 @@ function PlaceVisitCard({ visit, busy, onApply, formatDate }) {
   );
 }
 
-export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onApplyAll, renderGrid, formatDate, selectKeyOf, duplicates = [], onRemoveDuplicate, placeVisits = [], onApplyPlaceVisit }) {
+export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onApplyAll, renderGrid, formatDate, selectKeyOf, duplicates = [], onRemoveDuplicate, placeVisits = [], onApplyPlaceVisit, faceGroups = [], onRejectFaces }) {
   const [personDaysShown, setPersonDaysShown] = React.useState(PERSON_DAYS_PAGE);
   const groups = suggestions?.groups || [];
   const personDays = suggestions?.personDays || [];
@@ -139,6 +189,9 @@ export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onA
       h('div', { style: mutedStyle }, '사진에 이미 있는 위치·날짜·같이 올린 사진 정보로 찾은 태그예요. 적용해도 기존 태그는 지우지 않고, 직후에 되돌릴 수 있어요.')
     ),
     groups.map(group => h(SuggestionCard, { key: group.id, group, busy, onApply, renderGrid, formatDate: fmt })),
+    faceGroups.length > 0 && sectionTitle('얼굴로 찾은 사람'),
+    faceGroups.length > 0 && h('div', { style: mutedStyle }, '인물 태그가 붙은 사진으로 이 맥에서 얼굴을 배워 찾은 사진이에요. 얼굴 정보는 맥 밖으로 나가지 않아요.'),
+    faceGroups.map(group => h(FacePersonCard, { key: group.id, group, busy, onApply, onReject: onRejectFaces, renderGrid, selectKeyOf })),
     personDays.length > 0 && sectionTitle('인물 추천'),
     personDays.length > 0 && h('div', { style: mutedStyle }, '같은 날 다른 사진에 태그된 사람, 그날 모임에 참석한 사람이에요. 사진 속 인물은 직접 골라 주세요.'),
     personDays.slice(0, personDaysShown).map(day => h(PersonDay, { key: day.date, day, busy, onApply, renderGrid, formatDate: fmt, selectKeyOf })),
