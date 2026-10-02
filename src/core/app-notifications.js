@@ -122,6 +122,18 @@ function isNotificationSupported() {
     return activeIds[0] || '';
   }
 
+  // Only a participant someone actually picked on this device (chat, memo, comments, side menu
+  // badge ...) -- no "first participant" fallback. '' until the first pick.
+  function getChosenChatParticipantId(calId, calendar) {
+    const participants = calendar ? getActiveParticipants(calendar) : [];
+    const activeIds = participants.map(p => p.id);
+    const isActive = id => Boolean(id) && (activeIds.length === 0 || activeIds.includes(id));
+    const scopedId = calId ? getLocalStorage().getItem(getChatParticipantPrefKey(calId)) : '';
+    if (isActive(scopedId)) return scopedId;
+    const legacyId = getLocalStorage().getItem('gather_active_participant_id_v20');
+    return legacyId && activeIds.includes(legacyId) ? legacyId : '';
+  }
+
   function setStoredChatParticipantId(calId, participantId) {
     if (!participantId) return;
     if (calId) getLocalStorage().setItem(getChatParticipantPrefKey(calId), participantId);
@@ -346,6 +358,7 @@ function isNotificationSupported() {
     setChatNotifyEnabledForCalendar,
     getChatParticipantPrefKey,
     getStoredChatParticipantId,
+    getChosenChatParticipantId,
     setStoredChatParticipantId,
     describePushSubscribeFailure,
     getOrCreateDeviceId,

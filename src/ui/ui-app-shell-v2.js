@@ -16,7 +16,7 @@ import {
 } from './v2/shell-nav.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { syncThemeColor } from './v2/theme-color-sync.js';
-import { subscribeParticipantChange } from '../core/current-participant.js';
+import { readChosenParticipantId, subscribeParticipantChange } from '../core/current-participant.js';
 
 const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
 
@@ -3683,10 +3683,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // This keeps the existing Lightbox component/behaviour instead of maintaining another popup.
   const [activeV2Lightbox, setActiveV2Lightbox] = React.useState(null);
   const [isParticipantPickerOpen, setIsParticipantPickerOpen] = React.useState(false);
+  // The side menu badge appears only once a participant has been picked somewhere on this device
+  // (the chat's "first participant" default does not count), and then follows every later pick.
+  const [chosenParticipantId, setChosenParticipantId] = React.useState(() => readChosenParticipantId(activeCalId, calendar));
+  React.useEffect(() => { setChosenParticipantId(readChosenParticipantId(activeCalId, calendar)); }, [activeCalId, calendar]);
   // Whoever is chosen -- side menu badge, chat, memo or comment picker -- also receives this
   // device's push notifications (and is skipped for their own messages).
   React.useEffect(() => subscribeParticipantChange(({ calId, participantId }) => {
     if (!participantId || (calId && activeCalId && calId !== activeCalId)) return;
+    setChosenParticipantId(participantId);
     try {
       if (typeof syncPushSubscriptionParticipant === 'function') syncPushSubscriptionParticipant(calId || activeCalId, participantId);
     } catch (_) {}
@@ -4230,16 +4235,18 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       // 지금 이 기기에서 쓰는 참여자 (core/current-participant.js). Tap to switch; chat, memo,
       // comments and likes all follow.
       (() => {
-        const currentId = chatContext?.chatRoomProps?.chatParticipantId;
-        const current = participants.find(p => p && p.id === currentId && !p.deletedAt && !p.removedAt);
+        const current = chosenParticipantId
+          ? participants.find(p => p && p.id === chosenParticipantId && !p.deletedAt && !p.removedAt)
+          : null;
+        if (!current) return null;
         return React.createElement('button', {
           type: 'button',
           className: bentoClass('side-nav-cal-badge side-nav-participant-badge'),
           style: { '--participant-color': current?.color || '#94A3B8' },
-          title: current ? `${current.name} (눌러서 참여자 바꾸기)` : '참여자 선택',
-          'aria-label': current ? `지금 참여자 ${current.name}, 눌러서 바꾸기` : '참여자 선택',
+          title: `${current.name} (눌러서 참여자 바꾸기)`,
+          'aria-label': `지금 참여자 ${current.name}, 눌러서 바꾸기`,
           onClick: () => setIsParticipantPickerOpen(true),
-        }, current ? shortParticipantName(current.name) : '참여자 선택');
+        }, shortParticipantName(current.name));
       })(),
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'x' })
@@ -4517,7 +4524,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     isParticipantPickerOpen && window.GATHER_UI_COMPONENTS?.ParticipantSelectSheet && React.createElement(window.GATHER_UI_COMPONENTS.ParticipantSelectSheet, {
       calendar: chatContext?.calendar || calendar,
       title: '지금 참여자',
-      isOptionSelected: id => id === chatContext?.chatRoomProps?.chatParticipantId,
+      isOptionSelected: id => id === chosenParticipantId,
       selectedLabel: '선택됨',
       disableSelected: true,
       onSelect: id => {
