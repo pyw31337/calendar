@@ -51,11 +51,13 @@ function dismissSplashScreen() {
     try { splash.remove(); } catch (_) {}
     return;
   }
-  // Cinematic VFX splash timing (~1s for shockwave, glint flare, shimmer title, and warp dismiss)
+  // Splash timing: at least ~1s for the glint flare and shimmer title, then an extra 0.5s hold
+  // once the app is ready so the splash never flashes by (2026-10 request: show it 0.5s longer).
   const MIN_SPLASH_MS = 1050;
+  const READY_HOLD_MS = 500;
   const startTime = (typeof window !== 'undefined' && window.__GATHER_SPLASH_START__) || Date.now();
   const elapsed = Date.now() - startTime;
-  const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+  const remaining = Math.max(0, MIN_SPLASH_MS - elapsed) + READY_HOLD_MS;
   setTimeout(() => {
     splash.classList.add('is-hidden');
     setTimeout(() => {
