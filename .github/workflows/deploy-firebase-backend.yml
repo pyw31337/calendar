@@ -25,6 +25,8 @@ on:
         options:
           - none
           - migrate-photo-comments
+          - restore-bulk-deleted-photos-dry-run
+          - restore-bulk-deleted-photos
       delete_us_copies:
         description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
@@ -37,6 +39,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-firebase-backend
@@ -150,3 +153,28 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           node scripts/migrate-photo-comment-items.mjs
           APPLY=1 node scripts/migrate-photo-comment-items.mjs
+      # scripts/restore-bulk-deleted-photos.mjs: photos the 2026-10-02 보관함 bulk delete removed from
+      # chat messages and memos come back from the backup taken just before it (artifact of the
+      # Daily Calendar Backup run named in the manifest), without sending any push.
+      - name: Fetch the pre-delete backup
+        if: startsWith(inputs.post_deploy, 'restore-bulk-deleted-photos')
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 37004116964
+          github-token: ${{ github.token }}
+          path: pre-delete-backup
+      - name: Restore bulk-deleted photos
+        if: startsWith(inputs.post_deploy, 'restore-bulk-deleted-photos')
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          MANIFEST: scripts/restore-2026-10-02-bulk-delete.json
+        run: |
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          BACKUP=$(find pre-delete-backup -name 'calendar-prod-backup-*.json' | head -n 1)
+          test -n "$BACKUP" || { echo "backup json not found in the artifact"; find pre-delete-backup; exit 1; }
+          export BACKUP
+          node scripts/restore-bulk-deleted-photos.mjs
+          if [ "${{ inputs.post_deploy }}" = "restore-bulk-deleted-photos" ]; then
+            APPLY=1 node scripts/restore-bulk-deleted-photos.mjs
+          fi

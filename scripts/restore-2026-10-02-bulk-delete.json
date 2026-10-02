@@ -1,0 +1,78 @@
+{
+  "backupRun": 37004116964,
+  "note": "Photos removed by the 2026-10-02 07:19-07:58 UTC 보관함 bulk delete. Storage paths only; the content comes from the backup artifact.",
+  "docs": [
+    {
+      "calendar": "cw",
+      "collection": "messages",
+      "docId": "chat_cw_1790747369352_0_lzctat",
+      "files": [
+        "chatImages/cw/1790747359323_8zimol_1_original_2753670b.png",
+        "chatImages/cw/1790747359325_lhz8iw_0_original_2735029b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "messages",
+      "docId": "chat_cw_1790747461322_0_azms5m",
+      "files": [
+        "chatImages/cw/1790747460131_4u66v7_0_original_52598b.webp"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "messages",
+      "docId": "chat_cw_1790754876052_0_ylxuca",
+      "files": [
+        "chatImages/cw/1790754869137_1hycdb_0_original_475684b.jpg"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "messages",
+      "docId": "chat_cw_1790904856407_0_uezws2",
+      "files": [
+        "chatImages/cw/1790904849366_z8ycyh_0_original_1388312b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "messages",
+      "docId": "gallery_cw_1790810578858_0_xep2nt",
+      "files": [
+        "chatImages/cw/1790810573937_0ygibi_0_original_1310037b.jpg"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1790572077959_e5tyjr",
+      "files": [
+        "memoImages/cw/1790572078104_qtfzkm_15_original_924473b.jpg",
+        "memoImages/cw/1790572078108_w1877d_9_original_1021597b.jpg",
+        "memoImages/cw/1790572082519_452vd6_7_original_1137753b.jpg",
+        "memoImages/cw/1790572085494_5zk8u9_2_original_1169985b.jpg",
+        "memoImages/cw/1790572086351_22wf3r_13_original_369851b.jpg",
+        "memoImages/cw/1790572089490_e18pgm_8_original_1107507b.jpg"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1788844816082_i3x70z",
+      "files": [
+        "memoImages/jhair/1788844816096_lbze87_0_original_91319b.avif",
+        "memoImages/jhair/1788846425152_2uspc3_2_original_69901b.avif",
+        "memoImages/jhair/1788846426399_i5xrph_4_original_56263b.avif"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1788911408127_tx8z2y",
+      "files": [
+        "memoImages/jhair/1788911870844_ah7po0_1_original_3259290b.png"
+      ]
+    }
+  ]
+}
