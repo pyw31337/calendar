@@ -17,6 +17,14 @@ on:
           - functions
           - firestore:rules,storage
           - functions,firestore:rules,storage
+      post_deploy:
+        description: 'After deploying: one-off data step (backup first, then apply)'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - migrate-photo-comments
 
 permissions:
   contents: read
@@ -66,3 +74,28 @@ jobs:
           if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi
           printf 'TOUR_API_SERVICE_KEY="%s"\n' "$tour_key" > functions/.env.metro-live-2918e
           npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive
+      # Photo comments v2 (scripts/migrate-photo-comment-items.mjs): back up, report, then copy the
+      # old photoComments threads into photoCommentItems. Create-only and safe to repeat; the old
+      # collection is left untouched.
+      - name: Backup before data step
+        if: inputs.post_deploy != 'none'
+        run: npm run ops:export -- --dir ops-backups
+        env:
+          NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
+      - name: Keep the backup
+        if: inputs.post_deploy != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-${{ inputs.post_deploy }}-backup-${{ github.run_id }}
+          path: ops-backups/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Migrate photo comments
+        if: inputs.post_deploy == 'migrate-photo-comments'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          node scripts/migrate-photo-comment-items.mjs
+          APPLY=1 node scripts/migrate-photo-comment-items.mjs

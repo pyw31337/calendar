@@ -183,7 +183,6 @@ import {
   getAnniversaryDisplayColor,
 } from './app-domain-helpers.js';
 import { rebuildCalendarToTimestamp } from './app-admin-restore.js';
-import { fetchPhotoComments } from './photo-comments.js';
 import { invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { useChatMessageWindow } from './use-chat-message-window.js';
@@ -819,7 +818,7 @@ function CalendarApp() {
     setConfirmedMeetingsSubcollection([]);
     setPlacesSubcollection([]);
   }, [activeCalId]);
-  // photoCommentCounts / preloadedPhotoComments / photoCommentStoreRef: useGalleryIndexBindings (U12).
+  // photoCommentCounts: useGalleryIndexBindings (U12); the lightbox reads each thread itself (photo-comment-items.js).
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -880,11 +879,9 @@ function CalendarApp() {
     resetMainHeader
   } = useMainHeaderState({ React, activeView, isMainSideMenuOpen });
   const {
-    galleryPhotoIndex, photoCommentCounts, setPhotoCommentCounts,
-    preloadedPhotoComments, setPreloadedPhotoComments, preloadedPhotoCommentsReady, photoCommentStoreRef
+    galleryPhotoIndex, photoCommentCounts
   } = useGalleryIndexBindings({
-    React, activeCalId, activeView,
-    firebaseDb, getFirebaseDb: () => firebaseDb, firebaseConnectionVersion
+    React, activeCalId, activeView, firebaseDb, firebaseConnectionVersion
   });
   const {
     chatMessages, setChatMessages, setGalleryLiveMessages,
@@ -4616,41 +4613,25 @@ function CalendarApp() {
   const memosRef = React.useRef(memos);
   memosRef.current = memos;
 
-  // 라이트박스 사진 댓글 -- 사진의 mediaKey/refKey(getMediaIdentityKeys, 항상 값이 있음)를
-  // calendars/cal_{id}/photoComments 문서 id로 그대로 쓴다. firestore.rules의
-  // isValidPhotoCommentDocId와 같은 문자셋으로 한 번 더 다듬어(콜론/점/하이픈/밑줄/영숫자만,
-  // 300자 캡) 규칙에 안 걸리는 값만 서버로 보낸다.
-  const handleFetchPhotoComments = React.useCallback(async photoKey => {
-    const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
-    if (photoCommentStoreRef.current) return photoCommentStoreRef.current.fetch(docId);
-    return fetchPhotoComments({
-      photoKey,
-      calendarId: activeCalId,
-      db: firebaseDb,
-      projectId: firebaseConfig.projectId,
-      decodeDocument: firestoreDocumentToJs
-    });
-  }, [activeCalId, firebaseDb]);
-
   // U13: photo delete/replace/comment-save and the jump-to handlers live in
   // app-calendar-photo-actions.js. Called here, where they used to be declared, so they close
   // over this render's values exactly as before (and stay after every value they read).
   const {
     handleDeleteMeetingPhoto, unlinkMeetingPhotoReferences,
-    handleSavePhotoComments, findMemoById, handleDeletePhoto, handleBulkDeletePhotos, handleReplacePhoto,
+    findMemoById, handleDeletePhoto, handleBulkDeletePhotos, handleReplacePhoto,
     handleJumpToChatMessage, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
     handleJumpToMemo, handleJumpToGallery,
     handleJumpToMeetingDate
   } = createCalendarPhotoActions({
     activeCalId, showToast, showUndoableDeleteToast, showRetryableUploadToast, setSelectedDate,
     setIsModalOpen, setDateModalInitialTab, setSharedMemo, setChatUploadProgress,
-    setActiveLightbox, setPlacesInitialFocusId, setMemoInitialTag, setPhotoCommentCounts,
-    galleryPhotoIndex, photoCommentStoreRef, setPreloadedPhotoComments, chatMessages,
+    setActiveLightbox, setPlacesInitialFocusId, setMemoInitialTag,
+    galleryPhotoIndex, chatMessages,
     allChatMessages, memos, setMemos, galleryChatMessages, patchGalleryArchiveMemo,
     focusChatMessage, changeView, activeCal, activeCalRef, loadOlderChatMessagesRef,
     hasMoreOlderChatRef, patchLocalChatMessage, upsertLocalChatMessage, removeLocalChatMessage,
     prepareGalleryImageUploads, handleSaveImageTags, commitConfirmedMeetings, chatMessagesRef,
-    galleryChatMessagesRef, memosRef, findChatMessageById, handleFetchPhotoComments,
+    galleryChatMessagesRef, memosRef, findChatMessageById,
     getFirebaseDb: () => firebaseDb
   });
   window.__gatherBulkDeletePhotos = handleBulkDeletePhotos;
@@ -5186,7 +5167,7 @@ function CalendarApp() {
   // WP-01: V2 is the only shell (see ui-app-shell-v2.js).
   // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
   window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
-  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, selectColorTheme, activeColorThemeId, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchPhotoComments, handleSavePhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: (needed) => setMemosLimit(prev => {
+  const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, selectColorTheme, activeColorThemeId, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: (needed) => setMemosLimit(prev => {
     const floor = Number(needed);
     if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));
     return prev + MEMOS_PAGE_SIZE;

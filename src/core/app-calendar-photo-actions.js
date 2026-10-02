@@ -7,15 +7,15 @@
 //     (readFreshChatMessage / findMemoById) and deleting Storage files only when no other
 //     document still references them (docs/data-architecture-v3.md, media-reference-integrity);
 //   - the single Lightbox dispatch point (handleDeletePhoto / handleReplacePhoto);
-//   - photo comment saves.
+//   - photo replacement re-files the photo's comments (photo-comment-items.js movePhotoComments).
 // Tag saves already live in app-image-tag-save.js (CalendarApp passes handleSaveImageTags in).
 //
 // This is a plain factory, not a hook: CalendarApp calls it once per render, at the spot where
 // these handlers used to be declared, so every handler closes over that render's values exactly
 // as before. The React hooks this code leaned on (chatMessagesRef, galleryChatMessagesRef,
-// memosRef, findChatMessageById, handleFetchPhotoComments) stay in CalendarApp and are passed in. getFirebaseDb reads
+// memosRef, findChatMessageById) stay in CalendarApp and are passed in. getFirebaseDb reads
 // app-main's module-level Firestore handle live at call time, like the inline code did.
-import { createActivityLog, getClientAuditContext, getConfirmedMeetings, getMessageImageEntries, isValidDateString, queueServerAuditEvent, reconcileMessageImageTagMap, sanitizeMemoForFirestore, sanitizeMessageForFirestore, withTimeout } from './app-domain-helpers.js';
+import { createActivityLog, getConfirmedMeetings, getMessageImageEntries, isValidDateString, reconcileMessageImageTagMap, sanitizeMemoForFirestore, sanitizeMessageForFirestore, withTimeout } from './app-domain-helpers.js';
 import { fetchGalleryPhotoOrdinal, fetchMessageOrdinal, fetchMessageRest, firebaseConfig, firestoreDocumentToJs, writeCollectionDocumentWithFallback } from './app-firebase-data.js';
 import { deleteChatImageFromStorage, resolveChatImageBatch } from './app-image-pipeline.js';
 import { isChatImageUpload } from './image-variants.js';
@@ -23,18 +23,18 @@ import { cloneConfirmedMeetings } from './confirmed-meeting-coordinator.js';
 import { filterDeletedPhotoFromIndexItems } from './gallery-bulk-delete.js';
 import { findImageSlotByAsset, listOtherAssetReferences, removeAssetFromMeetings, replaceAssetInMeetings } from './media-reference-integrity.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
-import { savePhotoComments } from './photo-comments.js';
+import { movePhotoComments } from './photo-comment-items.js';
 
 export function createCalendarPhotoActions({
   activeCalId, showToast, showUndoableDeleteToast, showRetryableUploadToast, setSelectedDate,
   setIsModalOpen, setDateModalInitialTab, setSharedMemo, setChatUploadProgress,
-  setActiveLightbox, setPlacesInitialFocusId, setMemoInitialTag, setPhotoCommentCounts,
-  galleryPhotoIndex, photoCommentStoreRef, setPreloadedPhotoComments, chatMessages,
+  setActiveLightbox, setPlacesInitialFocusId, setMemoInitialTag,
+  galleryPhotoIndex, chatMessages,
   allChatMessages, memos, setMemos, galleryChatMessages, patchGalleryArchiveMemo,
   focusChatMessage, changeView, activeCal, activeCalRef, loadOlderChatMessagesRef,
   hasMoreOlderChatRef, patchLocalChatMessage, upsertLocalChatMessage, removeLocalChatMessage,
   prepareGalleryImageUploads, handleSaveImageTags, commitConfirmedMeetings, chatMessagesRef,
-  galleryChatMessagesRef, memosRef, findChatMessageById, handleFetchPhotoComments,
+  galleryChatMessagesRef, memosRef, findChatMessageById,
   getFirebaseDb
 }) {
   const isSameImageUrl = (url1, url2) => {
@@ -571,9 +571,7 @@ export function createCalendarPhotoActions({
       // Comments follow the photo, not the file.
       if (oldAssetKey && newAssetKey && oldAssetKey !== newAssetKey) {
         try {
-          const previousComments = await handleFetchPhotoComments(oldAssetKey);
-          const list = Array.isArray(previousComments) ? previousComments : (Array.isArray(previousComments?.comments) ? previousComments.comments : []);
-          if (list.length && await handleSavePhotoComments(newAssetKey, list)) await handleSavePhotoComments(oldAssetKey, []);
+          await movePhotoComments({ calendarId: activeCalId, fromKey: oldAssetKey, toKey: newAssetKey });
         } catch (commentErr) {
           console.warn('handleReplaceChatMessagePhoto comments not moved:', commentErr);
         }
@@ -598,36 +596,6 @@ export function createCalendarPhotoActions({
   // Memo photos live in the memos collection, structurally identical to chat message images
   // (imageUrls/thumbUrls arrays), so this mirrors handleDeleteChatMessagePhoto/
   // handleReplaceChatMessagePhoto one-for-one against that collection instead.
-  const handleSavePhotoComments = async (photoKey, nextComments) => {
-    const saved = await savePhotoComments({
-      photoKey,
-      comments: nextComments,
-      calendarId: activeCalId,
-      writeDocument: writeCollectionDocumentWithFallback,
-      audit: (type, detail) => queueServerAuditEvent(activeCalId, type, detail, getClientAuditContext())
-    });
-    if (saved) {
-      const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
-      if (docId) {
-        const comments = Array.isArray(nextComments) ? nextComments : [];
-        if (photoCommentStoreRef.current) photoCommentStoreRef.current.updateLocal(docId, comments);
-        setPreloadedPhotoComments(previous => {
-          const next = { ...previous };
-          if (comments.length > 0) next[docId] = comments;
-          else delete next[docId];
-          return next;
-        });
-        setPhotoCommentCounts(previous => {
-          const next = { ...previous };
-          if (comments.length > 0) next[docId] = comments.length;
-          else delete next[docId];
-          return next;
-        });
-      }
-    }
-    return saved;
-  };
-
   const findMemoById = async memoId => {
     const local = (memos || []).find(m => m.id === memoId);
     if (local) return local;
@@ -1215,7 +1183,7 @@ export function createCalendarPhotoActions({
 
   return {
     handleDeleteMeetingPhoto, unlinkMeetingPhotoReferences, handleDeleteChatMessagePhoto,
-    handleReplaceChatMessagePhoto, handleSavePhotoComments, findMemoById, handleDeletePhoto,
+    handleReplaceChatMessagePhoto, findMemoById, handleDeletePhoto,
     handleBulkDeletePhotos, handleReplacePhoto, handleJumpToChatMessage, handleGetChatMessageOrdinal,
     handleGetGalleryPhotoOrdinal, handleJumpToMemo, handleJumpToMemoTag, handleJumpToPlace,
     handleJumpToGallery, handleJumpToMeetingDate

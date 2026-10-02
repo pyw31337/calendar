@@ -4,6 +4,10 @@
 
 import { resolveLightboxPhotoOrigin } from './lightbox-photo-origin.js';
 import { useParticipantSync } from '../core/current-participant.js';
+import {
+  subscribePhotoCommentThread, addPhotoComment, editPhotoComment, deletePhotoComment, restorePhotoComment,
+  resolvePhotoCommentCalendarId
+} from '../core/photo-comment-items.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -84,9 +88,9 @@ function generateClientThumbnail(img, maxDim = 640) {
 }
 // 메모 카드(MemoCard, ui-calendar-core.js)가 쓰는 것과 똑같은 댓글 스레드 UI/로직(참여자
 // 선택 + 입력 + 편집/삭제, 3개 초과 시 접기)을 그대로 재현한 라이트박스 전용 버전. 데이터
-// 모양도 동일하다 -- comments: [{id, participantId, text, createdAt, updatedAt?}],
-// onCommentsChange(nextComments) 하나로 저장을 위임한다. MemoCard 쪽 로직은 이미 검증되어
-// 실사용 중이라 건드리지 않았다(회귀 위험 최소화).
+// 모양도 동일하다 -- comments: [{id, participantId, text, createdAt, updatedAt?}]. 저장은
+// actions({ add, edit, remove, restore }, core/photo-comment-items.js)로 댓글 하나씩만 한다 --
+// 스레드 전체를 다시 쓰지 않으므로 이 기기가 들고 있는 목록이 다른 사람 댓글을 지울 수 없다.
 //
 // 처음엔 ui-calendar-core.js에서 export해서 Lightbox가 window.GATHER_UI_COMPONENTS로 가져다
 // 쓰게 했었는데, 실제 배포본에서는 이 두 파일이 서로 다른 코드 스플릿 청크로 나뉘어 있어서
@@ -94,7 +98,7 @@ function generateClientThumbnail(img, maxDim = 640) {
 // CommentThread가 아예 없어 조용히 렌더링을 건너뛰었다 -- 라이트박스를 열어도 댓글 UI 자체가
 // 통째로 안 보이는 버그였다. Lightbox와 항상 같은 청크에 있도록 이 파일로 옮겨서 그 문제를
 // 원천적으로 없앴다.
-function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar, showToast, onRequestConfirm }) {
+function CommentThread({ comments: commentsProp = [], actions, calendar, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -133,9 +137,10 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
     if (!text || !commentParticipantId || isSavingComment) return;
     const now = Date.now();
     const wasEditing = !!editingCommentId;
-    const nextComments = editingCommentId
+    const editingTarget = wasEditing ? comments.find(c => c.id === editingCommentId) : null;
+    const nextComments = wasEditing
       ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
-      : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
+      : [...comments, { id: `pending_${now}`, participantId: commentParticipantId, text, createdAt: now }];
     // Optimistic: show the new/edited comment and clear the composer immediately, before the
     // server round trip. A failure rolls back to the last confirmed list (see optimisticComments'
     // declaration) and leaves the composer text in place so the user can retry.
@@ -148,8 +153,10 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
     }
     setIsSavingComment(true);
     try {
-      const saved = await Promise.resolve(onCommentsChange(nextComments));
-      if (saved === false) {
+      const saved = wasEditing
+        ? (editingTarget ? await actions.edit(editingTarget, { text, participantId: commentParticipantId }) : false)
+        : Boolean(await actions.add({ text, participantId: commentParticipantId }));
+      if (!saved) {
         setOptimisticComments(null);
         setCommentText(text);
         if (wasEditing) setEditingCommentId(editingCommentId);
@@ -193,17 +200,22 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
       ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
       : `${authorName}님의 댓글을 삭제하시겠습니까?`;
     const doDelete = async () => {
-      const previousComments = comments.slice();
-      const saved = await Promise.resolve(onCommentsChange(previousComments.filter(c => c.id !== commentId)));
-      if (saved === false) return;
+      if (!target) return;
+      setOptimisticComments(comments.filter(c => c.id !== commentId));
+      const saved = await actions.remove(target);
+      setOptimisticComments(null);
+      if (!saved) {
+        if (typeof showToast === 'function') showToast('댓글 삭제 실패', 'error');
+        return;
+      }
       if (editingCommentId === commentId) {
         setEditingCommentId(null);
         setCommentText('');
       }
       if (typeof showToast === 'function') {
         showToast('댓글이 삭제되었습니다', 'delete', 5000, async () => {
-          const restored = await Promise.resolve(onCommentsChange(previousComments));
-          if (restored !== false && typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
+          const restored = await actions.restore(target);
+          if (restored && typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
         });
       }
     };
@@ -684,7 +696,7 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null, preloadedPhotoComments = {}, preloadedPhotoCommentsReady = false }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -931,116 +943,42 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     : [];
   const currentIdentity = getPhotoCommentIdentity(identityInput, identityItems, { source: currentMeta.source, meetingDate: currentMeta.meetingDate })
     || getMediaIdentityKeys(identityInput, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {};
-  // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
-  // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
-  // handleFetchPhotoComments/handleSavePhotoComments). 여러 장을 스와이프해도 슬라이드별로
-  // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 초기화면에서부터 기존 댓글이
-  // 바로 보여야 하므로(showInfo 토글과 무관하게) 현재 사진이 바뀔 때마다 불러온다.
+  // 사진 댓글 -- 사진의 정식 키(canonical asset key, currentIdentity.mediaKey)가 댓글의 주인이다.
+  // 어느 화면에서 열어도 같은 키가 나오고, 옛 키(legacyKeys)는 읽기 전용 보조로만 쓴다.
   const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
   const legacyPhotoCommentKeys = Array.from(new Set([
     currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : '',
     ...(Array.isArray(currentIdentity.legacyKeys) ? currentIdentity.legacyKeys : []),
     ...(Array.isArray(currentMeta.legacyKeys) ? currentMeta.legacyKeys : [])
   ].filter(key => key && key !== photoCommentKey)));
-  const legacyPhotoCommentKeysToken = legacyPhotoCommentKeys.join('|');
-  const getPreloadedComments = () => {
-    const keys = [photoCommentKey, ...legacyPhotoCommentKeys].filter(Boolean);
-    for (const key of keys) {
-      if (!Object.prototype.hasOwnProperty.call(preloadedPhotoComments || {}, key)) continue;
-      const comments = preloadedPhotoComments[key];
-      if (Array.isArray(comments) && comments.length > 0) return comments;
-    }
-    return preloadedPhotoCommentsReady ? [] : null;
-  };
-  // A meeting photo whose comment thread predates photoId/sourceImageIndex being part of the
-  // key (see getLegacyMeetingMediaKey) is filed under this coarser key instead -- checked only
-  // when the current key comes up empty, so its existing comments still surface here.
-  const initialPreloadedComments = getPreloadedComments();
-  const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState(() => initialPreloadedComments !== null
-    ? { [photoCommentKey]: initialPreloadedComments }
-    : {});
-  const [photoCommentsStatusByKey, setPhotoCommentsStatusByKey] = React.useState(() => initialPreloadedComments !== null
-    ? { [photoCommentKey]: 'ready' }
-    : {});
-  const photoCommentsFetchedRef = React.useRef(new Set());
-  const photoCommentsFetchRef = React.useRef(onFetchPhotoComments);
+  // Photo comments v2 (core/photo-comment-items.js): this photo's thread is read live from its
+  // own comment documents -- canonical key first, plus legacy keys so a thread whose owner could
+  // not be decided by the migration still shows. Writes touch one comment at a time and always
+  // file under the canonical key, so nothing this device has in memory can overwrite a thread.
+  const commentCalendarId = resolvePhotoCommentCalendarId(calendar?.id);
+  const commentLookupToken = [photoCommentKey, ...legacyPhotoCommentKeys].filter(Boolean).join('|');
+  const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
+  const [photoCommentsStatusByKey, setPhotoCommentsStatusByKey] = React.useState({});
   const [photoCommentsRetryToken, setPhotoCommentsRetryToken] = React.useState(0);
-  React.useEffect(() => { photoCommentsFetchRef.current = onFetchPhotoComments; }, [onFetchPhotoComments]);
   React.useEffect(() => {
-    if (!photoCommentKey) return;
-    const preloaded = getPreloadedComments();
-    if (preloaded !== null) {
-      setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: preloaded }));
-      setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
-      return;
-    }
-    if (typeof photoCommentsFetchRef.current !== 'function') {
-      setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
-      return;
-    }
-    if (photoCommentsFetchedRef.current.has(photoCommentKey)) return;
-    photoCommentsFetchedRef.current.add(photoCommentKey);
-    setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'loading' }));
-    let cancelled = false;
-    let completed = false;
-    const normalizeCommentsResult = value => {
-      if (Array.isArray(value)) return { success: true, comments: value };
-      if (value && typeof value === 'object') {
-        return { success: value.success !== false, comments: Array.isArray(value.comments) ? value.comments : [] };
-      }
-      return { success: false, comments: [] };
-    };
-    const fetchWithTimeout = key => Promise.race([
-      Promise.resolve(photoCommentsFetchRef.current(key)),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('photo comments timeout')), 8000))
-    ]);
-    const lookupKeys = [photoCommentKey];
-    Promise.all(lookupKeys.map(key => fetchWithTimeout(key)
-      .then(normalizeCommentsResult)
-      .catch(() => ({ success: false, comments: [] })))).then(results => {
-      const success = results.some(result => result.success);
-      if (!success) {
-        if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
-        return;
-      }
-      const canonical = results[0];
-      const resolved = Array.isArray(canonical?.comments) ? canonical.comments : [];
-      if (!cancelled && Array.isArray(resolved)) {
-        completed = true;
-        setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));
+    if (!photoCommentKey) return undefined;
+    setPhotoCommentsStatusByKey(prev => (prev[photoCommentKey] === 'ready' ? prev : { ...prev, [photoCommentKey]: 'loading' }));
+    return subscribePhotoCommentThread({
+      calendarId: commentCalendarId,
+      keys: commentLookupToken.split('|'),
+      onChange: comments => {
+        setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: comments }));
         setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        photoCommentsFetchedRef.current.delete(photoCommentKey);
-        setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
-      }
+      },
+      onError: () => setPhotoCommentsStatusByKey(prev => (prev[photoCommentKey] === 'ready' ? prev : { ...prev, [photoCommentKey]: 'error' }))
     });
-    return () => {
-      cancelled = true;
-      if (!completed) photoCommentsFetchedRef.current.delete(photoCommentKey);
-    };
-  }, [photoCommentKey, legacyPhotoCommentKeysToken, preloadedPhotoComments, preloadedPhotoCommentsReady, photoCommentsRetryToken]);
-  const handlePhotoCommentsChange = async nextComments => {
-    if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
-    if (photoCommentsStatusByKey[photoCommentKey] !== 'ready') {
-      if (typeof showToast === 'function') showToast('댓글을 불러오는 중이거나 조회에 실패했습니다. 다시 열어주세요.', 'error');
-      return false;
-    }
-    const previous = photoCommentsByKey[photoCommentKey] || [];
-    setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));
-    try {
-      const saved = await Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
-      if (saved === false) {
-        setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: previous }));
-        return false;
-      }
-      return saved;
-    } catch (err) {
-      setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: previous }));
-      throw err;
-    }
-  };
+  }, [photoCommentKey, commentLookupToken, commentCalendarId, photoCommentsRetryToken]);
+  const photoCommentActions = React.useMemo(() => ({
+    add: ({ participantId, text }) => addPhotoComment({ calendarId: commentCalendarId, assetKey: photoCommentKey, participantId, text }),
+    edit: (comment, { participantId, text }) => editPhotoComment({ calendarId: commentCalendarId, comment, participantId, text }),
+    remove: comment => deletePhotoComment({ calendarId: commentCalendarId, comment }),
+    restore: comment => restorePhotoComment({ calendarId: commentCalendarId, comment })
+  }), [commentCalendarId, photoCommentKey]);
   // 댓글은 라이트박스 안에서만 쓰고 볼 수 있어야 한다는 요구사항에 맞춰 여기서만 렌더링하지만,
   // "초기화면에서 바로 보여야 한다"는 요구에 맞춰 showInfo(정보 패널) 토글과는 무관하게 사진 박스와
   // 페이지네이션 사이에 항상 자리를 갖는다 -- 기본 라이트박스가 어둡기 때문에 배경/글자색도 별도로
@@ -1068,7 +1006,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }, commentStatus === 'ready' ? /*#__PURE__*/React.createElement(CommentThread, {
       key: `comment-thread-${photoCommentKey}`,
       comments: photoCommentsByKey[photoCommentKey] || [],
-      onCommentsChange: handlePhotoCommentsChange,
+      actions: photoCommentActions,
       calendar: calendar,
       showToast: showToast,
       onRequestConfirm: onRequestConfirm

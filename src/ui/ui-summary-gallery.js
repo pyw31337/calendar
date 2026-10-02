@@ -639,7 +639,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
   );
 }
 
-export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onFetchPhotoComments, onSavePhotoComments, photoCommentCounts = {} }) {
+export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm,  photoCommentCounts = {} }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -841,9 +841,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
       onJumpToGallery: (msgId, idx, url) => { setLightbox(null); if (typeof onJumpToGallery === 'function') onJumpToGallery(msgId, idx, url); },
       onGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal,
-      onRequestConfirm,
-      onFetchPhotoComments,
-      onSavePhotoComments
+      onRequestConfirm
     })
   );
 }
@@ -1395,7 +1393,7 @@ export function HistoryView({
   onDeletePhoto = null, onDeletePhotos = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
-  onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
+  onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
   onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null,
   onIndexedPhotoLoadAll = null, onSavePlace = null,
@@ -3990,9 +3988,7 @@ export function HistoryView({
             if (ok !== false && grp && grp.photos.length <= 1) clearMemoryGroup();
             return ok;
           })
-        : null,
-      onFetchPhotoComments,
-      onSavePhotoComments
+        : null
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {

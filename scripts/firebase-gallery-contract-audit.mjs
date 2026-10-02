@@ -121,8 +121,8 @@ function collectExpectedOwners({ messages, memos, meetings }) {
 const reports = [];
 let hasContractFailure = false;
 for (const calendarId of CALENDAR_IDS) {
-  const [messages, memos, meetings, photoIndex, photoComments] = await Promise.all(
-    ['messages', 'memos', 'confirmedMeetings', 'photoIndex', 'photoComments'].map(collection => listCollection(calendarId, collection))
+  const [messages, memos, meetings, photoIndex, photoCommentItems] = await Promise.all(
+    ['messages', 'memos', 'confirmedMeetings', 'photoIndex', 'photoCommentItems'].map(collection => listCollection(calendarId, collection))
   );
   const expected = collectExpectedOwners({ messages, memos, meetings });
   const indexed = new Map(photoIndex.map(row => [row.assetKey || row.id, row]));
@@ -140,11 +140,16 @@ for (const calendarId of CALENDAR_IDS) {
     }
   });
   const unexpectedAssets = [...indexed.keys()].filter(key => !expected.has(key));
-  const commentCounts = new Map(photoComments.map(row => [row.id, Array.isArray(row.comments) ? row.comments.length : 0]));
+  // Live comments per photo (photo comments v2: one document per comment, soft-deleted via deletedAt).
+  const commentCounts = new Map();
+  photoCommentItems.forEach(row => {
+    if (!row.assetKey || row.deletedAt != null) return;
+    commentCounts.set(row.assetKey, (commentCounts.get(row.assetKey) || 0) + 1);
+  });
   const badgeMismatches = [];
   indexed.forEach((row, key) => {
     const aliases = [key, ...(Array.isArray(row.legacyKeys) ? row.legacyKeys : [])];
-    const expectedCount = Math.max(0, ...aliases.map(alias => Number(commentCounts.get(alias) || 0)));
+    const expectedCount = Number(commentCounts.get(key) || 0) || Math.max(0, ...aliases.map(alias => Number(commentCounts.get(alias) || 0)));
     if (Number(row.commentCount || 0) !== expectedCount) badgeMismatches.push({ assetKey: key, cached: Number(row.commentCount || 0), expected: expectedCount });
   });
   const indexedCommentAliases = new Set([...indexed].flatMap(([key, row]) => [key, ...(Array.isArray(row.legacyKeys) ? row.legacyKeys : [])]));

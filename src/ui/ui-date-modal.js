@@ -2368,11 +2368,13 @@ export function DateModal({
               backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`
             }
           }, photos.map((p, pIdx) => {
-            // getMediaIdentityKeys가 source:'anniversary'+photoId로 만드는 결과와 반드시 같은
-            // 형식(`anniversary:${photoId}`)이어야 라이트박스에서 단 댓글의 개수가 여기 뱃지에도
-            // 그대로 반영된다 -- openAnniversaryLightbox가 넘기는 photoId와 동일한 값을 쓴다.
+            // Same key the lightbox files this photo's comments under: the canonical asset key of
+            // the URL openAnniversaryLightbox passes (the old `anniversary:<photoId>` key is only a
+            // read fallback for a thread whose owner could not be decided).
             const photoIdForKey = p.id || `${ann.id || 'ann'}_${pIdx}`;
-            const commentCount = photoCommentCounts[`anniversary:${photoIdForKey}`] || 0;
+            const photoUrlForKey = p.url || p.thumbUrl || '';
+            const assetKeyForCount = getPhotoAssetCommentKey({ imageUrl: photoUrlForKey, full: photoUrlForKey, thumb: p.thumbUrl || p.url || '' }) || '';
+            const commentCount = (assetKeyForCount && photoCommentCounts[assetKeyForCount]) || photoCommentCounts[`anniversary:${photoIdForKey}`] || 0;
             return /*#__PURE__*/React.createElement("div", {
               key: p.id || `${bannerKey}_photo_${pIdx}`,
               className: commentCount > 0 ? 'gallery-comment-heartbeat' : undefined,

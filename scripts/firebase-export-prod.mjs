@@ -9,7 +9,8 @@ const PRODUCTION_DOC_IDS = ['cal_kkot', 'cal_cw', 'cal_jhair'];
 // excluded: they contain ephemeral device credentials and are recreated on the next visit.
 const BACKUP_COLLECTIONS = [
   'messages', 'memos', 'places', 'confirmedMeetings', 'activityLogs',
-  'anniversaries', 'customCultureItems', 'photoComments', 'meetingPhotoIndex', 'likes'
+  'anniversaries', 'customCultureItems', 'photoComments', 'photoCommentItems', 'photoCommentSummary',
+  'meetingPhotoIndex', 'likes'
 ];
 const DOCUMENT_LIMIT_BYTES = 1048576;
 

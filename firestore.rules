@@ -425,6 +425,47 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // 사진 댓글 v2 (functions/photo-comment-items.js, src/core/photo-comment-items.js): one
+      // document per comment, filed under the photo's canonical asset key. Created once, edited in
+      // place, removed only by setting deletedAt -- a client can never rewrite or hard-delete a
+      // thread, so no device's stale copy can wipe other people's comments. id and createdAt never
+      // change; the photo (assetKey) changes only when the photo itself is replaced.
+      function isValidPhotoCommentItemId(id) {
+        return id is string && id.matches('^[A-Za-z0-9_-]{1,120}$');
+      }
+      function hasValidPhotoCommentItemShape(id, data) {
+        return data.keys().hasOnly(['id', 'assetKey', 'participantId', 'text', 'createdAt', 'updatedAt', 'deletedAt', 'legacyKey', 'previousAssetKeys', 'migratedFrom'])
+          && data.id == id
+          && data.assetKey is string && isValidPhotoCommentDocId(data.assetKey)
+          && data.participantId is string && data.participantId.size() > 0 && data.participantId.size() <= 120
+          && data.text is string && data.text.size() > 0 && data.text.size() <= 2000
+          && data.createdAt is number
+          && (!('updatedAt' in data) || data.updatedAt is number)
+          && 'deletedAt' in data && (data.deletedAt == null || data.deletedAt is number)
+          && (!('legacyKey' in data) || (data.legacyKey is string && data.legacyKey.size() <= 300))
+          && (!('previousAssetKeys' in data) || (data.previousAssetKeys is list && data.previousAssetKeys.size() <= 20))
+          && (!('migratedFrom' in data) || data.migratedFrom == 'photoComments');
+      }
+      match /photoCommentItems/{commentId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create: if isCalendarDoc(calendarDocId)
+          && isValidPhotoCommentItemId(commentId)
+          && hasValidPhotoCommentItemShape(commentId, request.resource.data)
+          && request.resource.data.deletedAt == null
+          && !('migratedFrom' in request.resource.data);
+        allow update: if isCalendarDoc(calendarDocId)
+          && hasValidPhotoCommentItemShape(commentId, request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.get('migratedFrom', null) == resource.data.get('migratedFrom', null)
+          && request.resource.data.get('legacyKey', null) == resource.data.get('legacyKey', null);
+        allow delete: if false;
+      }
+      // Live comment count per photo, written only by the onPhotoCommentItemWrite function.
+      match /photoCommentSummary/{docId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
       // 좋아요 (src/core/likes-model.js): one document per liked thing per participant.
       // The document existing IS the like, so a toggle is one create or one delete. Doc id is
       // likeDocId(kind, ref, participantId) = `<kind>_<16 hex>_p<8 hex>`; older shared likes have
