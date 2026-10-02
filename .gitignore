@@ -25,3 +25,6 @@ ops-backups/
 !icons/*.png
 cron.log
 scripts/data/
+
+# Firestore emulator logs
+firestore-debug.log
