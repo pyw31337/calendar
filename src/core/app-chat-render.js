@@ -92,6 +92,20 @@ function formatCommentDate(...args) {
 // source message isn't loaded locally (yet) or no longer exists, and passes manually-uploaded
 // 일정 사진 (no sourceMessageId -- a standalone upload with no chat photo behind it) straight
 // through unchanged.
+// id → message index per chat array, so resolving every meeting photo is O(1) each instead of a
+// scan of the whole chat history (composeGalleryPhotos resolves every album photo on each build).
+const meetingSourceMessageIndex = new WeakMap();
+function findChatMessageById(chatMessages, id) {
+  if (!Array.isArray(chatMessages) || !id) return null;
+  let index = meetingSourceMessageIndex.get(chatMessages);
+  if (!index) {
+    index = new Map();
+    chatMessages.forEach(m => { if (m && m.id != null && !index.has(m.id)) index.set(m.id, m); });
+    meetingSourceMessageIndex.set(chatMessages, index);
+  }
+  return index.get(id) || null;
+}
+
 function resolveMeetingPhotoDisplay(photo, chatMessages) {
   const fallback = {
     imageUrl: photo?.imageUrl || photo?.full || '',
@@ -112,7 +126,7 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
   if (!photo?.sourceMessageId || sourceImageIndex == null) {
     return { ...fallback, ...fallbackKeys, sourceImageIndex };
   }
-  const sourceMessage = (Array.isArray(chatMessages) ? chatMessages : []).find(m => m && m.id === photo.sourceMessageId);
+  const sourceMessage = findChatMessageById(chatMessages, photo.sourceMessageId);
   if (!sourceMessage) return { ...fallback, ...fallbackKeys, sourceImageIndex };
   const entry = getMessageImageEntries(sourceMessage).find(item => item.imageIndex === sourceImageIndex);
   if (!entry) return { ...fallback, ...fallbackKeys, sourceImageIndex };
