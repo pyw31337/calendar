@@ -1,5 +1,13 @@
 // Keep every existing trigger on Cloud Functions 1st gen while using the current SDK.
 const functions = require('firebase-functions/v1');
+// Firestore lives in Seoul (asia-northeast3). Functions that read/write it on the hot path
+// (photo index + comment triggers, mediaCommand) run there too: from us-central1 every
+// transaction step crossed the Pacific, so one tag save took 1-2 s. During the move each of them
+// is deployed in both regions (the Seoul copy takes over, the US copy keeps older app builds
+// working); docs/functions-seoul-migration.md has the second step that drops the US copies.
+const SEOUL_REGION = 'asia-northeast3';
+const SEOUL_MOVE_REGIONS = [SEOUL_REGION, 'us-central1'];
+const seoulFunctions = () => functions.region(...SEOUL_MOVE_REGIONS);
 const { defineString, defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const photoCommentItems = require('./photo-comment-items');
@@ -514,22 +522,22 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   return true;
 }
 
-exports.onMessagePhotoIndexWrite = functions.firestore
+exports.onMessagePhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'message', 'messageId'));
 
-exports.onMemoPhotoIndexWrite = functions.firestore
+exports.onMemoPhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'memo', 'memoId'));
 
-exports.onMeetingPhotoIndexWrite = functions.firestore
+exports.onMeetingPhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
 
 // Existing meeting document ids are dates for backwards compatibility. Give each record a
 // stable opaque identity once, without rewriting the date or any legacy field. The guard avoids
 // a trigger loop and makes the migration safe to run alongside old installed clients.
-exports.ensureMeetingIdentity = functions.firestore
+exports.ensureMeetingIdentity = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite(async change => {
     if (!change.after.exists || String(change.after.data()?.meetingId || '')) return null;
@@ -537,7 +545,7 @@ exports.ensureMeetingIdentity = functions.firestore
     return null;
   });
 
-exports.onAnniversaryPhotoIndexWrite = functions.firestore
+exports.onAnniversaryPhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/anniversaries/{anniversaryId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'anniversary', 'anniversaryId'));
 
@@ -545,7 +553,7 @@ exports.onAnniversaryPhotoIndexWrite = functions.firestore
 // photo's count in the summary doc (thumbnail badges) and on its photoIndex row.
 // A newly written photo comment also goes out as a 댓글 notification (channel: comment), never
 // to its author and never for comments copied in by the migration.
-exports.onPhotoCommentItemWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onPhotoCommentItemWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/photoCommentItems/{commentId}')
   .onWrite(async (change, context) => {
     const before = change.before.exists ? change.before.data() : null;
@@ -575,7 +583,7 @@ exports.onPhotoCommentItemWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
 // The old photoComments/{key} arrays are no longer the source of truth. An app that has not
 // updated yet may still write one; copy any comment it adds into photoCommentItems (create-only,
 // so its stale copy of the thread can never undo an edit or delete made in the new app).
-exports.onPhotoCommentIndexWrite = functions.firestore
+exports.onPhotoCommentIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/photoComments/{photoKey}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;
@@ -640,7 +648,7 @@ async function syncMeetingPhotoIndex(change, context) {
   await batch.commit();
 }
 
-exports.onMessageMeetingPhotoIndexWrite = functions.firestore
+exports.onMessageMeetingPhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncMeetingPhotoIndex(change, context));
 
@@ -2710,7 +2718,9 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
 const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets']);
-exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
+// Both regions permanently: the app calls Seoul and falls back to us-central1, and app builds
+// cached before the move only know the us-central1 URL. An idle copy costs nothing.
+exports.mediaCommand = functions.region(SEOUL_REGION, 'us-central1').runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }

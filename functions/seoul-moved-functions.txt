@@ -1,0 +1,10 @@
+# Functions moved to asia-northeast3 (functions/index.js SEOUL_MOVE_REGIONS).
+# Step 2 of docs/functions-seoul-migration.md deletes exactly these names in us-central1.
+onMessagePhotoIndexWrite
+onMemoPhotoIndexWrite
+onMeetingPhotoIndexWrite
+ensureMeetingIdentity
+onAnniversaryPhotoIndexWrite
+onPhotoCommentItemWrite
+onPhotoCommentIndexWrite
+onMessageMeetingPhotoIndexWrite

@@ -25,6 +25,11 @@ on:
         options:
           - none
           - migrate-photo-comments
+      delete_us_copies:
+        description: 'Seoul move step 2: delete the us-central1 copies listed in functions/seoul-moved-functions.txt before deploying (docs/functions-seoul-migration.md)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -73,6 +78,13 @@ jobs:
           fi
           if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi
           printf 'TOUR_API_SERVICE_KEY="%s"\n' "$tour_key" > functions/.env.metro-live-2918e
+          if [ "${{ inputs.delete_us_copies }}" = "true" ]; then
+            # Only the names in the list, only in us-central1. Their Seoul copies keep running.
+            names=$(grep -v '^#' functions/seoul-moved-functions.txt | tr -s ' \n' ' ')
+            test -n "$names" || { echo "seoul-moved-functions.txt is empty"; exit 1; }
+            echo "Deleting us-central1 copies: $names"
+            npx --yes firebase-tools@14 functions:delete $names --region us-central1 --project metro-live-2918e --force
+          fi
           npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive
       # Photo comments v2 (scripts/migrate-photo-comment-items.mjs): back up, report, then copy the
       # old photoComments threads into photoCommentItems. Create-only and safe to repeat; the old
