@@ -15,6 +15,7 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
     # 1) 미리보기 (아무것도 바꾸지 않음): 어떤 사진에 어떤 이름이 붙을지 출력
     python3 tools/local-media-worker/import-people-tags.py --calendar cw --apple
     python3 tools/local-media-worker/import-people-tags.py --calendar cw --takeout "$HOME/Pictures/Moyeora Inbox/takeout"
+    #    --takeout 에는 테이크아웃 zip 파일들이 든 폴더(압축 안 풀어도 됨), zip 하나, 또는 푼 폴더를 줄 수 있다.
     # 2) 이름이 다르게 저장돼 있으면 짝지어 주기 (예: 구글 "박서준" -> 우리 "서준")
     ... --alias 박서준=서준 --alias "Yuri Kim=유리"
     # 3) 확인 후 적용
@@ -27,6 +28,7 @@ import os
 import re
 import sys
 import urllib.request
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
@@ -86,7 +88,8 @@ def person_labels(calendar_id):
 # ---------- hashing ----------
 def dhash(img):
     g = img.convert('L').resize((9, 8), Image.LANCZOS)
-    px = list(g.getdata())
+    # Pillow 12 deprecates getdata(); get_flattened_data() is the replacement where available.
+    px = list(g.get_flattened_data() if hasattr(g, 'get_flattened_data') else g.getdata())
     bits = 0
     for row in range(8):
         for col in range(8):
@@ -99,8 +102,10 @@ def hamming(a, b):
 
 
 def hash_file(path):
+    """path is a file path, or a callable returning an open binary file (a zip member)."""
     try:
-        with Image.open(path) as im:
+        source = path() if callable(path) else path
+        with Image.open(source) as im:
             im.draft('RGB', (256, 256))
             return dhash(im)
     except Exception:
@@ -149,29 +154,73 @@ def from_apple():
         yield {'names': names, 'paths': paths, 'date': p.date.date() if p.date else None, 'label': p.original_filename}
 
 
-def from_takeout(folder):
-    for dirpath, _, files in os.walk(folder):
-        for f in files:
-            if not f.lower().endswith('.json'):
-                continue
+def _takeout_entries(target):
+    """Every file of a Takeout export -- extracted folders and/or the .zip parts themselves, so the
+    export never has to be unzipped (Takeout can put a photo and its .json in different parts)."""
+    entries = {}
+    zips = []
+    paths = [target] if os.path.isfile(target) else []
+    if os.path.isdir(target):
+        for dirpath, _, files in os.walk(target):
+            for f in files:
+                paths.append(os.path.join(dirpath, f))
+    for path in paths:
+        if path.lower().endswith('.zip'):
             try:
-                meta = json.load(open(os.path.join(dirpath, f), encoding='utf-8'))
-            except Exception:
+                z = zipfile.ZipFile(path)
+            except zipfile.BadZipFile:
+                print(f'  열 수 없는 zip을 건너뜀: {path}')
                 continue
-            names = [p.get('name') for p in (meta.get('people') or []) if p.get('name')]
-            title = meta.get('title')
-            if not names or not title:
-                continue
-            image = os.path.join(dirpath, title)
-            if not os.path.exists(image):
-                # Takeout trims long names; "<title>.supplemental-metadata.json" sits next to the file.
-                stem = f.split('.supplemental')[0].replace('.json', '')
-                image = os.path.join(dirpath, stem)
-            if not os.path.exists(image):
-                continue
-            ts = (meta.get('photoTakenTime') or {}).get('timestamp')
-            when = (datetime.utcfromtimestamp(int(ts)) + timedelta(hours=9)).date() if ts else None
-            yield {'names': names, 'paths': [image], 'date': when, 'label': title}
+            zips.append(z)
+            for name in z.namelist():
+                if not name.endswith('/'):
+                    entries[name] = (z, name)
+        else:
+            rel = os.path.relpath(path, target) if os.path.isdir(target) else os.path.basename(path)
+            entries[rel] = (None, path)
+    return entries, zips
+
+
+def from_takeout(target):
+    entries, zips = _takeout_entries(target)
+    if zips:
+        print(f'테이크아웃 zip {len(zips)}개를 압축을 풀지 않고 읽습니다.')
+
+    def read_json(ref):
+        z, name = ref
+        with (z.open(name) if z else open(name, 'rb')) as fh:
+            return json.load(fh)
+
+    def opener(ref):
+        z, name = ref
+        return (lambda: z.open(name)) if z else name
+
+    for key, ref in entries.items():
+        if not key.lower().endswith('.json'):
+            continue
+        try:
+            meta = read_json(ref)
+        except Exception:
+            continue
+        if not isinstance(meta, dict):
+            continue
+        names = [p.get('name') for p in (meta.get('people') or []) if isinstance(p, dict) and p.get('name')]
+        title = meta.get('title')
+        if not names or not title:
+            continue
+        folder = os.path.dirname(key)
+        image = entries.get(os.path.join(folder, title)) if folder else entries.get(title)
+        if not image:
+            # Takeout trims long names; "<file>.supplemental-metadata.json" / "<file>.json" sit next to it.
+            stem = os.path.basename(key).split('.supplemental')[0]
+            if stem.lower().endswith('.json'):
+                stem = stem[:-5]
+            image = entries.get(os.path.join(folder, stem) if folder else stem)
+        if not image:
+            continue
+        ts = (meta.get('photoTakenTime') or {}).get('timestamp')
+        when = (datetime.utcfromtimestamp(int(ts)) + timedelta(hours=9)).date() if ts else None
+        yield {'names': names, 'paths': [opener(image)], 'date': when, 'label': title}
 
 
 # ---------- names ----------
@@ -207,20 +256,31 @@ def main():
         sys.exit('calendar id 형식이 아닙니다')
 
     aliases = dict(a.split('=', 1) for a in args.alias if '=' in a)
-    labels = person_labels(args.calendar)
-    to_label = name_mapper(labels, aliases)
-
     print('우리 사진 목록을 읽는 중...')
     rows = [r for r in list_all(f'calendars/cal_{args.calendar}/photoIndex') if r.get('thumb') or r.get('full')]
+    # People are often only ever written as photo tags (e.g. "리아", "지후") rather than as calendar
+    # participants, so tags already used on our photos count as known names too. Date tags
+    # (YYMMDD) are not names.
+    used_tags = {t for r in rows for t in re.split(r'[\s,#]+', r.get('tags') or '') if t and not t.isdigit()}
+    labels = list(dict.fromkeys(person_labels(args.calendar) + sorted(used_tags)))
+    to_label = name_mapper(labels, aliases)
+    print(f'우리 사진 {len(rows)}장의 썸네일을 비교용으로 준비합니다 (처음 한 번은 몇 분 걸리고, 다음부터는 저장해 둔 값을 씁니다)')
+    hashes = []
     with ThreadPoolExecutor(8) as pool:
-        hashes = list(pool.map(lambda r: hash_url(r.get('thumb') or r.get('full')), rows))
+        for i, h in enumerate(pool.map(lambda r: hash_url(r.get('thumb') or r.get('full')), rows), 1):
+            hashes.append(h)
+            if i % 100 == 0 or i == len(rows):
+                print(f'  {i}/{len(rows)}', flush=True)
     ours = [(r, h, date_tokens(r.get('tags'))) for r, h in zip(rows, hashes) if h]
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
     source = from_apple() if args.apple else from_takeout(args.takeout)
-    unknown, plan, seen_src = {}, {}, 0
+    unknown, plan, seen_src, no_image, hashed_src, closest_hist = {}, {}, 0, 0, 0, {}
+    print('원본 사진과 비교하는 중...')
     for item in source:
         seen_src += 1
+        if seen_src % 200 == 0:
+            print(f'  {seen_src}장 확인', flush=True)
         mapped = []
         for n in item['names']:
             label = to_label(n)
@@ -232,13 +292,20 @@ def main():
             continue
         h = next((x for x in (hash_file(p) for p in item['paths']) if x), None)
         if not h:
+            no_image += 1
             continue
+        hashed_src += 1
         best = None
+        closest = 64
         for row, rh, dates in ours:
             limit = SAME_DAY_DISTANCE if (item['date'] and any(abs((item['date'] - d).days) <= 1 for d in dates)) else ANY_DAY_DISTANCE
             dist = hamming(h, rh)
+            closest = min(closest, dist)
             if dist <= limit and (best is None or dist < best[1]):
                 best = (row, dist)
+        # Diagnostics: how close the nearest of our photos came, so a 0-match run says why.
+        bucket = '0-4' if closest <= 4 else '5-8' if closest <= 8 else '9-12' if closest <= 12 else '13-16' if closest <= 16 else '17+'
+        closest_hist[bucket] = closest_hist.get(bucket, 0) + 1
         if not best:
             continue
         row = best[0]
@@ -259,6 +326,13 @@ def main():
             'directMediaUrl': row.get('directMediaUrl') or '', 'tags': tags}})
 
     print(f'\n원본 사진 {seen_src}장 중 이름 있는 사진을 우리 사진 {len(plan)}장과 연결, 새 인물 태그가 붙을 사진 {len(changes)}장')
+    print(f'비교에 쓴 원본 사진 {hashed_src}장, 이 맥에 이미지가 없어 건너뛴 사진 {no_image}장')
+    if no_image:
+        print('  -> 사진 앱 > 설정 > iCloud > "이 Mac에 원본 다운로드"를 켜고, 다운로드가 끝난 뒤 다시 실행하면 늘어납니다.')
+    if closest_hist:
+        order = ['0-4', '5-8', '9-12', '13-16', '17+']
+        print('가장 비슷한 우리 사진과의 차이(64칸 중 다른 칸 수, 작을수록 같은 사진): '
+              + ', '.join(f'{k}: {closest_hist[k]}장' for k in order if k in closest_hist))
     for c in changes[:30]:
         print(f"  {c['assetKey']}: +{' '.join('#' + a for a in c['add'])}")
     if unknown:
