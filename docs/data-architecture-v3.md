@@ -287,3 +287,24 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
 - 확인: `ops:integrity-audit`(10건)·`ops:export`(61건, 14MB 백업) 모두 토큰 첨부·200.
 - **규칙 변경(request.auth 요구)은 아직 하지 않았다** — 이 에이전트 환경에서 보안 규칙 파일 수정이 차단되었고,
   규칙 변경은 에뮬레이터 테스트 + 사용자 명시 승인 후 진행한다(예정: 2026-10-01).
+
+## 8. 사진 댓글 v2 (2026-10-02) — 댓글 하나 = 문서 하나
+
+**원인 (실데이터 확인, 2026-10-01 백업 8개 + 라이브):** 서버에서 지워진 댓글은 0개였다. 문제는 읽기였다.
+- 모아엘가(cw)의 옛 스레드 19개(댓글 35개)가 `chat:gallery_…:N` 같은 옛 키 문서에 있었다. 썸네일 뱃지
+  (photoIndex.commentCount)는 옛 키까지 세었지만, 라이트박스는 정식 키(asset:v1:…) 문서만 읽어서
+  "뱃지는 2인데 열면 0" / "단 댓글이 사라짐"이 됐다. 옛 키를 볼지 말지는 어느 목록에서 열었는지에 따라 달라졌다.
+- 저장은 스레드 배열 전체를 그 기기가 가진 목록으로 덮어썼다(세션 캐시 10분 포함) — 실제 손실이 날 수 있는 구조.
+
+**새 구조:**
+- `photoCommentItems/{commentId}` — `{ id, assetKey, participantId, text, createdAt, updatedAt, deletedAt }`.
+  등록=문서 생성, 수정=그 문서만, 삭제=`deletedAt`(되돌리기 가능). 규칙상 하드 삭제·createdAt 변경 불가.
+- `photoCommentSummary/counts` — `{ counts: { [assetKey]: n } }`. `onPhotoCommentItemWrite` 함수만 쓴다.
+  photoIndex.commentCount도 같은 함수가 같은 숫자로 맞춘다. 뱃지 = 라이트박스에 보이는 수.
+- 라이트박스는 그 사진의 댓글만 실시간 구독(정식 키 + 옛 키, `in` 쿼리). 화면마다 다르던 키 계산·사전 로딩·세션 캐시 삭제.
+- 옛 `photoComments`는 그대로 보존(읽기 전용 기록). 아직 업데이트 안 된 앱이 옛 문서에 쓰면 `onPhotoCommentIndexWrite`가
+  새 댓글만 복사한다(create-only — 옛 앱의 낡은 목록이 새 앱의 수정/삭제를 되돌리지 못함).
+- 이관: `scripts/migrate-photo-comment-items.mjs` (Deploy Firebase backend 워크플로 `post_deploy: migrate-photo-comments`,
+  `ops:export` 백업 후 실행, 몇 번 돌려도 같음). 옛 키는 그 키를 legacyKeys로 가진 사진이 딱 하나일 때만 그 사진으로 옮기고,
+  아니면 옛 키 그대로 둔다(라이트박스가 옛 키도 함께 읽으므로 숨지 않음).
+- 코드: `functions/photo-comment-items.js`, `src/core/photo-comment-items.js`, 테스트 `functions/test/photo-comment-items.emulator.test.js`.

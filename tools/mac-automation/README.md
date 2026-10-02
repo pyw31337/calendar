@@ -4,7 +4,7 @@
 
 | 자동 실행 | 하는 일 |
 |---|---|
-| `com.moyeora.media-analysis` | 사진 분석(장소·날짜·글자) + 얼굴 인식 인물 추천, 15분마다 (cw·kkot·jhair) |
+| `com.moyeora.media-analysis` | 사진 분석(장소·날짜·글자) + 얼굴 인식 인물 추천. 15분마다 "새 사진이 있나"만 확인(문서 1개 읽기)하고, 새 사진이 있을 때만 분석 (cw·kkot·jhair) |
 | `com.cultureflow.*` | CultureFlow 매일 수집 · 업데이트 감시 |
 | `com.pyw31337.cctv.*` | CCTV 캐시 갱신 · 모니터 |
 | `com.moyeora.mac-backup` | 이 백업 (켜면 매주 일요일 04:10) |

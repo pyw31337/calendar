@@ -6,7 +6,7 @@ const DIST_ASSETS_DIR = join(process.cwd(), 'dist', 'assets');
 // Per-chunk caps retain practical release headroom while catching accidental eager growth.
 const BUDGETS = [
   { pattern: /^app-main-.*\.js$/, maxBytes: 360_000 },
-  { pattern: /^photo-comments-.*\.js$/, maxBytes: 40_000 },
+  { pattern: /^photo-comment-items-.*\.js$/, maxBytes: 40_000 },
   { pattern: /^ui-calendar-core-.*\.js$/, maxBytes: 120_000 },
   { pattern: /^ui-chat-room-.*\.js$/, maxBytes: 100_000 },
   { pattern: /^ui-places-.*\.js$/, maxBytes: 100_000 },

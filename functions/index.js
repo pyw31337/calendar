@@ -2,6 +2,7 @@
 const functions = require('firebase-functions/v1');
 const { defineString, defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
+const photoCommentItems = require('./photo-comment-items');
 const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
@@ -341,13 +342,16 @@ async function syncAssetGraphProjection(calendarDocId, assetKeys) {
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const db = admin.firestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
-  const collectionNames = ['messages', 'memos', 'confirmedMeetings', 'anniversaries', 'photoComments', 'photoIndex'];
+  const collectionNames = ['messages', 'memos', 'confirmedMeetings', 'anniversaries', 'photoCommentItems', 'photoIndex'];
   const snapshots = await Promise.all(collectionNames.map(collection => root.collection(collection).get()));
   const byName = Object.fromEntries(collectionNames.map((name, index) => [name, snapshots[index]]));
-  const commentCounts = new Map(byName.photoComments.docs.map(doc => {
-    const comments = doc.data()?.comments;
-    return [doc.id, Array.isArray(comments) ? comments.length : 0];
-  }));
+  // Live comments per photo, from the one-document-per-comment store (photo-comment-items.js).
+  const commentCounts = new Map();
+  byName.photoCommentItems.docs.forEach(doc => {
+    const data = doc.data() || {};
+    if (!data.assetKey || data.deletedAt != null) return;
+    commentCounts.set(data.assetKey, (commentCounts.get(data.assetKey) || 0) + 1);
+  });
   const ownersByAsset = new Map();
   const addOwners = (sourceType, snapshot, idField = null) => snapshot.docs.forEach(doc => {
     getPhotoIndexEntries(sourceType, idField ? String(doc.data()?.[idField] || doc.id) : doc.id, doc.data() || {}).forEach(entry => {
@@ -458,8 +462,10 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
     const snapshot = await transaction.get(ref);
     const existing = snapshot.exists ? (snapshot.data() || {}) : {};
     const replacement = afterByKey.get(assetKey);
+    // A new row starts from the photo's live comment count (photo-comment-items.js summary).
     const commentSnapshot = !snapshot.exists && replacement
-      ? await transaction.get(db.collection('calendars').doc(context.params.calendarDocId).collection('photoComments').doc(assetKey))
+      ? await transaction.get(db.collection('calendars').doc(context.params.calendarDocId)
+        .collection(photoCommentItems.SUMMARY).doc(photoCommentItems.SUMMARY_DOC))
       : null;
     let owners = Array.isArray(existing.owners) ? existing.owners.filter(owner => owner && typeof owner === 'object') : [];
     // A missing marker means this is a pre-completeness row. Never guess that its bounded owner
@@ -481,8 +487,8 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
     const persistedOwners = owners.slice(0, 12);
     const selected = persistedOwners[0];
     const legacyKeys = Array.from(new Set(persistedOwners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
-    const existingComments = commentSnapshot?.exists && Array.isArray(commentSnapshot.data()?.comments)
-      ? commentSnapshot.data().comments.length : 0;
+    const existingComments = commentSnapshot?.exists
+      ? Math.max(0, Number(commentSnapshot.data()?.counts?.[assetKey]) || 0) : 0;
     const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
     const geo = pickPhotoIndexGeo(persistedOwners, existing);
     transaction.set(ref, {
@@ -535,27 +541,31 @@ exports.onAnniversaryPhotoIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/anniversaries/{anniversaryId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'anniversary', 'anniversaryId'));
 
+// Photo comments v2 (photo-comment-items.js): one document per comment; this trigger keeps the
+// photo's count in the summary doc (thumbnail badges) and on its photoIndex row.
+exports.onPhotoCommentItemWrite = functions.firestore
+  .document('calendars/{calendarDocId}/photoCommentItems/{commentId}')
+  .onWrite(async (change, context) => {
+    const keys = photoCommentItems.assetKeysToRecount(
+      change.before.exists ? change.before.data() : null,
+      change.after.exists ? change.after.data() : null
+    );
+    for (const key of keys) {
+      await photoCommentItems.recountAsset(admin.firestore(), admin, context.params.calendarDocId, key);
+    }
+    return null;
+  });
+
+// The old photoComments/{key} arrays are no longer the source of truth. An app that has not
+// updated yet may still write one; copy any comment it adds into photoCommentItems (create-only,
+// so its stale copy of the thread can never undo an edit or delete made in the new app).
 exports.onPhotoCommentIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/photoComments/{photoKey}')
   .onWrite(async (change, context) => {
-    const comments = change.after.exists && Array.isArray(change.after.data()?.comments) ? change.after.data().comments : [];
-    const indexRef = admin.firestore().collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
-    const batch = admin.firestore().batch();
-    let writeCount = 0;
-    const canonical = await indexRef.doc(context.params.photoKey).get();
-    // A legacy comment key is not necessarily an asset key. Never create a partial/ghost photo
-    // row for it; update the canonical document only when it already exists.
-    if (canonical.exists) {
-      batch.set(canonical.ref, { commentCount: comments.length, updatedAt: Date.now() }, { merge: true });
-      writeCount += 1;
-    }
-    const aliases = await indexRef.where('legacyKeys', 'array-contains', context.params.photoKey).limit(100).get();
-    aliases.forEach(doc => {
-      if (canonical.exists && doc.id === canonical.id) return;
-      batch.set(doc.ref, { commentCount: comments.length, updatedAt: Date.now() }, { merge: true });
-      writeCount += 1;
-    });
-    if (writeCount > 0) await batch.commit();
+    if (!change.after.exists) return null;
+    const comments = change.after.data()?.comments;
+    await photoCommentItems.mirrorLegacyThread(admin.firestore(), context.params.calendarDocId, context.params.photoKey, comments);
+    return null;
   });
 
 // The client can only arrayUnion its own calendarId into sharedFiles/{hash} and
@@ -3043,9 +3053,9 @@ function formatBriefDate(date = new Date()) {
 
 function mediaWorkerIsStale(workerState, now = Date.now()) {
   const heartbeat = Number(workerState?.lastHeartbeatAt || 0);
-  // The local worker finishes its weekday window just before 08:00. A 40-minute tolerance
-  // leaves room for sleep/wake timing while still making an interrupted LaunchAgent visible.
-  return !heartbeat || now - heartbeat > 40 * 60 * 1000;
+  // An idle Mac (no new photos) reports in only every 12 hours -- it no longer calls the server
+  // every 15 minutes just to say it is alive. 26 hours still flags a Mac that stopped for a day.
+  return !heartbeat || now - heartbeat > 26 * 60 * 60 * 1000;
 }
 
 async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {

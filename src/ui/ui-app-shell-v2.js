@@ -2776,7 +2776,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
     handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory,
     handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory,
-    handleFetchPhotoComments, handleSavePhotoComments, handleFetchMeetingPhotoIndex,
+    handleFetchMeetingPhotoIndex,
     handleSavePlace, handleDeletePlace,
     placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
     isPlacesShareOpen, setIsPlacesShareOpen,
@@ -2784,7 +2784,6 @@ export function buildRenewalRecordsContext(calendar, deps) {
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
     onMemoCommentsChange,
     isMemoShareOpen, setIsMemoShareOpen,
-    preloadedPhotoComments, preloadedPhotoCommentsReady,
   } = deps || {};
   const bulkSaveImageTags = handleBulkSaveImageTags || window.__gatherBulkSaveImageTags || null;
   // This is a cheap calendar-record count used only until the 장소 tab finishes its own
@@ -2859,7 +2858,6 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory, onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
       onHideMemoryGroup: handleHideMemoryGroup, onRestoreMemoryGroup: handleRestoreMemoryGroup,
       onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
-      onFetchPhotoComments: handleFetchPhotoComments, onSavePhotoComments: handleSavePhotoComments,
       onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
       onSavePlace: handleSavePlace,
       placeCount: historyPlaceCount,
@@ -2926,10 +2924,6 @@ export function buildRenewalRecordsContext(calendar, deps) {
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
       onRequestConfirm: showConfirmDialog,
-      onFetchPhotoComments: handleFetchPhotoComments,
-      onSavePhotoComments: handleSavePhotoComments,
-      preloadedPhotoComments: preloadedPhotoComments || {},
-      preloadedPhotoCommentsReady: !!preloadedPhotoCommentsReady,
     },
   };
 }
@@ -4461,8 +4455,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onGetChatMessageOrdinal: v2RecordsContext.historyProps?.onGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: v2RecordsContext.historyProps?.onGetGalleryPhotoOrdinal,
       onRequestConfirm: v2RecordsContext.historyProps?.onRequestConfirm,
-      onFetchPhotoComments: v2RecordsContext.historyProps?.onFetchPhotoComments,
-      onSavePhotoComments: v2RecordsContext.historyProps?.onSavePhotoComments,
     }),
     calendarSettingsDateModalDate && React.createElement(bindUiComponentAliases(React).DateModal, {
       ...v2CalendarContext.dateModalProps,

@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
-import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
+import { buildPhotoCommentItem, visiblePhotoComments, cleanPhotoCommentKey } from '../src/core/photo-comment-items.js';
 import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries, preserveAnniversaryCurationFields, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../src/core/gallery-data.js';
 import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
@@ -140,30 +140,13 @@ assert(clonedMeetingProbe[0].photos[0].id === 'changed', 'confirmed meeting clon
 }
 
 {
-  const fetched = await fetchPhotoComments({
-    photoKey: 'asset:v1:test',
-    calendarId: 'cw',
-    db: {
-      collection: () => ({ doc: () => ({ collection: () => ({ doc: () => ({
-        get: async () => ({ exists: true, data: () => ({ comments: [{ id: 'comment-1' }] }) })
-      }) }) }) })
-    },
-    projectId: 'unused',
-    decodeDocument: value => value
-  });
-  assert(fetched.success && fetched.comments.length === 1, 'split photo-comment reader lost the selected asset thread');
-
-  const writes = [];
-  const audits = [];
-  const saved = await savePhotoComments({
-    photoKey: 'asset:v1:test',
-    comments: [{ id: 'comment-2' }],
-    calendarId: 'cw',
-    writeDocument: async (...args) => { writes.push(args); return { success: true }; },
-    audit: (...args) => audits.push(args)
-  });
-  assert(saved && writes[0]?.[2] === 'asset:v1:test' && writes[0]?.[4] === 'set', 'split photo-comment writer changed the canonical document target');
-  assert(audits[0]?.[0] === 'photo_comment_save', 'split photo-comment writer lost its audit event');
+  // Photo comments v2: one document per comment, never a whole-thread rewrite.
+  const item = buildPhotoCommentItem({ assetKey: 'asset:v1:test', participantId: 'p1', text: '  hi  ', now: 5, id: 'cmt_5_x' });
+  assert(item && item.assetKey === 'asset:v1:test' && item.text === 'hi' && item.deletedAt === null && item.createdAt === 5, 'photo comment items must be created live under the canonical asset key');
+  assert(buildPhotoCommentItem({ assetKey: 'asset:v1:test', participantId: 'p1', text: '   ' }) === null, 'empty photo comments must not be written');
+  const visible = visiblePhotoComments([{ id: 'b', createdAt: 2 }, { id: 'a', createdAt: 1 }, { id: 'c', createdAt: 3, deletedAt: 9 }, { id: 'a', createdAt: 1 }]);
+  assert(visible.map(c => c.id).join(',') === 'a,b', 'soft-deleted or duplicate comments must not show, and the thread reads oldest first');
+  assert(cleanPhotoCommentKey('chat:m 1/0') === 'chat:m_1_0', 'photo comment keys must use the rules-safe character set');
 }
 
 const settlementSimulation = calculateSettlementRows(
@@ -516,12 +499,10 @@ assert(imageTagSaveSource.includes('requestedIndex != null && !meta.meetingDate'
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const baseItemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
-assert(galleryIndexSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
+assert(galleryIndexSource.includes('subscribePhotoCommentCounts'), 'photo comment badges must read the server-kept summary document');
 assert(calendarViewsSource.includes('formatBalanceBadge(calculateSettlementBalance(calendar))'), 'V2 side-menu settlement badge must use the shared running-balance source');
-assert(galleryIndexSource.includes('enableBulkHydration: true'), 'photo comment badges must bulk-hydrate on gallery too');
 assert(!/needsPlacesData = React\.useMemo\(\s*\(\) => activeView === 'calendar'/.test(appMainSource), 'places/meetings must stay subscribed beyond calendar/places/settlement/history');
 assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'history' \|\| activeView === 'content'/.test(appMainSource), 'custom contents must stay subscribed beyond history/content');
-assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloadedPhotoComments\(\{\}\);/.test(appMainSource + galleryIndexSource), 'photo comment counts must not wipe to empty on every view remount');
 assert(galleryIndexSource.includes('useGalleryPhotoIndex') && appMainSource.includes('useGalleryIndexBindings'), 'gallery must consume the canonical server-maintained photo index');
 assert(calendarViewsSource.includes("galleryPhotoIndex.status === 'fallback' ? null : []"), 'gallery must not present a partial local archive while the canonical index is loading or failed');
 assert(chatGallerySource.includes('사진 목록 다시 불러오기'), 'failed canonical gallery reads must expose an explicit retry action');
@@ -532,11 +513,10 @@ assert(chatGallerySource.includes("is-mobile"), 'gallery pagination must mark th
 assert(chatGallerySource.includes('aspectRatio'), 'gallery add/edit actions must stay 1:1 so the mobile header fits');
 
 assert(chatGallerySource.includes('legacyKeys: p.legacyKeys'), 'indexed legacy comment aliases must reach the lightbox');
-assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must initialize from the subscribed comment documents');
-assert(lightboxSource.includes('photoCommentsFetchRef'), 'lightbox comment fetch callback must stay stable across unrelated renders');
-assert(lightboxSource.includes('photoCommentsFetchedRef.current.delete(photoCommentKey)'), 'cancelled or failed comment requests must remain retryable');
+assert(lightboxSource.includes('subscribePhotoCommentThread({'), 'lightbox must read the photo thread live from its comment documents');
+assert(lightboxSource.includes('commentLookupToken'), 'lightbox must look the thread up under the canonical key and its legacy keys');
+assert(!lightboxSource.includes('onCommentsChange('), 'lightbox comments must never be saved as a whole rewritten thread');
 assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox comment reads must expose an inline retry action');
-assert(lightboxSource.includes('Promise.all(lookupKeys.map'), 'lightbox comment aliases must load in parallel instead of serially blocking date galleries');
 assert(lightboxSource.includes('currentVisualUrl') && lightboxSource.includes('loadedOriginalUrls'), 'lightbox must paint an available thumbnail until the original image finishes loading');
 assert(!summaryGallerySource.includes('const fallbackDate = entryDateStr(entry)'), 'memories must not treat upload time as schedule membership');
 const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
@@ -619,12 +599,12 @@ assert(galleryDataSource.includes('preferredHasExplicitTags'), 'gallery dedupe m
 assert(chatRenderSource.includes('entry.tags, photo?.tags'), 'meeting photo display must not blank album tags when message imageTags are empty');
 assert(imageTagSaveSource.includes('resolveMessagePhotoImageIndex(message'), 'tag saves must resolve the image by asset identity before using a stale gallery slot');
 assert(imageTagSaveSource.includes('imageTagMap: reconcileMessageImageTagMap'), 'tag saves must persist the asset-keyed tag map alongside legacy imageTags');
-const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
+const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comment-items.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
 assert(imageTagSaveSource.includes('invalidatePhotoIndexCache(activeCalId)'), 'tag saves must invalidate the gallery photoIndex cache');
 assert(imageTagSaveSource.includes("requirePersisted: true"), 'lightbox tag/comment writes must require durable persistence, not queue success');
-assert(lightboxSource.includes('[photoCommentKey]: previous'), 'failed comment saves must roll back optimistic lightbox state');
+assert(lightboxSource.includes('setOptimisticComments(null);'), 'failed comment saves must roll back optimistic lightbox state');
 assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
 assert(calendarViewsSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
