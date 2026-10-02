@@ -8,9 +8,9 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
 우리 사진은 업로드 때 WebP/JPEG로 다시 압축돼 파일명·EXIF가 원본과 다르다. 그래서 작은 썸네일끼리
 지각 해시(dHash 64bit)로 같은 사진을 찾는다. 날짜가 같은 사진끼리 먼저 비교해 오탐을 줄인다.
 
-    python3 -m pip install --user pillow            # 필수
-    python3 -m pip install --user osxphotos         # 맥 사진 앱을 쓸 때
-    python3 -m pip install --user pillow-heif       # 테이크아웃에 HEIC 사진이 있을 때
+    # Homebrew 파이썬은 pip --user 설치를 막으므로 전용 가상환경에 설치한다 (한 번만)
+    python3 -m venv ~/.venvs/photos && source ~/.venvs/photos/bin/activate
+    pip install pillow osxphotos pillow-heif   # pillow 필수, osxphotos는 사진 앱, pillow-heif는 HEIC
 
     # 1) 미리보기 (아무것도 바꾸지 않음): 어떤 사진에 어떤 이름이 붙을지 출력
     python3 tools/local-media-worker/import-people-tags.py --calendar cw --apple
@@ -33,7 +33,7 @@ from datetime import datetime, timedelta
 try:
     from PIL import Image
 except ImportError:
-    sys.exit("Pillow가 필요합니다:  python3 -m pip install --user pillow")
+    sys.exit("Pillow가 필요합니다:  source ~/.venvs/photos/bin/activate && pip install pillow")
 try:
     import pillow_heif  # noqa: F401  (registers HEIC support when installed)
     pillow_heif.register_heif_opener()
@@ -138,7 +138,7 @@ def from_apple():
     try:
         import osxphotos
     except ImportError:
-        sys.exit("osxphotos가 필요합니다:  python3 -m pip install --user osxphotos")
+        sys.exit("osxphotos가 필요합니다:  source ~/.venvs/photos/bin/activate && pip install osxphotos")
     db = osxphotos.PhotosDB()
     for p in db.photos():
         names = [n for n in (p.persons or []) if n and n != '_UNKNOWN_']
