@@ -2897,6 +2897,19 @@ function createPhotoCommentIdentityResolver(collection = []) {
   };
 }
 
+// Resolver cached per collection array: grids that render from a callback (no hooks) can ask
+// for a photo's comment identity without rescanning the collection for every thumbnail.
+const photoCommentResolverCache = new WeakMap();
+function getPhotoCommentIdentityFromList(photo, collection = [], opts = {}) {
+  if (!Array.isArray(collection)) return createPhotoCommentIdentityResolver([])(photo, opts);
+  let resolve = photoCommentResolverCache.get(collection);
+  if (!resolve) {
+    resolve = createPhotoCommentIdentityResolver(collection);
+    photoCommentResolverCache.set(collection, resolve);
+  }
+  return resolve(photo, opts);
+}
+
 function getPhotoCommentCount(identity = {}, counts = {}) {
   const keys = Array.from(new Set([
     identity?.mediaKey,
@@ -3269,6 +3282,7 @@ export {
   getMediaIdentityKeys,
   getPhotoCommentIdentity,
   createPhotoCommentIdentityResolver,
+  getPhotoCommentIdentityFromList,
   getPhotoAssetCommentKey,
   getPhotoCommentCount,
   getLegacyMeetingMediaKey,

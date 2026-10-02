@@ -3,6 +3,7 @@
  */
 
 import { LikeButton } from './like-button.js';
+import { getPhotoCommentIdentityFromList } from '../core/app-domain-helpers.js';
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
@@ -170,11 +171,29 @@ function MemoryCoverThumb({ photos }) {
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
-function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
-function getPhotoCommentIdentity(...args) {
-  const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
-  return typeof f === 'function' ? f(...args) : {};
+// React keys for one photo grid, unique within that grid: two rows of the same asset used to
+// share a key, and duplicate keys leave stale cells behind when the list changes. Cached per
+// photos array so each grid computes it once, not once per cell.
+const archiveCellKeyCache = new WeakMap();
+function archiveCellKey(photos, idx, tag, keyOf) {
+  if (!Array.isArray(photos)) return `${tag}_${idx}`;
+  let byTag = archiveCellKeyCache.get(photos);
+  if (!byTag) { byTag = new Map(); archiveCellKeyCache.set(photos, byTag); }
+  let keys = byTag.get(tag);
+  if (!keys) {
+    const seen = new Map();
+    keys = photos.map((photo, index) => {
+      const base = String(keyOf(photo, index) || `${tag}_${index}`);
+      const count = seen.get(base) || 0;
+      seen.set(base, count + 1);
+      return count ? `${base}#${count}` : base;
+    });
+    byTag.set(tag, keys);
+  }
+  return keys[idx] || `${tag}_${idx}`;
 }
+
+function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getPhotoCommentCount(...args) {
   const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
   return typeof f === 'function' ? f(...args) : 0;
@@ -775,7 +794,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         style: { display: 'grid', gap: '6px', marginTop: '12px' }
       },
         displayedEntries.map((entry, idx) => {
-          const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
+          const identity = getPhotoCommentIdentityFromList(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
           const commentCount = getPhotoCommentCount(identity, photoCommentCounts);
           return /*#__PURE__*/React.createElement("div", {
           key: entry.assetKey || entry.mediaKey || entry.refKey || entry.full || entry.thumb,
@@ -2628,12 +2647,12 @@ export function HistoryView({
     listKey: keyPrefix,
     photos,
     renderPhoto: (photo, idx) => {
-    const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
+    const identity = getPhotoCommentIdentityFromList(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
     const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
     const selectKey = selection ? archivePhotoSelectKey(photo, idx) : '';
     const isSelected = !!selection && selection.keys.has(selectKey);
     return /*#__PURE__*/React.createElement("button", {
-      key: photo.mediaKey || photo.refKey || `${keyPrefix}_${idx}`,
+      key: archiveCellKey(photos, idx, keyPrefix, (p, i) => p.mediaKey || p.refKey || `${keyPrefix}_${i}`),
       type: "button",
       className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
       onClick: (e) => selection ? selection.onToggle(selectKey, { shiftKey: Boolean(e?.shiftKey), index: idx, photos, key: selectKey }) : openHistoryLightbox(photos, idx),
@@ -3042,10 +3061,10 @@ export function HistoryView({
       const ids = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
       const photoKey = ids[0] || photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
       const isChecked = checkable && selectedKeys.has(photoKey);
-      const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
+      const identity = getPhotoCommentIdentityFromList(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
       const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
       return /*#__PURE__*/React.createElement("button", {
-        key: photoKey, type: "button",
+        key: archiveCellKey(photos, idx, `thumb:${keyPrefix}`, (p, i) => collectMemoryPhotoIdentityKeys(p, getPhotoAssetCommentKey)[0] || p.mediaKey || p.refKey || `${keyPrefix}${i}`), type: "button",
         className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
         onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
         style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }

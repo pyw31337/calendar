@@ -546,10 +546,13 @@ export function composeGalleryPhotos({
     });
   });
   const meetings = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings(calendar) : [];
+  // First message per id (same answer as Array.find), built once instead of per album photo.
+  const messagesById = new Map();
+  chatMessages.forEach(message => { if (message && message.id != null && !messagesById.has(message.id)) messagesById.set(message.id, message); });
   meetings.forEach(meeting => {
     (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach((photo, index) => {
       if (photo?.sourceMessageId) {
-        const source = chatMessages.find(message => message?.id === photo.sourceMessageId);
+        const source = messagesById.get(photo.sourceMessageId);
         if (source && typeof isTombstone === 'function' && isTombstone(source)) return;
       }
       const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
