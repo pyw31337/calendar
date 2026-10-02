@@ -46,6 +46,8 @@ export function PhotoBulkActionBar({
   onMoveToGroup = null,
   onApplyTags = null,
   onDeletePhotos = null,
+  // 'exclude' (보관함): the button only takes the selection out of this classification.
+  deleteMode = 'delete',
   showToast = null,
   onRequestConfirm = null,
   isSaving = false,
@@ -292,25 +294,32 @@ export function PhotoBulkActionBar({
           type: 'button',
           onClick: () => {
             const run = () => { void onDeletePhotos(); };
-            if (typeof onRequestConfirm === 'function') {
+            if (deleteMode === 'exclude') {
+              if (typeof onRequestConfirm === 'function') onRequestConfirm('분류에서 제외', `선택한 ${selectedCount}장을 이 분류에서 뺄까요? 사진은 지우지 않아요.`, run);
+              else run();
+            } else if (typeof onRequestConfirm === 'function') {
               onRequestConfirm('사진 삭제', `선택한 ${selectedCount}장의 사진을 삭제할까요?`, run);
             } else {
               run();
             }
           },
           disabled: isDeleting,
-          title: '선택한 사진 삭제',
+          title: deleteMode === 'exclude' ? '선택한 사진을 이 분류에서 제외' : '선택한 사진 삭제',
           style: {
             display: 'inline-flex', alignItems: 'center', gap: '4px',
             height: '30px', padding: '0 10px', borderRadius: 'var(--radius-sm, 6px)',
-            border: '1px solid #FCA5A5', background: 'rgba(239,68,68,0.08)',
-            color: '#EF4444', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer'
+            border: deleteMode === 'exclude' ? '1px solid var(--border-subtle)' : '1px solid #FCA5A5',
+            background: deleteMode === 'exclude' ? 'var(--bg-secondary)' : 'rgba(239,68,68,0.08)',
+            color: deleteMode === 'exclude' ? 'var(--text-main)' : '#EF4444',
+            fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer'
           }
         },
-          /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }),
-          isDeleting
-            ? (deleteProgress && deleteProgress.total ? `삭제 중… (${deleteProgress.current}/${deleteProgress.total})` : '삭제 중…')
-            : '삭제'
+          deleteMode !== 'exclude' && /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }),
+          deleteMode === 'exclude'
+            ? (isDeleting ? '저장 중…' : '분류에서 제외')
+            : (isDeleting
+              ? (deleteProgress && deleteProgress.total ? `삭제 중… (${deleteProgress.current}/${deleteProgress.total})` : '삭제 중…')
+              : '삭제')
         ),
         // Clear selection button
         onClearSelection && /*#__PURE__*/React.createElement('button', {

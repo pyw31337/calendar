@@ -1855,6 +1855,14 @@ export function WeatherDetailModal({
             (() => {
               const colWidth = 54;
               const totalWidth = hourlyList.length * colWidth;
+              // Today's current hour: a soft brand band behind its whole column (chart + icon +
+              // label), so "지금" reads at a glance on every tab.
+              const nowIndex = isToday ? hourlyList.findIndex(h => parseInt(h.time.split(':')[0], 10) === currentHourNum) : -1;
+              const nowBand = nowIndex >= 0 ? /*#__PURE__*/React.createElement("span", {
+                className: "weather-hourly-now-band",
+                "aria-hidden": "true",
+                style: { left: `${nowIndex * colWidth + 3}px`, width: `${colWidth - 6}px` }
+              }) : null;
 
               if (hourlyTab === 'weather') {
                 const temps = hourlyList.map(h => Number(h.temp ?? 0));
@@ -1871,8 +1879,9 @@ export function WeatherDetailModal({
                 const linePath = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
                 return /*#__PURE__*/React.createElement("div", {
-                  style: { width: `${totalWidth}px`, display: 'flex', flexDirection: 'column' }
+                  style: { width: `${totalWidth}px`, display: 'flex', flexDirection: 'column', position: 'relative' }
                 },
+                  nowBand,
                   /* SVG Curve Chart */
                   /*#__PURE__*/React.createElement("svg", {
                     width: totalWidth,
@@ -1933,7 +1942,7 @@ export function WeatherDetailModal({
                       const isNow = isToday && currentHourNum === hourNum;
                       return /*#__PURE__*/React.createElement("div", {
                         key: idx,
-                        className: "weather-hourly-col",
+                        className: `weather-hourly-col${isNow ? ' is-now' : ''}`,
                         style: {
                           width: `${colWidth}px`,
                           flex: '0 0 auto',
@@ -1948,6 +1957,7 @@ export function WeatherDetailModal({
                       },
                         /* Weather Icon */
                         /*#__PURE__*/React.createElement("div", {
+                          className: "weather-hourly-icon",
                           style: { height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
                         }, getWeatherIcon(h.code, 20)),
                         /* Hour label */
@@ -1966,15 +1976,16 @@ export function WeatherDetailModal({
 
               // 강수·바람·습도·대기·자외선: one column per hour -- value, bar, icon or grade, hour.
               const barColumns = (rowFor) => /*#__PURE__*/React.createElement("div", {
-                style: { display: 'flex', width: `${totalWidth}px` }
+                style: { display: 'flex', width: `${totalWidth}px`, position: 'relative' }
               },
+                nowBand,
                 hourlyList.map((h, idx) => {
                   const hourNum = parseInt(h.time.split(':')[0], 10);
                   const isNow = isToday && currentHourNum === hourNum;
                   const row = rowFor(h);
                   return /*#__PURE__*/React.createElement("div", {
                     key: idx,
-                    className: "weather-hourly-col",
+                    className: `weather-hourly-col${isNow ? ' is-now' : ''}`,
                     title: row.title,
                     style: {
                       width: `${colWidth}px`, flex: '0 0 auto', display: 'flex', flexDirection: 'column',

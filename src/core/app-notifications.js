@@ -245,7 +245,7 @@ function isNotificationSupported() {
     return true;
   }
   function getDefaultNotifyChannels() {
-    return { chat: true, memo: true, poll: true, schedule: true };
+    return { chat: true, comment: true, memo: true, poll: true, schedule: true };
   }
   function getNotifyChannels() {
     try {

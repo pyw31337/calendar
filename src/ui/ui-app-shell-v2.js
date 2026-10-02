@@ -265,7 +265,7 @@ export const MOBILE_BOTTOM_NAV_ITEMS = [
   { id: 'more', label: '더보기', icon: 'more' },
 ];
 
-export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
+export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab, chatSender = null }) {
   const React = window.React;
   return React.createElement(
     'nav',
@@ -311,7 +311,15 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab }) {
         React.createElement(
           'span',
           { className: bentoClass('mobile-bottom-nav-icon'), 'aria-hidden': 'true' },
-          React.createElement(TabIcon, { id: item.icon, active: isActive, size: 22 })
+          React.createElement(TabIcon, { id: item.icon, active: isActive, size: 22 }),
+          // 채팅: a text-free dot in the personal color of whoever sent the last chat message.
+          item.id === 'chat' && chatSender && chatSender.color
+            ? React.createElement('span', {
+                className: bentoClass('mobile-bottom-nav-sender-dot'),
+                style: { '--sender-color': chatSender.color },
+                title: chatSender.name || undefined
+              })
+            : null
         ),
         React.createElement('span', { className: bentoClass('mobile-bottom-nav-label') }, item.label)
       );
@@ -4421,6 +4429,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement(MobileBottomNav, {
         activeTab,
         isSideNavOpen,
+        chatSender: lastChatMsg ? { color: chatAuthorPart?.color || '', name: lastChatAuthor } : null,
         onSelectTab: (tabId) => {
           if (tabId === 'more') {
             setIsSideNavOpen(prev => !prev);

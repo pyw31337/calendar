@@ -637,7 +637,8 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
     // Content search (and similar) fades tabs with 0 hits so empty categories read as inactive
     // without removing them from the bar -- mirrors the muted empty-state copy inside those tabs.
     const isFaded = !!opt.faded;
-    const showBadge = badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0')) && (!isDotBadge || Number(badge) > 0);
+    // A number count shows only on the active tab (every screen); dot badges stay on all tabs.
+    const showBadge = (isDotBadge || isActive || opt.badgeAlways === true) && badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0')) && (!isDotBadge || Number(badge) > 0);
     // A tab label is not a badge.  Give it its own hook so event-sheet labels can use the
     // readable tab type scale while numeric counts retain the compact badge treatment.
     // The populated-state dot is a CSS pseudo-element; its shared dimensions live in V2

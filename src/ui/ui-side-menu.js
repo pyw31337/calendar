@@ -37,6 +37,7 @@ export function AppSettingsModal({
   const BellIcon = __deps.BellIcon;
   const channels = [
     { key: 'chat', label: '채팅 알림' },
+    { key: 'comment', label: '댓글 알림' },
     { key: 'memo', label: '메모 알림' },
     { key: 'poll', label: '투표 알림' },
     { key: 'schedule', label: '일정 알림' }

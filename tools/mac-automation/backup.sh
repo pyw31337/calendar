@@ -6,6 +6,8 @@
 #   tools/mac-automation/backup.sh --with-secrets   # 키체인 토큰·.env 파일도 암호를 걸어 함께 (이관할 때)
 #   tools/mac-automation/backup.sh --install-weekly # 매주 일요일 새벽 4시 자동 백업 켜기 (비밀값 제외)
 #   tools/mac-automation/backup.sh --uninstall-weekly
+#   tools/mac-automation/backup.sh --auto             # 어드민 '맥 백업' 버튼이 부르는 방식: 비밀값까지, 암호는 키체인에서
+#   tools/mac-automation/backup.sh --print-passphrase # --auto 백업의 암호 보기 (새 맥으로 옮길 때 필요)
 #
 # 담는 것: ~/Library/LaunchAgents의 우리 자동 실행 설정, crontab, ~/Library/Application Support/Moyeora
 # (사진 분석 설정·상태·얼굴 데이터), ~/Developer 저장소 목록(주소·브랜치·커밋), 파이썬 가상환경 패키지 목록,
@@ -31,9 +33,17 @@ WEEKLY_PLIST="$HOME/Library/LaunchAgents/$WEEKLY_LABEL.plist"
 
 WITH_SECRETS=0
 QUIET=0
+AUTO=0
+PASSPHRASE_SERVICE="Moyeora Backup Passphrase"
+PASSPHRASE_CREATED=0
+RESULT_JSON="$SUPPORT_DIR/mac-backup-latest.json"
 for arg in "$@"; do
   case "$arg" in
     --with-secrets) WITH_SECRETS=1 ;;
+    --auto) AUTO=1; WITH_SECRETS=1; QUIET=1 ;;
+    --print-passphrase)
+      if /usr/bin/security find-generic-password -a "$USER" -s "$PASSPHRASE_SERVICE" -w 2>/dev/null; then exit 0; fi
+      print -u2 "아직 자동 백업 암호가 없습니다. 어드민 '맥 백업'에서 한 번 백업하면 만들어집니다."; exit 1 ;;
     --quiet) QUIET=1 ;;
     --install-weekly)
       mkdir -p "${WEEKLY_PLIST:h}" "$SUPPORT_DIR"
@@ -67,6 +77,18 @@ PLIST
 done
 
 say() { (( QUIET )) || print -- "$@"; }
+
+# --auto: the passphrase lives in this Mac's Keychain (made once, 32 random bytes), so a backup
+# started from the admin page needs nobody at the keyboard and always includes the secrets.
+if (( AUTO )) && [[ -z "${MOYEORA_BACKUP_PASSPHRASE:-}" ]]; then
+  if ! MOYEORA_BACKUP_PASSPHRASE="$(/usr/bin/security find-generic-password -a "$USER" -s "$PASSPHRASE_SERVICE" -w 2>/dev/null)"; then
+    MOYEORA_BACKUP_PASSPHRASE="$(/usr/bin/openssl rand -base64 32 | /usr/bin/tr -d '\n')"
+    /usr/bin/security add-generic-password -a "$USER" -s "$PASSPHRASE_SERVICE" -w "$MOYEORA_BACKUP_PASSPHRASE" -U
+    PASSPHRASE_CREATED=1
+  fi
+  export MOYEORA_BACKUP_PASSPHRASE
+  PASS_ARGS=(-pass env:MOYEORA_BACKUP_PASSPHRASE)
+fi
 
 STAMP="$(/bin/date +%Y%m%d-%H%M)"
 HOST="$(/usr/sbin/scutil --get LocalHostName 2>/dev/null || /bin/hostname -s)"
@@ -176,3 +198,20 @@ if (( ${#warn_repos} )); then
   for w in $warn_repos; do say "    - $w"; done
 fi
 if (( ! WITH_SECRETS && ${#secret_files} > 0 )); then say "  .env 같은 비밀 파일 ${#secret_files}개는 빠졌습니다. 이관할 때는 --with-secrets 로 한 번 더 백업하세요."; fi
+
+# Summary for the admin page (no secret in it): what was saved, where, and what needs attention.
+json_str() { local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; print -rn -- "\"$v\""; }
+{
+  print -n '{"ok":true,"at":'"$(( $(/bin/date +%s) * 1000 ))"
+  print -n ',"file":'; json_str "${ARCHIVE:t}"
+  print -n ',"folder":'; json_str "${DEST_ROOT/#$HOME/~}"
+  print -n ',"sizeBytes":'"$(/usr/bin/stat -f %z "$ARCHIVE")"
+  print -n ',"withSecrets":'"$( (( WITH_SECRETS )) && print true || print false )"
+  print -n ',"agents":'"${agents:-0}"',"repos":'"$(( $(/usr/bin/wc -l < "$WORK/repos.tsv") - 1 ))"
+  print -n ',"host":'; json_str "$HOST"
+  print -n ',"passphraseCreated":'"$( (( PASSPHRASE_CREATED )) && print true || print false )"
+  print -n ',"warnings":['
+  first=1; for w in $warn_repos; do (( first )) || print -n ','; first=0; json_str "GitHub에 안 올린 작업: $w"; done
+  print ']}'
+} > "$RESULT_JSON"
+if (( AUTO )); then print -r -- "$ARCHIVE"; fi

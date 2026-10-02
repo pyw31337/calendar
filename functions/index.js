@@ -543,16 +543,32 @@ exports.onAnniversaryPhotoIndexWrite = functions.firestore
 
 // Photo comments v2 (photo-comment-items.js): one document per comment; this trigger keeps the
 // photo's count in the summary doc (thumbnail badges) and on its photoIndex row.
-exports.onPhotoCommentItemWrite = functions.firestore
+// A newly written photo comment also goes out as a 댓글 notification (channel: comment), never
+// to its author and never for comments copied in by the migration.
+exports.onPhotoCommentItemWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/photoCommentItems/{commentId}')
   .onWrite(async (change, context) => {
-    const keys = photoCommentItems.assetKeysToRecount(
-      change.before.exists ? change.before.data() : null,
-      change.after.exists ? change.after.data() : null
-    );
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    const keys = photoCommentItems.assetKeysToRecount(before, after);
     for (const key of keys) {
       await photoCommentItems.recountAsset(admin.firestore(), admin, context.params.calendarDocId, key);
     }
+    if (before || !after || after.migratedFrom || after.deletedAt != null) return null;
+    const calendarDocId = context.params.calendarDocId;
+    const claimKey = `photo-comment:${context.params.commentId}`;
+    if (!(await claimPushDelivery(calendarDocId, claimKey))) return null;
+    const calendarSnap = await admin.firestore().collection('calendars').doc(calendarDocId).get();
+    const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
+    const named = participants.find(person => person && person.id === after.participantId);
+    const author = (named && named.name) || '참여자';
+    await broadcastCalendarPush(calendarDocId, {
+      title: `${author}의 사진 댓글`,
+      body: String(after.text || '').slice(0, 120),
+      url: buildPushTargetUrl(calendarDocId, { view: 'gallery' }),
+      tag: `photo-comment-${calendarDocId}-${context.params.commentId}`,
+      renotify: false
+    }, { skipParticipantId: after.participantId || null, channel: 'comment' });
     return null;
   });
 
@@ -672,7 +688,7 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   ensureVapidConfigured();
   const db = admin.firestore();
   const skipParticipantId = options.skipParticipantId || null;
-  const channel = options.channel || 'chat'; // chat | memo | poll | schedule
+  const channel = options.channel || 'chat'; // chat | comment | memo | poll | schedule
   // Cap fan-out so a compromised/abnormally large subscription set cannot create an
   // unbounded push-send and Firestore-write bill in one trigger invocation.
   const subSnap = await db.collection('calendars').doc(calendarDocId).collection('push_subscriptions').limit(500).get();
@@ -912,7 +928,7 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
       }),
       tag: `memo-${calendarDocId}-${decision.tag}`,
       renotify: false
-    }, { skipParticipantId: decision.skipParticipantId, channel: 'memo' });
+    }, { skipParticipantId: decision.skipParticipantId, channel: decision.kind === 'comment' ? 'comment' : 'memo' });
   });
 
 // Meeting confirmed (the 확정 button, not a settlement/participant edit) → schedule channel.
@@ -2617,7 +2633,7 @@ exports.listPushSubscriptionHealth = functions.https.onRequest(async (req, res) 
   try {
     const snap = await admin.firestore().collection('calendars').doc(`cal_${calendarId}`).collection('push_subscriptions').limit(1000).get();
     const now = Date.now();
-    const summary = { total: snap.size, active: 0, stale30d: 0, sent: 0, failed: 0, channels: { chat: 0, memo: 0, poll: 0, schedule: 0 } };
+    const summary = { total: snap.size, active: 0, stale30d: 0, sent: 0, failed: 0, channels: { chat: 0, comment: 0, memo: 0, poll: 0, schedule: 0 } };
     snap.forEach(doc => {
       const data = doc.data() || {};
       if (data.lastPushStatus === 'sent') summary.sent += 1;
@@ -2757,6 +2773,65 @@ function hasValidMediaWorkerToken(req) {
   const right = Buffer.from(expected, 'utf8');
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
+
+// 맥 백업 (어드민 '맥 백업' 탭): the admin asks for a backup; the Mac picks the request up on
+// its next 15-minute check (macWorkerSync, worker token) and reports the result back. Only a
+// timestamp and the backup summary are stored -- never a key, passphrase or file content.
+const MAC_BACKUP_DOC = () => admin.firestore().collection('adminOps').doc('macBackup');
+
+function sanitizeMacBackupResult(raw = {}) {
+  const text = (value, max) => String(value == null ? '' : value).slice(0, max);
+  const num = value => (Number.isFinite(Number(value)) ? Number(value) : 0);
+  return {
+    ok: raw.ok === true,
+    at: num(raw.at) || Date.now(),
+    file: text(raw.file, 300),
+    folder: text(raw.folder, 300),
+    sizeBytes: num(raw.sizeBytes),
+    withSecrets: raw.withSecrets === true,
+    agents: num(raw.agents),
+    repos: num(raw.repos),
+    host: text(raw.host, 80),
+    warnings: (Array.isArray(raw.warnings) ? raw.warnings : []).slice(0, 20).map(item => text(item, 200)),
+    error: text(raw.error, 500),
+    passphraseCreated: raw.passphraseCreated === true
+  };
+}
+
+exports.macBackupAdmin = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, action } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  const ref = MAC_BACKUP_DOC();
+  if (action === 'request') {
+    await ref.set({ requestedAt: Date.now() }, { merge: true });
+  }
+  const snap = await ref.get();
+  res.status(200).json({ ok: true, state: snap.exists ? snap.data() : {} });
+});
+
+exports.macWorkerSync = functions.runWith({ secrets: [MEDIA_WORKER_TOKEN] }).https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  if (!hasValidMediaWorkerToken(req)) { res.status(401).json({ ok: false }); return; }
+  const ref = MAC_BACKUP_DOC();
+  const update = { lastSeenAt: Date.now() };
+  if (req.body?.backup && typeof req.body.backup === 'object') {
+    update.lastResult = sanitizeMacBackupResult(req.body.backup);
+    update.handledRequestAt = Number(req.body.handledRequestAt) || 0;
+  }
+  await ref.set(update, { merge: true });
+  const snap = await ref.get();
+  const data = snap.data() || {};
+  const pending = Number(data.requestedAt || 0) > Number(data.handledRequestAt || 0);
+  res.status(200).json({ ok: true, backupRequestedAt: pending ? Number(data.requestedAt) : 0 });
+});
 
 // Receives metadata generated by the opted-in macOS worker.  It deliberately accepts no image
 // bytes or arbitrary URLs: originals remain in Firebase Storage, and a result can only reference

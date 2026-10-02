@@ -128,7 +128,14 @@ if [[ -f "$SRC/secrets.tar.gz.enc" ]]; then
     print "  [미리보기] 암호를 물어보고 토큰·.env 를 복원"
   else
     SECRETS="$TMP/secrets"; mkdir -p "$SECRETS"
-    print "  백업할 때 정한 암호를 입력하세요."
+    # Same Mac (or its Keychain restored): the --auto backup passphrase is already there.
+    if (( ${#PASS_ARGS} == 0 )) && MOYEORA_BACKUP_PASSPHRASE="$(/usr/bin/security find-generic-password -a "$USER" -s "Moyeora Backup Passphrase" -w 2>/dev/null)"; then
+      export MOYEORA_BACKUP_PASSPHRASE; PASS_ARGS=(-pass env:MOYEORA_BACKUP_PASSPHRASE)
+      print "  이 맥 키체인의 자동 백업 암호를 씁니다."
+    else
+      print "  백업 암호를 입력하세요. 어드민 버튼으로 만든 백업이면 옛 맥에서"
+      print "  'zsh ~/Developer/calendar/tools/mac-automation/backup.sh --print-passphrase' 로 본 암호입니다."
+    fi
     /usr/bin/openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 "${PASS_ARGS[@]}" -in "$SRC/secrets.tar.gz.enc" | /usr/bin/tar -C "$SECRETS" -xzf -
     if [[ -f "$SECRETS/media-worker-token" ]]; then
       service="$(<"$SECRETS/media-worker-token.service")"

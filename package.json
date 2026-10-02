@@ -26,6 +26,7 @@
     "ops:integrity-repair": "node scripts/repair-media-integrity.mjs",
     "ops:repair-tag-divergence": "node scripts/repair-tag-divergence.mjs",
     "ops:apply-tag-suggestions": "node scripts/apply-tag-suggestions.mjs",
+    "ops:restore-archive-deleted-photos": "node scripts/restore-archive-deleted-photos.mjs",
     "test:functions:emulator": "npx --yes firebase-tools@14 emulators:exec --project demo-moyeora --only firestore,storage \"node --test functions/test/media-commands.emulator.test.js functions/test/rules-image-geo.emulator.test.js functions/test/rules-likes.emulator.test.js functions/test/photo-comment-items.emulator.test.js\"",
     "ops:gallery-contract-audit": "node scripts/firebase-gallery-contract-audit.mjs",
     "ops:repair-meeting-photo-refs": "node scripts/firebase-repair-meeting-photo-refs.mjs",

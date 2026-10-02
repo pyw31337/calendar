@@ -1,8 +1,8 @@
 /**
  * Which image file a surface should request.
  *
- * Chat uploads keep three objects: original, 512px chat thumb, 160px small thumb.
- * Calendar, gallery, memo, and meeting uploads keep two: original + small thumb.
+ * Chat and memo uploads keep three objects: original, 512px card/bubble thumb, 160px small thumb.
+ * Calendar, gallery, and meeting uploads keep two: original + small thumb.
  * Chat vs other is uploadSource / message channel, never the URL host.
  * Grids may derive the small object from a Storage original path so a new
  * Firestore field is not required for the request.
