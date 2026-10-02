@@ -30,6 +30,8 @@ on:
           - restore-bulk-deleted-photos
           - restore-memo-files-dry-run
           - restore-memo-files
+          - reattach-photo-comments-dry-run
+          - reattach-photo-comments
       delete_us_copies:
         description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
@@ -181,4 +183,17 @@ jobs:
           node scripts/restore-bulk-deleted-photos.mjs
           if [ "${{ inputs.post_deploy }}" = "restore-bulk-deleted-photos" ] || [ "${{ inputs.post_deploy }}" = "restore-memo-files" ]; then
             APPLY=1 node scripts/restore-bulk-deleted-photos.mjs
+          fi
+      # scripts/reattach-photo-comments.mjs: comments filed under a key no photo has go back to
+      # the photo they were written on (assetKey only; text and authors stay).
+      - name: Re-attach photo comments
+        if: startsWith(inputs.post_deploy, 'reattach-photo-comments')
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          node scripts/reattach-photo-comments.mjs
+          if [ "${{ inputs.post_deploy }}" = "reattach-photo-comments" ]; then
+            APPLY=1 node scripts/reattach-photo-comments.mjs
           fi

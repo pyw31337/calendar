@@ -74,13 +74,15 @@ async function pool(items, worker) {
 async function auditCalendar(calendarId) {
   const base = `calendars/cal_${calendarId}`;
   const [index, messages, meetings, memos, comments] = await Promise.all(
-    ['photoIndex', 'messages', 'confirmedMeetings', 'memos', 'photoComments'].map(name => listAll(`${base}/${name}`))
+    // Comments live one-per-document in photoCommentItems (photo comments v2); the old
+    // photoComments threads are a read-only record and no longer what the app shows.
+    ['photoIndex', 'messages', 'confirmedMeetings', 'memos', 'photoCommentItems'].map(name => listAll(`${base}/${name}`))
   );
   const sources = { message: new Map(messages.map(d => [d.id, docUrls(d)])), memo: new Map(memos.map(d => [d.id, docUrls(d)])), meeting: new Map(meetings.map(m => [m.id, meetingUrls(m)])) };
 
   const report = {
     calendarId,
-    documents: { photoIndex: index.length, messages: messages.length, meetings: meetings.length, memos: memos.length, photoComments: comments.length },
+    documents: { photoIndex: index.length, messages: messages.length, meetings: meetings.length, memos: memos.length, photoCommentItems: comments.length },
     deadIndexRows: 0, sourceRefsToMissingFiles: 0, staleIndexOwners: 0, indexOwners: 0,
     photosWithCopies: 0, copiesWithDifferentTags: 0, messagesWithPositionalTagsOnly: 0,
     positionalCommentThreads: 0, orphanCommentThreads: 0,
@@ -132,13 +134,14 @@ async function auditCalendar(calendarId) {
 
   const assetKeys = new Set(index.map(r => r.id));
   const legacyKeys = new Set(index.flatMap(r => r.legacyKeys || []));
-  comments.forEach(c => {
-    if (!Array.isArray(c.comments) || !c.comments.length) return;
-    const isAsset = c.id.startsWith('asset:v1:');
+  const threads = new Map();
+  comments.filter(c => c.deletedAt == null && c.assetKey).forEach(c => threads.set(c.assetKey, (threads.get(c.assetKey) || 0) + 1));
+  threads.forEach((count, key) => {
+    const isAsset = key.startsWith('asset:v1:');
     if (!isAsset) report.positionalCommentThreads += 1;
-    if (isAsset ? !assetKeys.has(c.id) : !legacyKeys.has(c.id)) {
+    if (isAsset ? !assetKeys.has(key) : !legacyKeys.has(key)) {
       report.orphanCommentThreads += 1;
-      if (report.samples.orphanComments.length < 10) report.samples.orphanComments.push(`${c.id} (${c.comments.length})`);
+      if (report.samples.orphanComments.length < 10) report.samples.orphanComments.push(`${key} (${count})`);
     }
   });
   // Classification only. This script never writes, and it must not: photoIndex is
