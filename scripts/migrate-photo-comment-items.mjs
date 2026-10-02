@@ -63,3 +63,6 @@ for (const id of await calendarDocIds()) {
 }
 const total = reports.reduce((acc, r) => ({ comments: acc.comments + r.comments, created: acc.created + r.created, existing: acc.existing + r.existing }), { comments: 0, created: 0, existing: 0 });
 console.log(`${APPLY ? 'APPLIED' : 'DRY-RUN'}: ${reports.length} calendars, ${total.comments} old comments, ${total.created} ${APPLY ? 'created' : 'to create'}, ${total.existing} already migrated.`);
+// The admin SDK keeps its connection open; end explicitly so the workflow step finishes.
+await db.terminate();
+process.exit(0);
