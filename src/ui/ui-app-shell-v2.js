@@ -2666,7 +2666,7 @@ function DestinationLoadingSurface({ shape = 'page' }) {
     chat: ['is-search', 'bubble', 'bubble', 'bubble', 'bubble'],
     memo: ['is-search', 'is-tabs', 'card', 'card', 'card'],
     places: ['is-search', 'is-hero', 'row', 'row', 'row'],
-    gallery: ['is-tabs', 'photo', 'photo'],
+    gallery: ['is-tabs', 'photo'],
     settlement: ['is-tabs', 'is-hero', 'row', 'row', 'row'],
     page: ['is-title', 'is-card', 'row', 'row', 'row', 'row'],
   }[shape] || ['is-title', 'is-card', 'row', 'row', 'row', 'row'];
@@ -2682,7 +2682,7 @@ function DestinationLoadingSurface({ shape = 'page' }) {
     if (kind === 'card') return React.createElement('div', { key: index, className: 'bp-skel-block is-card', 'aria-hidden': 'true' });
     if (kind === 'photo') {
       return React.createElement('div', { key: index, className: 'bp-skel-photo-grid', 'aria-hidden': 'true' },
-        Array.from({ length: 6 }, (_, cell) => React.createElement('span', { key: cell, className: 'bp-skel-thumb' }))
+        Array.from({ length: shape === 'gallery' ? 24 : 6 }, (_, cell) => React.createElement('span', { key: cell, className: 'bp-skel-thumb' }))
       );
     }
     return React.createElement('div', { key: index, className: `bp-skel-block ${kind}`, 'aria-hidden': 'true' });
