@@ -7610,3 +7610,27 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn:not(.is-l
 html:has(.renewal-shell.v2-design) .gallery-link-grid .gallery-like-card > :first-child,
 html:has(.renewal-shell.v2-design) .gallery-file-grid .gallery-like-card > :first-child { padding-right: 46px !important; box-sizing: border-box; }
 html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn:not(.is-liked) { color: var(--text-light, #94A3B8); }
+
+/* Side menu head: calendar name, then the participant chosen on this device in their own color
+ * (core/current-participant.js). The badge is a button -- tapping it switches participant. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-head .bp-side-nav-cal-badge.bp-side-nav-participant-badge {
+  background: var(--participant-color, #94A3B8) !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  margin-left: 8px !important;
+  margin-right: auto;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-head .bp-side-nav-brand {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-head .bp-side-nav-brand-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

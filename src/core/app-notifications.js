@@ -126,6 +126,11 @@ function isNotificationSupported() {
     if (!participantId) return;
     if (calId) getLocalStorage().setItem(getChatParticipantPrefKey(calId), participantId);
     getLocalStorage().setItem('gather_active_participant_id_v20', participantId);
+    // One device-wide 참여자 (core/current-participant.js): chat, memo, comments, likes and the
+    // side menu badge all follow this choice.
+    try {
+      window.dispatchEvent(new CustomEvent('gather:participant-change', { detail: { calId: calId || '', participantId } }));
+    } catch (_) {}
   }
 
   function describePushSubscribeFailure(reason) {

@@ -324,6 +324,7 @@ import {
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue, shouldQueueCalendarWriteFailure, replayQueuedCalendarWrite } from './app-write-queue.js';
 import { useAppFeedbackState } from './app-feedback-state.js';
+import { useParticipantSync } from './current-participant.js';
 // window.GATHER_APP_FIREBASE_DATA was never assigned anywhere in this codebase -- these two
 // vars were a permanently-null dead snapshot from module-eval time onward, which meant every
 // `if (!firebaseDb)` check below saw the SDK as "unavailable" forever and fell back to its
@@ -1366,6 +1367,8 @@ function CalendarApp() {
       }
     }
   }, [activeCalId, activeCal]);
+  // A participant chosen anywhere else (side menu badge, memo composer, comments) is the chat's too.
+  useParticipantSync(React, activeCalId, setChatParticipantId);
 
   // Live chat window, gallery live window and the stalled-listener watchdog: useChatMessageWindow.
 

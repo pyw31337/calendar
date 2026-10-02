@@ -16,6 +16,7 @@ import {
 } from './v2/shell-nav.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { syncThemeColor } from './v2/theme-color-sync.js';
+import { subscribeParticipantChange } from '../core/current-participant.js';
 
 const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
 
@@ -2434,14 +2435,9 @@ export function buildRenewalChatContext(calendar, deps) {
     onJumpToChatMessage: handleJumpToChatMessage,
     onSelectChatParticipant: id => {
       setChatParticipantId?.(id);
-      if (activeCalId) {
-        setStoredChatParticipantId?.(activeCalId, id);
-        try {
-          if (typeof syncPushSubscriptionParticipant === 'function') {
-            syncPushSubscriptionParticipant(activeCalId, id);
-          }
-        } catch (_) {}
-      }
+      // Storing it broadcasts the change (core/current-participant.js); RenewalAppShell moves the
+      // push subscription to the new participant for every picker, this one included.
+      if (activeCalId) setStoredChatParticipantId?.(activeCalId, id);
     },
     editingMessage,
     onSaveEditMessage: handleSaveEditMessage,
@@ -3686,6 +3682,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // returns before that host, so use one local host and route every V2 feature tree to it.
   // This keeps the existing Lightbox component/behaviour instead of maintaining another popup.
   const [activeV2Lightbox, setActiveV2Lightbox] = React.useState(null);
+  const [isParticipantPickerOpen, setIsParticipantPickerOpen] = React.useState(false);
+  // Whoever is chosen -- side menu badge, chat, memo or comment picker -- also receives this
+  // device's push notifications (and is skipped for their own messages).
+  React.useEffect(() => subscribeParticipantChange(({ calId, participantId }) => {
+    if (!participantId || (calId && activeCalId && calId !== activeCalId)) return;
+    try {
+      if (typeof syncPushSubscriptionParticipant === 'function') syncPushSubscriptionParticipant(calId || activeCalId, participantId);
+    } catch (_) {}
+  }), [activeCalId]);
   const openV2Lightbox = React.useCallback(payload => setActiveV2Lightbox(payload || null), []);
   const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
   const [isSideNavOpen, setIsSideNavOpen] = React.useState(false);
@@ -4220,17 +4225,22 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           className: bentoClass('side-nav-brand-icon'),
           'aria-hidden': 'true',
         }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: bentoClass('side-nav-brand-text') }, '모여라 캘린더'),
-        (() => {
-          const calBadge = cleanCalBadge(calendarName);
-          return calBadge
-            ? React.createElement('span', {
-                className: bentoClass('side-nav-cal-badge'),
-                title: calBadge,
-              }, calBadge)
-            : null;
-        })()
+        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: cleanCalBadge(calendarName) || '모여라 캘린더' }, cleanCalBadge(calendarName) || '모여라 캘린더')
       ),
+      // 지금 이 기기에서 쓰는 참여자 (core/current-participant.js). Tap to switch; chat, memo,
+      // comments and likes all follow.
+      (() => {
+        const currentId = chatContext?.chatRoomProps?.chatParticipantId;
+        const current = participants.find(p => p && p.id === currentId && !p.deletedAt && !p.removedAt);
+        return React.createElement('button', {
+          type: 'button',
+          className: bentoClass('side-nav-cal-badge side-nav-participant-badge'),
+          style: { '--participant-color': current?.color || '#94A3B8' },
+          title: current ? `${current.name} (눌러서 참여자 바꾸기)` : '참여자 선택',
+          'aria-label': current ? `지금 참여자 ${current.name}, 눌러서 바꾸기` : '참여자 선택',
+          onClick: () => setIsParticipantPickerOpen(true),
+        }, current ? shortParticipantName(current.name) : '참여자 선택');
+      })(),
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'x' })
       )
@@ -4502,6 +4512,20 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     // v2 returns before app-main's withStickyVideo(), which is the only place ConfirmDialog
     // used to mount. Without this, showConfirmDialog() updates state that nothing renders
     // (anniversary delete, participant delete, poll delete, ...).
+    // ParticipantSelectSheet (ui-shared.js) is part of the first bundle, unlike the chat chunk's
+    // ChatParticipantSheet, so the side menu badge works before 채팅 has ever been opened.
+    isParticipantPickerOpen && window.GATHER_UI_COMPONENTS?.ParticipantSelectSheet && React.createElement(window.GATHER_UI_COMPONENTS.ParticipantSelectSheet, {
+      calendar: chatContext?.calendar || calendar,
+      title: '지금 참여자',
+      isOptionSelected: id => id === chatContext?.chatRoomProps?.chatParticipantId,
+      selectedLabel: '선택됨',
+      disableSelected: true,
+      onSelect: id => {
+        chatContext?.onSelectChatParticipant?.(id);
+        setIsParticipantPickerOpen(false);
+      },
+      onClose: () => setIsParticipantPickerOpen(false),
+    }),
     confirmDialog && React.createElement(bindUiComponentAliases(React).ConfirmDialog, {
       title: confirmDialog.title,
       message: confirmDialog.message,

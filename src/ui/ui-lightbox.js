@@ -3,6 +3,7 @@
  */
 
 import { resolveLightboxPhotoOrigin } from './lightbox-photo-origin.js';
+import { useParticipantSync } from '../core/current-participant.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -112,6 +113,7 @@ function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar
   const comments = optimisticComments != null ? optimisticComments : commentsProp;
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
+  useParticipantSync(React, calendar?.id, setCommentParticipantId);
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const [isSavingComment, setIsSavingComment] = React.useState(false);

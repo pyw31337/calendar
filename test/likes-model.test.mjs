@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { LIKE_KINDS, buildLikeDocument, groupLikesByKind, likeDocId, photoLikeItem } from '../src/core/likes-model.js';
+import { splitLikesForParticipant } from '../src/core/likes-model.js';
 
 test('like document ids are stable, kind-prefixed and match the rules pattern', async () => {
   const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
@@ -39,4 +40,28 @@ test('photo likes keep what the lightbox needs to reopen the photo', () => {
   assert.equal(item.ref, 'asset:1');
   assert.equal(item.url, 'https://x/f.jpg');
   assert.equal(item.target.imageIndex, 2);
+});
+
+test('likes are per participant: different ids for different people, legacy id unchanged', () => {
+  const shared = likeDocId('photo', 'asset:v1:a');
+  const yuri = likeDocId('photo', 'asset:v1:a', 'p_yuri');
+  const youngwoo = likeDocId('photo', 'asset:v1:a', 'p_youngwoo');
+  assert.match(shared, /^photo_[0-9a-f]{16}$/);
+  assert.match(yuri, /^photo_[0-9a-f]{16}_p[0-9a-f]{8}$/);
+  assert.notEqual(yuri, youngwoo);
+  assert.equal(yuri.slice(0, shared.length), shared);
+  assert.equal(buildLikeDocument({ kind: 'photo', ref: 'r' }, 1, 'p_yuri').participantId, 'p_yuri');
+  assert.equal('participantId' in buildLikeDocument({ kind: 'photo', ref: 'r' }, 1), false);
+});
+
+test('mine is only my likes; all merges everyone per liked thing with who liked it', () => {
+  const likes = [
+    { id: '1', kind: 'photo', ref: 'a', participantId: 'p1', likedAt: 1 },
+    { id: '2', kind: 'photo', ref: 'a', participantId: 'p2', likedAt: 3 },
+    { id: '3', kind: 'memo', ref: 'm', participantId: 'p2', likedAt: 2 },
+    { id: '4', kind: 'place', ref: 'x', likedAt: 5 },
+  ];
+  const { mine, all } = splitLikesForParticipant(likes, 'p1');
+  assert.deepEqual(mine.map(l => l.id), ['1']);
+  assert.deepEqual(all.map(l => [l.kind, l.likerIds]), [['place', []], ['photo', ['p2', 'p1']], ['memo', ['p2']]]);
 });
