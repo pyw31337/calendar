@@ -2531,6 +2531,20 @@ html:has(.renewal-shell.v2-design) .place-card-row.is-focused {
   box-shadow: 0 0 0 4px rgb(var(--a-brand-rgb, 124 47 229) / 0.18) !important;
 }
 
+/* One highlight per target. Deep links (알림 탭, 출처 이동, 검색) mark both a row and the bubble
+ * or comment inside it, so the row drew a second, square frame around the bubble. When a focused
+ * element contains another focused one, only the innermost keeps the frame and the shake.
+ * (Doubled class + .renewal-shell: must beat color-themes.css's background rule.) */
+html:has(.renewal-shell.v2-design) .renewal-shell .chat-search-focused-bubble.chat-search-focused-bubble:has(.chat-search-focused-bubble, .search-result-focus),
+html:has(.renewal-shell.v2-design) .renewal-shell .search-result-focus.search-result-focus:has(.chat-search-focused-bubble, .search-result-focus),
+html:has(.renewal-shell.v2-design) .renewal-shell .place-card-row.is-focused:has(.chat-search-focused-bubble, .search-result-focus) {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  animation: none !important;
+}
+
 /* Memo focus: no outer rectangle border, no multi-layer borders, clean 1px solid border on the card itself */
 html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.v2-memo-card-is-focused,
 html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.chat-search-focused-bubble,
@@ -2550,10 +2564,11 @@ html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble 
   box-shadow: none !important;
   outline: none !important;
 }
-html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-memo-card-contract,
-html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-contract,
-html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused .v2-memo-card-contract,
-html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract {
+/* A focused comment inside the memo is the target then: the card stays unframed. */
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)) {
   border: 1px solid var(--brand, #7C3AED) !important;
   background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
   box-shadow: none !important;
