@@ -486,14 +486,19 @@ const photoActionsSource = fs.readFileSync(new URL('../src/core/app-calendar-pho
 const calendarViewsSource = fs.readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
-const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
+// The gallery page spans ui-chat-gallery.js (view) and gallery-collections.js (its 사진/링크/파일
+// lists, split out in the 2026-10 rewrite), so these pins read both.
+const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8')
+  + fs.readFileSync(new URL('../src/core/gallery-collections.js', import.meta.url), 'utf8');
 const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
 const summaryGallerySource = fs.readFileSync(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
 assert(lightboxSource.includes('isMeetingMessageTagTarget'), 'meeting message uploads must expose per-photo tag controls');
 assert(lightboxSource.includes('toTagImageIndex'), 'lightbox tag save must coerce photo-index imageIndex values');
 assert(lightboxSource.includes('태그를 입력해 주세요'), 'empty lightbox tag save must show a toast instead of no-op');
 assert(imageTagSaveSource.includes('const toIndex'), 'image tag persistence must coerce non-integer imageIndex values');
-assert(chatGallerySource.includes("source === 'memo'"), 'indexed memo photos must recover messageId for tag save');
+// The 사진 list is built in gallery-collections.js since the 2026-10 gallery rewrite.
+const galleryCollectionsSource = fs.readFileSync(new URL('../src/core/gallery-collections.js', import.meta.url), 'utf8');
+assert(galleryCollectionsSource.includes("source === 'memo'") && chatGallerySource.includes('resolveIndexedGalleryPhotos('), 'indexed memo photos must recover messageId for tag save');
 assert(summaryGallerySource.includes('composeGalleryPhotos'), 'main-screen PhotoGallery must compose via shared gallery dedupe');
 assert(summaryGallerySource.includes('renderMemoryAllDateToggle'), 'memories tab must reuse the gallery 전체|일자 toggle');
 assert(summaryGallerySource.includes('renderMemoryTrashButton'), 'memories edit mode must show a red trash action instead of 제외 text');
@@ -510,7 +515,7 @@ assert(chatRenderSource.includes('coerceIndex') && chatRenderSource.includes('re
 assert(imageTagSaveSource.includes('requestedIndex != null && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
-assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
+assert(chatGallerySource.includes('const baseItemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
 assert(galleryIndexSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
 assert(calendarViewsSource.includes('formatBalanceBadge(calculateSettlementBalance(calendar))'), 'V2 side-menu settlement badge must use the shared running-balance source');
 assert(galleryIndexSource.includes('enableBulkHydration: true'), 'photo comment badges must bulk-hydrate on gallery too');

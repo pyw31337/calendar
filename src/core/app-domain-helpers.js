@@ -2849,6 +2849,54 @@ function getPhotoCommentIdentity(photo = {}, collection = [], opts = {}) {
   };
 }
 
+// getPhotoCommentIdentity re-scans the whole collection for every photo (and every legacy
+// candidate), which made a 100-thumbnail gallery page do hundreds of thousands of identity
+// computations on each render. This builds the "which assets claim this legacy key" table once
+// per collection and answers each photo in O(1). Same result as getPhotoCommentIdentity(photo,
+// collection, opts) whenever collection items carry their own source/meetingDate (gallery rows do).
+function collectPhotoCommentLegacyCandidates(item = {}, itemOpts = {}) {
+  const itemBase = getMediaIdentityKeys(item, itemOpts) || {};
+  const itemMessageId = typeof item?.messageId === 'string' && item.messageId
+    ? item.messageId
+    : (typeof itemOpts.messageId === 'string' ? itemOpts.messageId : '');
+  const itemImageIndex = Number.isInteger(item?.imageIndex) ? item.imageIndex : null;
+  const itemSourceMessageId = typeof item?.sourceMessageId === 'string' ? item.sourceMessageId : '';
+  const itemSourceImageIndex = Number.isInteger(item?.sourceImageIndex) ? item.sourceImageIndex : null;
+  return Array.from(new Set([
+    itemBase.mediaKey,
+    itemBase.refKey,
+    itemMessageId && itemImageIndex != null ? `chat:${itemMessageId}:${itemImageIndex}` : '',
+    itemSourceMessageId && itemSourceImageIndex != null ? `chat:${itemSourceMessageId}:${itemSourceImageIndex}` : ''
+  ].filter(Boolean)));
+}
+
+function createPhotoCommentIdentityResolver(collection = []) {
+  const items = Array.isArray(collection) ? collection : [];
+  const owners = new Map();
+  if (items.length >= 2) {
+    items.forEach(item => {
+      const candidates = collectPhotoCommentLegacyCandidates(item || {}, {
+        source: item?.source,
+        meetingDate: item?.meetingDate
+      });
+      candidates.forEach(candidate => {
+        const set = owners.get(candidate) || new Set();
+        set.add(getPhotoAssetCommentKey(item) || `legacy:${candidate}`);
+        owners.set(candidate, set);
+      });
+    });
+  }
+  return function resolvePhotoCommentIdentity(photo = {}, opts = {}) {
+    const base = getMediaIdentityKeys(photo, opts) || {};
+    const canonicalKey = getPhotoAssetCommentKey(photo);
+    if (!canonicalKey) return { ...base, legacyKeys: [] };
+    const legacyKeys = collectPhotoCommentLegacyCandidates(photo, opts)
+      .filter(key => key !== canonicalKey)
+      .filter(candidate => items.length < 2 || (owners.get(candidate)?.size || 0) <= 1);
+    return { ...base, assetKey: canonicalKey, mediaKey: canonicalKey, refKey: canonicalKey, legacyKeys };
+  };
+}
+
 function getPhotoCommentCount(identity = {}, counts = {}) {
   const keys = Array.from(new Set([
     identity?.mediaKey,
@@ -3220,6 +3268,7 @@ export {
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,
   getPhotoCommentIdentity,
+  createPhotoCommentIdentityResolver,
   getPhotoAssetCommentKey,
   getPhotoCommentCount,
   getLegacyMeetingMediaKey,

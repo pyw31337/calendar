@@ -64,7 +64,8 @@ test('Gallery tabs render clean labels without status dots or numeric count pill
   assert.match(galleryJs, /\{ value: 'photos', label: '사진' \}/, 'photos tab uses plain label');
   assert.match(galleryJs, /\{ value: 'links', label: '링크' \}/, 'links tab uses plain label');
   assert.match(galleryJs, /\{ value: 'files', label: '파일' \}/, 'files tab uses plain label');
-  assert.match(galleryJs, /\{ value: 'analysis', label: 'AI 분석' \}/, 'analysis tab uses plain label');
+  assert.match(galleryJs, /toggleAnalysis: \(\) => setActiveTab/, 'AI 분석 opens from the header sparkles button, not a tab');
+  assert.match(galleryJs, /\{ value: 'likes', label: '좋아요' \}/, 'gallery tabs end with 좋아요');
   assert.doesNotMatch(galleryJs, /value: 'photos'[\s\S]*?badgeMode:\s*'dot'/, 'photos tab does not use badgeMode dot');
   assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs \.underline-tabs-label[\s\S]*?font-size:\s*var\(--v2-event-sheet-tab-label-fs\);/, 'gallery tabs use shared 0.9rem event-sheet font size');
   assert.match(destLateCss, /:is\(\.gallery-page-tabs,[\s\S]*?\.v2-gallery[\s\S]*?\) \.underline-tabs-label\.has-status-dot::after[\s\S]*?display:\s*none !important;/, 'gallery tabs suppress status dots');
@@ -119,10 +120,11 @@ test('Mobile bottom nav floats over main content and allows content to scroll un
 });
 
 test('Chat and memo file attachments collection and gallery photo filtering', async () => {
-  const [chatFilesJs, galleryJs, galleryDataJs] = await Promise.all([
+  const [chatFilesJs, galleryJs, galleryDataJs, galleryCollectionsJs] = await Promise.all([
     readFile(new URL('../src/core/chat-file-attachments.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8'),
-    readFile(new URL('../src/core/gallery-data.js', import.meta.url), 'utf8')
+    readFile(new URL('../src/core/gallery-data.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/core/gallery-collections.js', import.meta.url), 'utf8')
   ]);
 
   // File collection from memos
@@ -131,8 +133,9 @@ test('Chat and memo file attachments collection and gallery photo filtering', as
   assert.match(galleryJs, /import \{ collectChatFileAttachmentsFromMessages \} from '\.\.\/core\/chat-file-attachments\.js';/, 'ui-chat-gallery imports collectChatFileAttachmentsFromMessages');
 
   // Photo, file, and link tabs share one classifier. A storage host is not a photo.
-  assert.match(galleryJs, /classifyGalleryItem\(photo\) === 'photo'/, 'sharedPhotos keeps only items classified as photos');
-  assert.match(galleryJs, /classifyGalleryItem\(item\) === 'link'/, 'links tab uses the gallery classifier');
+  // The 사진/링크 lists are built in gallery-collections.js (2026-10 gallery rewrite).
+  assert.match(galleryCollectionsJs, /classifyGalleryItem\(photo\) === 'photo'/, 'sharedPhotos keeps only items classified as photos');
+  assert.match(galleryCollectionsJs, /classifyGalleryItem\(item\) === 'link'/, 'links tab uses the gallery classifier');
   assert.match(galleryJs, /classifyGalleryItem\(item\) === 'file'/, 'files tab uses the gallery classifier');
   assert.match(galleryJs, /getPhotoTagCompleteness/, 'AI analysis uses the shared person-tag completeness check');
   assert.match(galleryDataJs, /export function isGalleryWebLinkPhoto/, 'webpage rows are still excluded from stored photos');

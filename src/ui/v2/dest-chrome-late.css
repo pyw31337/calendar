@@ -6775,8 +6775,12 @@ html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-share-btn {
   top: 18px !important;
   right: 42px !important;
 }
+html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-like-btn {
+  top: 16px !important;
+  right: 64px !important;
+}
 html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .v2-memo-card-title {
-  padding-right: 58px !important;
+  padding-right: 86px !important;
   margin-bottom: 18px !important;
 }
 html:has(.renewal-shell.v2-design) .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
@@ -7521,3 +7525,71 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
 @media (max-width: 374px) {
   html:has(.renewal-shell.v2-design) .date-modal-anniv-btn-label { display: none; }
 }
+
+/* 좋아요 heart (src/ui/like-button.js): filled heart, gray until liked, then the theme brand color.
+   'onMedia' sits on a thumbnail's top-left corner ('at-right' moves it to the top-right);
+   'onCard' on a card's top-right corner; 'inlineMedia' in-flow on a dark surface. */
+html:has(.renewal-shell.v2-design) .gather-like-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #94A3B8);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 999px;
+  line-height: 0;
+  transition: color 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-liked { color: var(--brand, #7C3AED); }
+html:has(.renewal-shell.v2-design) .gather-like-btn:active { transform: scale(0.86); }
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.38);
+  color: rgba(255, 255, 255, 0.94);
+}
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia.at-right { left: auto; right: 6px; }
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia.is-liked,
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-inlineMedia.is-liked { background: rgba(255, 255, 255, 0.94); color: var(--brand, #7C3AED); }
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-inlineMedia {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.32);
+  color: rgba(255, 255, 255, 0.92);
+}
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-onCard {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: var(--bg-card);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+}
+html:has(.renewal-shell.v2-design) .gather-like-host { position: relative; min-width: 0; }
+/* Memo card heart: absolutely placed left of 공유 (share sits at right 34px, or 18px without a pin). */
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn {
+  position: absolute;
+  top: 8px;
+  right: 56px;
+  padding: 2px;
+  z-index: 2;
+}
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn.is-no-pin { right: 40px; }
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn:not(.is-liked) { opacity: 0.35; }
+/* Gallery 링크/파일 cards: room for the top-right heart so it never covers the title. */
+html:has(.renewal-shell.v2-design) .gallery-link-grid .gallery-like-card > :first-child,
+html:has(.renewal-shell.v2-design) .gallery-file-grid .gallery-like-card > :first-child { padding-right: 46px !important; box-sizing: border-box; }
+html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn:not(.is-liked) { color: var(--text-light, #94A3B8); }

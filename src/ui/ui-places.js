@@ -3,6 +3,7 @@
  */
 
 import { PanelResizeHandle } from './ui-widgets.js';
+import { LikeButton } from './like-button.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1836,6 +1837,14 @@ export function PlacesView({
               onMouseDown: e => e.stopPropagation(),
               onTouchStart: e => e.stopPropagation()
             },
+              /* 좋아요 -- left of 업체보기 */
+              /*#__PURE__*/React.createElement(LikeButton, {
+                calendarId: calendar?.id,
+                size: 15,
+                className: 'place-card-like-btn',
+                style: { width: '28px', height: '28px', padding: 0 },
+                item: { kind: 'place', ref: String(place.id || place.name || ''), title: place.alias || place.name || '장소', subtitle: place.address || place.roadAddress || '', url: getPlaceExternalMapUrl(place) || '', target: { placeId: place.id || '' } }
+              }),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: event => {
@@ -1870,7 +1879,7 @@ export function PlacesView({
             ),
             
             /* Category Label Capsule and Visit Info */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingRight: '64px' } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingRight: '96px' } },
               /*#__PURE__*/React.createElement("span", {
                 style: {
                   display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: 'var(--radius-full)',

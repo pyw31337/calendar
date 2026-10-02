@@ -15,6 +15,11 @@ import { setTagClipboard, getTagClipboard } from './photo-bulk-action-bar.js';
 import { isExternalServiceUrl } from '../core/memo-share-link.js';
 import { collectChatFileAttachmentsFromMessages } from '../core/chat-file-attachments.js';
 import { requestGalleryChatCorpus } from '../core/gallery-archive-state.js';
+import { buildGalleryKeyIndex, buildGalleryLinks, createGalleryOwnerLookup, galleryFileKey, resolveIndexedGalleryPhotos, withUniqueGalleryKeys } from '../core/gallery-collections.js';
+import { createPhotoCommentIdentityResolver } from '../core/app-domain-helpers.js';
+import { useLikes } from '../core/likes-store.js';
+import { groupLikesByKind, LIKE_KIND_LABELS, photoLikeItem as galleryPhotoLikeItem } from '../core/likes-model.js';
+import { LikeButton } from './like-button.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -71,10 +76,6 @@ function getSuggestedDateTag(photo, item) {
 }
 
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
-function getPhotoCommentIdentity(...args) {
-  const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
-  return typeof f === 'function' ? f(...args) : {};
-}
 function getPhotoCommentCount(...args) {
   const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
   return typeof f === 'function' ? f(...args) : 0;
@@ -500,7 +501,8 @@ export function ChatGalleryModal({
   syncStatus = null,
   onSaveImageTags = null,
   onBulkSaveImageTags = null,
-  onRegisterMenuActions = null
+  onRegisterMenuActions = null,
+  onActiveTabChange = null
 }) {
   const React = window.React;
   // The full-page gallery owns scrolling through .gallery-page-scroll.  Lock the document
@@ -604,6 +606,8 @@ export function ChatGalleryModal({
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
   const [activeTab, setActiveTab] = React.useState('photos');
+  // 좋아요 tab: everything the calendar liked across screens (core/likes-store.js).
+  const galleryLikes = useLikes(React, calendar?.id);
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
   const [galleryListPage, setGalleryListPage] = React.useState(1);
   const setGalleryTab = next => {
@@ -631,6 +635,9 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (activeTab === 'analysis') void loadMediaAnalysis();
   }, [activeTab, loadMediaAnalysis]);
+  React.useEffect(() => {
+    if (typeof onActiveTabChange === 'function') onActiveTabChange(activeTab);
+  }, [activeTab, onActiveTabChange]);
   const updateAnalysisReview = React.useCallback((assetKey, review) => {
     setMediaAnalysis(previous => ({
       ...previous,
@@ -1068,177 +1075,39 @@ export function ChatGalleryModal({
     return Array.from(byId.values());
   }, [gallerySearchCorpusReady, gallerySearchCorpus, memos]);
 
-  const sharedLinks = React.useMemo(() => {
-    // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image
-    // link grid, any mix of URLs typed/pasted together) only ever contributed its first one here,
-    // silently dropping the rest from this tab even though every one of them still renders its own
-    // preview in the chat/memo itself. extractAllUrlInfosLoose surfaces all of them, INCLUDING a
-    // bare domain with no http(s):// or www. prefix (e.g. a share-sheet link pasted as just
-    // "naver.me/xxxx") -- that already rendered its own preview fine in chat/memo (via
-    // extractFirstUrlInfo's looser single-link match) but was invisible to this tab entirely
-    // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
-    // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
-    // preview live the same way a fresh link normally would. Recognized image links are excluded
-    // In the gallery, only external service URLs belong to the 링크 tab.
-    // Internal service links (memos, calendar shares, app routes, self origin) are excluded.
-    const list = [];
-    const seen = new Set();
-    (sourceChatMessages || []).forEach(msg => {
-      if (!msg.text) return;
-      let firstUrlSeen = false;
-      extractAllUrlInfosLoose(msg.text).forEach(info => {
-        if (!info.url || seen.has(info.url)) return;
-        if (!isExternalServiceUrl(info.url)) return;
-        seen.add(info.url);
-        list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
-        firstUrlSeen = true;
-      });
-    });
-    (sourceMemos || []).forEach(memo => {
-      const body = memo?.text || memo?.content || memo?.body || '';
-      if (!body) return;
-      if (!body || isTombstone(memo)) return;
-      let firstUrlSeen = false;
-      extractAllUrlInfosLoose(body).forEach(info => {
-        if (!info.url || seen.has(info.url)) return;
-        if (!isExternalServiceUrl(info.url)) return;
-        seen.add(info.url);
-        list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '', text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
-        firstUrlSeen = true;
-      });
-    });
-    getConfirmedMeetings(calendar).forEach(meeting => {
-      const body = [meeting?.note, meeting?.memo, meeting?.description, meeting?.text].filter(Boolean).join('\n');
-      if (!body) return;
-      extractAllUrlInfosLoose(body).forEach(info => {
-        if (!info.url || seen.has(info.url)) return;
-        if (!isExternalServiceUrl(info.url)) return;
-        seen.add(info.url);
-        list.push({
-          url: info.url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
-          messageId: `meeting:${meeting.date || ''}`, text: body, source: 'meeting',
-          title: meeting.date ? `${meeting.date} 일정` : '일정'
-        });
-      });
-    });
-    return list
-      .filter(item => classifyGalleryItem(item) === 'link')
-      .sort((a, b) => b.timestamp - a.timestamp);
-  }, [sourceChatMessages, sourceMemos, calendar]);
+  // 링크 tab: every external URL in chat, memos and meeting notes (gallery-collections.js).
+  // Each row has a unique galleryKey -- several links from one message used to share the
+  // message id as their React key, which left stale cards behind when switching tabs.
+  const sharedLinks = React.useMemo(() => buildGalleryLinks({
+    messages: sourceChatMessages,
+    memos: sourceMemos,
+    meetings: getConfirmedMeetings(calendar) || [],
+    extractUrls: extractAllUrlInfosLoose,
+    isExternalServiceUrl,
+    isTombstone,
+    classifyGalleryItem
+  }), [sourceChatMessages, sourceMemos, calendar]);
 
   const sharedPhotos = React.useMemo(() => {
     const chatMessages = sourceChatMessages;
     const memos = sourceMemos;
     if (Array.isArray(indexedPhotos)) {
-      return indexedPhotos
-        .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
-        // Movie/sports (anniversary) posters belong in 컨텐츠, not gallery 사진.
-        .filter(photo => {
-          const source = String(photo.source || '').trim();
-          if (source === 'anniversary') return false;
-          return !String(photo.sourceOwner || '').startsWith('anniversary:');
-        })
-        // Meme keyboard stickers
-        .filter(photo => !isMemeKeyboardPhotoEntry(photo))
-        // One classifier: storage PDFs are files, webpages are links, images are photos.
-        .filter(photo => classifyGalleryItem(photo) === 'photo')
-        .map(photo => {
-          const source = photo.source || 'gallery';
-          const imageIndex = Number.isInteger(photo.imageIndex)
-            ? photo.imageIndex
-            : (Number.isFinite(Number(photo.imageIndex)) ? Math.max(0, Math.round(Number(photo.imageIndex))) : 0);
-          // Photo-index memo rows historically omitted messageId (''). Recover from sourceOwner
-          // (`memo:<id>:<index>`) so lightbox tag save can resolve the memo document.
-          let messageId = photo.messageId;
-          if ((!messageId || messageId === '') && source === 'memo') {
-            const owner = String(photo.sourceOwner || (Array.isArray(photo.owners) && photo.owners[0] && photo.owners[0].sourceOwner) || '');
-            const match = owner.match(/^memo:([^:]+):/);
-            if (match) messageId = match[1];
-          }
-          // Client cannot write photoIndex. CF denorm can lag, so the source document's
-          // asset-keyed tag state wins.  Do not combine it with a tag from a duplicate photo:
-          // deletion/dedup must never make another photo's tag appear here.
-          const indexTags = String(photo.tags || '');
-          let localTags = null;
-          let localTagsAreAuthoritative = false;
-          const getAssetMappedTags = row => {
-            const map = row?.imageTagMap;
-            const assetKey = String(photo?.assetKey || getPhotoAssetCommentKey(photo) || '');
-            if (map && typeof map === 'object' && !Array.isArray(map) && assetKey
-              && Object.prototype.hasOwnProperty.call(map, assetKey)) {
-              return { tags: String(map[assetKey] || ''), authoritative: true };
-            }
-            return null;
-          };
-          if (messageId) {
-            if (source === 'memo') {
-              const memo = (memos || []).find(row => row && row.id === messageId);
-              if (memo) {
-                const mapped = getAssetMappedTags(memo);
-                if (mapped) {
-                  localTags = mapped.tags;
-                  localTagsAreAuthoritative = mapped.authoritative;
-                } else if (Array.isArray(memo.imageTags) && Object.prototype.hasOwnProperty.call(memo.imageTags, imageIndex)) {
-                  localTags = String(memo.imageTags[imageIndex] || '');
-                  localTagsAreAuthoritative = true;
-                }
-              }
-            } else if (photo.directMediaUrl) {
-              const msg = (chatMessages || []).find(row => row && row.id === messageId);
-              if (msg) localTags = String(getDirectMediaTagsForUrl(msg, photo.directMediaUrl) || '');
-            } else {
-              const msg = (chatMessages || []).find(row => row && row.id === messageId);
-              if (msg) {
-                const mapped = getAssetMappedTags(msg);
-                if (mapped) {
-                  localTags = mapped.tags;
-                  localTagsAreAuthoritative = mapped.authoritative;
-                } else if (Array.isArray(msg.imageTags) && Object.prototype.hasOwnProperty.call(msg.imageTags, imageIndex)) {
-                  localTags = String(msg.imageTags[imageIndex] || '');
-                  localTagsAreAuthoritative = true;
-                }
-              }
-            }
-          }
-          // Meeting album copies store durable tags on confirmedMeetings.photos[].tags. After
-          // rebuildPhotoIndex, the selected message owner can expose empty/partial imageTags for
-          // the same asset — still consult the meeting-local tags so lightbox reopen stays full.
-          if (source === 'meeting' || photo.meetingDate || photo.photoId || photo.sourceMessageId) {
-            const meetings = typeof getConfirmedMeetings === 'function' ? (getConfirmedMeetings(calendar) || []) : [];
-            for (const meeting of meetings) {
-              const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-              const match = photos.find(row => {
-                if (!row) return false;
-                if (photo.photoId && row.id === photo.photoId) return true;
-                if (photo.sourceMessageId && row.sourceMessageId === photo.sourceMessageId
-                  && Number(row.sourceImageIndex) === Number(photo.sourceImageIndex != null ? photo.sourceImageIndex : imageIndex)) {
-                  return true;
-                }
-                return false;
-              });
-              if (match && match.tags != null && !localTagsAreAuthoritative && localTags == null) {
-                // An album copy is a legacy fallback only.  Once the original message/memo
-                // owns an explicit map slot (including an empty slot), it must not be replaced.
-                localTags = String(match.tags || '');
-                break;
-              }
-            }
-          }
-          const calendarId = calendar && calendar.id ? calendar.id : '';
-          let tags = resolveGalleryLightboxTags(calendarId, {
-            ...photo,
-            messageId: messageId || photo.messageId,
-            imageIndex
-          }, { localTags, indexTags, localTagAuthoritative: localTagsAreAuthoritative });
-          return {
-            ...photo,
-            source,
-            uploadSource: photo.uploadSource || (['chat', 'gallery', 'meeting', 'memo'].includes(source) ? source : photo.uploadSource),
-            messageId: messageId || photo.messageId,
-            imageIndex,
-            tags
-          };
-        });
+      // One lookup table per input instead of Array.find per photo (photos × messages).
+      const lookup = createGalleryOwnerLookup({
+        messages: chatMessages,
+        memos,
+        meetings: typeof getConfirmedMeetings === 'function' ? (getConfirmedMeetings(calendar) || []) : []
+      });
+      return resolveIndexedGalleryPhotos(indexedPhotos, {
+        lookup,
+        calendarId: calendar && calendar.id ? calendar.id : '',
+        isBrokenPhotoValue,
+        isMemeKeyboardPhotoEntry,
+        classifyGalleryItem,
+        getPhotoAssetCommentKey,
+        getDirectMediaTagsForUrl,
+        resolveGalleryLightboxTags
+      });
     }
     const composed = composeGalleryPhotos({
       chatMessages, memos, calendar, isTombstone, getMessageImageEntries,
@@ -1334,8 +1203,8 @@ export function ChatGalleryModal({
         }
       });
     });
-    return dedupeGalleryFiles([...fromMessages, ...fromIndex, ...fromLinkText]
-      .filter(item => classifyGalleryItem(item) === 'file'));
+    return withUniqueGalleryKeys(dedupeGalleryFiles([...fromMessages, ...fromIndex, ...fromLinkText]
+      .filter(item => classifyGalleryItem(item) === 'file')), galleryFileKey);
   }, [sourceChatMessages, sourceMemos, indexedPhotos]);
 
   const filteredFiles = React.useMemo(() => {
@@ -1370,6 +1239,8 @@ export function ChatGalleryModal({
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
   }), [filteredPhotos, brokenPhotoRevision]);
+  const visiblePhotoIndexByKey = React.useMemo(() => buildGalleryKeyIndex(visiblePhotos, getPhotoKey), [visiblePhotos]);
+  const visiblePhotoCommentIdentity = React.useMemo(() => createPhotoCommentIdentityResolver(visiblePhotos), [visiblePhotos]);
   const selectedBulkPhotos = React.useMemo(() => {
     if (activeTab !== 'photos' || selectedBulkShareKeys.size === 0) return [];
     return visiblePhotos.filter(photo => selectedBulkShareKeys.has(getPhotoKey(photo)));
@@ -1488,10 +1359,12 @@ export function ChatGalleryModal({
       void onIndexedPhotoLoadAll();
       return;
     }
-    if (!requiresCompletePhotoIndex && indexedPhotoComplete && typeof onIndexedPhotoPageChange === 'function') {
+    // Only shrink back to one page while the reader is on 사진. Leaving for 링크/파일 used to
+    // drop the full list, and coming back in 일자 view re-downloaded every photo each time.
+    if (activeTab === 'photos' && !requiresCompletePhotoIndex && indexedPhotoComplete && typeof onIndexedPhotoPageChange === 'function') {
       void onIndexedPhotoPageChange(indexedPhotoPage || 1);
     }
-  }, [usingPhotoIndex, requiresCompletePhotoIndex, indexedPhotoComplete, indexedPhotoLoading, indexedPhotoPage, onIndexedPhotoLoadAll, onIndexedPhotoPageChange]);
+  }, [activeTab, usingPhotoIndex, requiresCompletePhotoIndex, indexedPhotoComplete, indexedPhotoLoading, indexedPhotoPage, onIndexedPhotoLoadAll, onIndexedPhotoPageChange]);
   const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
   const getGalleryItemDateKey = item => {
     const meetingDate = String(item?.meetingDate || '').trim();
@@ -1767,7 +1640,7 @@ export function ChatGalleryModal({
       ? (visiblePhotos || []).filter(photo => keySet.has(getPhotoKey(photo)))
       : [];
     const selectedFiles = activeTab === 'files'
-      ? (filteredFiles || []).filter(item => keySet.has(String(item.id || item.url || '')))
+      ? (filteredFiles || []).filter(item => keySet.has(item.galleryKey || String(item.id || item.url || '')))
       : [];
     const photoPlaces = (() => {
       const labels = new Set(['갤러리']);
@@ -1814,12 +1687,12 @@ export function ChatGalleryModal({
           if (showToast) showToast(okCount ? `사진 ${okCount}장을 삭제했습니다.` : '삭제할 사진을 처리하지 못했습니다.', okCount ? 'success' : 'error');
         } else if (activeTab === 'files') {
           if (typeof onDeleteFiles !== 'function') return;
-          const files = (filteredFiles || []).filter(item => keySet.has(String(item.id || item.url || '')));
+          const files = (filteredFiles || []).filter(item => keySet.has(item.galleryKey || String(item.id || item.url || '')));
           const deleted = await onDeleteFiles(files);
           if (showToast) showToast(deleted ? `파일 ${deleted}개를 삭제했습니다.` : '삭제할 파일을 처리하지 못했습니다.', deleted ? 'success' : 'error');
         } else {
           if (typeof onDeleteGalleryLinks !== 'function') return;
-          const links = (filteredLinks || []).filter(item => keySet.has(item.messageId || item.url));
+          const links = (filteredLinks || []).filter(item => keySet.has(item.galleryKey || item.messageId || item.url));
           const result = await onDeleteGalleryLinks(links) || { deleted: 0, skipped: 0 };
           if (showToast) {
             if (result.deleted && result.skipped) showToast(`링크 ${result.deleted}개 삭제, ${result.skipped}개는 본문에 있어 건너뛰었습니다.`, 'info');
@@ -1927,7 +1800,7 @@ export function ChatGalleryModal({
       const keySet = new Set(keys);
       let fragment = '';
       if (activeTab === 'links') {
-        const links = (filteredLinks || []).filter(item => keySet.has(item.messageId || item.url));
+        const links = (filteredLinks || []).filter(item => keySet.has(item.galleryKey || item.messageId || item.url));
         fragment = encodeGatherLinksFragment(links);
         if (!fragment) { if (showToast) showToast('공유할 링크를 선택해 주세요.', 'error'); return; }
         const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
@@ -1939,7 +1812,7 @@ export function ChatGalleryModal({
         return;
       }
       if (activeTab === 'files') {
-        const files = (filteredFiles || []).filter(item => keySet.has(String(item.id || item.url || '')));
+        const files = (filteredFiles || []).filter(item => keySet.has(item.galleryKey || String(item.id || item.url || '')));
         fragment = encodeGatherFilesFragment(files);
         if (!fragment) { if (showToast) showToast('공유할 파일을 선택해 주세요.', 'error'); return; }
         const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
@@ -2056,6 +1929,8 @@ export function ChatGalleryModal({
       uploadImage: () => handleUploadClick(),
       uploadFile: () => handleUploadClick(),
       uploadLink: () => { setActiveTab('links'); setIsAddingLink(true); },
+      // Header sparkles button: AI 분석 is no longer a tab; pressing again returns to 사진.
+      toggleAnalysis: () => setActiveTab(prev => (prev === 'analysis' ? 'photos' : 'analysis')),
     });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions, v2SearchControlled]);
@@ -2469,7 +2344,15 @@ export function ChatGalleryModal({
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     position: 'relative', overflow: 'hidden'
   };
-  const renderGalleryPhotoGrid = (items, lightboxItems = visiblePhotos) => /*#__PURE__*/React.createElement("div", {
+  const renderGalleryPhotoGrid = (items, lightboxItems = visiblePhotos) => {
+    // Per-render lookups are built once per list (not once per thumbnail): the lightbox index
+    // and the comment-thread identity used to scan the whole photo list for every tile.
+    const lightboxList = lightboxItems || [];
+    const isMainList = lightboxList === visiblePhotos;
+    const lightboxIndexByKey = isMainList ? visiblePhotoIndexByKey : buildGalleryKeyIndex(lightboxList, getPhotoKey);
+    const resolveCommentIdentity = isMainList ? visiblePhotoCommentIdentity : createPhotoCommentIdentityResolver(lightboxList);
+    const usedKeys = new Map();
+    return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
@@ -2479,14 +2362,18 @@ export function ChatGalleryModal({
     }
   }, (items || []).map((photo, idx) => {
     const photoKey = getPhotoKey(photo);
-    const itemKey = photoKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`;
-    const lightboxIndex = (lightboxItems || []).findIndex(entry => getPhotoKey(entry) === photoKey);
+    const baseItemKey = photoKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`;
+    // Two rows of the same asset must never share a React key (duplicate keys leave stale tiles).
+    const seenCount = usedKeys.get(baseItemKey) || 0;
+    usedKeys.set(baseItemKey, seenCount + 1);
+    const itemKey = seenCount ? `${baseItemKey}#${seenCount}` : baseItemKey;
+    const lightboxIndex = lightboxIndexByKey.has(photoKey) ? lightboxIndexByKey.get(photoKey) : -1;
     const isChecked = isBulkShareMode && selectedBulkShareKeys.has(photoKey);
     // Same mediaKey/refKey identity the Lightbox itself computes to key a photo's comment thread
     // (see ui-lightbox.js's currentIdentity) -- reusing it here (rather than photoKey/itemKey,
     // which are this grid's own React-key/dedup identifiers with a different shape for most
     // photos) is what lets this thumbnail badge and the Lightbox's comment count agree.
-    const commentIdentity = getPhotoCommentIdentity(photo, lightboxItems || [], { source: photo.source, meetingDate: photo.meetingDate })
+    const commentIdentity = resolveCommentIdentity(photo, { source: photo.source, meetingDate: photo.meetingDate })
       || (typeof getMediaIdentityKeys === 'function' ? getMediaIdentityKeys(photo, { source: photo.source, meetingDate: photo.meetingDate }) : {});
     // Falls back to the pre-photoId/index era key (see getLegacyMeetingMediaKey) so meeting
     // photo comment threads saved before that data shape existed still show their badge here.
@@ -2531,13 +2418,20 @@ export function ChatGalleryModal({
       }
     });
     const commentBadge = PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount });
-    if (!isBulkShareMode && !commentBadge) return thumb;
+    // 좋아요 sits on the thumbnail's top-left corner (the bulk-select checkbox takes that corner
+    // while selecting, so the heart steps aside then).
+    const likeButton = !isBulkShareMode && photoKey && /*#__PURE__*/React.createElement(LikeButton, {
+      calendarId: calendar?.id,
+      variant: 'onMedia',
+      item: galleryPhotoLikeItem(photo, photoKey)
+    });
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
       className: commentCount ? 'gallery-comment-heartbeat' : '',
       style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
     },
       thumb,
+      likeButton,
       isBulkShareMode && (EditSelectCheckbox
         ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
         : /*#__PURE__*/React.createElement("span", {
@@ -2556,6 +2450,7 @@ export function ChatGalleryModal({
       commentBadge
     );
   }));
+  };
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement("div", {
     className: "gallery-link-grid",
     style: {
@@ -2567,14 +2462,22 @@ export function ChatGalleryModal({
     }
   },
     (items || []).map(item => {
-      const itemKey = item.messageId || item.url;
+      const itemKey = item.galleryKey || `${item.messageId || ''}:${item.url}`;
       const isChecked = selectedBulkShareKeys.has(itemKey);
       const card = /*#__PURE__*/React.createElement(GalleryLinkCard, {
         key: itemKey,
         item: item,
         searchQuery: searchQuery
       });
-      if (!isBulkShareMode) return card;
+      if (!isBulkShareMode) {
+        return /*#__PURE__*/React.createElement("div", { key: itemKey, className: "gather-like-host gallery-like-card" },
+          card,
+          /*#__PURE__*/React.createElement(LikeButton, {
+            calendarId: calendar?.id,
+            variant: 'onCard',
+            item: { kind: 'link', ref: item.url, title: item.linkPreview?.title || item.title || item.url, subtitle: item.linkPreview?.description || '', thumb: item.linkPreview?.image || '', url: item.url, target: { source: item.source, messageId: item.messageId } }
+          }));
+      }
       return /*#__PURE__*/React.createElement("div", {
         key: itemKey,
         onClick: ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); },
@@ -2609,7 +2512,7 @@ export function ChatGalleryModal({
       boxSizing: 'border-box'
     }
   }, (items || []).map((item, idx) => {
-    const itemKey = String(item.id || item.url || idx);
+    const itemKey = item.galleryKey || String(item.id || item.url || idx);
     const isChecked = selectedBulkShareKeys.has(itemKey);
     const card = FileAttachmentCard ? /*#__PURE__*/React.createElement(FileAttachmentCard, {
       key: itemKey,
@@ -2623,10 +2526,16 @@ export function ChatGalleryModal({
     if (!card) return null;
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
+      className: isBulkShareMode ? undefined : 'gather-like-host gallery-like-card',
       onClick: isBulkShareMode ? ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); } : undefined,
       style: { position: 'relative', width: '100%', minWidth: 0, height: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
     },
       card,
+      !isBulkShareMode && /*#__PURE__*/React.createElement(LikeButton, {
+        calendarId: calendar?.id,
+        variant: 'onCard',
+        item: { kind: 'file', ref: item.url || item.id, title: item.name || '파일', subtitle: item.ext ? String(item.ext).toUpperCase() : '', url: item.url, target: { messageId: item.messageId || '', mime: item.mime || '' } }
+      }),
       isBulkShareMode && (EditSelectCheckbox
         ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
         : /*#__PURE__*/React.createElement("span", {
@@ -2939,7 +2848,84 @@ export function ChatGalleryModal({
       }, "등록")
     )
   );
+  // 좋아요 tab: photos as a grid (tap → lightbox over the liked photos), everything else as
+  // cards that reopen the original (link/file open directly, the rest switch to their screen).
+  const LIKE_DESTINATION = { memo: 'memo', place: 'places', content: 'content', memory: 'archive', person: 'archive', meeting: 'archive' };
+  const openLikedItem = like => {
+    if ((like.kind === 'link' || like.kind === 'file') && like.url) {
+      window.open(like.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const view = LIKE_DESTINATION[like.kind];
+    if (view && typeof onChangeView === 'function') onChangeView(view);
+  };
+  const renderLikesTab = () => {
+    const groups = groupLikesByKind(galleryLikes.list);
+    if (!groups.length) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "gallery-likes-empty",
+        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '48px 16px', fontSize: 'var(--font-size-base)', lineHeight: 1.6 }
+      }, galleryLikes.ready ? '아직 좋아요한 항목이 없어요. 사진·메모·장소 등에서 하트를 눌러 모아보세요.' : '좋아요 목록을 불러오는 중...');
+    }
+    return groups.map(group => /*#__PURE__*/React.createElement("section", {
+      key: group.kind,
+      className: "gallery-likes-section",
+      style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-md, 15px)', fontWeight: 800, color: 'var(--text-main)' }
+      }, group.label, /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: 'var(--text-muted)' }
+      }, group.items.length)),
+      group.kind === 'photo'
+        ? /*#__PURE__*/React.createElement("div", {
+            style: { display: 'grid', gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap: '6px' }
+          }, group.items.map((like, index) => /*#__PURE__*/React.createElement("div", {
+            key: like.id, style: { position: 'relative' }
+          },
+            /*#__PURE__*/React.createElement("img", {
+              src: like.thumb || like.url, alt: like.title || '좋아요한 사진', loading: 'lazy', decoding: 'async', referrerPolicy: 'no-referrer',
+              onClick: () => setActiveLightbox && setActiveLightbox({
+                urls: group.items.map(entry => entry.url || entry.thumb),
+                index,
+                meta: group.items.map(entry => ({ ...(entry.target || {}), thumb: entry.thumb, tags: entry.title === '사진' ? '' : entry.title }))
+              }),
+              style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+            }),
+            /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onMedia', item: like })
+          )))
+        : /*#__PURE__*/React.createElement("div", {
+            style: { display: 'grid', gridTemplateColumns: isTabletOrMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: '8px' }
+          }, group.items.map(like => /*#__PURE__*/React.createElement("div", {
+            key: like.id,
+            className: "gather-like-host gallery-like-card",
+            role: "button",
+            tabIndex: 0,
+            onClick: () => openLikedItem(like),
+            onKeyDown: event => { if (event.key === 'Enter') openLikedItem(like); },
+            style: {
+              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 48px 12px 12px', cursor: 'pointer',
+              backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', minWidth: 0
+            }
+          },
+            like.thumb && /*#__PURE__*/React.createElement("img", {
+              src: like.thumb, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer',
+              style: { width: '52px', height: '52px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }
+            }),
+            /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },
+              /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, like.title || LIKE_KIND_LABELS[like.kind]),
+              like.subtitle && /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, like.subtitle)
+            ),
+            /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onCard', item: like })
+          )))
+    ));
+  };
   const renderGalleryContent = () => {
+    if (activeTab === 'likes') return renderLikesTab();
     if (activeTab === 'analysis') {
       const allItems = mediaAnalysis.items || [];
       const unreviewed = [];
@@ -4255,7 +4241,8 @@ export function ChatGalleryModal({
           { value: 'photos', label: '사진' },
           { value: 'links', label: '링크' },
           { value: 'files', label: '파일' },
-          { value: 'analysis', label: 'AI 분석' }
+          { value: 'likes', label: '좋아요' }
+          // AI 분석 moved to the header sparkles button (GalleryScreen onToggleAnalysis).
         ]
       })
     );
@@ -4290,7 +4277,9 @@ export function ChatGalleryModal({
       display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
       minWidth: 0
     }
-  }, renderGalleryContent())));
+  },
+  // Each tab mounts its own subtree: React never reuses one tab's list DOM for another tab.
+  /*#__PURE__*/React.createElement(React.Fragment, { key: `gallery-tab-${activeTab}-${galleryViewMode}` }, renderGalleryContent()))));
   // Same '연월 선택' bottom sheet the settlement page's month-nav opens, portaled the same way
   // (bottom-sheet rule: never nest under a transformed ancestor -- see the settlement page's own
   // comment on this).

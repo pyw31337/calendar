@@ -2,6 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
+import { LikeButton } from './like-button.js';
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
@@ -1378,7 +1379,7 @@ export function HistoryView({
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
   onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoStatus = null, indexedPhotoComplete = false, onIndexedPhotoPageChange = null,
   onIndexedPhotoLoadAll = null, onSavePlace = null,
-  photoCommentCounts = {}, onRegisterMenuActions = null
+  photoCommentCounts = {}, onRegisterMenuActions = null, onActiveTabChange = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1533,6 +1534,10 @@ export function HistoryView({
     setSearchQuery(v2SearchQuery || '');
   }, [v2SearchControlled, v2SearchQuery]);
   const [archiveIndexScan, setArchiveIndexScan] = React.useState('idle');
+  // The header sparkles button (ArchiveScreen) toggles 추천 through these refs; the tab state is
+  // declared further down.
+  const historyTabRef = React.useRef('memories');
+  const changeHistoryTabRef = React.useRef(null);
   // v2 shell (PC): side-nav's per-tab submenu needs 보관함 검색 -- otherwise local to this component.
   React.useEffect(() => {
     if (typeof onRegisterMenuActions !== 'function') return undefined;
@@ -1541,6 +1546,7 @@ export function HistoryView({
         if (v2SearchControlled && window.__gatherOpenPageSearch) window.__gatherOpenPageSearch();
         else setIsSearchOpen(v => !v);
       },
+      toggleSuggest: () => changeHistoryTabRef.current?.(historyTabRef.current === 'suggest' ? 'memories' : 'suggest'),
     });
     return () => onRegisterMenuActions(null);
   }, [onRegisterMenuActions, v2SearchControlled]);
@@ -1589,6 +1595,11 @@ export function HistoryView({
     setSelectedMemoryGroupId(null);
     pushHistoryState(tab);
   };
+  historyTabRef.current = historyTab;
+  changeHistoryTabRef.current = changeHistoryTab;
+  React.useEffect(() => {
+    if (typeof onActiveTabChange === 'function') onActiveTabChange(historyTab);
+  }, [historyTab, onActiveTabChange]);
   // Leaving 보관함 drops its own URL params. Navigation elsewhere keeps the rest of the query, so
   // a lingering historyTab=meetings made the next visit (from the side menu too) open on 지난모임
   // instead of 추억. A deep link that already carries historyTab still opens that tab.
@@ -2921,6 +2932,10 @@ export function HistoryView({
       className: 'archive-photo-cell'
     },
       /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
+      !isMemoryListEditMode && /*#__PURE__*/React.createElement(LikeButton, {
+        as: 'span', variant: 'onMedia', calendarId: calendar?.id,
+        item: { kind: 'memory', ref: group.id, title: group.title, subtitle: formatHistoryDate(group.startDate) || '', thumb: cover ? (cover.thumb || cover.full || '') : '', target: { startDate: group.startDate || '' } }
+      }),
       cover
         ? /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: group.photos })
         : /*#__PURE__*/React.createElement("div", {
@@ -3117,8 +3132,8 @@ export function HistoryView({
       { value: 'memories', label: '추억', badge: historyTab === 'memories' ? travelMemoryGroups.length : null },
       { value: 'people', label: '인물', badge: personTagChips.length },
       { value: 'places', label: '장소', badge: historyTab === 'places' ? placePhotoGroups.groups.length : (placeCount || null) },
-      { value: 'meetings', label: '모임', badge: confirmedDates.length },
-      { value: 'suggest', label: '추천', badge: tagSuggestions ? (tagSuggestions.autoPhotoCount || null) : null }
+      { value: 'meetings', label: '모임', badge: confirmedDates.length }
+      // 추천 lives on the header sparkles button now (ArchiveScreen onToggleSuggest).
     ]
   })
   );
@@ -3178,7 +3193,14 @@ export function HistoryView({
               className: "confirmed-meeting-date",
               style: { fontWeight: 800, color: isPast ? '#94A3B8' : '#FFFFFF', fontSize: '0.95rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
             }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)),
-            /*#__PURE__*/React.createElement("span", { className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`, style: { flexShrink: 0 } }, ddayLabel)
+            /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
+              /*#__PURE__*/React.createElement("span", { className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`, style: { flexShrink: 0 } }, ddayLabel),
+              // 좋아요: right of the D-day badge (the card itself is a button, hence as: 'span').
+              /*#__PURE__*/React.createElement(LikeButton, {
+                as: 'span', variant: 'inlineMedia', calendarId: calendar?.id,
+                item: { kind: 'meeting', ref: d, title: formatDateWithDayName(d), subtitle: datePlaces.map(p => p.alias || p.name).filter(Boolean).join(', '), target: { date: d } }
+              })
+            )
           ),
           memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '6px', flexWrap: 'wrap' } },
             memoEntries.map(e => {
@@ -3496,6 +3518,10 @@ export function HistoryView({
                 className: 'archive-photo-cell'
               },
                 /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(tagPhotos.length)),
+                /*#__PURE__*/React.createElement(LikeButton, {
+                  as: 'span', variant: 'onMedia', calendarId: calendar?.id,
+                  item: { kind: 'person', ref: tag.label, title: tag.label, subtitle: `사진 ${tagPhotos.length}장`, thumb: cover ? (cover.thumb || cover.full || '') : '' }
+                }),
                 cover
                   ? /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: tagPhotos })
                   : /*#__PURE__*/React.createElement("div", {
@@ -3699,6 +3725,10 @@ export function HistoryView({
               }
             },
               /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
+              /*#__PURE__*/React.createElement(LikeButton, {
+                as: 'span', variant: 'onMedia', calendarId: calendar?.id,
+                item: { kind: 'place', ref: String(group.place.id || group.key), title: group.place.alias || group.place.name, subtitle: group.place.address || '', thumb: group.photos[0] ? (group.photos[0].thumb || group.photos[0].full || '') : '', target: { placeId: group.place.id || '' } }
+              }),
               /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: orderCoverPhotos(group.photos) }),
               /*#__PURE__*/React.createElement("div", {
                 style: {
@@ -6612,11 +6642,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 }
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
+            // 좋아요 takes the poster's top-right corner; the 캘린더 연동 mark moved to bottom-left.
+            /*#__PURE__*/React.createElement(LikeButton, {
+              as: 'span', variant: 'onMedia', className: 'at-right', calendarId: calendar?.id,
+              item: { kind: 'content', ref: String(item.id || item.title || ''), title: item.title || '', subtitle: posterDateText || '', thumb: posterUrl || '', url: item.url || item.link || '', target: { category: anniversaryCategory || '', contentId: item.id || '' } }
+            }),
             registered && /*#__PURE__*/React.createElement("div", {
               className: "culture-registered-badge",
               title: "캘린더 등록됨",
               "aria-label": "캘린더 등록됨",
-              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
+              style: { position: 'absolute', bottom: '6px', left: '6px', zIndex: 3, backgroundColor: 'var(--cta-fill, #7C3AED)', color: 'var(--on-cta, #fff)', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null)
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },

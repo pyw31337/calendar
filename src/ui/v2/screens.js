@@ -152,6 +152,11 @@ const ICON_NODES = {
     ['path', { d: 'M9 11h6' }],
     ['path', { d: 'M13 15h2' }],
   ],
+  // Tabler sparkles-2 — 보관함 추천 / 갤러리 AI 분석 header button (2026-10).
+  sparkles: [
+    ['path', { d: 'M14 6a9.3 9.3 0 0 0 1.516 -.546c.911 -.438 1.494 -1.015 1.937 -1.932c.207 -.428 .382 -.928 .547 -1.522c.165 .595 .34 1.095 .547 1.521c.443 .918 1.026 1.495 1.937 1.933c.426 .205 .925 .38 1.516 .546a9.3 9.3 0 0 0 -1.516 .547c-.911 .438 -1.494 1.015 -1.937 1.932a9 9 0 0 0 -.547 1.521c-.165 -.594 -.34 -1.095 -.547 -1.521c-.443 -.918 -1.026 -1.494 -1.937 -1.932a9 9 0 0 0 -1.516 -.547' }],
+    ['path', { d: 'M3 14a21 21 0 0 0 1.652 -.532c2.542 -.953 3.853 -2.238 4.816 -4.806a20 20 0 0 0 .532 -1.662a20 20 0 0 0 .532 1.662c.963 2.567 2.275 3.853 4.816 4.806q .75 .28 1.652 .532a21 21 0 0 0 -1.652 .532c-2.542 .953 -3.854 2.238 -4.816 4.806a20 20 0 0 0 -.532 1.662a20 20 0 0 0 -.532 -1.662c-.963 -2.568 -2.275 -3.853 -4.816 -4.806a21 21 0 0 0 -1.652 -.532' }],
+  ],
   fileUpload: [
     ['path', { d: 'M14 3v4a1 1 0 0 0 1 1h4' }],
     ['path', { d: 'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2' }],
@@ -1797,6 +1802,10 @@ export function GalleryScreen(p) {
       extra: headerExtra([
         typeof p.onUploadFiles === 'function' && h(IconButton, { label: '파일 업로드', icon: 'fileUpload', onClick: p.onUploadFiles }),
         typeof p.onUploadLink === 'function' && h(IconButton, { label: '링크 업로드', icon: 'link', onClick: p.onUploadLink }),
+        // AI 분석 moved out of the tab row into the header (2026-10); pressing again returns to 사진.
+        typeof p.onToggleAnalysis === 'function' && h(IconButton, {
+          label: p.analysisActive ? 'AI 분석 닫기' : 'AI 분석', icon: 'sparkles', active: !!p.analysisActive, onClick: p.onToggleAnalysis,
+        }),
       ]),
     },
       h('div', { id: 'v2-gallery-header-tabs-slot', className: 'v2-gallery-tabs-slot' })
@@ -1824,7 +1833,12 @@ function makeTabbedScreen(name, title) {
           onClick: () => p.onSetGridCols(p.gridCols === '1' ? '2' : '1'),
         }),
       ])
-      : null);
+      : (name === 'archive' && typeof p.onToggleSuggest === 'function'
+        // 추천 moved out of the archive tab row into the header (2026-10).
+        ? headerExtra([h(IconButton, {
+          label: p.suggestActive ? '추천 닫기' : '태그 추천', icon: 'sparkles', active: !!p.suggestActive, onClick: p.onToggleSuggest,
+        })])
+        : null));
     return h(
       'section',
       { className: `v2-${name} v2-dest-page v2-embed-frame v2-has-page-header` },
