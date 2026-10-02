@@ -425,6 +425,32 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // 좋아요 (src/core/likes-model.js): one document per liked thing, shared by the calendar.
+      // The document existing IS the like, so a toggle is one create or one delete. Doc id is
+      // likeDocId(kind, ref) = `<kind>_<16 hex>`. Fixed field set (hasOnly) because nothing else
+      // writes here and the 좋아요 tab renders these fields directly.
+      function isValidLikeDocId(id) {
+        return id is string && id.matches('^(photo|memo|file|link|content|memory|person|place|meeting)_[0-9a-f]{16}$');
+      }
+      function hasValidLikeShape(data) {
+        return data.keys().hasOnly(['kind', 'ref', 'title', 'subtitle', 'thumb', 'url', 'likedAt', 'target'])
+          && data.kind is string && data.kind.matches('^(photo|memo|file|link|content|memory|person|place|meeting)$')
+          && data.ref is string && data.ref.size() > 0 && data.ref.size() <= 500
+          && (!('title' in data) || (data.title is string && data.title.size() <= 300))
+          && (!('subtitle' in data) || (data.subtitle is string && data.subtitle.size() <= 300))
+          && (!('thumb' in data) || (data.thumb is string && data.thumb.size() <= 2000))
+          && (!('url' in data) || (data.url is string && data.url.size() <= 2000))
+          && (!('likedAt' in data) || data.likedAt is number)
+          && (!('target' in data) || (data.target is map && data.target.size() <= 20));
+      }
+      match /likes/{likeId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId)
+          && isValidLikeDocId(likeId)
+          && hasValidLikeShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId) && isValidLikeDocId(likeId);
+      }
+
       // Confirmed meeting dates + their 회비 정산 (settlement) data. Same migration reasoning as
       // places above. Doc ID is the entry's own `date` string (unique per calendar already, since
       // getConfirmedMeetings/handleConfirmMeeting key off date) rather than a generated id.

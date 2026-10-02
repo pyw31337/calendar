@@ -2,6 +2,7 @@ import { shortParticipantName } from './v2/view-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
+import { LikeButton } from './like-button.js';
 
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
@@ -1921,6 +1922,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         : { position: 'absolute', top: '10px', right: '34px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'flex', alignItems: 'center' },
       className: "memo-card-share-btn"
     }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
+    /* 좋아요 -- immediately left of the share button (same 16px size, same top line). */
+    memo.id && /*#__PURE__*/React.createElement(LikeButton, {
+      calendarId: calendar?.id,
+      size: 16,
+      className: 'memo-card-like-btn' + (hidePinButton ? ' is-no-pin' : ''),
+      item: { kind: 'memo', ref: String(memo.id), title: memo.title || String(memo.text || memo.content || '').split('\n')[0].slice(0, 80) || '메모', subtitle: String(memo.text || memo.content || '').replace(/\s+/g, ' ').slice(0, 120), thumb: (Array.isArray(memo.thumbUrls) && memo.thumbUrls[0]) || (Array.isArray(memo.imageUrls) && memo.imageUrls[0]) || memo.imageUrl || '', target: { memoId: String(memo.id) } }
+    }),
     /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) --
        hidden entirely on the main-screen preview (hidePinButton), which has no "고정" concept. */
     !hidePinButton && /*#__PURE__*/React.createElement("button", {
@@ -1933,10 +1941,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       style: {
         position: 'absolute', top: '10px', right: '10px',
         background: 'none', border: 'none', cursor: 'pointer',
-        color: effectivePinned ? '#F59E0B' : '#64748B',
+        // Unpinned = the same gray as the share icon next to it (it used to pick up the brand
+        // purple from the V2 card CSS even when off).
+        color: effectivePinned ? '#F59E0B' : 'var(--text-muted)',
         opacity: effectivePinned ? 1 : 0.2
       },
-      className: "memo-card-pin-btn"
+      className: "memo-card-pin-btn" + (effectivePinned ? " is-pinned" : "")
     }, effectivePinned ?
       /* ON state filled pin SVG */
       /*#__PURE__*/React.createElement("svg", {
@@ -1958,7 +1968,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         color: 'var(--text-main)',
         marginBottom: isPageLayout ? '3px' : '8px',
         lineHeight: isPageLayout ? '1.25' : undefined,
-        paddingRight: hidePinButton ? '30px' : '44px',
+        paddingRight: hidePinButton ? '56px' : '70px',
         wordBreak: 'break-all'
       }
     }, highlightKeyword(memo.title, searchQuery)),

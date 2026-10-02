@@ -2946,6 +2946,8 @@ export function buildRenewalRecordsContext(calendar, deps) {
 function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const [gallerySearchQuery, setGallerySearchQuery] = React.useState('');
+  const [galleryTab, setGalleryTab] = React.useState('photos');
+  const handleGalleryTabChange = React.useCallback(tab => setGalleryTab(tab), []);
   const galleryActionsRef = React.useRef({});
   const registerGalleryActions = React.useCallback((actions) => {
     galleryActionsRef.current = actions || {};
@@ -2971,6 +2973,8 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     v2SearchQuery: gallerySearchQuery,
     onV2SearchQuery: setGallerySearchQuery,
     onRegisterMenuActions: registerGalleryActions,
+    onActiveTabChange: handleGalleryTabChange,
+    onChangeView,
   });
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'v2-records-media' },
@@ -2986,6 +2990,8 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
         searchPlaceholder: '사진·링크·파일 통합 검색 (태그, 텍스트, URL)',
         onUploadFiles: () => galleryActionsRef.current.uploadMixed?.(),
         onUploadLink: () => galleryActionsRef.current.uploadLink?.(),
+        onToggleAnalysis: () => galleryActionsRef.current.toggleAnalysis?.(),
+        analysisActive: galleryTab === 'analysis',
         slots: {},
       })
     ),
@@ -3055,6 +3061,8 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
   const [archiveSearchQuery, setArchiveSearchQuery] = React.useState('');
+  const [archiveTab, setArchiveTab] = React.useState('memories');
+  const handleArchiveTabChange = React.useCallback(tab => setArchiveTab(tab), []);
   const historyActionsRef = React.useRef({});
   const registerHistoryActions = React.useCallback((actions) => {
     historyActionsRef.current = actions || {};
@@ -3071,6 +3079,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
     v2SearchQuery: archiveSearchQuery,
     onV2SearchQuery: setArchiveSearchQuery,
     onRegisterMenuActions: registerHistoryActions,
+    onActiveTabChange: handleArchiveTabChange,
   });
   return React.createElement(React.Fragment, null,
     renderArchiveScreen({
@@ -3083,6 +3092,8 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
       searchQuery: archiveSearchQuery,
       onSearchQuery: setArchiveSearchQuery,
       searchPlaceholder: '추억·인물·장소·날짜·태그 검색...',
+      onToggleSuggest: () => historyActionsRef.current.toggleSuggest?.(),
+      suggestActive: archiveTab === 'suggest',
       slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
