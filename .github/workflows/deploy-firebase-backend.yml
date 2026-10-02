@@ -162,7 +162,7 @@ jobs:
         if: startsWith(inputs.post_deploy, 'restore-bulk-deleted-photos')
         uses: actions/download-artifact@v4
         with:
-          run-id: 37004116964
+          run-id: 36977244581
           github-token: ${{ github.token }}
           path: pre-delete-backup
       - name: Restore bulk-deleted photos
