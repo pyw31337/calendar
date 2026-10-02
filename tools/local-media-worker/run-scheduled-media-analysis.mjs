@@ -100,7 +100,7 @@ async function main() {
     if (config.facePython) {
       const result = results[results.length - 1];
       try {
-        await run(config.facePython, [FACE_WORKER, '--calendar', calendarId, '--config', configPath, '--upload', '--quiet', '--max-new', String(config.faceMaxNewPerRun || 400)]);
+        await run(config.facePython, [FACE_WORKER, '--calendar', calendarId, '--config', configPath, '--upload', '--quiet', '--if-changed', '--max-new', String(config.faceMaxNewPerRun || 400)]);
         result.faces = { ok: true };
       } catch (error) {
         result.faces = { ok: false, error: String(error?.message || error).slice(0, 300) };

@@ -13,8 +13,9 @@
     source ~/.venvs/photos/bin/activate
     pip install opencv-python-headless numpy pillow     # 한 번만
 
-    python tools/local-media-worker/face-tags.py --calendar cw              # 미리보기 (아무것도 안 올림)
-    python tools/local-media-worker/face-tags.py --calendar cw --upload     # 추천을 앱으로 보냄
+    python tools/local-media-worker/face-tags.py                            # 미리보기: 사진 분석에 등록된 캘린더 전부
+    python tools/local-media-worker/face-tags.py --calendar cw              # 미리보기: 한 캘린더만 (cw,kkot 처럼 여러 개도)
+    python tools/local-media-worker/face-tags.py --upload                   # 추천을 앱으로 보냄
     python tools/local-media-worker/face-tags.py --enable-schedule          # 매일 밤 사진 분석 때 자동 실행
     python tools/local-media-worker/face-tags.py --disable-schedule --forget  # 끄고 이 맥의 얼굴 데이터 삭제
 """
@@ -72,6 +73,7 @@ TOPK = 3              # score = mean of the 3 closest known faces (children chan
 MIN_SAMPLES = 3       # a person needs this many clean faces before we suggest them
 PRUNE = 0.25          # a "clean" sample this far from the person's average is a mistagged photo
 UPLOAD_BATCH = 100
+REFRESH_HOURS = 6     # --if-changed still re-learns this often (new person tags, participants)
 VIDEO_EXT = re.compile(r'\.(mp4|mov|m4v|webm|avi|3gp)(?:$|[?#])', re.I)
 
 
@@ -151,6 +153,7 @@ def open_db():
       CREATE TABLE IF NOT EXISTS faces (calendar TEXT, asset TEXT, idx INTEGER, x REAL, y REAL, w REAL, h REAL,
                                         score REAL, emb BLOB, PRIMARY KEY (calendar, asset, idx));
       CREATE TABLE IF NOT EXISTS uploaded (calendar TEXT, asset TEXT, names TEXT, PRIMARY KEY (calendar, asset));
+      CREATE TABLE IF NOT EXISTS runs (calendar TEXT PRIMARY KEY, revision TEXT, at INTEGER);
     ''')
     return db
 
@@ -406,11 +409,12 @@ def forget():
 
 def main():
     ap = argparse.ArgumentParser(description='우리 사진의 인물 태그로 얼굴을 배워 태그 없는 사진에 인물을 추천합니다')
-    ap.add_argument('--calendar')
+    ap.add_argument('--calendar', help='cw 또는 cw,kkot,jhair. 생략하면 사진 분석에 등록된 캘린더 전부')
     ap.add_argument('--config', default=DEFAULT_CONFIG)
     ap.add_argument('--upload', action='store_true', help='추천을 앱(보관함 > 추천)으로 보냄')
     ap.add_argument('--max-new', type=int, default=0, help='이번에 새로 볼 사진 수 제한 (0 = 전부)')
     ap.add_argument('--quiet', action='store_true')
+    ap.add_argument('--if-changed', action='store_true', help='사진이 바뀌었거나 몇 시간 지났을 때만 (자동 실행용)')
     ap.add_argument('--enable-schedule', action='store_true', help='매일 사진 분석 때 자동 실행')
     ap.add_argument('--disable-schedule', action='store_true', help='매일 자동 실행 끄기')
     ap.add_argument('--forget', action='store_true', help='이 맥에 저장된 얼굴 데이터 삭제')
@@ -421,19 +425,57 @@ def main():
         if args.forget:
             forget()
         return
-    if not args.calendar or not re.fullmatch(r'[A-Za-z0-9_-]{1,60}', args.calendar):
-        sys.exit('--calendar 를 주세요 (예: --calendar cw)')
+    config = read_config(args.config)
+    calendars = [c.strip() for c in (args.calendar or '').split(',') if c.strip()] or list(config.get('calendarIds') or [])
+    if not calendars:
+        sys.exit('--calendar 를 주세요 (예: --calendar cw). 사진 분석 워커를 설정했다면 그 캘린더 전부를 자동으로 봅니다.')
+    bad = [c for c in calendars if not re.fullmatch(r'[A-Za-z0-9_-]{1,60}', c)]
+    if bad:
+        sys.exit(f'캘린더 id 형식이 아닙니다: {", ".join(bad)}')
 
     people_import = _people_import()
-    rows = [r for r in people_import.list_all(f'calendars/cal_{args.calendar}/photoIndex') if photo_url(r)]
-    labels = people_import.person_labels(args.calendar)
+    engine = FaceEngine()
+    db = open_db()
+    failed = []
+    for calendar in calendars:
+        if not args.quiet and len(calendars) > 1:
+            print(f'\n===== {calendar} =====')
+        try:
+            run_calendar(calendar, args, config, people_import, engine, db)
+        except Exception as error:  # one calendar failing must not stop the others
+            failed.append(calendar)
+            print(f'{calendar}: 실패 - {str(error)[:200]}', file=sys.stderr)
+    if failed:
+        sys.exit(1)
+
+
+def photo_index_revision(people_import, calendar):
+    try:
+        doc = people_import._get(f'{people_import.ROOT}/calendars/cal_{calendar}/photoIndexMeta/summary')
+        return str(people_import._decode(doc.get('fields', {}).get('revision', {'nullValue': None})) or '')
+    except Exception:
+        return ''
+
+
+def run_calendar(calendar, args, config, people_import, engine, db):
+    """Faces are learned and matched per calendar: people, photos and suggestions never cross
+    from one calendar to another (each calendar is its own group)."""
+    revision = photo_index_revision(people_import, calendar)
+    if args.if_changed:
+        # The scheduler calls this every 15 minutes. Reading every photo each time would be
+        # thousands of Firestore reads a day, so skip unless photos changed (new upload, tag
+        # edit) or REFRESH_HOURS passed (participants or person tags can change without it).
+        last = db.execute('SELECT revision, at FROM runs WHERE calendar = ?', (calendar,)).fetchone()
+        # No revision document (older calendars) -> fall back to the time limit alone.
+        if last and time.time() - (last[1] or 0) < REFRESH_HOURS * 3600 and (not revision or last[0] == revision):
+            return
+    rows = [r for r in people_import.list_all(f'calendars/cal_{calendar}/photoIndex') if photo_url(r)]
+    labels = people_import.person_labels(calendar)
     variants = person_variants(labels)
     spelling = preferred_spelling(rows, variants)
 
-    engine = FaceEngine()
-    db = open_db()
-    scan_photos(db, engine, args.calendar, rows, args.max_new, args.quiet)
-    photo_faces = load_faces(db, args.calendar, {r['id'] for r in rows})
+    scan_photos(db, engine, calendar, rows, args.max_new, args.quiet)
+    photo_faces = load_faces(db, calendar, {r['id'] for r in rows})
     photo_people = {r['id']: people_in(r.get('tags'), variants) for r in rows}
     gallery, sample_counts = learn(photo_faces, photo_people)
     suggestions = suggest(gallery, photo_faces, photo_people)
@@ -461,10 +503,11 @@ def main():
             print(f"  {asset}: " + ' '.join(f'+#{spelling.get(l, l)}({v:.2f})' for l, v in names))
 
     if args.upload:
-        upload(db, args.calendar, read_config(args.config), suggestions, photo_faces, spelling, args.quiet)
+        upload(db, calendar, config, suggestions, photo_faces, spelling, args.quiet)
     elif not args.quiet:
         print('\n미리보기만 했습니다. 앱 추천으로 보내려면 --upload 를 붙여 다시 실행하세요.')
-
+    db.execute('INSERT OR REPLACE INTO runs VALUES (?, ?, ?)', (calendar, revision, int(time.time())))
+    db.commit()
 
 if __name__ == '__main__':
     main()
