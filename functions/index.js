@@ -3053,9 +3053,9 @@ function formatBriefDate(date = new Date()) {
 
 function mediaWorkerIsStale(workerState, now = Date.now()) {
   const heartbeat = Number(workerState?.lastHeartbeatAt || 0);
-  // The local worker finishes its weekday window just before 08:00. A 40-minute tolerance
-  // leaves room for sleep/wake timing while still making an interrupted LaunchAgent visible.
-  return !heartbeat || now - heartbeat > 40 * 60 * 1000;
+  // An idle Mac (no new photos) reports in only every 12 hours -- it no longer calls the server
+  // every 15 minutes just to say it is alive. 26 hours still flags a Mac that stopped for a day.
+  return !heartbeat || now - heartbeat > 26 * 60 * 60 * 1000;
 }
 
 async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {

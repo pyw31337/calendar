@@ -73,7 +73,6 @@ TOPK = 3              # score = mean of the 3 closest known faces (children chan
 MIN_SAMPLES = 3       # a person needs this many clean faces before we suggest them
 PRUNE = 0.25          # a "clean" sample this far from the person's average is a mistagged photo
 UPLOAD_BATCH = 100
-REFRESH_HOURS = 6     # --if-changed still re-learns this often (new person tags, participants)
 VIDEO_EXT = re.compile(r'\.(mp4|mov|m4v|webm|avi|3gp)(?:$|[?#])', re.I)
 
 
@@ -462,12 +461,12 @@ def run_calendar(calendar, args, config, people_import, engine, db):
     from one calendar to another (each calendar is its own group)."""
     revision = photo_index_revision(people_import, calendar)
     if args.if_changed:
-        # The scheduler calls this every 15 minutes. Reading every photo each time would be
-        # thousands of Firestore reads a day, so skip unless photos changed (new upload, tag
-        # edit) or REFRESH_HOURS passed (participants or person tags can change without it).
+        # The scheduler checks every 15 minutes, but only new data is worth any work: skip unless
+        # the photo index changed (new upload, tag edit, person tag). That check is one document
+        # read; no time-based full re-run.
         last = db.execute('SELECT revision, at FROM runs WHERE calendar = ?', (calendar,)).fetchone()
-        # No revision document (older calendars) -> fall back to the time limit alone.
-        if last and time.time() - (last[1] or 0) < REFRESH_HOURS * 3600 and (not revision or last[0] == revision):
+        # No revision document (older calendars) -> at most once a day.
+        if last and (last[0] == revision if revision else time.time() - (last[1] or 0) < 24 * 3600):
             return
     rows = [r for r in people_import.list_all(f'calendars/cal_{calendar}/photoIndex') if photo_url(r)]
     labels = people_import.person_labels(calendar)

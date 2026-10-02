@@ -21,6 +21,7 @@ const MAX_DOWNLOAD_BYTES = 35 * 1024 * 1024;
 const DEFAULT_TOKEN_SERVICE = 'Moyeora Media Analysis Worker';
 const MAX_CONSECUTIVE_ASSET_FAILURES = 3;
 const NETWORK_TIMEOUT_MS = 30 * 1000;
+const IDLE_HEARTBEAT_MS = 12 * 60 * 60 * 1000;
 
 function kstDateStamp(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -382,8 +383,16 @@ async function main() {
   // A completed revision can skip image downloads, but it must still heartbeat the server.  This
   // is how the server distinguishes an idle Mac from one that silently stopped running.
   if (!args.force && revision && revision === current.revision && !current.pendingRevision) {
-    const result = await upload(args, token, runId, [], 'scheduled', { status: 'idle' });
-    const report = { calendarId: args.calendar, skipped: true, reason: 'photo-index-unchanged', revision, generatedAt: now, summary: result.summary || {} };
+    // Nothing new: one document read and no server call, except a heartbeat every 12 hours
+    // (functions/index.js mediaWorkerIsStale allows 26 hours).
+    const heartbeatDue = now - Number(current.lastIdleHeartbeatAt || 0) >= IDLE_HEARTBEAT_MS;
+    const result = heartbeatDue ? await upload(args, token, runId, [], 'scheduled', { status: 'idle' }) : {};
+    if (heartbeatDue) {
+      state.calendars = { ...(state.calendars || {}), [args.calendar]: { ...current, lastIdleHeartbeatAt: now } };
+      await mkdir(dirname(statePath), { recursive: true });
+      await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+    }
+    const report = { calendarId: args.calendar, skipped: true, reason: 'photo-index-unchanged', heartbeat: heartbeatDue, revision, generatedAt: now, summary: result.summary || {} };
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     return;
@@ -461,7 +470,8 @@ async function main() {
         ? (current.cursor || null)
         : (last ? { updatedAt: Number(last.data.updatedAt) || 0, name: last.name } : current.cursor || null),
       failures: nextFailures,
-      lastRunAt: now
+      lastRunAt: now,
+      lastIdleHeartbeatAt: now
     }
   };
   await mkdir(dirname(statePath), { recursive: true });
