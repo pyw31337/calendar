@@ -2,8 +2,14 @@
  * 좋아요 (likes) — data model. One Firestore document per liked thing, shared by everyone in the
  * calendar (the 갤러리 > 좋아요 tab is the group's collection of favourites):
  *
- *   calendars/cal_{calendarId}/likes/{likeDocId(kind, ref)}
- *     { kind, ref, title, subtitle, thumb, url, likedAt, target }
+ *   calendars/cal_{calendarId}/likes/{likeDocId(kind, ref, participantId)}
+ *     { kind, ref, participantId, title, subtitle, thumb, url, likedAt, target }
+ *
+ * Likes belong to the participant currently selected on this device (the same 참여자 the chat,
+ * memo and comments use; there is no login yet). The id carries a short hash of the participant
+ * id, so 김유리's like and 박영우's like of the same photo are two documents, and choosing the same
+ * participant on another device shows the same likes. Likes written before this (no participantId,
+ * id without the `_p…` suffix) are kept and show only under 모두.
  *
  * `kind` is what was liked, `ref` the stable identity of that thing inside its own feature
  * (photo asset key, memo id, place id, url, …). The document exists ⇔ the thing is liked, so a
@@ -29,16 +35,23 @@ function fnv1a(text, seed) {
   return hash.toString(16).padStart(8, '0');
 }
 
-export function likeDocId(kind, ref) {
+export function likeDocId(kind, ref, participantId = '') {
   const cleanKind = LIKE_KINDS.includes(kind) ? kind : 'item';
   const key = `${cleanKind}:${String(ref || '')}`;
-  return `${cleanKind}_${fnv1a(key, 0x811c9dc5)}${fnv1a(key, 0x01234567)}`;
+  const base = `${cleanKind}_${fnv1a(key, 0x811c9dc5)}${fnv1a(key, 0x01234567)}`;
+  const pid = String(participantId || '');
+  return pid ? `${base}_p${fnv1a(pid, 0x9e3779b9)}` : base;
+}
+
+/** Same thing liked by several people -> one key (the 모두 view merges them). */
+export function likeThingKey(like) {
+  return `${like?.kind || ''}:${like?.ref || ''}`;
 }
 
 const clip = (value, max) => String(value == null ? '' : value).slice(0, max);
 
 /** Normalises a like before it is written (sizes match firestore.rules hasValidLikeShape). */
-export function buildLikeDocument(item, now = Date.now()) {
+export function buildLikeDocument(item, now = Date.now(), participantId = '') {
   const kind = LIKE_KINDS.includes(item?.kind) ? item.kind : null;
   const ref = clip(item?.ref, 500);
   if (!kind || !ref) return null;
@@ -48,7 +61,7 @@ export function buildLikeDocument(item, now = Date.now()) {
     if (typeof value === 'number' || typeof value === 'boolean') target[clip(key, 40)] = value;
     else target[clip(key, 40)] = clip(value, 1000);
   });
-  return {
+  const doc = {
     kind,
     ref,
     title: clip(item?.title, 300),
@@ -58,6 +71,28 @@ export function buildLikeDocument(item, now = Date.now()) {
     likedAt: Number(item?.likedAt) || now,
     target
   };
+  const pid = clip(participantId, 120);
+  if (pid) doc.participantId = pid;
+  return doc;
+}
+
+/**
+ * The 좋아요 tab lists: `mine` = this participant's likes; `all` = every participant's likes plus
+ * the older shared ones, one entry per liked thing with who liked it (newest like first).
+ */
+export function splitLikesForParticipant(likes, participantId) {
+  const list = Array.isArray(likes) ? likes : [];
+  const pid = String(participantId || '');
+  const mine = pid ? list.filter(like => like && like.participantId === pid) : list.filter(like => like && !like.participantId);
+  const merged = new Map();
+  list.slice().sort((a, b) => Number(b?.likedAt || 0) - Number(a?.likedAt || 0)).forEach(like => {
+    if (!like) return;
+    const key = likeThingKey(like);
+    const prev = merged.get(key);
+    if (!prev) { merged.set(key, { ...like, likerIds: like.participantId ? [like.participantId] : [] }); return; }
+    if (like.participantId && !prev.likerIds.includes(like.participantId)) prev.likerIds.push(like.participantId);
+  });
+  return { mine, all: Array.from(merged.values()) };
 }
 
 /** Likes grouped for the 좋아요 tab: kinds in LIKE_KINDS order, newest first inside each. */

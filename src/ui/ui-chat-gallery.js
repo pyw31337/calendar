@@ -608,6 +608,8 @@ export function ChatGalleryModal({
   const [activeTab, setActiveTab] = React.useState('photos');
   // 좋아요 tab: everything the calendar liked across screens (core/likes-store.js).
   const galleryLikes = useLikes(React, calendar?.id);
+  // 내 좋아요 = the participant chosen on this device; 모두 = everyone's, one card per liked thing.
+  const [likesScope, setLikesScope] = React.useState('mine');
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
   const [galleryListPage, setGalleryListPage] = React.useState(1);
   const setGalleryTab = next => {
@@ -2859,15 +2861,41 @@ export function ChatGalleryModal({
     const view = LIKE_DESTINATION[like.kind];
     if (view && typeof onChangeView === 'function') onChangeView(view);
   };
+  const likeParticipants = Array.isArray(calendar?.participants) ? calendar.participants : [];
+  const likerNames = like => (like.likerIds || [])
+    .map(id => likeParticipants.find(p => p && p.id === id)?.name)
+    .filter(Boolean);
+  const renderLikesScope = () => {
+    const me = likeParticipants.find(p => p && p.id === galleryLikes.participantId);
+    const pill = (value, label) => /*#__PURE__*/React.createElement("button", {
+      key: value,
+      type: "button",
+      "aria-pressed": likesScope === value ? 'true' : 'false',
+      onClick: () => setLikesScope(value),
+      style: {
+        minHeight: '32px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer', fontSize: 'var(--font-size-xs)', fontWeight: 800,
+        border: likesScope === value ? 'none' : '1px solid var(--border-color)',
+        background: likesScope === value ? 'var(--brand, #7C3AED)' : 'var(--bg-card)',
+        color: likesScope === value ? 'var(--on-brand, #fff)' : 'var(--text-main)'
+      }
+    }, label);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "gallery-likes-scope",
+      style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+    }, pill('mine', me ? `${me.name} 님의 좋아요` : '내 좋아요'), pill('all', '모두의 좋아요'));
+  };
   const renderLikesTab = () => {
-    const groups = groupLikesByKind(galleryLikes.list);
+    const groups = groupLikesByKind(likesScope === 'all' ? galleryLikes.all : galleryLikes.list);
     if (!groups.length) {
-      return /*#__PURE__*/React.createElement("div", {
+      return [renderLikesScope(), /*#__PURE__*/React.createElement("div", {
+        key: "empty",
         className: "gallery-likes-empty",
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '48px 16px', fontSize: 'var(--font-size-base)', lineHeight: 1.6 }
-      }, galleryLikes.ready ? '아직 좋아요한 항목이 없어요. 사진·메모·장소 등에서 하트를 눌러 모아보세요.' : '좋아요 목록을 불러오는 중...');
+      }, !galleryLikes.ready ? '좋아요 목록을 불러오는 중...' : likesScope === 'all'
+        ? '아직 아무도 좋아요한 항목이 없어요.'
+        : '아직 좋아요한 항목이 없어요. 사진·메모·장소 등에서 하트를 눌러 모아보세요.')];
     }
-    return groups.map(group => /*#__PURE__*/React.createElement("section", {
+    return [/*#__PURE__*/React.createElement(React.Fragment, { key: "scope" }, renderLikesScope())].concat(groups.map(group => /*#__PURE__*/React.createElement("section", {
       key: group.kind,
       className: "gallery-likes-section",
       style: { display: 'flex', flexDirection: 'column', gap: '10px' }
@@ -2892,7 +2920,11 @@ export function ChatGalleryModal({
               }),
               style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
             }),
-            /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onMedia', item: like })
+            /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onMedia', item: like }),
+            likesScope === 'all' && likerNames(like).length > 0 && /*#__PURE__*/React.createElement("span", {
+              title: likerNames(like).join(', '),
+              style: { position: 'absolute', left: '6px', bottom: '6px', padding: '1px 7px', borderRadius: '999px', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '11px', fontWeight: 800, pointerEvents: 'none' }
+            }, likerNames(like).length > 1 ? `${likerNames(like).length}명` : likerNames(like)[0])
           )))
         : /*#__PURE__*/React.createElement("div", {
             style: { display: 'grid', gridTemplateColumns: isTabletOrMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: '8px' }
@@ -2918,11 +2950,14 @@ export function ChatGalleryModal({
               }, like.title || LIKE_KIND_LABELS[like.kind]),
               like.subtitle && /*#__PURE__*/React.createElement("span", {
                 style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-              }, like.subtitle)
+              }, like.subtitle),
+              likesScope === 'all' && likerNames(like).length > 0 && /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--brand, #7C3AED)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, `♥ ${likerNames(like).join(' · ')}`)
             ),
             /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onCard', item: like })
           )))
-    ));
+    )));
   };
   const renderGalleryContent = () => {
     if (activeTab === 'likes') return renderLikesTab();

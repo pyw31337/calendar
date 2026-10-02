@@ -3,6 +3,7 @@
  */
 
 import { enqueueWriteOperation } from '../core/app-write-queue.js';
+import { useParticipantSync } from '../core/current-participant.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 
@@ -458,6 +459,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [composerParticipantId, setComposerParticipantId] = React.useState(() => {
     return getStoredChatParticipantId(calendar?.id, calendar);
   });
+  useParticipantSync(React, calendar?.id, setComposerParticipantId);
   const [isComposerPartOpen, setIsComposerPartOpen] = React.useState(false);
   const [editParticipantId, setEditParticipantId] = React.useState('');
   const [isEditPartOpen, setIsEditPartOpen] = React.useState(false);

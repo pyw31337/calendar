@@ -48,3 +48,12 @@ test('unknown fields and kinds are rejected', async () => {
   assert.equal((await put('photo_2123456789abcdef', like({ kind: str('chat') }))).status, 403);
   assert.equal((await put('photo_3123456789abcdef', like({ ref: str('') }))).status, 403);
 });
+
+test('a participant like needs its participantId; the legacy shared id still works', async () => {
+  const pid = { participantId: str('p_yuri') };
+  assert.equal((await put('photo_4123456789abcdef_p0123abcd', like(pid))).status, 200);
+  assert.equal((await put('photo_5123456789abcdef_p0123abcd', like())).status, 403, 'suffixed id without participantId');
+  assert.equal((await put('photo_6123456789abcdef_pXYZ', like(pid))).status, 403, 'malformed participant suffix');
+  assert.equal((await put('photo_7123456789abcdef', like())).status, 200, 'legacy shared like');
+  assert.equal((await put('photo_8123456789abcdef_p0123abcd', like({ participantId: str('x'.repeat(121)) }))).status, 403);
+});

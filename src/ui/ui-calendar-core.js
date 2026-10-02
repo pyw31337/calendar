@@ -3,6 +3,7 @@ import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { LikeButton } from './like-button.js';
+import { useParticipantSync } from '../core/current-participant.js';
 
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
@@ -1710,6 +1711,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   }, [memo.id]);
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
+  useParticipantSync(React, calendar?.id, setCommentParticipantId);
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const [isSavingComment, setIsSavingComment] = React.useState(false);

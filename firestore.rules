@@ -425,15 +425,22 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
-      // 좋아요 (src/core/likes-model.js): one document per liked thing, shared by the calendar.
+      // 좋아요 (src/core/likes-model.js): one document per liked thing per participant.
       // The document existing IS the like, so a toggle is one create or one delete. Doc id is
-      // likeDocId(kind, ref) = `<kind>_<16 hex>`. Fixed field set (hasOnly) because nothing else
-      // writes here and the 좋아요 tab renders these fields directly.
+      // likeDocId(kind, ref, participantId) = `<kind>_<16 hex>_p<8 hex>`; older shared likes have
+      // no `_p` suffix and no participantId. A suffixed id must carry the participantId field.
+      // Fixed field set (hasOnly) because nothing else writes here and the 좋아요 tab renders
+      // these fields directly.
       function isValidLikeDocId(id) {
-        return id is string && id.matches('^(photo|memo|file|link|content|memory|person|place|meeting)_[0-9a-f]{16}$');
+        return id is string && id.matches('^(photo|memo|file|link|content|memory|person|place|meeting)_[0-9a-f]{16}(_p[0-9a-f]{8})?$');
+      }
+      function hasLikeOwnerForId(id, data) {
+        return !id.matches('.*_p[0-9a-f]{8}$')
+          || ('participantId' in data && data.participantId is string && data.participantId.size() > 0 && data.participantId.size() <= 120);
       }
       function hasValidLikeShape(data) {
-        return data.keys().hasOnly(['kind', 'ref', 'title', 'subtitle', 'thumb', 'url', 'likedAt', 'target'])
+        return data.keys().hasOnly(['kind', 'ref', 'participantId', 'title', 'subtitle', 'thumb', 'url', 'likedAt', 'target'])
+          && (!('participantId' in data) || (data.participantId is string && data.participantId.size() <= 120))
           && data.kind is string && data.kind.matches('^(photo|memo|file|link|content|memory|person|place|meeting)$')
           && data.ref is string && data.ref.size() > 0 && data.ref.size() <= 500
           && (!('title' in data) || (data.title is string && data.title.size() <= 300))
@@ -447,6 +454,7 @@ service cloud.firestore {
         allow read: if isCalendarDoc(calendarDocId);
         allow create, update: if isCalendarDoc(calendarDocId)
           && isValidLikeDocId(likeId)
+          && hasLikeOwnerForId(likeId, request.resource.data)
           && hasValidLikeShape(request.resource.data);
         allow delete: if isCalendarDoc(calendarDocId) && isValidLikeDocId(likeId);
       }

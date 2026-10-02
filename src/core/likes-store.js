@@ -4,7 +4,8 @@
  * app's standard writeCollectionDocumentWithFallback (SDK → REST → retry queue), scoped to
  * calendars/cal_{id}/likes like every other calendar subcollection.
  */
-import { LIKE_KINDS, buildLikeDocument, likeDocId } from './likes-model.js';
+import { LIKE_KINDS, buildLikeDocument, likeDocId, splitLikesForParticipant } from './likes-model.js';
+import { subscribeParticipantChange, readCurrentParticipantId } from './current-participant.js';
 // app-firebase-data is loaded lazily: a static import from here (pulled in by UI modules that
 // the app shell itself imports) creates an evaluation cycle and broke boot.
 const firebaseData = () => import('./app-firebase-data.js');
@@ -29,9 +30,13 @@ function createLikesStore(calendarId) {
   const rebuild = () => {
     const merged = new Map(byId);
     pending.forEach((doc, id) => { if (doc) merged.set(id, doc); else merged.delete(id); });
-    snapshot = { list: Array.from(merged.values()), ready, version: snapshot.version + 1, byId: merged };
+    const participantId = readCurrentParticipantId(calendarId);
+    const { mine, all } = splitLikesForParticipant(Array.from(merged.values()), participantId);
+    snapshot = { list: mine, all, participantId, ready, version: snapshot.version + 1, byId: merged };
     listeners.forEach(fn => { try { fn(snapshot); } catch (_) {} });
   };
+  // Choosing another participant (side menu badge, chat, memo …) switches whose hearts are lit.
+  subscribeParticipantChange(({ calId }) => { if (!calId || calId === calendarId) rebuild(); });
 
   const loadRest = async () => {
     if (restLoaded) return;
@@ -93,14 +98,15 @@ function createLikesStore(calendarId) {
     },
     getSnapshot: () => snapshot,
     isLiked(kind, ref) {
-      const id = likeDocId(kind, ref);
+      const id = likeDocId(kind, ref, readCurrentParticipantId(calendarId));
       if (pending.has(id)) return Boolean(pending.get(id));
       return byId.has(id);
     },
     async toggle(item) {
-      const doc = buildLikeDocument(item);
+      const participantId = readCurrentParticipantId(calendarId);
+      const doc = buildLikeDocument(item, Date.now(), participantId);
       if (!doc) return false;
-      const id = likeDocId(doc.kind, doc.ref);
+      const id = likeDocId(doc.kind, doc.ref, participantId);
       const wasLiked = this.isLiked(doc.kind, doc.ref);
       pending.set(id, wasLiked ? null : { ...doc, id });
       rebuild();
@@ -139,6 +145,8 @@ export function useLikes(React, calendarId) {
   React.useEffect(() => (store ? store.subscribe(setSnapshot) : undefined), [store]);
   return {
     list: snapshot.list || [],
+    all: snapshot.all || snapshot.list || [],
+    participantId: snapshot.participantId || '',
     ready: Boolean(snapshot.ready),
     isLiked: (kind, ref) => Boolean(store && store.isLiked(kind, ref)),
     toggle: item => (store ? store.toggle(item) : Promise.resolve(false))
