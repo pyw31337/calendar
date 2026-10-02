@@ -65,9 +65,9 @@
   background: transparent !important;
   box-shadow: none !important;
 }
-.v2-design .v2-memo .chat-search-focused-bubble .v2-memo-card-contract,
-.v2-design .v2-memo .v2-memo-card-is-focused .v2-memo-card-contract,
-.v2-design .v2-home-memo-module .v2-memo-card-is-focused .v2-memo-card-contract {
+.v2-design .v2-memo .chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+.v2-design .v2-memo .v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+.v2-design .v2-home-memo-module .v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)) {
   border: 1px solid var(--brand, #7C3AED) !important;
   background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
   box-shadow: none !important;

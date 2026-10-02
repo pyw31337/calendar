@@ -45,7 +45,7 @@ for (const [width, height, dpr, safeTop] of IOS_LAUNCH_DEVICES) {
   await page.setContent(`<!doctype html><html><head><style>${pageCss}
     html, body { margin: 0; background: #07021A; }
     .app-splash, .app-splash * { animation-play-state: paused !important; animation-delay: -10s !important; }
-    .app-splash-shockwave, .app-splash-glint, .app-splash-title, .app-splash-sub, .app-splash-footer { visibility: hidden !important; }
+    .app-splash-glint, .app-splash-title, .app-splash-sub, .app-splash-footer { visibility: hidden !important; }
   </style></head><body>${markup.replace(/src="icons\/icon-v6-192\.png"/, `src="${icon}"`)}</body></html>`);
   await page.waitForTimeout(150);
   const name = `launch-${width * dpr}x${height * dpr}.jpg`;

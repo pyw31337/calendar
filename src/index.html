@@ -239,20 +239,6 @@
         pointer-events: none;
         animation: bp-splash-aura 7s ease-in-out infinite alternate;
       }
-      .app-splash-shockwave {
-        position: absolute;
-        top: calc(env(safe-area-inset-top, 0px) + 18vh + 46px);
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        border: 2px solid rgba(18, 205, 240, 0.7);
-        box-shadow: 0 0 28px rgba(124, 47, 229, 0.8), inset 0 0 16px rgba(18, 205, 240, 0.6);
-        pointer-events: none;
-        opacity: 0;
-        animation: bp-splash-shockwave 1.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
-      }
       .app-splash-content {
         position: relative;
         z-index: 1;
@@ -367,11 +353,6 @@
         box-shadow: 0 0 8px #12CDF0;
         animation: bp-splash-pulse-dot 1s ease-in-out infinite;
       }
-      @keyframes bp-splash-shockwave {
-        0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0.95; }
-        60% { opacity: 0.6; }
-        100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
-      }
       @keyframes bp-splash-ring-spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -421,7 +402,6 @@
   <body>
     <div id="app-splash" class="app-splash" aria-hidden="true">
       <div class="app-splash-bg"></div>
-      <div class="app-splash-shockwave"></div>
       <div class="app-splash-content">
         <div class="app-splash-icon-wrap">
           <div class="app-splash-ring"></div>

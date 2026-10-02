@@ -941,14 +941,10 @@ function CalendarApp() {
     const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
     if (!el) return false;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const targetBubble = el.querySelector('.chat-search-focused-bubble')
-      || el.querySelector('[key="bubble-wrapper"] > div')
-      || el.querySelector('.message-bubble')
-      || el;
-    targetBubble.classList.remove('chat-search-focused-bubble');
-    void targetBubble.offsetWidth;
-    targetBubble.classList.add('chat-search-focused-bubble');
-    setTimeout(() => targetBubble.classList.remove('chat-search-focused-bubble'), 2200);
+    // The highlight itself comes only from ChatRoomView (externalFocusMessageId -> the bubble's
+    // chat-search-focused-bubble). An imperative classList flash used to run here too; its
+    // selector never matched the bubble, so it fell back to the whole message row and painted
+    // a second, rectangular focus frame around it (seen when opening a chat from a push).
 
     if (externalFocusTimeoutRef.current) clearTimeout(externalFocusTimeoutRef.current);
     // Clear first so re-targeting the same message a second time still re-triggers the shake
