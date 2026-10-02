@@ -28,6 +28,8 @@ on:
           - migrate-photo-comments
           - restore-bulk-deleted-photos-dry-run
           - restore-bulk-deleted-photos
+          - restore-memo-files-dry-run
+          - restore-memo-files
       delete_us_copies:
         description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
@@ -159,17 +161,17 @@ jobs:
       # chat messages and memos come back from the backup taken just before it (artifact of the
       # Daily Calendar Backup run named in the manifest), without sending any push.
       - name: Fetch the pre-delete backup
-        if: startsWith(inputs.post_deploy, 'restore-bulk-deleted-photos')
+        if: startsWith(inputs.post_deploy, 'restore-')
         uses: actions/download-artifact@v4
         with:
           run-id: 36977244581
           github-token: ${{ github.token }}
           path: pre-delete-backup
       - name: Restore bulk-deleted photos
-        if: startsWith(inputs.post_deploy, 'restore-bulk-deleted-photos')
+        if: startsWith(inputs.post_deploy, 'restore-')
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          MANIFEST: scripts/restore-2026-10-02-bulk-delete.json
+          MANIFEST: ${{ startsWith(inputs.post_deploy, 'restore-memo-files') && 'scripts/restore-2026-10-03-memo-files.json' || 'scripts/restore-2026-10-02-bulk-delete.json' }}
         run: |
           printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
@@ -177,6 +179,6 @@ jobs:
           test -n "$BACKUP" || { echo "backup json not found in the artifact"; find pre-delete-backup; exit 1; }
           export BACKUP
           node scripts/restore-bulk-deleted-photos.mjs
-          if [ "${{ inputs.post_deploy }}" = "restore-bulk-deleted-photos" ]; then
+          if [ "${{ inputs.post_deploy }}" = "restore-bulk-deleted-photos" ] || [ "${{ inputs.post_deploy }}" = "restore-memo-files" ]; then
             APPLY=1 node scripts/restore-bulk-deleted-photos.mjs
           fi

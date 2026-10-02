@@ -1,0 +1,174 @@
+{
+  "backupRun": 36977244581,
+  "note": "Memo photo files that were deleted while memos (some copied to other calendars) still showed them. Storage paths only; the documents already point at these files.",
+  "docs": [
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1790569622870_iwn14v",
+      "files": [
+        "memoImages/cw/1790569859931_7xdz24_0_original_244558b.jpg"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1788934577587_6cxgpl",
+      "files": [
+        "memoImages/cw/1788934577600_khkirc_0_original_1569557b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1788934088979_t1l1v1",
+      "files": [
+        "memoImages/cw/1788934088991_9v0av0_0_original_382882b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1789698232295_ig4re1",
+      "files": [
+        "memoImages/kkot/1789698196650_wb1526_0_original_1601730b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1789688747270_k061n5",
+      "files": [
+        "memoImages/cw/1789688747287_rho5iy_0_original_539677b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1790569768287_f8cjtz",
+      "files": [
+        "memoImages/cw/1790569768343_uoliiv_0_original_172584b.jpg"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1789603074588_y0q3oh",
+      "files": [
+        "memoImages/cw/1789603074606_fpn25o_0_original_399711b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1790571475631_hzs927",
+      "files": [
+        "memoImages/cw/1790571475716_uw5l6l_0_original_313102b.jpg"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1790572457893_pd5x8z",
+      "files": [
+        "memoImages/cw/1790574614295_vdz96y_0_original_154339b.jpg"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1788935015636_rxulbq",
+      "files": [
+        "memoImages/cw/1788935015652_nwxqj1_0_original_1528001b.png"
+      ]
+    },
+    {
+      "calendar": "cw",
+      "collection": "memos",
+      "docId": "memo_1788934831568_uodfpp",
+      "files": [
+        "memoImages/cw/1788934831581_6lzm1i_0_original_449800b.png"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1788934851501_qteiul",
+      "files": [
+        "memoImages/cw/1788934831581_6lzm1i_0_original_449800b.png"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1788935027330_bk57yx",
+      "files": [
+        "memoImages/cw/1788935015652_nwxqj1_0_original_1528001b.png"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1788934117623_kxx247",
+      "files": [
+        "memoImages/cw/1788934088991_9v0av0_0_original_382882b.png"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1789698243117_la96ym",
+      "files": [
+        "memoImages/kkot/1789698196650_wb1526_0_original_1601730b.png"
+      ]
+    },
+    {
+      "calendar": "jhair",
+      "collection": "memos",
+      "docId": "memo_1788934596860_weem0q",
+      "files": [
+        "memoImages/cw/1788934577600_khkirc_0_original_1569557b.png"
+      ]
+    },
+    {
+      "calendar": "kkot",
+      "collection": "memos",
+      "docId": "memo_1788934844355_7wdf4b",
+      "files": [
+        "memoImages/cw/1788934831581_6lzm1i_0_original_449800b.png"
+      ]
+    },
+    {
+      "calendar": "kkot",
+      "collection": "memos",
+      "docId": "memo_1788934126126_i5l6kb",
+      "files": [
+        "memoImages/cw/1788934088991_9v0av0_0_original_382882b.png"
+      ]
+    },
+    {
+      "calendar": "kkot",
+      "collection": "memos",
+      "docId": "memo_1788934606265_2ktxym",
+      "files": [
+        "memoImages/cw/1788934577600_khkirc_0_original_1569557b.png"
+      ]
+    },
+    {
+      "calendar": "kkot",
+      "collection": "memos",
+      "docId": "memo_1789698196635_xf5fhl",
+      "files": [
+        "memoImages/kkot/1789698196650_wb1526_0_original_1601730b.png"
+      ]
+    },
+    {
+      "calendar": "kkot",
+      "collection": "memos",
+      "docId": "memo_1788935034608_101nvl",
+      "files": [
+        "memoImages/cw/1788935015652_nwxqj1_0_original_1528001b.png"
+      ]
+    }
+  ]
+}
