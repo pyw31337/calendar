@@ -735,6 +735,44 @@ function getKnownImageFingerprintSet(calendarId) {
   return knownImageFingerprintsByCalendar.get(String(calendarId || '').trim()) || new Set();
 }
 
+// fingerprint -> the stored original ({ imageUrl, thumbUrl }) of that photo, per calendar. A
+// re-upload of the same bytes then points at this file instead of storing a second copy.
+// Only slot-aligned records are trusted: a legacy record whose imageFingerprints lost a slot
+// (photo deletes used to leave it behind) would map a fingerprint onto its neighbour's file.
+const knownImageOriginalsByCalendar = new Map();
+function rememberKnownImageOriginals(calendarId, records) {
+  const id = String(calendarId || '').trim();
+  if (!id) return;
+  const map = knownImageOriginalsByCalendar.get(id) || new Map();
+  Array.from(records || []).forEach(record => {
+    const urls = Array.isArray(record?.imageUrls) ? record.imageUrls : [];
+    const thumbs = Array.isArray(record?.thumbUrls) ? record.thumbUrls : [];
+    const fingerprints = Array.isArray(record?.imageFingerprints) ? record.imageFingerprints : [];
+    if (!urls.length || fingerprints.length !== urls.length) return;
+    fingerprints.forEach((value, index) => {
+      const fingerprint = normalizeImageFingerprint(value);
+      const imageUrl = String(urls[index] || '');
+      if (!fingerprint || !/^https:\/\//.test(imageUrl) || map.has(fingerprint)) return;
+      map.set(fingerprint, { imageUrl, thumbUrl: String(thumbs[index] || '') || imageUrl });
+    });
+  });
+  while (map.size > KNOWN_IMAGE_FINGERPRINT_LIMIT) map.delete(map.keys().next().value);
+  knownImageOriginalsByCalendar.set(id, map);
+}
+
+// The stored original is reused only while its file is really there (a lightbox delete may
+// have removed it); otherwise the photo uploads normally.
+async function findReusableOriginal(calendarId, fingerprint) {
+  const original = knownImageOriginalsByCalendar.get(String(calendarId || '').trim())?.get(normalizeImageFingerprint(fingerprint));
+  if (!original || typeof fetch !== 'function') return null;
+  try {
+    const response = await withTimeout(fetch(original.imageUrl, { method: 'HEAD', cache: 'no-store' }), 6000, 'original check');
+    return response.ok ? original : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function readFirestoreFingerprintValues(document) {
   const values = document?.fields?.imageFingerprints?.arrayValue?.values;
   return Array.isArray(values)
@@ -770,7 +808,7 @@ async function lookupKnownImageFingerprintsForCalendar(calendarId, candidateValu
       body: JSON.stringify({
         structuredQuery: {
           from: [{ collectionId: collection }],
-          select: { fields: [{ fieldPath: 'imageFingerprints' }] },
+          select: { fields: ['imageFingerprints', 'imageUrls', 'thumbUrls'].map(fieldPath => ({ fieldPath })) },
           where: {
             fieldFilter: {
               field: { fieldPath: 'imageFingerprints' },
@@ -785,7 +823,11 @@ async function lookupKnownImageFingerprintsForCalendar(calendarId, candidateValu
     const rows = await response.json();
     (Array.isArray(rows) ? rows : [rows])
       .filter(row => row?.document)
-      .forEach(row => rememberKnownImageFingerprints(id, readFirestoreFingerprintValues(row.document)));
+      .forEach(row => {
+        rememberKnownImageFingerprints(id, readFirestoreFingerprintValues(row.document));
+        const strings = field => (row.document.fields?.[field]?.arrayValue?.values || []).map(value => value?.stringValue || '');
+        rememberKnownImageOriginals(id, [{ imageUrls: strings('imageUrls'), thumbUrls: strings('thumbUrls'), imageFingerprints: strings('imageFingerprints') }]);
+      });
   };
 
   const chunks = [];
@@ -811,7 +853,7 @@ async function hydrateKnownImageFingerprintsForCalendar(calendarId) {
 
 function selectNonDuplicateCompressedImages(calendarId, compressedList) {
   const known = getKnownImageFingerprintSet(calendarId);
-  const seen = new Set(known);
+  const seen = new Set();
   const accepted = [];
   const duplicateIndexes = [];
   Array.from(compressedList || []).forEach((item, index) => {
@@ -821,13 +863,15 @@ function selectNonDuplicateCompressedImages(calendarId, compressedList) {
       accepted.push({ item, index });
       return;
     }
+    // The same photo twice in one selection is one photo. A photo already stored in this calendar
+    // is kept, and resolveImageBatch points it at the stored original instead of uploading it.
     const fingerprint = normalizeImageFingerprint(item?.fingerprint);
     if (fingerprint && seen.has(fingerprint)) {
       duplicateIndexes.push(index);
       return;
     }
     if (fingerprint) seen.add(fingerprint);
-    accepted.push({ item, index });
+    accepted.push({ item, index, alreadyStored: Boolean(fingerprint && known.has(fingerprint)) });
   });
   return { accepted, duplicateIndexes };
 }
@@ -1435,12 +1479,28 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     .filter(item => !item?.isExisting)
     .map(item => item?.fingerprint));
   const { accepted, duplicateIndexes } = selectNonDuplicateCompressedImages(calendarId, compressedList);
-  const uploadIndexes = accepted.filter(({ item }) => !item.isExisting);
+  // A photo already stored in this calendar is never stored again: its slot gets the existing
+  // original's URLs. Callers whose records the shared-file delete guard does not scan
+  // (anniversaries, posters) pass reuseStoredOriginals: false and upload as before.
+  const reuseByIndex = new Map();
+  if (options.reuseStoredOriginals !== false) {
+    await Promise.all(accepted.filter(entry => entry.alreadyStored && !entry.item?.isExisting).map(async entry => {
+      const original = await findReusableOriginal(calendarId, entry.item.fingerprint);
+      if (original) reuseByIndex.set(entry.index, original);
+    }));
+  }
+  const reusedResult = (item, index) => {
+    revokeCompressedObjectUrls(item);
+    const original = reuseByIndex.get(index);
+    return { imageUrl: original.imageUrl, thumbUrl: original.thumbUrl, smallThumbUrl: '', metadata: item.metadata || null, fingerprint: item.fingerprint || '', reused: true, sourceIndex: Number.isInteger(item.sourceIndex) ? item.sourceIndex : index };
+  };
+  const reusedIndexes = Array.from(reuseByIndex.keys());
+  const uploadIndexes = accepted.filter(({ item, index }) => !item.isExisting && !reuseByIndex.has(index));
 
   await checkFirebaseStorageHealth().catch(() => false);
   if (uploadIndexes.length === 0) {
     if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: accepted.length, total: accepted.length });
-    const existingResults = accepted.map(({ item, index }) => ({
+    const existingResults = accepted.map(({ item, index }) => (reuseByIndex.has(index) ? reusedResult(item, index) : {
       imageUrl: item.original,
       thumbUrl: item.thumbnail,
       metadata: item.metadata || null,
@@ -1450,6 +1510,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     }));
     Object.defineProperty(existingResults, 'failed', { value: [], enumerable: false, configurable: true });
     Object.defineProperty(existingResults, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
+    Object.defineProperty(existingResults, 'reusedIndexes', { value: reusedIndexes, enumerable: false, configurable: true });
     return existingResults;
   }
 
@@ -1500,6 +1561,10 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
         compressionDone++;
         reportCompressionProgress();
         results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail, metadata: c.metadata || null, fingerprint: c.fingerprint || '', isExisting: true, sourceIndex };
+      } else if (reuseByIndex.has(originalIndex)) {
+        compressionDone++;
+        reportCompressionProgress();
+        results[idx] = reusedResult(c, originalIndex);
       } else {
         let result = null;
         try {
@@ -1521,6 +1586,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
   Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
   Object.defineProperty(results, 'duplicateIndexes', { value: duplicateIndexes, enumerable: false, configurable: true });
+  Object.defineProperty(results, 'reusedIndexes', { value: reusedIndexes, enumerable: false, configurable: true });
   return results;
   } finally {
     releaseMediaUploadWakeLock();
@@ -1537,8 +1603,8 @@ async function resolveChatImageBatch(calendarId, compressedList, onProgress, opt
   return resolveImageBatch(calendarId, tagged, onProgress, uploadChatImageAssets, options);
 }
 
-async function resolveMemoImageBatch(calendarId, compressedList, onProgress) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadMemoImageAssets);
+async function resolveMemoImageBatch(calendarId, compressedList, onProgress, options = {}) {
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadMemoImageAssets, options);
 }
 
 // A Storage download URL looks like https://firebasestorage.googleapis.com/...; a fallback
@@ -1590,15 +1656,17 @@ function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, ti
   return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
 }
 
+// Anniversary photos and culture posters live outside the records the shared-file delete guard
+// scans, so they keep their own copy instead of pointing at a chat/memo original.
 async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgress) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets);
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets, { reuseStoredOriginals: false });
 }
 
 export {
   loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, isImageUploadFile, getImageUploadCandidates, limitImageUploadSelection, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
   imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
-  buildImageFingerprint, rememberKnownImageFingerprints, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
+  buildImageFingerprint, rememberKnownImageFingerprints, rememberKnownImageOriginals, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
   acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
   uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles,

@@ -236,6 +236,21 @@ export function createCalendarPhotoActions({
     }
     return findChatMessageById(messageId);
   };
+  // imageFingerprints is slot-aligned with imageUrls: drop the same slots, so the duplicate check
+  // never maps a fingerprint onto a neighbour's file. A misaligned legacy array is left alone.
+  const fingerprintsWithoutSlots = (record, isDropped) => {
+    const fingerprints = record?.imageFingerprints;
+    const urls = Array.isArray(record?.imageUrls) ? record.imageUrls : [];
+    if (!Array.isArray(fingerprints) || fingerprints.length !== urls.length) return {};
+    return { imageFingerprints: fingerprints.filter((_, index) => !isDropped(index)) };
+  };
+  // A replaced photo's slot carries the replacement's fingerprint, under the same alignment rule.
+  const fingerprintsWithSlot = (record, slot, fingerprint) => {
+    const fingerprints = record?.imageFingerprints;
+    const urls = Array.isArray(record?.imageUrls) ? record.imageUrls : [];
+    if (!Array.isArray(fingerprints) || fingerprints.length !== urls.length || slot >= urls.length) return {};
+    return { imageFingerprints: fingerprints.map((value, index) => (index === slot ? String(fingerprint || '') : value)) };
+  };
   // photoIndex owners of one asset (server view of every document that references the file).
   // Returns null when the index cannot be read, so callers keep the file rather than guess.
   const fetchAssetIndexOwners = async asset => {
@@ -277,6 +292,17 @@ export function createCalendarPhotoActions({
     if (thumb && thumb !== full) deleteChatImageFromStorage(thumb);
     return true;
   };
+  // A whole message (or the slots an edit dropped) goes through the same guard per photo: one
+  // file can be shared by several records, because a re-upload reuses the stored original.
+  const deleteMessageImagesIfUnreferenced = async (message, exclusions = {}) => {
+    const urls = Array.isArray(message?.imageUrls) && message.imageUrls.length
+      ? message.imageUrls : (message?.imageUrl ? [message.imageUrl] : []);
+    const thumbs = Array.isArray(message?.thumbUrls) && message.thumbUrls.length
+      ? message.thumbUrls : (message?.thumbUrl ? [message.thumbUrl] : []);
+    for (let index = 0; index < urls.length; index += 1) {
+      await deleteAssetFilesIfUnreferenced({ imageUrl: urls[index], thumbUrl: thumbs[index] || '' }, exclusions);
+    }
+  };
 
   // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
   // the right photo after the chat message they trace back to loses an image -- the entry at
@@ -284,15 +310,34 @@ export function createCalendarPhotoActions({
   // later index shifts down by one to track the now-renumbered imageUrls array. Pass
   // deletedImageIndex=null when the whole message was removed, dropping every reference to it
   // regardless of index.
+  // Other messages that still hold this file (server photoIndex owners plus loaded messages): a
+  // re-upload reuses the stored original, so one file can back several messages. Their album
+  // entries are theirs. When the index cannot be read the set is just the loaded messages.
+  const otherMessagesHoldingAsset = async (asset, messageId) => {
+    const imageUrl = asset?.imageUrl || asset?.thumbUrl || '';
+    const indexOwners = imageUrl ? (await fetchAssetIndexOwners({ imageUrl }) || []) : [];
+    const holders = new Set(indexOwners.map(owner => (String(owner).match(/^message:(.+):\d+$/) || [])[1]).filter(Boolean));
+    if (imageUrl) {
+      [...(chatMessagesRef.current || []), ...(galleryChatMessagesRef.current || [])].forEach(message => {
+        if (message?.id && findImageSlotByAsset(message, asset) >= 0) holders.add(message.id);
+      });
+    }
+    holders.delete(messageId);
+    return holders;
+  };
   const unlinkMeetingPhotoReferences = async (messageId, deletedImageIndex, deletedPhoto = {}) => {
     if (!activeCal || !messageId) return true;
     // Every album entry of the deleted file goes, including copies made by other paths or in a
     // second meeting (removeAssetFromMeetings matches by Storage identity, not only by
     // sourceMessageId) -- those leftovers were the 404 thumbnails in 추억/갤러리.
+    const holders = await otherMessagesHoldingAsset(deletedPhoto, messageId);
     const { meetings: nextConfirmedMeetings, changed } = removeAssetFromMeetings(
       getConfirmedMeetings(activeCal),
       { imageUrl: deletedPhoto.imageUrl || '', thumbUrl: deletedPhoto.thumbUrl || '' },
-      { messageId, deletedIndex: deletedImageIndex, dropAllFromMessage: deletedImageIndex === null }
+      {
+        messageId, deletedIndex: deletedImageIndex, dropAllFromMessage: deletedImageIndex === null,
+        isHeldByOtherMessage: photo => holders.has(photo.sourceMessageId)
+      }
     );
     if (!changed) return true;
     const ok = await commitConfirmedMeetings(nextConfirmedMeetings, null, [], 'write', 'success');
@@ -363,8 +408,8 @@ export function createCalendarPhotoActions({
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
       const allowed = asCreate
-        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
-        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
+        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
+        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
       const out = {};
       for (const key of allowed) {
         if (msg && msg[key] !== undefined) out[key] = msg[key];
@@ -403,7 +448,8 @@ export function createCalendarPhotoActions({
           imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
           thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
           imageTags: nextTags,
-          imageTagMap: nextImageTagMap
+          imageTagMap: nextImageTagMap,
+          ...fingerprintsWithoutSlots(sourceMessage, index => index === imageIndex)
         });
         const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제', { deletePaths });
         if (!ok) throw new Error('Photo delete update failed');
@@ -552,7 +598,8 @@ export function createCalendarPhotoActions({
         imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
         thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
         imageTags: nextImageTags,
-        imageTagMap: nextImageTagMap
+        imageTagMap: nextImageTagMap,
+        ...fingerprintsWithSlot(sourceMessage, imageIndex, resolved.fingerprint)
       });
       const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 교체');
       if (!ok) throw new Error('Photo replace update failed');
@@ -561,15 +608,17 @@ export function createCalendarPhotoActions({
       // Every meeting album copy follows the replacement; otherwise it keeps pointing at the
       // old file, which is deleted below -> a broken thumbnail in 일정/추억.
       let meetingsMoved = true;
+      const holders = await otherMessagesHoldingAsset(oldAsset, messageId).catch(() => new Set());
       try {
-        const moved = replaceAssetInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), oldAsset, { imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl });
+        const moved = replaceAssetInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), oldAsset, { imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl }, { messageId, isHeldByOtherMessage: photo => holders.has(photo.sourceMessageId) });
         if (moved.changed) meetingsMoved = Boolean(await commitConfirmedMeetings(moved.meetings, null, [], 'write', 'success'));
       } catch (moveErr) {
         meetingsMoved = false;
         console.warn('handleReplaceChatMessagePhoto meeting copies not moved:', moveErr);
       }
-      // Comments follow the photo, not the file.
-      if (oldAssetKey && newAssetKey && oldAssetKey !== newAssetKey) {
+      // Comments follow the photo, not the file -- unless another message still shows the old
+      // file, whose thread they then are.
+      if (oldAssetKey && newAssetKey && oldAssetKey !== newAssetKey && !holders.size) {
         try {
           await movePhotoComments({ calendarId: activeCalId, fromKey: oldAssetKey, toKey: newAssetKey });
         } catch (commentErr) {
@@ -650,7 +699,8 @@ export function createCalendarPhotoActions({
         imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
         thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
         ...(nextImageTags ? { imageTags: nextImageTags } : {}),
-        imageTagMap: nextImageTagMap
+        imageTagMap: nextImageTagMap,
+        ...fingerprintsWithoutSlots(memo, i => i === imageIndex)
       });
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제', { deletePaths });
       if (!updated) throw new Error('Memo photo delete failed');
@@ -722,7 +772,8 @@ export function createCalendarPhotoActions({
         imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
         thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null,
         imageTags: nextImageTags,
-        imageTagMap: nextImageTagMap
+        imageTagMap: nextImageTagMap,
+        ...fingerprintsWithSlot(memo, imageIndex, resolved.fingerprint)
       });
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 교체');
       if (!updated) throw new Error('Memo photo replace failed');
@@ -1016,7 +1067,7 @@ export function createCalendarPhotoActions({
           await writeCollectionDocumentWithFallback('messages', activeCalId, msgId, null, 'delete', '채팅 사진 일괄 삭제');
           removeLocalChatMessage(msgId);
         } else {
-          const data = sanitizeMessageForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || nextThumbs[0] || null, thumbUrl: nextThumbs[0] || nextUrls[0] || null, imageTags: nextTags, imageTagMap: nextTagMap });
+          const data = sanitizeMessageForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || nextThumbs[0] || null, thumbUrl: nextThumbs[0] || nextUrls[0] || null, imageTags: nextTags, imageTagMap: nextTagMap, ...fingerprintsWithoutSlots(srcMsg, i => delSlots.has(i)) });
           await writeCollectionDocumentWithFallback('messages', activeCalId, msgId, data, 'update', '채팅 사진 일괄 삭제', { deletePaths: (!nextUrls.length && !nextThumbs.length) ? ['imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags'] : [] });
           patchLocalChatMessage(msgId, data);
         }
@@ -1186,6 +1237,6 @@ export function createCalendarPhotoActions({
     handleReplaceChatMessagePhoto, findMemoById, handleDeletePhoto,
     handleBulkDeletePhotos, handleReplacePhoto, handleJumpToChatMessage, handleGetChatMessageOrdinal,
     handleGetGalleryPhotoOrdinal, handleJumpToMemo, handleJumpToMemoTag, handleJumpToPlace,
-    handleJumpToGallery, handleJumpToMeetingDate
+    handleJumpToGallery, handleJumpToMeetingDate, deleteMessageImagesIfUnreferenced
   };
 }

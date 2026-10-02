@@ -153,10 +153,6 @@ function deleteActivityLogsAfterTimestamp(...args) {
   const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function deleteAllChatImagesFromStorage(...args) {
-  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function deleteMessageRest(...args) {
   const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1615,7 +1611,8 @@ export function AdminDashboard({ initialCalendars }) {
     try {
       const deleted = await writeAdminCollection('messages', calId, msg.id, null, 'delete', '관리자 채팅 삭제');
       if (deleted?.success) {
-        if (!deleted.queued) deleteAllChatImagesFromStorage(msg);
+        // Files stay: a re-upload reuses the stored original, so another record (in this or the
+        // photo's album) may still show it. The guarded delete only knows the active calendar.
         showAdminToast(deleted.queued ? '연결되면 삭제됩니다.' : '삭제완료', deleted.queued ? 'info' : 'success');
         setMessagesMap(prev => ({
           ...prev,
