@@ -3306,7 +3306,9 @@ function CalendarApp() {
     // restoreMessage below is reused both for the undo toast's "되돌리기" action and, on a
     // failed/erroring delete, to roll the optimistic removal back.
     removeLocalChatMessage(id);
-    const finalizeStorage = () => { deleteMessageImagesIfUnreferenced(sourceSnapshot, { excludeMessageId: id }); };
+    // Photo files stay in Storage: another record or calendar may show the same file (see
+    // deleteAssetFilesIfUnreferenced in app-calendar-photo-actions.js).
+    const finalizeStorage = () => {};
     const restoreMessage = async (options = {}) => {
       try {
         const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
@@ -3520,19 +3522,8 @@ function CalendarApp() {
         }
       }
       if (ok) {
-        const originalEntries = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
-          ? editingMessage.imageUrls.map((url, idx) => ({ original: url, thumbnail: (editingMessage.thumbUrls || [])[idx] || url }))
-          : (editingMessage.imageUrl ? [{ original: editingMessage.imageUrl, thumbnail: editingMessage.thumbUrl || editingMessage.imageUrl }] : []);
-        const keptOriginals = new Set((newImages || []).filter(img => img.isExisting).map(img => img.original));
-        const removedEntries = originalEntries.filter(entry => !keptOriginals.has(entry.original));
-        const finalizeRemovedStorage = () => {
-          if (removedEntries.length > 0) {
-            deleteMessageImagesIfUnreferenced({
-              imageUrls: removedEntries.map(e => e.original),
-              thumbUrls: removedEntries.map(e => e.thumbnail)
-            }, { excludeMessageId: id });
-          }
-        };
+        // Removed photos' files stay in Storage, as for every photo delete.
+        const finalizeRemovedStorage = () => {};
         patchLocalChatMessage(id, data);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
@@ -4626,7 +4617,7 @@ function CalendarApp() {
     findMemoById, handleDeletePhoto, handleBulkDeletePhotos, handleReplacePhoto,
     handleJumpToChatMessage, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
     handleJumpToMemo, handleJumpToGallery,
-    handleJumpToMeetingDate, deleteMessageImagesIfUnreferenced
+    handleJumpToMeetingDate
   } = createCalendarPhotoActions({
     activeCalId, showToast, showUndoableDeleteToast, showRetryableUploadToast, setSelectedDate,
     setIsModalOpen, setDateModalInitialTab, setSharedMemo, setChatUploadProgress,

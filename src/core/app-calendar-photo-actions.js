@@ -17,11 +17,11 @@
 // app-main's module-level Firestore handle live at call time, like the inline code did.
 import { createActivityLog, getConfirmedMeetings, getMessageImageEntries, isValidDateString, reconcileMessageImageTagMap, sanitizeMemoForFirestore, sanitizeMessageForFirestore, withTimeout } from './app-domain-helpers.js';
 import { fetchGalleryPhotoOrdinal, fetchMessageOrdinal, fetchMessageRest, firebaseConfig, firestoreDocumentToJs, writeCollectionDocumentWithFallback } from './app-firebase-data.js';
-import { deleteChatImageFromStorage, resolveChatImageBatch } from './app-image-pipeline.js';
+import { resolveChatImageBatch } from './app-image-pipeline.js';
 import { isChatImageUpload } from './image-variants.js';
 import { cloneConfirmedMeetings } from './confirmed-meeting-coordinator.js';
 import { filterDeletedPhotoFromIndexItems } from './gallery-bulk-delete.js';
-import { findImageSlotByAsset, listOtherAssetReferences, removeAssetFromMeetings, replaceAssetInMeetings } from './media-reference-integrity.js';
+import { findImageSlotByAsset, removeAssetFromMeetings, replaceAssetInMeetings } from './media-reference-integrity.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { movePhotoComments } from './photo-comment-items.js';
 
@@ -268,41 +268,15 @@ export function createCalendarPhotoActions({
       return null;
     }
   };
-  // The only Storage deletion path for user photos: the file goes only when no other message,
-  // memo or meeting album still points at it (otherwise that reference becomes a permanent 404
-  // thumbnail). A leaked file costs a few KB; a dangling reference breaks every screen.
-  const deleteAssetFilesIfUnreferenced = async (asset, exclusions = {}) => {
-    const full = String(asset?.imageUrl || asset?.full || '');
-    const thumb = String(asset?.thumbUrl || asset?.thumb || '');
-    if (!full && !thumb) return false;
-    const indexOwners = await fetchAssetIndexOwners({ imageUrl: full || thumb });
-    if (indexOwners === null) return false;
-    const others = listOtherAssetReferences({ imageUrl: full, thumbUrl: thumb }, {
-      messages: [...(chatMessagesRef.current || []), ...(galleryChatMessagesRef.current || [])],
-      memos: memosRef.current || [],
-      meetings: getConfirmedMeetings(activeCalRef.current || activeCal),
-      indexOwners,
-      ...exclusions
-    });
-    if (others.length) {
-      console.info('Storage file kept; still referenced by', others);
-      return false;
-    }
-    if (full) deleteChatImageFromStorage(full);
-    if (thumb && thumb !== full) deleteChatImageFromStorage(thumb);
-    return true;
-  };
-  // A whole message (or the slots an edit dropped) goes through the same guard per photo: one
-  // file can be shared by several records, because a re-upload reuses the stored original.
-  const deleteMessageImagesIfUnreferenced = async (message, exclusions = {}) => {
-    const urls = Array.isArray(message?.imageUrls) && message.imageUrls.length
-      ? message.imageUrls : (message?.imageUrl ? [message.imageUrl] : []);
-    const thumbs = Array.isArray(message?.thumbUrls) && message.thumbUrls.length
-      ? message.thumbUrls : (message?.thumbUrl ? [message.thumbUrl] : []);
-    for (let index = 0; index < urls.length; index += 1) {
-      await deleteAssetFilesIfUnreferenced({ imageUrl: urls[index], thumbUrl: thumbs[index] || '' }, exclusions);
-    }
-  };
+  // Photo files are never deleted from the app. One Storage file can back records in other
+  // calendars (photos and memos copied across calendars keep the source URL) and in other
+  // records here (a re-upload links the stored original), and no client can see every calendar,
+  // so a delete here broke the photo there (memo photos shared by cw/jhair/kkot were lost that
+  // way). Deleting a photo removes the record's reference; the file stays. A leaked file costs a
+  // few hundred KB; a dangling reference is a lost photo. Orphaned files can be swept on the
+  // server, which can see every calendar.
+  // Kept as the single place a photo file deletion would go; it deletes nothing.
+  const deleteAssetFilesIfUnreferenced = async () => false;
 
   // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
   // the right photo after the chat message they trace back to loses an image -- the entry at
@@ -1237,6 +1211,6 @@ export function createCalendarPhotoActions({
     handleReplaceChatMessagePhoto, findMemoById, handleDeletePhoto,
     handleBulkDeletePhotos, handleReplacePhoto, handleJumpToChatMessage, handleGetChatMessageOrdinal,
     handleGetGalleryPhotoOrdinal, handleJumpToMemo, handleJumpToMemoTag, handleJumpToPlace,
-    handleJumpToGallery, handleJumpToMeetingDate, deleteMessageImagesIfUnreferenced
+    handleJumpToGallery, handleJumpToMeetingDate
   };
 }

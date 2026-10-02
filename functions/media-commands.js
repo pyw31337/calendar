@@ -8,7 +8,8 @@
 //                  and queues the Storage objects for delayed garbage collection;
 //   tagAsset    -> writes the tag to every owning message/memo slot and every album copy.
 // Storage objects are never deleted inline. They go to `storageGc/{id}` with a grace period and
-// the sweeper deletes them only if no photoIndex row still points at the file (invariant I2).
+// the sweeper deletes them only if no photoIndex row of any calendar still points at the file
+// (invariant I2).
 //
 // Pure dependency injection (db, bucket) so the logic is tested against the Firestore/Storage
 // emulator (functions/test/media-commands.emulator.test.js).
@@ -448,25 +449,23 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
   });
 }
 
-// Delete queued Storage objects whose grace period elapsed and that no photoIndex row still
-// references (checked per calendar, by original or thumb path).
+// Delete queued Storage objects whose grace period elapsed and that no photoIndex row of ANY
+// calendar still references (by original or thumb path). Photos and memos copied across
+// calendars keep the source file's URL, so checking only the queuing calendar deleted files
+// another calendar still showed.
 async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
   const due = await db.collection('storageGc').where('deleteAfter', '<=', now).limit(limit).get();
   const result = { examined: due.size, deleted: 0, kept: 0 };
-  const referencedByCalendar = new Map();
-  const referencedPaths = async calendarDocId => {
-    if (!referencedByCalendar.has(calendarDocId)) {
-      const index = await db.collection('calendars').doc(calendarDocId).collection('photoIndex').get();
-      const paths = new Set();
-      index.docs.forEach(row => { const data = row.data() || {}; [data.full, data.thumb].forEach(url => { const p = storagePathFromUrl(url); if (p) paths.add(p); }); });
-      referencedByCalendar.set(calendarDocId, paths);
-    }
-    return referencedByCalendar.get(calendarDocId);
-  };
+  if (!due.size) return result;
+  const referenced = new Set();
+  const calendars = await db.collection('calendars').listDocuments();
+  for (const calendar of calendars) {
+    const index = await calendar.collection('photoIndex').get();
+    index.docs.forEach(row => { const data = row.data() || {}; [data.full, data.thumb].forEach(url => { const p = storagePathFromUrl(url); if (p) referenced.add(p); }); });
+  }
   for (const doc of due.docs) {
-    const { path, calendarDocId } = doc.data() || {};
-    const stillReferenced = (await referencedPaths(calendarDocId)).has(path);
-    if (stillReferenced) {
+    const { path } = doc.data() || {};
+    if (referenced.has(path)) {
       result.kept += 1;
       await doc.ref.delete();
       continue;
