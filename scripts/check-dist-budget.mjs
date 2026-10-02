@@ -54,7 +54,9 @@ const LAZY_CHUNK_PATTERNS = [
 // 1.653 MB keeps a few KB of minifier headroom and still catches a real jump.
 // The settings color-theme picker (src/core/color-themes.js) added ~4 KB eager
 // (1653953 > 1653000); 1.66 MB restores the same few KB of headroom.
-const TOTAL_JS_MAX_BYTES = 1_660_000;
+// 보관함 추천's "얼굴로 찾은 사람" card (face suggestions from the Mac worker) lives in the eager
+// archive chunk (1660883 > 1660000); 1.668 MB keeps the same few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_668_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

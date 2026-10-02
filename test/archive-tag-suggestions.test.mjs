@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPlacePhotoGroups } from '../src/ui/archive-place-groups.js';
-import { buildTagSuggestions, albumDateOf, dateTagToken } from '../src/ui/archive-tag-suggestions.js';
+import { buildTagSuggestions, buildFaceSuggestions, albumDateOf, dateTagToken } from '../src/ui/archive-tag-suggestions.js';
 
 const places = [
   { id: 'p1', name: '예당호 출렁다리', lat: 36.62, lng: 126.83 },
@@ -126,4 +126,25 @@ test('duplicates keep one photo with every tag, and copies with comments are not
   assert.equal(dup.length, 1);
   assert.equal(dup[0].mergedTags, '서준 260919 바이킹');
   assert.equal(dup[0].removable, false);
+});
+
+test('face suggestions: one card per person, skip photos already tagged (any spelling) or rejected', () => {
+  const photos = [
+    { assetKey: 'asset:v1:a', tags: '#여행' },
+    { assetKey: 'asset:v1:b', tags: '#서준' },
+    { assetKey: 'asset:v1:c', tags: '' },
+    { assetKey: 'asset:v1:d', tags: '' },
+  ];
+  const faceItems = [
+    { assetKey: 'asset:v1:a', facePeople: [{ name: '김유리', score: 0.5 }, { name: '서준', score: 0.6 }] },
+    { assetKey: 'asset:v1:b', facePeople: [{ name: '서준', score: 0.9 }] },
+    { assetKey: 'asset:v1:c', facePeople: [{ name: '김유리', score: 0.8 }], faceRejected: [] },
+    { assetKey: 'asset:v1:d', facePeople: [{ name: '김유리', score: 0.9 }], faceRejected: ['김유리'] },
+    { assetKey: 'asset:v1:gone', facePeople: [{ name: '김유리', score: 0.9 }] },
+  ];
+  const cards = buildFaceSuggestions({ photos, faceItems, personLabels: ['김유리', '박서준'] });
+  assert.deepEqual(cards.map(card => [card.tag, card.photos.map(p => p.assetKey)]), [
+    ['김유리', ['asset:v1:c', 'asset:v1:a']],
+    ['서준', ['asset:v1:a']],
+  ]);
 });

@@ -141,3 +141,20 @@ test('daily briefing remains in a safe server-only mode until a verified sender 
   assert.equal(isNaverSmtpConfigured({ account: 'pyw213@naver.com', appPassword: 'ABCD1234EFGH' }), true);
   assert.equal(isNaverSmtpConfigured({ account: 'pyw213@naver.com', appPassword: '__NOT_CONFIGURED__' }), false);
 });
+
+test('face suggestions keep only bounded names and drop the ones the family rejected', () => {
+  const { sanitizeFaceItem } = require('../functions/media-analysis.js');
+  const item = sanitizeFaceItem({
+    assetKey: 'asset:v1:abc-123',
+    facePeople: [{ name: '#김유리', score: 0.71234 }, { name: '김유리', score: 0.5 }, { name: '서준', score: 1.7 }, { name: '' }],
+    faceCount: 3,
+    embedding: [0.1, 0.2]
+  }, ['서준'], 1000);
+  assert.deepEqual(item.facePeople, [{ name: '김유리', score: 0.712 }]);
+  assert.equal(item.faceSuggested, true);
+  assert.equal(item.faceCount, 3);
+  assert.equal(item.id, stableAnalysisId('asset:v1:abc-123'));
+  assert.equal('embedding' in item, false, 'no face data ever reaches the server');
+  assert.equal(sanitizeFaceItem({ assetKey: 'https://x/a.jpg', facePeople: [{ name: 'a' }] }), null);
+  assert.equal(sanitizeFaceItem({ assetKey: 'asset:v1:abc-123', facePeople: [] }).faceSuggested, false);
+});
