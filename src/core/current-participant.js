@@ -15,6 +15,16 @@ export function readCurrentParticipantId(calendarId, calendar) {
   }
 }
 
+/** The participant someone actually picked on this device, or '' before the first pick. */
+export function readChosenParticipantId(calendarId, calendar) {
+  try {
+    const read = typeof window !== 'undefined' && window.GATHER_APP_NOTIFICATIONS?.getChosenChatParticipantId;
+    return typeof read === 'function' ? String(read(calendarId, calendar) || '') : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 /** handler({ calId, participantId }); returns an unsubscribe function. */
 export function subscribeParticipantChange(handler) {
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
