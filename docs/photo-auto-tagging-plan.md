@@ -93,8 +93,13 @@
   필드에 Vision 결과와 따로 merge 된다. `--disable-schedule --forget`으로 끄고 맥의 얼굴 데이터를 지운다.
 - 앱: 보관함 > 추천 > **얼굴로 찾은 사람** 카드(사람별, 확실한 순). 골라서 `#이름 붙이기` 또는 `아니에요`.
   아니에요는 `recordFaceFeedback`으로 그 사진의 `faceRejected`에 남아 다시 추천되지 않는다.
-- 자동: `face-tags.py --enable-schedule`이 `media-worker.json`에 `facePython`을 넣으면, 매 사진 분석 실행 뒤
-  캘린더마다 `--upload --quiet --max-new 400`으로 돈다. 처음 본 사진만 내려받고 나머지는 저장해 둔 얼굴을 쓴다.
+- 자동: `face-tags.py --enable-schedule`이 `media-worker.json`에 `facePython`을 넣으면, 매 사진 분석 실행(15분) 뒤
+  사진 분석에 등록된 캘린더(cw·kkot·jhair)마다 `--upload --quiet --if-changed --max-new 400`으로 돈다. 처음 본 사진만 내려받고
+  나머지는 저장해 둔 얼굴을 쓴다. `--if-changed`는 photoIndexMeta/summary의 revision이 그대로이고 6시간이 안 지났으면
+  사진 목록을 다시 읽지 않는다(15분마다 전체 목록을 읽으면 하루 수천~수만 건의 Firestore 읽기).
+- 캘린더별로 따로 배운다: 같은 사람이라도 캘린더가 다르면 얼굴 표본·추천이 섞이지 않는다(캘린더 격리).
+- 손으로 돌릴 때 `--calendar` 를 생략하면 등록된 캘린더 전부, `--calendar cw,kkot` 처럼 여러 개도 된다.
+- 맥을 바꿀 때: 얼굴 데이터·설정은 `tools/mac-automation/backup.sh` 백업에 들어가고 `restore.sh` 로 새 맥에 되살린다.
 
 ## 4-1. 구현됨: 보관함 "추천" 탭 (2026-10-01)
 
