@@ -70,6 +70,7 @@ function mergedFields(current, old, lostPaths) {
   // A field one side never had (memos rarely carry fingerprints) is padded so lengths stay equal.
   const present = SLOT_FIELDS.filter(field => next.some(slot => field in slot));
   present.forEach(field => { fields[field] = next.map(slot => slot[field] ?? ''); });
+  if (!fields.imageUrls) return null;
   fields.imageUrl = fields.imageUrls[0] || '';
   if (fields.thumbUrls) fields.thumbUrl = fields.thumbUrls[0] || '';
   const tagMap = { ...(current.imageTagMap || {}) };
@@ -136,6 +137,11 @@ for (const entry of manifest.docs) {
 
   const current = snap.data();
   const fields = mergedFields(current, old, lostPaths);
+  if (!fields) {
+    row.skipped = 'no slot matched';
+    row.debug = { lostPaths: [...lostPaths], oldUrls: (old.imageUrls || []).map(pathOf), currentUrls: (current.imageUrls || []).map(pathOf) };
+    continue;
+  }
   row.slotsBefore = (current.imageUrls || []).length;
   row.slotsAfter = fields.imageUrls.length;
   if (row.slotsAfter === row.slotsBefore) { row.skipped = 'nothing to put back'; continue; }
