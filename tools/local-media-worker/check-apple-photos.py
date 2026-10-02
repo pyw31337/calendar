@@ -4,10 +4,13 @@
 사진 앱 보관함을 osxphotos로 읽어, 우리 앱으로 인물·장소·날짜를 가져올 수 있는 상태인지 요약한다.
 사진 파일·보관함은 바꾸지 않고, 결과는 화면에만 출력한다(아무 데도 보내지 않음).
 
-    # 처음 한 번 (터미널)
-    python3 -m pip install --user osxphotos
+    # 처음 한 번 (터미널). Homebrew 파이썬은 pip --user 설치를 막으므로 전용 가상환경을 쓴다.
+    python3 -m venv ~/.venvs/photos
+    source ~/.venvs/photos/bin/activate
+    pip install osxphotos pillow pillow-heif
     # 시스템 설정 > 개인정보 보호 및 보안 > 전체 디스크 접근 권한 > 터미널 켜기
-    python3 tools/local-media-worker/check-apple-photos.py
+    python tools/local-media-worker/check-apple-photos.py
+    # 다음부터는 source ~/.venvs/photos/bin/activate 후 실행만 하면 된다.
 """
 import collections
 import sys
@@ -15,7 +18,7 @@ import sys
 try:
     import osxphotos
 except ImportError:
-    sys.exit("osxphotos가 없습니다. 먼저 실행하세요:  python3 -m pip install --user osxphotos")
+    sys.exit("osxphotos가 없습니다. 먼저 실행하세요:  source ~/.venvs/photos/bin/activate && pip install osxphotos")
 
 
 def main():
