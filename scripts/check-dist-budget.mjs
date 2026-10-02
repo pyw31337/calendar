@@ -56,7 +56,10 @@ const LAZY_CHUNK_PATTERNS = [
 // (1653953 > 1653000); 1.66 MB restores the same few KB of headroom.
 // 보관함 추천's "얼굴로 찾은 사람" card (face suggestions from the Mac worker) lives in the eager
 // archive chunk (1660883 > 1660000); 1.668 MB keeps the same few KB of headroom.
-const TOTAL_JS_MAX_BYTES = 1_668_000;
+// One copy per photo (a re-upload links the stored original; shared-file delete/album guards)
+// added ~4 KB to the eager upload/photo-action code (1671684 > 1668000); 1.676 MB keeps the same
+// few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_676_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

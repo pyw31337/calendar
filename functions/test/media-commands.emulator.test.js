@@ -172,3 +172,16 @@ test('GC sweep deletes only unreferenced files after the grace period', async ()
   assert.equal((await bucket.file('chatImages/testcal/kept.jpg').exists())[0], true);
   assert.equal((await db.collection('storageGc').get()).size, 1);
 });
+
+test('GC sweep keeps a file another calendar still shows (photos copied across calendars)', async () => {
+  await reset();
+  await bucket.file('memoImages/testcal/shared.jpg').save(Buffer.from('z'));
+  await db.collection('storageGc').doc('shared').set({ path: 'memoImages/testcal/shared.jpg', calendarDocId: CAL, deleteAfter: 10 });
+  const other = db.collection('calendars').doc('cal_othercal');
+  const sharedUrl = 'https://firebasestorage.googleapis.com/v0/b/demo-moyeora.appspot.com/o/memoImages%2Ftestcal%2Fshared.jpg?alt=media';
+  await other.collection('photoIndex').doc('asset:v1:shared').set({ full: sharedUrl, thumb: sharedUrl });
+  const result = await sweepStorageGc({ db, bucket, now: 100 });
+  assert.deepEqual(result, { examined: 1, deleted: 0, kept: 1 });
+  assert.equal((await bucket.file('memoImages/testcal/shared.jpg').exists())[0], true);
+  await other.collection('photoIndex').doc('asset:v1:shared').delete();
+});

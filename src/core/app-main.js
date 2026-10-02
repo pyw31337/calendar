@@ -37,7 +37,7 @@ import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCat
 import {
   buildMetadataTags,
   forgetPreprocessedImages,
-  rememberKnownImageFingerprints,
+  rememberKnownImageFingerprints, rememberKnownImageOriginals,
   processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles,
   uploadInlineChatImageToStorage, readClipboardImageFiles,
@@ -898,9 +898,9 @@ function CalendarApp() {
     React, activeCalId, activeView, isGlobalSearchOpen,
     firebaseDb, getFirebaseDb: () => firebaseDb, firebaseConnectionVersion
   });
-  // Persisted fingerprints cover already-rendered media immediately; the image pipeline also
-  // hydrates the full, field-masked archive before a new upload, so pagination cannot make an
-  // older duplicate look new.
+  // Fingerprints (and the stored originals they map to) of already-loaded media; before an
+  // upload the image pipeline also queries the server for exactly the submitted fingerprints,
+  // so pagination cannot make an older duplicate look new.
   React.useEffect(() => {
     const activeCalendar = (calendars || []).find(calendar => calendar?.id === activeCalId);
     const fingerprints = [
@@ -909,6 +909,7 @@ function CalendarApp() {
       ...(activeCalendar?.anniversaries || []).flatMap(anniversary => (anniversary?.photos || []).map(photo => photo?.fingerprint))
     ];
     rememberKnownImageFingerprints(activeCalId, fingerprints);
+    rememberKnownImageOriginals(activeCalId, [...(allChatMessages || []), ...(memos || [])]);
   }, [activeCalId, allChatMessages, memos, calendars]);
   const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
@@ -2697,6 +2698,14 @@ function CalendarApp() {
     lastScrollTopRef.current = scrollTop;
   };
 
+  // The same photo is stored once per calendar: a repeat in one selection is dropped, and a photo
+  // already uploaded before points at its stored original (resolveImageBatch) instead.
+  const notifyDedupedImages = resolved => {
+    const reused = resolved?.reusedIndexes?.length || 0;
+    const dropped = resolved?.duplicateIndexes?.length || 0;
+    if (reused) showToast(`이미 올라간 사진 ${reused}장은 새로 올리지 않고 원본을 연결했어요.`, 'info', 4000);
+    if (dropped) showToast(`같은 사진 ${dropped}장이 함께 선택돼 한 장만 올렸어요.`, 'info', 4000);
+  };
   const handleSendChatMessage = async () => {
     const hasText = !!chatInput.trim();
     const imageCount = chatImages.length;
@@ -2813,9 +2822,7 @@ function CalendarApp() {
         // unavailable) keep their full quality -- instead the batch is split across multiple
         // chat messages if needed so no single message can exceed Firestore's 1MiB/doc limit.
         const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
-        if (resolvedImages.duplicateIndexes?.length) {
-          showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
-        }
+        notifyDedupedImages(resolvedImages);
         if (resolvedImages.length === 0) {
           throw new Error('이미 업로드된 사진입니다. 새 사진을 선택해 주세요.');
         }
@@ -3004,9 +3011,7 @@ function CalendarApp() {
           label: '갤러리 사진 업로드 중...'
         });
       }, { profile: 'grid' });
-      if (resolvedImages.duplicateIndexes?.length) {
-        showToast(`이미 업로드된 사진과 같은 ${resolvedImages.duplicateIndexes.length}장을 제외했습니다.`, 'info', 4000);
-      }
+      notifyDedupedImages(resolvedImages);
       if (resolvedImages.length === 0) {
         showToast('새로 업로드할 사진이 없습니다. 기존 사진과 동일한 파일입니다.', 'info', 5000);
         return false;
@@ -3301,10 +3306,12 @@ function CalendarApp() {
     // restoreMessage below is reused both for the undo toast's "되돌리기" action and, on a
     // failed/erroring delete, to roll the optimistic removal back.
     removeLocalChatMessage(id);
-    const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
+    // Photo files stay in Storage: another record or calendar may show the same file (see
+    // deleteAssetFilesIfUnreferenced in app-calendar-photo-actions.js).
+    const finalizeStorage = () => {};
     const restoreMessage = async (options = {}) => {
       try {
-        const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
+        const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
         const createData = {};
         for (const key of allowed) {
           if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
@@ -3515,19 +3522,8 @@ function CalendarApp() {
         }
       }
       if (ok) {
-        const originalEntries = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
-          ? editingMessage.imageUrls.map((url, idx) => ({ original: url, thumbnail: (editingMessage.thumbUrls || [])[idx] || url }))
-          : (editingMessage.imageUrl ? [{ original: editingMessage.imageUrl, thumbnail: editingMessage.thumbUrl || editingMessage.imageUrl }] : []);
-        const keptOriginals = new Set((newImages || []).filter(img => img.isExisting).map(img => img.original));
-        const removedEntries = originalEntries.filter(entry => !keptOriginals.has(entry.original));
-        const finalizeRemovedStorage = () => {
-          if (removedEntries.length > 0) {
-            deleteAllChatImagesFromStorage({
-              imageUrls: removedEntries.map(e => e.original),
-              thumbUrls: removedEntries.map(e => e.thumbnail)
-            });
-          }
-        };
+        // Removed photos' files stay in Storage, as for every photo delete.
+        const finalizeRemovedStorage = () => {};
         patchLocalChatMessage(id, data);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));

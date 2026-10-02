@@ -79,7 +79,7 @@ const meetingPhotoList = meeting => (Array.isArray(meeting?.photos) ? meeting.ph
  * meeting, were left behind and became 404 thumbnails). Same-message references after the
  * deleted slot are renumbered because they still address the message by position.
  */
-export function removeAssetFromMeetings(meetings = [], asset = {}, { messageId = '', deletedIndex = null, dropAllFromMessage = false } = {}) {
+export function removeAssetFromMeetings(meetings = [], asset = {}, { messageId = '', deletedIndex = null, dropAllFromMessage = false, isHeldByOtherMessage = null } = {}) {
   let changed = false;
   const next = (Array.isArray(meetings) ? meetings : []).map(meeting => {
     const photos = meetingPhotoList(meeting);
@@ -87,7 +87,11 @@ export function removeAssetFromMeetings(meetings = [], asset = {}, { messageId =
     const kept = [];
     photos.forEach(photo => {
       const sameMessage = messageId && photo?.sourceMessageId === messageId;
-      const byIdentity = sharesAsset(photo, asset);
+      // One file can back several messages (a re-upload reuses the stored original). An album
+      // entry another message still holds is that message's photo, not the deleted one.
+      const heldElsewhere = Boolean(messageId && photo?.sourceMessageId && !sameMessage
+        && typeof isHeldByOtherMessage === 'function' && isHeldByOtherMessage(photo));
+      const byIdentity = !heldElsewhere && sharesAsset(photo, asset);
       const byPosition = sameMessage && (dropAllFromMessage
         || (Number.isInteger(deletedIndex) && photo.sourceImageIndex === deletedIndex));
       if (byIdentity || byPosition) {
@@ -110,7 +114,7 @@ export function removeAssetFromMeetings(meetings = [], asset = {}, { messageId =
 }
 
 /** Point every album copy of `oldAsset` at the replacement file; tags, ids and order stay. */
-export function replaceAssetInMeetings(meetings = [], oldAsset = {}, newAsset = {}) {
+export function replaceAssetInMeetings(meetings = [], oldAsset = {}, newAsset = {}, { messageId = '', isHeldByOtherMessage = null } = {}) {
   const imageUrl = String(newAsset.imageUrl || newAsset.full || '');
   const thumbUrl = String(newAsset.thumbUrl || newAsset.thumb || imageUrl);
   if (!imageUrl) return { meetings, changed: false };
@@ -119,6 +123,9 @@ export function replaceAssetInMeetings(meetings = [], oldAsset = {}, newAsset = 
     let meetingChanged = false;
     const photos = meetingPhotoList(meeting).map(photo => {
       if (!sharesAsset(photo, oldAsset)) return photo;
+      // An entry of another message that still shows the old file stays on it (shared original).
+      if (messageId && photo?.sourceMessageId && photo.sourceMessageId !== messageId
+        && typeof isHeldByOtherMessage === 'function' && isHeldByOtherMessage(photo)) return photo;
       meetingChanged = true;
       const patched = { ...photo, imageUrl, thumbUrl, updatedAt: Date.now() };
       if ('full' in photo) patched.full = imageUrl;
