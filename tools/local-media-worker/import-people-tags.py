@@ -224,7 +224,7 @@ def main():
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
     source = from_apple() if args.apple else from_takeout(args.takeout)
-    unknown, plan, seen_src, no_image = {}, {}, 0, 0
+    unknown, plan, seen_src, no_image, hashed_src, closest_hist = {}, {}, 0, 0, 0, {}
     print('원본 사진과 비교하는 중...')
     for item in source:
         seen_src += 1
@@ -243,12 +243,18 @@ def main():
         if not h:
             no_image += 1
             continue
+        hashed_src += 1
         best = None
+        closest = 64
         for row, rh, dates in ours:
             limit = SAME_DAY_DISTANCE if (item['date'] and any(abs((item['date'] - d).days) <= 1 for d in dates)) else ANY_DAY_DISTANCE
             dist = hamming(h, rh)
+            closest = min(closest, dist)
             if dist <= limit and (best is None or dist < best[1]):
                 best = (row, dist)
+        # Diagnostics: how close the nearest of our photos came, so a 0-match run says why.
+        bucket = '0-4' if closest <= 4 else '5-8' if closest <= 8 else '9-12' if closest <= 12 else '13-16' if closest <= 16 else '17+'
+        closest_hist[bucket] = closest_hist.get(bucket, 0) + 1
         if not best:
             continue
         row = best[0]
@@ -269,8 +275,13 @@ def main():
             'directMediaUrl': row.get('directMediaUrl') or '', 'tags': tags}})
 
     print(f'\n원본 사진 {seen_src}장 중 이름 있는 사진을 우리 사진 {len(plan)}장과 연결, 새 인물 태그가 붙을 사진 {len(changes)}장')
+    print(f'비교에 쓴 원본 사진 {hashed_src}장, 이 맥에 이미지가 없어 건너뛴 사진 {no_image}장')
     if no_image:
-        print(f'이 맥에 이미지가 없어 비교하지 못한 사진 {no_image}장 -- 사진 앱 > 설정 > iCloud > "이 Mac에 원본 다운로드"를 켜면 늘어납니다.')
+        print('  -> 사진 앱 > 설정 > iCloud > "이 Mac에 원본 다운로드"를 켜고, 다운로드가 끝난 뒤 다시 실행하면 늘어납니다.')
+    if closest_hist:
+        order = ['0-4', '5-8', '9-12', '13-16', '17+']
+        print('가장 비슷한 우리 사진과의 차이(64칸 중 다른 칸 수, 작을수록 같은 사진): '
+              + ', '.join(f'{k}: {closest_hist[k]}장' for k in order if k in closest_hist))
     for c in changes[:30]:
         print(f"  {c['assetKey']}: +{' '.join('#' + a for a in c['add'])}")
     if unknown:
