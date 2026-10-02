@@ -27,6 +27,7 @@ import { useTabStripGesture } from './tab-strip-gesture.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, withNotAPlaceTag } from './archive-place-groups.js';
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
+import { isExcludedFromPeople, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
 import { CommonPagination } from './ui-shared.js';
 import { getCulturePosterBadge, CULTURE_POSTER_BADGE_COLORS } from './culture-poster-badge.js';
 
@@ -2130,6 +2131,9 @@ export function HistoryView({
     }));
     historyPhotoEntries.forEach(entry => {
       const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
+      // 인물아님: taken out of 분류 필요 by 제외 (archive-person-exclusion.js); still matched to a
+      // person if it carries one's tag.
+      const excluded = isExcludedFromPeople(entry?.tags);
       if (!tokens.length) {
         unclassified.push(entry);
         return;
@@ -2141,7 +2145,7 @@ export function HistoryView({
           hasPerson = true;
         }
       });
-      if (!hasPerson) unclassified.push(entry);
+      if (!hasPerson && !excluded) unclassified.push(entry);
     });
     return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
   }, [historyTab, historyPhotoEntries, personTagChips, q ? 1 : 0]);
@@ -2155,7 +2159,6 @@ export function HistoryView({
   const [peopleSelectMode, setPeopleSelectMode] = React.useState(false);
   const [peopleSelectedKeys, setPeopleSelectedKeys] = React.useState(() => new Set());
   const [isPeopleBulkDeleting, setIsPeopleBulkDeleting] = React.useState(false);
-  const [peopleDeleteProgress, setPeopleDeleteProgress] = React.useState(null);
   const peopleAnchorKeyRef = React.useRef('');
 
   React.useEffect(() => {
@@ -2249,61 +2252,59 @@ export function HistoryView({
     }
   };
 
-  const handleDeleteSelectedPeoplePhotos = async () => {
+  // 제외 (never a delete): 분류 필요 → 인물아님 mark; a person → that person's tag comes off.
+  // Deleting a photo is only the lightbox's single-photo delete.
+  const handleExcludeSelectedPeoplePhotos = async () => {
     const photos = (photosForPersonTag || []).filter((p, idx) => peopleSelectedKeys.has(archivePhotoSelectKey(p, idx)));
     if (!photos.length) return;
-    const deleteFn = onDeletePhotos || window.__gatherBulkDeletePhotos;
-    hideArchivePhotos(photos);
+    const save = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
+    if (typeof save !== 'function') {
+      showToast?.('분류 제외 기능을 준비하지 못했습니다.', 'error');
+      return;
+    }
+    const fromUnclassified = selectedPersonTag === PERSON_UNCLASSIFIED_KEY;
+    const seen = new Set();
+    const changes = [];
+    photos.forEach(photo => {
+      const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
+      if (!assetKey || seen.has(assetKey)) return;
+      seen.add(assetKey);
+      const next = fromUnclassified ? withNotAPersonTag(photo?.tags || '') : withoutPersonTag(photo?.tags || '', selectedPersonTag);
+      if (next.status === 'already') return;
+      changes.push({ photo, assetKey, beforeTags: next.before, tags: next.tags });
+    });
     setPeopleSelectedKeys(new Set());
     setPeopleSelectMode(false);
+    if (!changes.length) {
+      showToast?.('선택한 사진은 이미 이 분류에서 빠져 있어요.', 'info');
+      return;
+    }
     setIsPeopleBulkDeleting(true);
-    setPeopleDeleteProgress({ current: 0, total: photos.length });
-
     try {
-      if (typeof deleteFn === 'function') {
-        const res = await deleteFn(photos, {
-          onProgress: ({ current, total }) => setPeopleDeleteProgress({ current, total })
-        });
-        const deleted = Number(res?.deleted || 0);
-        const failed = Number(res?.failed || 0);
-        if (!deleted && failed) {
-          restoreArchivePhotos(photos);
-          showToast?.('사진 삭제에 실패했습니다.', 'error');
-        } else if (failed) {
-          showToast?.(`사진 ${deleted}장을 삭제했습니다. ${failed}장은 지우지 못했습니다.`, 'error');
-        } else {
-          showToast?.(`사진 ${deleted || photos.length}장을 삭제했습니다.`, 'success');
-        }
-      } else if (typeof onDeletePhoto === 'function') {
-        let done = 0;
-        let failed = 0;
-        for (const photo of photos) {
-          try {
-            const ok = await onDeletePhoto({ ...photo, silent: true });
-            if (ok === false) failed += 1;
-            else done += 1;
-          } catch (_) {
-            failed += 1;
-          }
-          setPeopleDeleteProgress({ current: done + failed, total: photos.length });
-        }
-        if (!done && failed) {
-          restoreArchivePhotos(photos);
-          showToast?.('사진 삭제에 실패했습니다.', 'error');
-        } else {
-          showToast?.(`사진 ${done}장을 삭제했습니다.`, failed ? 'error' : 'success');
-        }
-      } else {
-        restoreArchivePhotos(photos);
-        showToast?.('사진 삭제 기능을 준비하지 못했습니다.', 'error');
-      }
-    } catch (err) {
-      console.error('handleDeleteSelectedPeoplePhotos failed:', err);
-      restoreArchivePhotos(photos);
-      showToast?.('사진 삭제에 실패했습니다.', 'error');
+      await saveArchiveTagsWithUndo(save, changes, `${changes.length}장을 ${fromUnclassified ? '분류 필요' : `#${selectedPersonTag}`}에서 뺐어요. 사진은 그대로예요.`);
     } finally {
       setIsPeopleBulkDeleting(false);
-      setPeopleDeleteProgress(null);
+    }
+  };
+  // One bulk tag save with an undo toast (인물 제외 and 장소 분류에서 제거 share it).
+  const saveArchiveTagsWithUndo = async (save, changes, doneMessage) => {
+    publishArchiveTags(changes);
+    try {
+      const result = await save(changes);
+      if (!result?.ok) throw new Error('분류 제외 저장 실패');
+      const undoChanges = changes.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
+      showToast?.(doneMessage, 'success', 9000, () => {
+        publishArchiveTags(undoChanges);
+        void Promise.resolve(save(undoChanges))
+          .then(undoResult => {
+            if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
+            showToast?.(undoResult?.ok ? '제외를 되돌렸습니다.' : '제외를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+          })
+          .catch(() => { rollbackArchiveTags(undoChanges); showToast?.('제외를 되돌리지 못했습니다.', 'error'); });
+      }, null, '되돌리기');
+    } catch (err) {
+      rollbackArchiveTags(changes);
+      showToast?.(String(err?.message || '분류에서 빼지 못했습니다.'), 'error');
     }
   };
 
@@ -2620,28 +2621,10 @@ export function HistoryView({
       return;
     }
     if (typeof bulkSaveImageTagsRef.current === 'function') {
-      publishArchiveTags(bulkChanges);
       setPlaceSelectedKeys(new Set());
       setPlaceSelectMode(false);
       try {
-        const result = await bulkSaveImageTagsRef.current(bulkChanges);
-        if (!result?.ok) throw new Error('분류 제거 저장 실패');
-        const undoChanges = bulkChanges.map(change => ({ ...change, tags: change.beforeTags, beforeTags: change.tags }));
-        showToast(`${bulkChanges.length}장을 분류 필요에서 뺐어요. 사진 파일은 그대로예요.`, 'success', 9000, () => {
-          const undo = bulkSaveImageTagsRef.current;
-          if (typeof undo !== 'function') return;
-          publishArchiveTags(undoChanges);
-          void undo(undoChanges)
-            .then(undoResult => {
-              if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
-              showToast(undoResult?.ok ? '분류 제거를 되돌렸습니다.' : '분류 제거를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
-            })
-            .catch(error => { rollbackArchiveTags(undoChanges); console.error('Place dismiss undo failed:', error); showToast('분류 제거 되돌리기에 실패했습니다.', 'error'); });
-        }, null, '되돌리기');
-      } catch (err) {
-        rollbackArchiveTags(bulkChanges);
-        console.error('Place dismiss tag save failed:', err);
-        showToast(String(err?.message || '분류에서 빼지 못했습니다.'), 'error');
+        await saveArchiveTagsWithUndo(bulkSaveImageTagsRef.current, bulkChanges, `${bulkChanges.length}장을 분류 필요에서 뺐어요. 사진 파일은 그대로예요.`);
       } finally {
         setPlaceAssignProgress(null);
       }
@@ -3731,12 +3714,12 @@ export function HistoryView({
         groupOptions: selectedPersonTag !== PERSON_UNCLASSIFIED_KEY ? personTagChips.filter(c => c.label !== selectedPersonTag).map(c => ({ id: c.id, label: c.label })) : [],
         onMoveToGroup: handleMovePeopleGroup,
         onApplyTags: handleApplyPeopleTags,
-        onDeletePhotos: handleDeleteSelectedPeoplePhotos,
+        onDeletePhotos: handleExcludeSelectedPeoplePhotos,
+        deleteMode: 'exclude',
         showToast,
         onRequestConfirm,
         isSaving: false,
         isDeleting: isPeopleBulkDeleting,
-        deleteProgress: peopleDeleteProgress,
         mode: 'people'
       })
     )),
