@@ -185,3 +185,21 @@ test('GC sweep keeps a file another calendar still shows (photos copied across c
   assert.equal((await bucket.file('memoImages/testcal/shared.jpg').exists())[0], true);
   await other.collection('photoIndex').doc('asset:v1:shared').delete();
 });
+
+test('GC sweep keeps a file an anniversary photo or a culture poster still points at', async () => {
+  await reset();
+  const file = name => `https://firebasestorage.googleapis.com/v0/b/demo-moyeora.appspot.com/o/chatImages%2Ftestcal%2F${name}?alt=media`;
+  for (const name of ['ann.jpg', 'poster.jpg', 'loose.jpg']) {
+    await bucket.file(`chatImages/testcal/${name}`).save(Buffer.from(name));
+    await db.collection('storageGc').doc(name).set({ path: `chatImages/testcal/${name}`, calendarDocId: CAL, deleteAfter: 10 });
+  }
+  await root.collection('anniversaries').doc('a1').set({ title: 'x', photos: [{ url: file('ann.jpg'), thumbUrl: file('ann.jpg') }] });
+  await root.collection('customCultureItems').doc('c1').set({ title: 'y', image: file('poster.jpg'), imageUrl: file('poster.jpg') });
+  const result = await sweepStorageGc({ db, bucket, now: 100 });
+  assert.deepEqual(result, { examined: 3, deleted: 1, kept: 2 });
+  assert.equal((await bucket.file('chatImages/testcal/ann.jpg').exists())[0], true);
+  assert.equal((await bucket.file('chatImages/testcal/poster.jpg').exists())[0], true);
+  assert.equal((await bucket.file('chatImages/testcal/loose.jpg').exists())[0], false);
+  await root.collection('anniversaries').doc('a1').delete();
+  await root.collection('customCultureItems').doc('c1').delete();
+});

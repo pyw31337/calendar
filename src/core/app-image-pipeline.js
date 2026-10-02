@@ -1480,8 +1480,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     .map(item => item?.fingerprint));
   const { accepted, duplicateIndexes } = selectNonDuplicateCompressedImages(calendarId, compressedList);
   // A photo already stored in this calendar is never stored again: its slot gets the existing
-  // original's URLs. Callers whose records the shared-file delete guard does not scan
-  // (anniversaries, posters) pass reuseStoredOriginals: false and upload as before.
+  // original's URLs (reuseStoredOriginals: false opts out).
   const reuseByIndex = new Map();
   if (options.reuseStoredOriginals !== false) {
     await Promise.all(accepted.filter(entry => entry.alreadyStored && !entry.item?.isExisting).map(async entry => {
@@ -1656,10 +1655,11 @@ function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, ti
   return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
 }
 
-// Anniversary photos and culture posters live outside the records the shared-file delete guard
-// scans, so they keep their own copy instead of pointing at a chat/memo original.
+// Anniversary photos and culture posters link a stored original like every other upload: photo
+// files are never deleted from the app, and the server GC sweep keeps any file an anniversary or
+// culture item still points at.
 async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgress) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets, { reuseStoredOriginals: false });
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets);
 }
 
 export {

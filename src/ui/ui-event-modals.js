@@ -373,7 +373,7 @@ export function AnniversaryModal({
     setSelectedPlace(ann.place || null);
     setPlaceQuery('');
     setPlaceResults([]);
-    setPhotos(Array.isArray(ann.photos) ? ann.photos.map(p => ({ isExisting: true, original: p.url, thumbnail: p.thumbUrl || p.url, tags: p.tags || '', photoId: p.id || '' })) : []);
+    setPhotos(Array.isArray(ann.photos) ? ann.photos.map(p => ({ isExisting: true, original: p.url, thumbnail: p.thumbUrl || p.url, tags: p.tags || '', photoId: p.id || '', fingerprint: p.fingerprint || '' })) : []);
     if (ann.type === 'dday') {
       // Pre-existing D-Day entries can no longer be created from this form, but must still be
       // editable in place rather than silently losing their targetDate/isCountDown fields.
