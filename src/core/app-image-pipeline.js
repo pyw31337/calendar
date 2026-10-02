@@ -488,7 +488,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       }
     });
   };
-  // 512px stays the chat-bubble thumb. Grids use the 160px sibling instead.
+  // 512px is the tile thumb (grids, cards, chat bubbles); 160px is for tiny surfaces only.
   const getHighQualityThumbBlob = () => encodeScaledWebpBlob(CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY);
   const getSmallThumbBlob = () => encodeScaledWebpBlob(SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY);
 
@@ -1124,6 +1124,8 @@ function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, pr
     const chatBlob = compressed?.thumbnailBlob || null;
     const smallBlob = compressed?.smallThumbBlob || null;
     const smallSource = smallBlob || (grid ? chatBlob : null);
+    // Every profile keeps the 512px thumb: tiles show it (image-variants.js). Grid uploads
+    // used to skip it and fell back to the 160px file, which looked blurry on 2x/3x screens.
     if (!storage || !originalBlob || (grid ? !smallSource : !chatBlob)) {
       resolve(null);
       return;
@@ -1132,7 +1134,7 @@ function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, pr
     const originalMeta = getUploadImageBlobMeta(originalBlob, originalBlob?.type === 'image/webp' ? 'webp' : 'jpg');
     const originalRef = storage.ref(`${basePath}_original_${originalBlob.size}b.${originalMeta.ext}`);
     stampJobs.push({ blob: originalBlob, ref: originalRef, key: `${index}-orig`, contentType: originalMeta.contentType, role: 'original' });
-    if (!grid) {
+    if (chatBlob && chatBlob !== smallSource) {
       const thumbMeta = getUploadImageBlobMeta(chatBlob, 'webp');
       const thumbRef = storage.ref(`${basePath}_thumb_${chatBlob.size}b.${thumbMeta.ext}`);
       stampJobs.push({ blob: chatBlob, ref: thumbRef, key: `${index}-thumb`, contentType: thumbMeta.contentType, role: 'chatThumb' });
@@ -1160,7 +1162,7 @@ function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, pr
       if (urls.every(Boolean)) {
         const byRole = {};
         stampJobs.forEach((job, jobIndex) => { byRole[job.role] = urls[jobIndex]; });
-        if (grid) resolve({ imageUrl: byRole.original, thumbUrl: byRole.small, smallThumbUrl: byRole.small });
+        if (grid) resolve({ imageUrl: byRole.original, thumbUrl: byRole.chatThumb || byRole.small, smallThumbUrl: byRole.small });
         else resolve({ imageUrl: byRole.original, thumbUrl: byRole.chatThumb, smallThumbUrl: byRole.small || '' });
         return;
       }
