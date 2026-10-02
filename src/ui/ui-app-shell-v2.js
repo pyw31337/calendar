@@ -1619,6 +1619,7 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
       weatherLocation: modalWeatherLocation,
       resolveLocationForDate: resolveWeatherLocationForDate,
       days,
+      confirmedDates: confirmedMeetingDates,
       onClose: () => setSelectedWeatherDate(null),
       onSaveLocation: handleSaveLocation,
       onSelectDate: (targetDate) => {
@@ -3683,8 +3684,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // This keeps the existing Lightbox component/behaviour instead of maintaining another popup.
   const [activeV2Lightbox, setActiveV2Lightbox] = React.useState(null);
   const [isParticipantPickerOpen, setIsParticipantPickerOpen] = React.useState(false);
-  // The side menu badge appears only once a participant has been picked somewhere on this device
-  // (the chat's "first participant" default does not count), and then follows every later pick.
+  // The participant picked somewhere on this device (chat, memo, comments, the badge itself).
   const [chosenParticipantId, setChosenParticipantId] = React.useState(() => readChosenParticipantId(activeCalId, calendar));
   React.useEffect(() => { setChosenParticipantId(readChosenParticipantId(activeCalId, calendar)); }, [activeCalId, calendar]);
   // Whoever is chosen -- side menu badge, chat, memo or comment picker -- also receives this
@@ -4235,8 +4235,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       // 지금 이 기기에서 쓰는 참여자 (core/current-participant.js). Tap to switch; chat, memo,
       // comments and likes all follow.
       (() => {
-        const current = chosenParticipantId
-          ? participants.find(p => p && p.id === chosenParticipantId && !p.deletedAt && !p.removedAt)
+        // A pick made on this device wins; otherwise the participant the chat is already using
+        // (the chat picks one on its own), so the badge always says who this device is.
+        const badgeId = chosenParticipantId || chatContext?.chatRoomProps?.chatParticipantId || '';
+        const current = badgeId
+          ? participants.find(p => p && p.id === badgeId && !p.deletedAt && !p.removedAt)
           : null;
         if (!current) return null;
         return React.createElement('button', {
@@ -4524,7 +4527,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     isParticipantPickerOpen && window.GATHER_UI_COMPONENTS?.ParticipantSelectSheet && React.createElement(window.GATHER_UI_COMPONENTS.ParticipantSelectSheet, {
       calendar: chatContext?.calendar || calendar,
       title: '지금 참여자',
-      isOptionSelected: id => id === chosenParticipantId,
+      isOptionSelected: id => id === (chosenParticipantId || chatContext?.chatRoomProps?.chatParticipantId),
       selectedLabel: '선택됨',
       disableSelected: true,
       onSelect: id => {

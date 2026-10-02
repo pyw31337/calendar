@@ -4415,42 +4415,72 @@ html:has(.renewal-shell.v2-design) .weather-detail-icon-button:focus-visible {
   outline: none;
 }
 
-/* "내일 2026년 10월 3일 (토)" sits on the close button's row and never wraps; narrow phones
-   (320-374px) show the year as "26년". */
+/* "내일 26.10.03 (토) 개천절" (src/ui/date-title.js) sits on the close button's row and never wraps.
+   The weather popup and the 일정 popup share these rules. */
 html:has(.renewal-shell.v2-design) .weather-detail-date-line {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
   align-items: center;
-  gap: 8px;
   padding: 0;
   color: var(--v2-ink, var(--text-main, #171426));
   white-space: nowrap;
 }
-
-html:has(.renewal-shell.v2-design) .weather-detail-date-line strong {
+html:has(.renewal-shell.v2-design) .v2-date-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  overflow: hidden;
-  font-size: var(--v2-fs-title, 1.2rem);
-  font-weight: 850;
-  letter-spacing: -0.035em;
-  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-html:has(.renewal-shell.v2-design) .weather-detail-year-short { display: none; }
-@media (max-width: 374px) {
-  html:has(.renewal-shell.v2-design) .weather-detail-year-full { display: none; }
-  html:has(.renewal-shell.v2-design) .weather-detail-year-short { display: inline; }
-  html:has(.renewal-shell.v2-design) .weather-detail-date-line strong { font-size: 1.08rem; }
-}
-
-html:has(.renewal-shell.v2-design) .weather-detail-date-eyebrow {
+html:has(.renewal-shell.v2-design) .v2-date-title-rel {
   flex: 0 0 auto;
   padding: 3px 7px;
-  color: var(--v2-primary, var(--a-brand, #7c2fe5));
+  color: var(--v2-primary, var(--a-brand, #7C2FE5));
   border-radius: var(--radius-full, 999px);
   background: var(--v2-glass-purple-fill, rgb(var(--a-brand-rgb, 124 47 229) / 0.1));
   font-size: var(--v2-fs-2xs, 0.75rem);
   font-weight: 800;
+  line-height: 1.2;
+}
+html:has(.renewal-shell.v2-design) .v2-date-title-date {
+  flex: 0 0 auto;
+  font-size: var(--v2-fs-title, 1.2rem);
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  color: var(--v2-ink, var(--text-main, #171426));
+}
+html:has(.renewal-shell.v2-design) .v2-date-title-md.is-confirmed {
+  color: var(--a-brand, #7C2FE5);
+}
+html:has(.renewal-shell.v2-design) .v2-date-title-md.is-all-available {
+  color: var(--status-green, #10B981);
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-date-title-md.is-confirmed {
+  color: var(--d-brand, #C9FD58);
+}
+html:has(.renewal-shell.v2-design) .v2-date-title-holiday {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 8px;
+  border: 1px solid #FEE2E2;
+  border-radius: var(--radius-sm, 8px);
+  background: #FEF2F2;
+  color: #EF4444;
+  font-size: var(--font-size-sm, 0.8rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .v2-date-title-holiday {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.16);
+  color: #FCA5A5;
+}
+@media (max-width: 374px) {
+  html:has(.renewal-shell.v2-design) .v2-date-title-date { font-size: 1.08rem; }
+  html:has(.renewal-shell.v2-design) .v2-date-title { gap: 6px; }
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-days-strip {
@@ -4535,7 +4565,6 @@ html:has(.renewal-shell.v2-design) .weather-highlight-card {
   border-radius: 28px;
   color: #fff;
   background: linear-gradient(115deg, #1d4ed8 0%, #0ea5e9 46%, #22d3ee 100%);
-  box-shadow: 0 18px 36px rgba(14, 165, 233, 0.34);
   isolation: isolate;
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card:hover {
@@ -4543,48 +4572,37 @@ html:has(.renewal-shell.v2-design) .weather-highlight-card:hover {
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="clear"] {
   background: linear-gradient(115deg, #2563eb 0%, #38bdf8 42%, #7dd3fc 100%);
-  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.38);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="cloudy"] {
   background: linear-gradient(115deg, #1d4ed8 0%, #3b82f6 48%, #60a5fa 100%);
-  box-shadow: 0 18px 36px rgba(29, 78, 216, 0.34);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="overcast"] {
   background: linear-gradient(115deg, #334155 0%, #475569 46%, #64748b 100%);
-  box-shadow: 0 18px 36px rgba(51, 65, 85, 0.32);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="fog"] {
   background: linear-gradient(115deg, #475569 0%, #64748b 50%, #94a3b8 100%);
-  box-shadow: 0 18px 36px rgba(71, 85, 105, 0.3);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="rain"] {
   background: linear-gradient(115deg, #0e7490 0%, #0891b2 42%, #22d3ee 100%);
-  box-shadow: 0 18px 40px rgba(8, 145, 178, 0.4);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="thunder"] {
   background: linear-gradient(115deg, #312e81 0%, #6d28d9 48%, #a855f7 100%);
-  box-shadow: 0 18px 40px rgba(109, 40, 217, 0.42);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="snow"] {
   background: linear-gradient(115deg, #1d4ed8 0%, #60a5fa 48%, #dbeafe 100%);
-  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.3);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night"],
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-cloud"] {
   background: linear-gradient(115deg, #1e1b4b 0%, #4c1d95 52%, #7c3aed 100%);
-  box-shadow: 0 18px 40px rgba(76, 29, 149, 0.42);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-rain"] {
   background: linear-gradient(115deg, #0f172a 0%, #0e7490 52%, #22d3ee 100%);
-  box-shadow: 0 18px 40px rgba(14, 116, 144, 0.4);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-thunder"] {
   background: linear-gradient(115deg, #1e1b4b 0%, #6d28d9 58%, #f59e0b 150%);
-  box-shadow: 0 18px 40px rgba(76, 29, 149, 0.44);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather="night-snow"] {
   background: linear-gradient(115deg, #1e293b 0%, #6366f1 58%, #e0e7ff 100%);
-  box-shadow: 0 18px 36px rgba(99, 102, 241, 0.36);
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card::after { display: none; }
 html:has(.renewal-shell.v2-design) .weather-highlight-copy {
@@ -7634,3 +7652,12 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-head .b
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The weather highlight card is flat (no drop shadow) and follows the finger when swiped to
+   the previous/next day. */
+html:has(.renewal-shell.v2-design) .weather-highlight-card,
+html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather] {
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design) .weather-highlight-card.is-dragging { cursor: grabbing; }
+html:has(.renewal-shell.v2-design) .weather-detail-metric[data-hourly-tab] { cursor: pointer; }

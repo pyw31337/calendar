@@ -8,6 +8,7 @@ import {
   fetchDetailedWeatherForecast,
   resolveDailyForecast
 } from '../core/app-weather.js';
+import { DateTitle } from './date-title.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1138,6 +1139,21 @@ function WeatherScene({ kind }) {
   );
 }
 
+// Hourly 대기 (PM10, 한국 환경부 기준) and 자외선 grades for the hourly tabs.
+function hourlyAirGrade(pm10) {
+  if (pm10 <= 30) return { text: '좋음', color: '#3B82F6' };
+  if (pm10 <= 80) return { text: '보통', color: '#10B981' };
+  if (pm10 <= 150) return { text: '나쁨', color: '#F59E0B' };
+  return { text: '매우나쁨', color: '#EF4444' };
+}
+function hourlyUvGrade(uv) {
+  if (uv < 3) return { text: '낮음', color: '#10B981' };
+  if (uv < 6) return { text: '보통', color: '#F2AE2E' };
+  if (uv < 8) return { text: '높음', color: '#F97316' };
+  if (uv < 11) return { text: '매우높음', color: '#EF4444' };
+  return { text: '위험', color: '#7C3AED' };
+}
+
 export function WeatherDetailModal({
   dateStr: initialDateStr,
   weatherLocation,
@@ -1145,7 +1161,8 @@ export function WeatherDetailModal({
   onSelectDate,
   onSaveLocation,
   resolveLocationForDate = null,
-  days = []
+  days = [],
+  confirmedDates = null
 }) {
   const React = window.React;
   const [selectedDate, setSelectedDate] = React.useState(initialDateStr || '');
@@ -1315,12 +1332,19 @@ export function WeatherDetailModal({
   const isToday = isDateValid && now.toDateString() === targetDate.toDateString();
   const currentHourNum = now.getHours();
   const isNight = isToday ? (currentHourNum < 6 || currentHourNum >= 19) : false;
-  const formattedDateTitle = isDateValid
-    ? `${targetDate.getFullYear()}년 ${targetDate.getMonth() + 1}월 ${targetDate.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][targetDate.getDay()]})`
-    : selectedDate;
 
-  const matchedDay = Array.isArray(days) ? days.find(d => d.dateStr === selectedDate) : null;
-  const dayBadge = matchedDay ? matchedDay.label : null;
+  const isConfirmedDay = Boolean(selectedDate) && (confirmedDates instanceof Set
+    ? confirmedDates.has(selectedDate)
+    : (Array.isArray(confirmedDates) && confirmedDates.includes(selectedDate)));
+  const holidayLabelText = (() => {
+    const read = (window.GATHER_UI_DEPS || {}).getHolidayNamesForDate || GATHER_APP_UTILS.getHolidayNamesForDate;
+    try {
+      const names = typeof read === 'function' ? read(selectedDate) : [];
+      return Array.isArray(names) ? names.filter(Boolean).join('·') : '';
+    } catch (_) {
+      return '';
+    }
+  })();
 
   const weatherCode = daily?.code ?? 0;
   const weatherDesc = getWeatherDescription(weatherCode);
@@ -1338,12 +1362,65 @@ export function WeatherDetailModal({
     : (maxTemp != null ? maxTemp : (hourlyList[0]?.temp != null ? Math.round(hourlyList[0].temp) : null));
   const cardKind = weatherSceneKind(weatherCode, isNight);
 
+  // The hourly chart opens on the current hour (one column of the past stays visible), on every
+  // day and tab -- not at 0시. It only exists once the forecast has loaded, hence those deps.
+  const hasHourly = hourlyList.length > 0;
   React.useEffect(() => {
-    if (timelineRef.current && isToday) {
-      const scrollPos = Math.max(0, currentHourNum * 54 - 54);
-      timelineRef.current.scrollLeft = scrollPos;
+    const el = timelineRef.current;
+    if (!el || !hasHourly) return;
+    el.scrollLeft = Math.max(0, (currentHourNum - 1) * 54);
+  }, [selectedDate, hourlyTab, currentHourNum, hasHourly, loading]);
+
+  // Metric cards open their hourly tab (강수량 → 강수, 최대 풍속 → 바람, 대기질 → 대기, 자외선 → 자외선).
+  const hourlySectionRef = React.useRef(null);
+  const openHourlyTab = (key) => {
+    setHourlyTab(key);
+    try { hourlySectionRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+  };
+  const metricCardProps = (key, label) => ({
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': `${label} 시간별 보기`,
+    'data-hourly-tab': key,
+    style: { cursor: 'pointer' },
+    onClick: () => openHourlyTab(key),
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHourlyTab(key); } }
+  });
+
+  // Swipe / drag the highlight card to the previous or next day of the strip.
+  const dayOrder = Array.isArray(days) ? days.map(d => d.dateStr) : [];
+  const dayIndex = dayOrder.indexOf(selectedDate);
+  const cardSwipeRef = React.useRef(null);
+  const [cardDragPx, setCardDragPx] = React.useState(0);
+  const beginCardSwipe = (event) => {
+    if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (event.target?.closest?.('.weather-highlight-setting')) return;
+    cardSwipeRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, active: false };
+  };
+  const moveCardSwipe = (event) => {
+    const swipe = cardSwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    const dx = event.clientX - swipe.startX;
+    const dy = event.clientY - swipe.startY;
+    if (!swipe.active) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+      swipe.active = true;
+      try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch (_) {}
     }
-  }, [selectedDate, hourlyTab, isToday, currentHourNum]);
+    const atEdge = (dx > 0 && dayIndex <= 0) || (dx < 0 && dayIndex >= dayOrder.length - 1);
+    setCardDragPx(atEdge ? dx / 4 : dx);
+  };
+  const endCardSwipe = (event) => {
+    const swipe = cardSwipeRef.current;
+    if (!swipe || (event && swipe.pointerId !== event.pointerId)) return;
+    cardSwipeRef.current = null;
+    try { event?.currentTarget?.releasePointerCapture?.(swipe.pointerId); } catch (_) {}
+    const dx = event && swipe.active ? event.clientX - swipe.startX : 0;
+    setCardDragPx(0);
+    if (Math.abs(dx) < 48 || dayIndex < 0) return;
+    const next = dayOrder[dayIndex + (dx < 0 ? 1 : -1)];
+    if (next) setSelectedDate(next);
+  };
 
   const uvText = (uv) => {
     if (uv == null) return '보통';
@@ -1458,20 +1535,14 @@ export function WeatherDetailModal({
       }
     }),
 
-    /* Header: "내일 2026년 10월 3일 (토)" and the close button share one row. The weather-region
+    /* Header: "내일 26.10.03 (토) 개천절" (date-title.js, same as the 일정 popup) and the close
+       button share one row. The weather-region
        control lives on the highlight card's bottom row (tap anywhere on it). */
     /*#__PURE__*/React.createElement("div", {
       className: "weather-detail-header"
     },
       /*#__PURE__*/React.createElement("div", { className: "weather-detail-date-line" },
-        /*#__PURE__*/React.createElement("span", { className: "weather-detail-date-eyebrow" }, dayBadge || '일일 예보'),
-        /*#__PURE__*/React.createElement("strong", null,
-          isDateValid
-            ? /*#__PURE__*/React.createElement(React.Fragment, null,
-                /*#__PURE__*/React.createElement("span", { className: "weather-detail-year-full" }, `${targetDate.getFullYear()}년`),
-                /*#__PURE__*/React.createElement("span", { className: "weather-detail-year-short" }, `${String(targetDate.getFullYear()).slice(2)}년`),
-                ` ${formattedDateTitle.replace(/^\d{4}년 /, '')}`)
-            : formattedDateTitle)
+        /*#__PURE__*/React.createElement(DateTitle, { dateStr: selectedDate, isConfirmed: isConfirmedDay, holidayText: holidayLabelText })
       ),
       /*#__PURE__*/React.createElement("div", { className: "weather-detail-header-actions" },
         /*#__PURE__*/React.createElement("button", {
@@ -1555,8 +1626,17 @@ export function WeatherDetailModal({
       !loading && !error && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Primary Highlight Card */
         /*#__PURE__*/React.createElement("div", {
-          className: "weather-highlight-card",
-          "data-weather": cardKind
+          className: `weather-highlight-card${cardDragPx ? ' is-dragging' : ''}`,
+          "data-weather": cardKind,
+          onPointerDown: beginCardSwipe,
+          onPointerMove: moveCardSwipe,
+          onPointerUp: endCardSwipe,
+          onPointerCancel: endCardSwipe,
+          style: {
+            touchAction: 'pan-y',
+            transform: cardDragPx ? `translateX(${cardDragPx}px)` : undefined,
+            transition: cardDragPx ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)'
+          }
         },
           /*#__PURE__*/React.createElement("div", { className: "weather-highlight-copy" },
             /*#__PURE__*/React.createElement("span", { className: "weather-highlight-condition" }, weatherDesc),
@@ -1594,7 +1674,8 @@ export function WeatherDetailModal({
         },
           /* 1. Precipitation */
           /*#__PURE__*/React.createElement("div", {
-            className: "weather-detail-metric"
+            className: "weather-detail-metric",
+            ...metricCardProps('precip', '강수량 및 확률')
           },
             /*#__PURE__*/React.createElement("div", {
               className: "weather-detail-metric-label",
@@ -1617,7 +1698,8 @@ export function WeatherDetailModal({
 
           /* 2. Fine Dust (Air Quality) */
           /*#__PURE__*/React.createElement("div", {
-            className: "weather-detail-metric"
+            className: "weather-detail-metric",
+            ...metricCardProps('air', '대기질')
           },
             /*#__PURE__*/React.createElement("div", {
               className: "weather-detail-metric-label",
@@ -1666,7 +1748,8 @@ export function WeatherDetailModal({
 
           /* 3. Wind Speed */
           /*#__PURE__*/React.createElement("div", {
-            className: "weather-detail-metric"
+            className: "weather-detail-metric",
+            ...metricCardProps('wind', '최대 풍속')
           },
             /*#__PURE__*/React.createElement("div", {
               className: "weather-detail-metric-label",
@@ -1682,7 +1765,8 @@ export function WeatherDetailModal({
 
           /* 4. UV Index */
           /*#__PURE__*/React.createElement("div", {
-            className: "weather-detail-metric"
+            className: "weather-detail-metric",
+            ...metricCardProps('uv', '자외선 지수')
           },
             /*#__PURE__*/React.createElement("div", {
               className: "weather-detail-metric-label",
@@ -1699,18 +1783,19 @@ export function WeatherDetailModal({
 
         /* Hourly Weather Timeline */
         hourlyList.length > 0 && /*#__PURE__*/React.createElement("div", {
+          ref: hourlySectionRef,
           className: "weather-hourly-section",
           style: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }
         },
           /* Header: Title + Sub-tabs */
           /*#__PURE__*/React.createElement("div", {
-            // Title on its own line, the four tabs below it across the full width.
+            // Title on its own line, the six tabs below it across the full width.
             style: { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }
           },
             /*#__PURE__*/React.createElement("span", {
               style: { fontSize: 'var(--font-size-sm, 0.88rem)', fontWeight: 800, color: 'var(--text-main, #1E293B)' }
             }, "시간별 일기예보"),
-            /* 4 Sub-tabs: 날씨, 강수, 바람, 습도 */
+            /* 6 Sub-tabs: 날씨, 강수, 바람, 습도, 대기, 자외선 */
             /*#__PURE__*/React.createElement("div", {
               className: "weather-hourly-tabs",
               role: "tablist",
@@ -1720,7 +1805,9 @@ export function WeatherDetailModal({
                 { key: 'weather', label: '날씨' },
                 { key: 'precip', label: '강수' },
                 { key: 'wind', label: '바람' },
-                { key: 'humidity', label: '습도' }
+                { key: 'humidity', label: '습도' },
+                { key: 'air', label: '대기' },
+                { key: 'uv', label: '자외선' }
               ].map(tab => /*#__PURE__*/React.createElement("button", {
                 key: tab.key,
                 type: "button",
@@ -1731,7 +1818,8 @@ export function WeatherDetailModal({
                 style: {
                   flex: '1 1 0',
                   minWidth: 0,
-                  padding: '4px 10px',
+                  padding: '4px 2px',
+                  whiteSpace: 'nowrap',
                   fontSize: '0.75rem',
                   fontWeight: hourlyTab === tab.key ? 800 : 600,
                   color: hourlyTab === tab.key ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)',
@@ -1876,170 +1964,36 @@ export function WeatherDetailModal({
                 );
               }
 
-              if (hourlyTab === 'precip') {
-                return /*#__PURE__*/React.createElement("div", {
-                  style: { display: 'flex', width: `${totalWidth}px` }
-                },
-                  hourlyList.map((h, idx) => {
-                    const hourNum = parseInt(h.time.split(':')[0], 10);
-                    const isNow = isToday && currentHourNum === hourNum;
-                    const prob = Math.round(h.precipProb ?? 0);
-                    const barHeight = Math.max(4, Math.round(prob * 0.45));
-                    return /*#__PURE__*/React.createElement("div", {
-                      key: idx,
-                      className: "weather-hourly-col",
-                      style: {
-                        width: `${colWidth}px`,
-                        flex: '0 0 auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 0',
-                        border: 'none',
-                        background: 'transparent'
-                      }
-                    },
-                      /* Percentage */
-                      /*#__PURE__*/React.createElement("span", {
-                        style: { fontSize: '0.75rem', fontWeight: 750, color: prob > 0 ? '#3B82F6' : 'var(--text-muted)' }
-                      }, `${prob}%`),
-                      /* Bar area */
-                      /*#__PURE__*/React.createElement("div", {
-                        style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }
-                      },
-                        /*#__PURE__*/React.createElement("div", {
-                          style: {
-                            width: '14px',
-                            height: `${barHeight}px`,
-                            borderRadius: '4px',
-                            backgroundColor: prob > 0 ? '#3B82F6' : 'rgba(0,0,0,0.06)'
-                          }
-                        })
-                      ),
-                      /* Rain Icon */
-                      /*#__PURE__*/React.createElement("div", {
-                        style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-                      }, /*#__PURE__*/React.createElement(MetricIconRain, { size: 14, color: prob > 0 ? '#3B82F6' : 'var(--text-muted)' })),
-                      /* Hour label */
-                      /*#__PURE__*/React.createElement("span", {
-                        style: {
-                          fontSize: '0.75rem',
-                          fontWeight: isNow ? 800 : 500,
-                          color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
-                        }
-                      }, isNow ? '현재' : `${hourNum}시`)
-                    );
-                  })
-                );
-              }
-
-              if (hourlyTab === 'wind') {
-                return /*#__PURE__*/React.createElement("div", {
-                  style: { display: 'flex', width: `${totalWidth}px` }
-                },
-                  hourlyList.map((h, idx) => {
-                    const hourNum = parseInt(h.time.split(':')[0], 10);
-                    const isNow = isToday && currentHourNum === hourNum;
-                    const speed = h.windSpeed != null ? Number(h.windSpeed).toFixed(1) : (windSpeed || '2.0');
-                    const barHeight = Math.min(48, Math.max(6, Math.round(Number(speed) * 6)));
-                    return /*#__PURE__*/React.createElement("div", {
-                      key: idx,
-                      className: "weather-hourly-col",
-                      style: {
-                        width: `${colWidth}px`,
-                        flex: '0 0 auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 0',
-                        border: 'none',
-                        background: 'transparent'
-                      }
-                    },
-                      /* Speed text */
-                      /*#__PURE__*/React.createElement("span", {
-                        style: { fontSize: '0.75rem', fontWeight: 750, color: 'var(--v2-primary, #7C2FE5)' }
-                      }, `${speed}m/s`),
-                      /* Bar area */
-                      /*#__PURE__*/React.createElement("div", {
-                        style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }
-                      },
-                        /*#__PURE__*/React.createElement("div", {
-                          style: {
-                            width: '14px',
-                            height: `${barHeight}px`,
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--v2-primary, #7C2FE5)',
-                            opacity: 0.8
-                          }
-                        })
-                      ),
-                      /* Wind Icon */
-                      /*#__PURE__*/React.createElement("div", {
-                        style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-                      }, /*#__PURE__*/React.createElement(MetricIconWind, { size: 14 })),
-                      /* Hour label */
-                      /*#__PURE__*/React.createElement("span", {
-                        style: {
-                          fontSize: '0.75rem',
-                          fontWeight: isNow ? 800 : 500,
-                          color: isNow ? 'var(--v2-primary, #7C2FE5)' : 'var(--text-muted, #64748B)'
-                        }
-                      }, isNow ? '현재' : `${hourNum}시`)
-                    );
-                  })
-                );
-              }
-
-              // humidity
-              return /*#__PURE__*/React.createElement("div", {
+              // 강수·바람·습도·대기·자외선: one column per hour -- value, bar, icon or grade, hour.
+              const barColumns = (rowFor) => /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', width: `${totalWidth}px` }
               },
                 hourlyList.map((h, idx) => {
                   const hourNum = parseInt(h.time.split(':')[0], 10);
                   const isNow = isToday && currentHourNum === hourNum;
-                  const hum = Math.round(h.humidity ?? 50);
-                  const barHeight = Math.max(6, Math.round(hum * 0.48));
+                  const row = rowFor(h);
                   return /*#__PURE__*/React.createElement("div", {
                     key: idx,
                     className: "weather-hourly-col",
+                    title: row.title,
                     style: {
-                      width: `${colWidth}px`,
-                      flex: '0 0 auto',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 0',
-                      border: 'none',
-                      background: 'transparent'
+                      width: `${colWidth}px`, flex: '0 0 auto', display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', gap: '6px', padding: '6px 0', border: 'none', background: 'transparent'
                     }
                   },
-                    /* Humidity text */
                     /*#__PURE__*/React.createElement("span", {
-                      style: { fontSize: '0.75rem', fontWeight: 750, color: '#06B6D4' }
-                    }, `${hum}%`),
-                    /* Bar area */
+                      style: { fontSize: '0.75rem', fontWeight: 750, color: row.textColor || row.color }
+                    }, row.text),
                     /*#__PURE__*/React.createElement("div", {
                       style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }
                     },
                       /*#__PURE__*/React.createElement("div", {
-                        style: {
-                          width: '14px',
-                          height: `${barHeight}px`,
-                          borderRadius: '4px',
-                          backgroundColor: '#06B6D4',
-                          opacity: 0.85
-                        }
+                        style: { width: '14px', height: `${row.bar}px`, borderRadius: '4px', backgroundColor: row.color, opacity: row.opacity ?? 1 }
                       })
                     ),
-                    /* Droplet icon */
                     /*#__PURE__*/React.createElement("div", {
-                      style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-                    }, /*#__PURE__*/React.createElement(MetricIconDroplet, { size: 16, color: '#22D3EE' })),
-                    /* Hour label */
+                      style: { height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 700, color: row.textColor || row.color }
+                    }, row.foot),
                     /*#__PURE__*/React.createElement("span", {
                       style: {
                         fontSize: '0.75rem',
@@ -2050,6 +2004,59 @@ export function WeatherDetailModal({
                   );
                 })
               );
+
+              if (hourlyTab === 'precip') {
+                return barColumns(h => {
+                  const prob = Math.round(h.precipProb ?? 0);
+                  const color = prob > 0 ? '#3B82F6' : 'rgba(0,0,0,0.06)';
+                  const textColor = prob > 0 ? '#3B82F6' : 'var(--text-muted)';
+                  return {
+                    text: `${prob}%`, bar: Math.max(4, Math.round(prob * 0.45)), color, textColor,
+                    foot: /*#__PURE__*/React.createElement(MetricIconRain, { size: 14, color: textColor })
+                  };
+                });
+              }
+
+              if (hourlyTab === 'wind') {
+                return barColumns(h => {
+                  const speed = h.windSpeed != null ? Number(h.windSpeed).toFixed(1) : (windSpeed || '2.0');
+                  return {
+                    text: `${speed}m/s`, bar: Math.min(48, Math.max(6, Math.round(Number(speed) * 6))),
+                    color: 'var(--v2-primary, #7C2FE5)', opacity: 0.8,
+                    foot: /*#__PURE__*/React.createElement(MetricIconWind, { size: 14 })
+                  };
+                });
+              }
+
+              if (hourlyTab === 'air' || hourlyTab === 'uv') {
+                const isAir = hourlyTab === 'air';
+                if (!hourlyList.some(h => (isAir ? h.pm10 : h.uv) != null)) {
+                  return /*#__PURE__*/React.createElement("div", {
+                    className: "weather-hourly-empty",
+                    style: { width: '100%', padding: '22px 8px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted, #64748B)' }
+                  }, isAir ? '이 날은 아직 대기질 시간별 예보가 없어요 (약 4일 앞까지 제공)' : '이 날은 자외선 시간별 예보가 없어요');
+                }
+                return barColumns(h => {
+                  const value = isAir ? h.pm10 : h.uv;
+                  if (value == null) return { text: '-', bar: 4, color: 'rgba(0,0,0,0.06)', textColor: 'var(--text-muted)', foot: '' };
+                  const grade = isAir ? hourlyAirGrade(value) : hourlyUvGrade(value);
+                  return {
+                    text: `${Math.round(value)}`,
+                    bar: Math.min(50, Math.max(6, Math.round(value * (isAir ? 0.4 : 5)))),
+                    color: grade.color, opacity: 0.85, foot: grade.text,
+                    title: isAir ? `미세 ${Math.round(value)}㎍${h.pm2_5 != null ? ` · 초미세 ${Math.round(h.pm2_5)}㎍` : ''}` : `자외선 ${Math.round(value)}`
+                  };
+                });
+              }
+
+              // humidity
+              return barColumns(h => {
+                const hum = Math.round(h.humidity ?? 50);
+                return {
+                  text: `${hum}%`, bar: Math.max(6, Math.round(hum * 0.48)), color: '#06B6D4', opacity: 0.85,
+                  foot: /*#__PURE__*/React.createElement(MetricIconDroplet, { size: 16, color: '#22D3EE' })
+                };
+              });
             })()
           )
         )
