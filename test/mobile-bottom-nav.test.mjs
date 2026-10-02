@@ -14,7 +14,7 @@ test('mobile bottom nav item list and component match user specification', () =>
   assert.match(js, /\{ id: 'more', label: '더보기', icon: 'more' \}/);
 
   // Verify MobileBottomNav component declaration & usage
-  assert.match(js, /export function MobileBottomNav\(\{ activeTab, isSideNavOpen, onSelectTab \}\)/);
+  assert.match(js, /export function MobileBottomNav\(\{ activeTab, isSideNavOpen, onSelectTab, chatSender = null \}\)/);
   assert.match(js, /React\.createElement\(MobileBottomNav,/);
   // Center circle for calendar without bottom text label
   assert.match(js, /mobile-bottom-nav-center-circle/);

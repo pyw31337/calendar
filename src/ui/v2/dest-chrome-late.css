@@ -7702,7 +7702,7 @@ html:has(.renewal-shell.v2-design) .v2-design .bp-hero-zone .bp-dday-strip {
 }
 
 /* Hourly forecast: today's current hour gets a brand band and brand-coloured icon/labels. */
-.weather-hourly-now-band {
+html:has(.renewal-shell.v2-design) .weather-hourly-now-band {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -7712,15 +7712,15 @@ html:has(.renewal-shell.v2-design) .v2-design .bp-hero-zone .bp-dday-strip {
   box-shadow: inset 0 0 0 1px rgb(var(--a-brand-rgb, 124 47 229) / 0.25);
   pointer-events: none;
 }
-.weather-hourly-timeline svg,
-.weather-hourly-timeline .weather-hourly-col { position: relative; z-index: 1; }
-.weather-hourly-col.is-now .weather-hourly-icon { color: var(--a-brand, #7C2FE5); }
-.weather-hourly-col.is-now .weather-hourly-icon svg { stroke: currentColor; }
-html[data-theme="dark"] .weather-hourly-now-band {
+html:has(.renewal-shell.v2-design) .weather-hourly-timeline svg,
+html:has(.renewal-shell.v2-design) .weather-hourly-timeline .weather-hourly-col { position: relative; z-index: 1; }
+html:has(.renewal-shell.v2-design) .weather-hourly-col.is-now .weather-hourly-icon { color: var(--a-brand, #7C2FE5); }
+html:has(.renewal-shell.v2-design) .weather-hourly-col.is-now .weather-hourly-icon svg { stroke: currentColor; }
+html[data-theme="dark"]:has(.renewal-shell.v2-design) .weather-hourly-now-band {
   background: rgb(var(--d-brand-rgb, 201 253 88) / 0.12);
   box-shadow: inset 0 0 0 1px rgb(var(--d-brand-rgb, 201 253 88) / 0.3);
 }
-html[data-theme="dark"] .weather-hourly-col.is-now .weather-hourly-icon { color: var(--d-brand, #C9FD58); }
+html[data-theme="dark"]:has(.renewal-shell.v2-design) .weather-hourly-col.is-now .weather-hourly-icon { color: var(--d-brand, #C9FD58); }
 
 /* Header right-end icons sit closer together on every page: each icon button is 36px wide
    (the height keeps the 44px tap target) with a 2px gap. */
@@ -7772,6 +7772,6 @@ html:has(.renewal-shell.v2-design) .bp-mobile-bottom-nav-sender-dot {
   height: 9px;
   border-radius: 50%;
   background: var(--sender-color, #94A3B8);
-  box-shadow: 0 0 0 2px var(--bg-card, #fff);
+  box-shadow: 0 0 0 2px var(--bg-card);
   pointer-events: none;
 }
