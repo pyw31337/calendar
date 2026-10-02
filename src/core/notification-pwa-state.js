@@ -14,7 +14,7 @@ import {
   unsubscribeUserFromPush
 } from './app-domain-helpers.js';
 
-const DEFAULT_NOTIFY_CHANNELS = Object.freeze({ chat: true, memo: true, poll: true, schedule: true });
+const DEFAULT_NOTIFY_CHANNELS = Object.freeze({ chat: true, comment: true, memo: true, poll: true, schedule: true });
 
 function readNotificationPermission() {
   return isNotificationSupported() ? Notification.permission : 'unsupported';

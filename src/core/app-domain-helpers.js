@@ -1067,11 +1067,11 @@ function setNotifGuideSeen(...args) {
 }
 function getNotifyChannels(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotifyChannels;
-  return typeof f === 'function' ? f(...args) : { chat: true, memo: true, poll: true, schedule: true };
+  return typeof f === 'function' ? f(...args) : { chat: true, comment: true, memo: true, poll: true, schedule: true };
 }
 function setNotifyChannel(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).setNotifyChannel;
-  return typeof f === 'function' ? f(...args) : { chat: true, memo: true, poll: true, schedule: true };
+  return typeof f === 'function' ? f(...args) : { chat: true, comment: true, memo: true, poll: true, schedule: true };
 }
 function isNotifyChannelEnabled(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).isNotifyChannelEnabled;

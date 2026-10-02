@@ -1575,7 +1575,10 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
   const stamp = Date.now();
   const rand = Math.random().toString(36).slice(2, 8);
   const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
-  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'grid');
+  // Memo cards show the photo ~270 CSS px wide (540-800 device px on phones), so the 160px small
+  // thumb looked blurry. Memos keep the chat set -- original + 512px card thumb + 160px small --
+  // and the card uses the 512px thumb; tiny grid tiles still derive the 160px sibling.
+  return uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, 'chat');
 }
 
 function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {

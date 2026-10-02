@@ -24,7 +24,9 @@ concurrency:
 
 env:
   CALENDAR_IDS: kkot,cw,jhair
-  NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
+  # NODE_OPTIONS (the auth bootstrap) lives in the checkout, so it is set per step: at job level
+  # it also applied to actions/checkout itself, which then failed before the repo existed.
+  AUTH_IMPORT: --import ./scripts/lib/firestore-anon-auth.mjs
 
 jobs:
   maintain:
@@ -38,13 +40,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Re-align diverged copies
-        run: REPAIR_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 node scripts/repair-tag-divergence.mjs > repair-1.json
+        run: REPAIR_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 NODE_OPTIONS="$AUTH_IMPORT" node scripts/repair-tag-divergence.mjs > repair-1.json
       - name: Apply automatic tag suggestions
-        run: SUGGEST_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 node scripts/apply-tag-suggestions.mjs > suggest.json
+        run: SUGGEST_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 NODE_OPTIONS="$AUTH_IMPORT" node scripts/apply-tag-suggestions.mjs > suggest.json
       - name: Let the photo index catch up
         run: sleep 60
       - name: Re-align again
-        run: REPAIR_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 node scripts/repair-tag-divergence.mjs > repair-2.json
+        run: REPAIR_CALENDAR_IDS="$CALENDAR_IDS" APPLY=1 NODE_OPTIONS="$AUTH_IMPORT" node scripts/repair-tag-divergence.mjs > repair-2.json
       - name: Summary
         if: always()
         run: |

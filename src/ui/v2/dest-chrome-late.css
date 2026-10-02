@@ -7557,6 +7557,29 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
    기념일 등록 button keeps only its icon on narrow phones. */
 @media (max-width: 374px) {
   html:has(.renewal-shell.v2-design) .date-modal-anniv-btn-label { display: none; }
+  /* Icon-only, it takes the close button's exact box (32px, 8px corners) with the icon centred. */
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet .bp-sheet-anniv-btn {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet .bp-sheet-anniv-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+    margin: 0 !important;
+  }
 }
 
 /* 좋아요 heart (src/ui/like-button.js): filled heart, gray until liked, then the theme brand color.
@@ -7661,3 +7684,94 @@ html:has(.renewal-shell.v2-design) .weather-highlight-card[data-weather] {
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-card.is-dragging { cursor: grabbing; }
 html:has(.renewal-shell.v2-design) .weather-detail-metric[data-hourly-tab] { cursor: pointer; }
+
+/* Hero zone: TODAY card, weather row, meeting bar and D-day badges sit one even 8px apart.
+   (The meeting bar's wrapper used to add 18px above and below on top of the rows' own 8px.) */
+html:has(.renewal-shell.v2-design) .v2-design .bp-hero-zone .bp-dday-toggle-wrap {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-design .bp-hero-zone .bp-dday-toggle-wrap:last-child {
+  padding-bottom: 18px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-design .bp-hero-zone .bp-dday-strip {
+  padding-top: 8px !important;
+}
+@media (max-width: 359px) {
+  html:has(.renewal-shell.v2-design) .v2-design .bp-hero-zone .bp-dday-toggle-wrap:last-child { padding-bottom: 10px !important; }
+}
+
+/* Hourly forecast: today's current hour gets a brand band and brand-coloured icon/labels. */
+.weather-hourly-now-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  border-radius: 14px;
+  background: rgb(var(--a-brand-rgb, 124 47 229) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--a-brand-rgb, 124 47 229) / 0.25);
+  pointer-events: none;
+}
+.weather-hourly-timeline svg,
+.weather-hourly-timeline .weather-hourly-col { position: relative; z-index: 1; }
+.weather-hourly-col.is-now .weather-hourly-icon { color: var(--a-brand, #7C2FE5); }
+.weather-hourly-col.is-now .weather-hourly-icon svg { stroke: currentColor; }
+html[data-theme="dark"] .weather-hourly-now-band {
+  background: rgb(var(--d-brand-rgb, 201 253 88) / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(var(--d-brand-rgb, 201 253 88) / 0.3);
+}
+html[data-theme="dark"] .weather-hourly-col.is-now .weather-hourly-icon { color: var(--d-brand, #C9FD58); }
+
+/* Header right-end icons sit closer together on every page: each icon button is 36px wide
+   (the height keeps the 44px tap target) with a 2px gap. */
+html:has(.renewal-shell.v2-design) .v2-design .v2-page-header .bp-header-actions {
+  gap: 2px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-design .v2-page-header .bp-header-actions .bp-icon-btn,
+html:has(.renewal-shell.v2-design) .v2-design .v2-page-header .bp-header-actions > button {
+  min-width: 36px !important;
+  width: 36px !important;
+}
+
+/* Mobile: list pages run under the floating bottom menu. The records frame (갤러리/보관함/컨텐츠)
+   no longer stops above the menu and clips its list; each scrolling list keeps its own bottom
+   clearance so the last row and pagination still scroll clear of the menu. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .v2-design .v2-records-frame {
+    padding-bottom: 0 !important;
+  }
+}
+@media (max-width: 1199px) {
+  /* One bottom clearance for every list on mobile: the floating bottom menu (its height already
+     includes the home-indicator inset) + 16px. Lists scroll under the menu, and their last row
+     or pagination always ends above it. (The pane-bottom inset alone only cleared the home
+     indicator, which hid 메모's pagination under the menu.) */
+  .renewal-shell.v2-design { --v2-list-bottom: calc(var(--mobile-bottom-nav-total, 58px) + 16px); }
+  html:has(.renewal-shell.v2-design)[data-v2-keyboard] .renewal-shell.v2-design { --v2-list-bottom: 16px; }
+  html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design > main.renewal-shell-main.renewal-shell-main .v2-dest-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design > main.renewal-shell-main.renewal-shell-main .v2-legacy-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design > main.renewal-shell-main.renewal-shell-main .history-page-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design > main.renewal-shell-main.renewal-shell-main .places-list-body {
+    padding-bottom: var(--v2-list-bottom) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design > main.renewal-shell-main.renewal-shell-main .gallery-page-scroll {
+    padding-bottom: calc(88px + var(--v2-list-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design > main.renewal-shell-main.renewal-shell-main .culture-items-grid {
+    padding-bottom: calc(4px + var(--v2-list-bottom)) !important;
+  }
+}
+
+/* Bottom menu 채팅: last sender's personal-color dot at the bubble icon's top-right. */
+html:has(.renewal-shell.v2-design) .bp-mobile-bottom-nav-icon { position: relative; }
+html:has(.renewal-shell.v2-design) .bp-mobile-bottom-nav-sender-dot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sender-color, #94A3B8);
+  box-shadow: 0 0 0 2px var(--bg-card, #fff);
+  pointer-events: none;
+}
