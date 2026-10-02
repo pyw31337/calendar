@@ -17,6 +17,7 @@ on:
           - functions
           - firestore:rules,storage
           - functions,firestore:rules,storage
+          - none (data step only)
       post_deploy:
         description: 'After deploying: one-off data step (backup first, then apply)'
         required: false
@@ -65,6 +66,7 @@ jobs:
       - name: Emulator tests (gate)
         run: npm run test:functions:emulator
       - name: Deploy
+        if: inputs.targets != 'none (data step only)'
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           TOUR_API_SERVICE_KEY_SECRET: ${{ secrets.TOUR_API_SERVICE_KEY }}
