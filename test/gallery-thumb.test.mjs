@@ -69,7 +69,8 @@ test('selectGalleryPreviewPhotos skips meme pool + missing URLs and still fills 
   });
   assert.deepEqual(picked.map((p) => p.id), ['ok1', 'ok2', 'ok3']);
   assert.equal(picked[0].__thumbResolved.state, 'ready');
-  assert.equal(picked[0].thumb, 'https://firebasestorage.googleapis.com/v0/b/x/o/chatImages%2Fcw%2F1f_small.webp?alt=media');
+  // Tiles show the stored thumb (the 512 tier), not the derived 160px sibling.
+  assert.equal(picked[0].thumb, ok(1));
   assert.equal(picked[0].full, ok('1f'));
 });
 

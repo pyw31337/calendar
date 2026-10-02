@@ -1,8 +1,11 @@
 /**
  * Which image file a surface should request.
  *
- * Chat and memo uploads keep three objects: original, 512px card/bubble thumb, 160px small thumb.
- * Calendar, gallery, and meeting uploads keep two: original + small thumb.
+ * Every upload keeps three objects: original, 512px thumb, 160px small thumb.
+ * Tiles (gallery/archive/memory grids, memo cards, chat bubbles) show the 512px thumb: a tile is
+ * 90-280 CSS px, i.e. 180-840 device px on 2x/3x screens, so the 160px file looked blurry there.
+ * The 160px file is for tiny surfaces ('mini': avatars, strips, map pins) and is the fallback when
+ * a photo has no 512px thumb. The lightbox shows the original.
  * Chat vs other is uploadSource / message channel, never the URL host.
  * Grids may derive the small object from a Storage original path so a new
  * Firestore field is not required for the request.
@@ -106,7 +109,7 @@ function explicitSmallUrl(chatThumb, smallThumb) {
 }
 
 /**
- * @param {'grid'|'chat'|'chat-bubble'|'lightbox'} surface
+ * @param {'grid'|'mini'|'chat'|'chat-bubble'|'lightbox'} surface
  */
 export function selectImageVariant({
   surface = 'grid',
@@ -116,24 +119,21 @@ export function selectImageVariant({
   chatThumb = '',
   smallThumb = '',
 } = {}) {
-  const chat = isChatImageUpload({ uploadSource, channel });
   const full = clean(original);
   const mid = clean(chatThumb);
   const midIsSmall = Boolean(mid) && isSmallThumbPath(storagePathFromDownloadUrl(mid));
   const small = explicitSmallUrl(mid, smallThumb) || derivedSmallThumbUrl(full);
   if (surface === 'lightbox') return full || mid || small || '';
-  if (surface === 'chat' || surface === 'chat-bubble') {
-    if (chat) return (mid && !midIsSmall ? mid : '') || small || full || '';
-    return small || full || mid || '';
-  }
-  return small || mid || full || '';
+  // A stored "thumb" that is really the original (old rows) is not a tile thumb: loading the
+  // full file per tile is slow, so those fall to the 160px file first.
+  const midIsOriginal = Boolean(mid) && (mid === full || isOriginalObjectPath(storagePathFromDownloadUrl(mid)));
+  const tileThumb = mid && !midIsSmall && !midIsOriginal ? mid : '';
+  if (surface === 'mini') return small || tileThumb || full || '';
+  return tileThumb || small || full || '';
 }
 
 export function imageUploadVariantPlan(profile) {
-  if (profile === 'grid') {
-    return { profile: 'grid', files: ['original', 'small'], keepChatThumb: false };
-  }
-  return { profile: 'chat', files: ['original', 'chatThumb', 'small'], keepChatThumb: true };
+  return { profile: profile === 'grid' ? 'grid' : 'chat', files: ['original', 'chatThumb', 'small'], keepChatThumb: true };
 }
 
 export function shouldCreateSmallThumb({ smallObjectExists = false } = {}) {
@@ -141,26 +141,13 @@ export function shouldCreateSmallThumb({ smallObjectExists = false } = {}) {
 }
 
 /**
- * A 512 thumb may be removed only after the small object exists and nothing
- * still points at the 512 object. Original bytes are never a delete candidate,
- * including a Sep 29 in-place WebP whose object name is still .jpg.
+ * The 512 thumb is what tiles show (selectImageVariant), so it is never superseded by the
+ * 160px file any more: nothing deletes it. Kept as a function so the migration script and its
+ * callers keep one rule. (Original bytes were never a delete candidate either, including a
+ * Sep 29 in-place WebP whose object name is still .jpg.)
  */
-export function canDeleteSupersededThumb({
-  chat = false,
-  thumbPath = '',
-  originalPaths = [],
-  smallExists = false,
-  refsPointAtSmall = false,
-  thumbStillReferenced = false,
-  thumbIsOriginalBytes = false,
-} = {}) {
-  if (chat) return false;
-  if (!smallExists || !refsPointAtSmall || thumbStillReferenced) return false;
-  if (!isThumbObjectPath(thumbPath)) return false;
-  if ((originalPaths || []).includes(thumbPath)) return false;
-  if (thumbIsOriginalBytes) return false;
-  if (isOriginalObjectPath(thumbPath)) return false;
-  return true;
+export function canDeleteSupersededThumb() {
+  return false;
 }
 
 export function variantMigrationPlan({
@@ -174,12 +161,8 @@ export function variantMigrationPlan({
   thumbStillReferenced = true,
 } = {}) {
   const createSmall = shouldCreateSmallThumb({ smallObjectExists });
-  const retargetThumb = !chat
-    && !createSmall
-    && isThumbObjectPath(thumbPath)
-    && Boolean(smallPath)
-    && thumbPath !== smallPath
-    && !refsPointAtSmall;
+  // Refs keep pointing at the 512 thumb (tiles show it); only a missing 160px file is made.
+  const retargetThumb = false;
   const deleteThumb = canDeleteSupersededThumb({
     chat,
     thumbPath,

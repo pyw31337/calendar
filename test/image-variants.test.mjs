@@ -20,13 +20,13 @@ const chatThumb = `${bucket}${encodeURIComponent('chatImages/cw/1_thumb_400b.web
 const small = `${bucket}${encodeURIComponent('chatImages/cw/1_small.webp')}?alt=media`;
 const jpgOriginal = `${bucket}${encodeURIComponent('chatImages/cw/legacy.jpg')}?alt=media&token=jpg`;
 
-test('sizes stay at the chat 512 thumb and the 160 grid thumb', () => {
+test('sizes stay at the 512 tile thumb and the 160 small thumb; every upload keeps both', () => {
   assert.equal(CHAT_THUMB_MAX_EDGE, 512);
   assert.equal(CHAT_THUMB_QUALITY, 0.8);
   assert.equal(SMALL_THUMB_MAX_EDGE, 160);
   assert.equal(SMALL_THUMB_QUALITY, 0.8);
   assert.deepEqual(imageUploadVariantPlan('chat').files, ['original', 'chatThumb', 'small']);
-  assert.deepEqual(imageUploadVariantPlan('grid').files, ['original', 'small']);
+  assert.deepEqual(imageUploadVariantPlan('grid').files, ['original', 'chatThumb', 'small']);
 });
 
 test('chat is uploadSource or the message channel, not the storage host', () => {
@@ -42,32 +42,22 @@ test('chat is uploadSource or the message channel, not the storage host', () => 
   assert.equal(isChatImageUpload({ uploadSource: 'chat' }), true);
 });
 
-test('grids request the small thumb, chat bubbles the 512 thumb, lightbox the original', () => {
+test('tiles request the 512 thumb, mini surfaces the 160 small one, lightbox the original', () => {
   const derived = derivedSmallThumbUrl(original);
   assert.equal(derived, small);
-  assert.equal(selectImageVariant({
-    surface: 'grid', uploadSource: 'chat', channel: 'message', original, chatThumb,
-  }), small);
-  assert.equal(selectImageVariant({
-    surface: 'chat-bubble', uploadSource: 'chat', channel: 'message', original, chatThumb,
-  }), chatThumb);
-  assert.equal(selectImageVariant({
-    surface: 'lightbox', uploadSource: 'chat', channel: 'message', original, chatThumb,
-  }), original);
-  assert.equal(selectImageVariant({
-    surface: 'grid', uploadSource: 'gallery', channel: 'message', original, chatThumb,
-  }), small);
-  assert.equal(selectImageVariant({
-    surface: 'grid', uploadSource: 'meeting', channel: 'meeting', original, chatThumb,
-  }), small);
-  assert.equal(selectImageVariant({
-    surface: 'grid', uploadSource: 'memo', original, chatThumb: small,
-  }), small);
+  for (const uploadSource of ['chat', 'gallery', 'meeting', 'memo', '']) {
+    assert.equal(selectImageVariant({ surface: 'grid', uploadSource, original, chatThumb }), chatThumb);
+    assert.equal(selectImageVariant({ surface: 'chat-bubble', uploadSource, original, chatThumb }), chatThumb);
+    assert.equal(selectImageVariant({ surface: 'mini', uploadSource, original, chatThumb }), small);
+    assert.equal(selectImageVariant({ surface: 'lightbox', uploadSource, original, chatThumb }), original);
+  }
+  // No 512 thumb (a stored thumb that is itself the small file, or none): the small one, then the original.
+  assert.equal(selectImageVariant({ surface: 'grid', uploadSource: 'memo', original, chatThumb: small }), small);
+  assert.equal(selectImageVariant({ surface: 'grid', original: 'https://cdn.example/a.jpg' }), 'https://cdn.example/a.jpg');
+  // A stored thumb that is the original itself: tiles take the 160px file instead of the full one.
+  assert.equal(selectImageVariant({ surface: 'grid', original, chatThumb: original }), small);
   assert.equal(siblingSmallStoragePath('chatImages/cw/legacy.jpg'), 'chatImages/cw/legacy_small.webp');
   assert.equal(derivedSmallThumbUrl('https://cdn.example/not-storage.jpg'), '');
-  assert.equal(selectImageVariant({
-    surface: 'chat-bubble', uploadSource: '', channel: 'message', original, chatThumb,
-  }), chatThumb);
 });
 
 test('migration is idempotent and will not delete the only original, including mislabeled webp', () => {
@@ -98,9 +88,11 @@ test('migration is idempotent and will not delete the only original, including m
     refsPointAtSmall: false,
     thumbStillReferenced: true,
   });
+  // Tiles show the 512 thumb now: refs are never retargeted to the small file.
   assert.equal(readyToRetarget.createSmall, false);
-  assert.equal(readyToRetarget.retargetThumb, true);
+  assert.equal(readyToRetarget.retargetThumb, false);
   assert.equal(readyToRetarget.deleteThumb, false);
+  assert.equal(readyToRetarget.skip, true);
 
   assert.equal(canDeleteSupersededThumb({
     chat: false,
@@ -110,7 +102,7 @@ test('migration is idempotent and will not delete the only original, including m
     refsPointAtSmall: true,
     thumbStillReferenced: false,
     thumbIsOriginalBytes: false,
-  }), true);
+  }), false); // the 512 thumb is never deleted
   assert.equal(canDeleteSupersededThumb({
     chat: false,
     thumbPath: 'chatImages/cw/legacy.jpg',

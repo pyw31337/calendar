@@ -2477,6 +2477,7 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement(LikeButton, {
             calendarId: calendar?.id,
             variant: 'onCard',
+            size: 16,
             item: { kind: 'link', ref: item.url, title: item.linkPreview?.title || item.title || item.url, subtitle: item.linkPreview?.description || '', thumb: item.linkPreview?.image || '', url: item.url, target: { source: item.source, messageId: item.messageId } }
           }));
       }
@@ -2536,6 +2537,7 @@ export function ChatGalleryModal({
       !isBulkShareMode && /*#__PURE__*/React.createElement(LikeButton, {
         calendarId: calendar?.id,
         variant: 'onCard',
+        size: 16,
         item: { kind: 'file', ref: item.url || item.id, title: item.name || '파일', subtitle: item.ext ? String(item.ext).toUpperCase() : '', url: item.url, target: { messageId: item.messageId || '', mime: item.mime || '' } }
       }),
       isBulkShareMode && (EditSelectCheckbox
@@ -2706,29 +2708,50 @@ export function ChatGalleryModal({
   // that lived beside the 사진|링크 tabs). Desktop keeps the filter in the page header.
   // Shell is 44px + 3px padding; do not set minHeight:44px on inner segments or purple bleed
   // past the gray pill border on iOS Safari. Clip with overflow:hidden.
-  const renderVisitFilterToggleMobile = () => /*#__PURE__*/React.createElement("div", {
-    className: "visit-filter-toggle-mobile",
+  // One segmented toggle for the gallery: 전체|일자 and the 좋아요 tab's 내|모두 share its look.
+  const renderSegmentToggle = (options, value, onChange, extraClass = '') => /*#__PURE__*/React.createElement("div", {
+    className: `visit-filter-toggle-mobile${extraClass ? ` ${extraClass}` : ''}`,
     style: {
       display: 'inline-flex', alignItems: 'center', height: '44px', boxSizing: 'border-box',
       padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-card)', flexShrink: 0, overflow: 'hidden'
+      backgroundColor: 'var(--bg-card)', flexShrink: 0, overflow: 'hidden', alignSelf: 'flex-start'
     }
   },
-    [
-      { key: 'all', label: '전체' },
-      { key: 'date', label: '일자' }
-    ].map(tab => /*#__PURE__*/React.createElement("button", {
+    options.map(tab => /*#__PURE__*/React.createElement("button", {
       key: tab.key,
       type: "button",
-      onClick: () => setGalleryViewMode(tab.key),
+      "aria-pressed": value === tab.key ? 'true' : 'false',
+      onClick: () => onChange(tab.key),
       style: {
         height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-        backgroundColor: galleryViewMode === tab.key ? 'var(--accent-primary)' : 'transparent',
-        color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
+        backgroundColor: value === tab.key ? 'var(--accent-primary)' : 'transparent',
+        color: value === tab.key ? '#FFFFFF' : 'var(--text-muted)'
       }
     }, tab.label))
   );
+  const renderVisitFilterToggleMobile = () => renderSegmentToggle(
+    [{ key: 'all', label: '전체' }, { key: 'date', label: '일자' }], galleryViewMode,
+    key => (key === 'date' ? setGalleryViewMode('date') : setGalleryViewMode('all'))
+  );
+  // Loading placeholder with the same geometry as the real list (same columns, gap, start
+  // position), so content fills in where the placeholder was instead of jumping up from below.
+  // Every gallery tab uses it; a "nothing here" message only shows once data has arrived.
+  const renderGallerySkeleton = kind => /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    "aria-label": kind === 'photos' ? '사진 목록을 불러오는 중' : '목록을 불러오는 중',
+    style: kind === 'photos'
+      ? { display: 'grid', gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap: '6px', width: '100%', alignContent: 'start' }
+      : { display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: '12px', width: '100%', alignContent: 'start' }
+  }, Array.from({ length: kind === 'photos' ? gridCols * 3 : 4 }, (_, index) => /*#__PURE__*/React.createElement("span", {
+    key: index,
+    className: kind === 'photos' ? 'bp-skel-thumb' : 'bp-skel-block',
+    "aria-hidden": "true",
+    style: kind === 'photos' ? { borderRadius: 'var(--radius-sm, 8px)' } : { height: '150px', borderRadius: 'var(--radius-md)' }
+  })));
+  // Chat/memo history (links, files, fallback photos) has not arrived yet.
+  const galleryHistoryPending = (!Array.isArray(chatMessages) || chatMessages.length === 0)
+    && (loadingOlderChat || hasMoreOlderChat || Number(chatCount) > 0);
   const renderBulkTagPanel = () => (!isBulkShareMode || !isBulkTagPanelOpen || activeTab !== 'photos') ? null : /*#__PURE__*/React.createElement("section", {
     className: "gallery-bulk-tag-panel",
     "aria-label": "선택한 사진 태그 관리",
@@ -2867,26 +2890,15 @@ export function ChatGalleryModal({
     .filter(Boolean);
   const renderLikesScope = () => {
     const me = likeParticipants.find(p => p && p.id === galleryLikes.participantId);
-    const pill = (value, label) => /*#__PURE__*/React.createElement("button", {
-      key: value,
-      type: "button",
-      "aria-pressed": likesScope === value ? 'true' : 'false',
-      onClick: () => setLikesScope(value),
-      style: {
-        minHeight: '32px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer', fontSize: 'var(--font-size-xs)', fontWeight: 800,
-        border: likesScope === value ? 'none' : '1px solid var(--border-color)',
-        background: likesScope === value ? 'var(--brand, #7C3AED)' : 'var(--bg-card)',
-        color: likesScope === value ? 'var(--on-brand, #fff)' : 'var(--text-main)'
-      }
-    }, label);
-    return /*#__PURE__*/React.createElement("div", {
-      className: "gallery-likes-scope",
-      style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
-    }, pill('mine', me ? `${me.name} 님의 좋아요` : '내 좋아요'), pill('all', '모두의 좋아요'));
+    return /*#__PURE__*/React.createElement(React.Fragment, { key: "scope" }, renderSegmentToggle(
+      [{ key: 'mine', label: me ? `${me.name} 님의 좋아요` : '내 좋아요' }, { key: 'all', label: '모두의 좋아요' }],
+      likesScope, key => (key === 'all' ? setLikesScope('all') : setLikesScope('mine')), 'gallery-likes-scope'
+    ));
   };
   const renderLikesTab = () => {
     const groups = groupLikesByKind(likesScope === 'all' ? galleryLikes.all : galleryLikes.list);
     if (!groups.length) {
+      if (!galleryLikes.ready) return [renderLikesScope(), /*#__PURE__*/React.createElement(React.Fragment, { key: "loading" }, renderGallerySkeleton('cards'))];
       return [renderLikesScope(), /*#__PURE__*/React.createElement("div", {
         key: "empty",
         className: "gallery-likes-empty",
@@ -2955,7 +2967,7 @@ export function ChatGalleryModal({
                 style: { fontSize: 'var(--font-size-xs)', color: 'var(--brand, #7C3AED)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
               }, `♥ ${likerNames(like).join(' · ')}`)
             ),
-            /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onCard', item: like })
+            /*#__PURE__*/React.createElement(LikeButton, { calendarId: calendar?.id, variant: 'onCard', size: 16, item: like })
           )))
     )));
   };
@@ -3922,24 +3934,17 @@ export function ChatGalleryModal({
       const failed = indexedPhotoStatus === 'error';
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderPhotoListHeader(),
-        /*#__PURE__*/React.createElement("div", {
-          role: failed ? 'alert' : 'status',
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, failed
-          ? /*#__PURE__*/React.createElement("button", {
+        failed
+          ? /*#__PURE__*/React.createElement("div", {
+              role: 'alert',
+              style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
+            }, /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-action btn-action-outline",
               onClick: () => { if (typeof onIndexedPhotoPageChange === 'function') void onIndexedPhotoPageChange(indexedPhotoPage || 1, { force: true }); },
               style: { minHeight: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)', fontWeight: 800 }
-            }, "사진 목록 다시 불러오기")
-          : /*#__PURE__*/React.createElement("div", {
-              className: "bp-skel-page",
-              role: "status",
-              "aria-label": "사진 목록을 불러오는 중"
-            }, /*#__PURE__*/React.createElement("div", { className: "bp-skel-block is-tabs", "aria-hidden": "true" }),
-              /*#__PURE__*/React.createElement("div", { className: "bp-skel-photo-grid", "aria-hidden": "true" },
-                Array.from({ length: 9 }, (_, index) => /*#__PURE__*/React.createElement("span", { key: index, className: "bp-skel-thumb" }))
-              )))
+            }, "사진 목록 다시 불러오기"))
+          : renderGallerySkeleton('photos')
       );
     }
     if (galleryViewMode === 'date') {
@@ -4007,7 +4012,8 @@ export function ChatGalleryModal({
       const pagedFiles = paginateGalleryItems(sortedFiles, galleryListPage, GALLERY_CARD_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderFileListHeader(),
-        sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        sortedFiles.length === 0 && !searchQuery && galleryHistoryPending ? renderGallerySkeleton('cards')
+        : sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery ? gallerySearchMissLabel : "업로드된 파일이 없습니다.") : renderGalleryFileList(pagedFiles.items),
         renderGalleryPagination({
@@ -4024,7 +4030,8 @@ export function ChatGalleryModal({
       const pagedLinks = paginateGalleryItems(sortedLinks, galleryListPage, GALLERY_CARD_PAGE_SIZE);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderLinkListHeader(),
-        sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        sortedLinks.length === 0 && !searchQuery && galleryHistoryPending ? renderGallerySkeleton('cards')
+        : sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery ? gallerySearchMissLabel : "공유된 링크가 없습니다.") : renderGalleryLinkList(pagedLinks.items),
         renderGalleryPagination({
@@ -4041,7 +4048,10 @@ export function ChatGalleryModal({
     const sortedPhotos = sortedVisiblePhotos.filter(photo => renderedKeys.has(getPhotoKey(photo)));
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       renderPhotoListHeader(),
-      sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      sortedPhotos.length === 0 && !searchQuery && (sortedVisiblePhotos.length > 0 || indexedPhotoLoading
+        || (usingPhotoIndex ? Number(indexedPhotoTotal) > 0 : galleryHistoryPending))
+        ? renderGallerySkeleton('photos')
+      : sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
       }, searchQuery
         ? gallerySearchMissLabel

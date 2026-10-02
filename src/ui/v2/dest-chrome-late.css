@@ -7625,17 +7625,17 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.is-inlineMedia {
   color: #FFFFFF;
   filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.45));
 }
+/* Same look as the memo card heart: the bare heart, no chip or border, faded until liked. */
 html:has(.renewal-shell.v2-design) .gather-like-btn.is-onCard {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   z-index: 3;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: var(--bg-card);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+  padding: 2px;
+  background: transparent;
+  box-shadow: none;
 }
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-onCard:not(.is-liked) { opacity: 0.35; }
 html:has(.renewal-shell.v2-design) .gather-like-host { position: relative; min-width: 0; }
 /* Memo card heart: absolutely placed left of 공유 (share sits at right 34px, or 18px without a pin). */
 html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn {
@@ -7649,7 +7649,7 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn.is-no-pin
 html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn:not(.is-liked) { opacity: 0.35; }
 /* Gallery 링크/파일 cards: room for the top-right heart so it never covers the title. */
 html:has(.renewal-shell.v2-design) .gallery-link-grid .gallery-like-card > :first-child,
-html:has(.renewal-shell.v2-design) .gallery-file-grid .gallery-like-card > :first-child { padding-right: 46px !important; box-sizing: border-box; }
+html:has(.renewal-shell.v2-design) .gallery-file-grid .gallery-like-card > :first-child { padding-right: 34px !important; box-sizing: border-box; }
 html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn:not(.is-liked) { color: var(--text-light, #94A3B8); }
 
 /* Side menu head: calendar name, then the participant chosen on this device in their own color
@@ -7775,3 +7775,26 @@ html:has(.renewal-shell.v2-design) .bp-mobile-bottom-nav-sender-dot {
   box-shadow: 0 0 0 2px var(--bg-card);
   pointer-events: none;
 }
+
+/* One top gap for every list page: the first toolbar row sits 16px under the tab bar, the
+   same as 보관함 (history-page-scroll 12px + its 4px toolbar wrapper). The gallery scroll used
+   the 40px/20px destination padding on top of its own 12px header padding (52px / 32px). */
+html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design .v2-gallery .gallery-page-scroll,
+html:has(.renewal-shell.v2-design) .renewal-shell.renewal-shell.v2-design .v2-records-media .gallery-page-scroll {
+  padding-top: 4px !important;
+}
+/* The gallery's first-load placeholder (before its screen code arrives) takes the page's own
+   geometry: toolbar-sized bar 16px under the tabs, then thumbnails with the real grid gap. */
+html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery {
+  padding: 16px var(--v2-dest-content-pad-x, 20px) 28px;
+  gap: 16px;
+}
+html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-block.is-tabs { width: 104px; height: 44px; border-radius: var(--radius-md, 12px); }
+html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-photo-grid {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  padding: 0;
+}
+html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-thumb { border-radius: 8px; }
+/* 좋아요 tab: its 내|모두 toggle sits 16px under the tabs like every other gallery toolbar. */
+html:has(.renewal-shell.v2-design) .visit-filter-toggle-mobile.gallery-likes-scope { margin-top: 12px; }

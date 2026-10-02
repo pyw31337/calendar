@@ -105,8 +105,8 @@ export function projectPhotoAssetPair(item = {}) {
 
 /**
  * One photo, one key, one pair.
- * displaySrc follows the surface: grids request the small thumb, chat bubbles
- * the 512 chat thumb, lightbox the original. fallbackSrc is the next ready
+ * displaySrc follows the surface: tiles (grids, chat bubbles) request the 512px
+ * thumb, 'mini' the 160px small one, lightbox the original. fallbackSrc is the next ready
  * candidate of the same photo. assetKey matches getPhotoAssetCommentKey.
  */
 export function resolvePhotoAsset(item, options = {}) {
@@ -135,13 +135,13 @@ export function resolvePhotoAsset(item, options = {}) {
     push(pair.full);
     push(pair.thumb);
     push(small);
-  } else if (surface === 'chat' || surface === 'chat-bubble') {
-    push(pair.thumb);
+  } else if (surface === 'mini') {
     push(small);
+    push(pair.thumb);
     push(pair.full);
   } else {
-    push(small);
     push(pair.thumb);
+    push(small);
     push(pair.full);
   }
   const {
