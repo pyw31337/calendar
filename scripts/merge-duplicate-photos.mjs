@@ -140,7 +140,9 @@ async function mergeCalendar(calendarId) {
         if (result === 'repointed') report.slotsRepointed += 1;
         else report.skipped.push(`${owner}: ${result}`);
       }
-      for (const meetingDoc of meetings) {
+      const holdsExtra = doc => (Array.isArray(doc.data()?.photos) ? doc.data().photos : [])
+        .some(photo => pathOf(photo?.imageUrl || photo?.full || photo?.url) === fromPath);
+      for (const meetingDoc of meetings.filter(holdsExtra)) {
         await db.runTransaction(async tx => {
           const snap = await tx.get(meetingDoc.ref);
           const photos = Array.isArray(snap.data()?.photos) ? snap.data().photos : [];
