@@ -7,12 +7,12 @@ const functions = require('firebase-functions/v1');
 // push is claimed once via claimPushDelivery); scheduled jobs, which have no claim, run in Seoul
 // only. docs/functions-seoul-migration.md has the step that drops the US copies.
 const SEOUL_REGION = 'asia-northeast3';
-const SEOUL_MOVE_REGIONS = [SEOUL_REGION, 'us-central1'];
-const seoulFunctions = () => functions.region(...SEOUL_MOVE_REGIONS);
-// Step 2 of docs/functions-seoul-migration.md: Firestore triggers run only in Seoul (the
-// us-central1 copies listed in seoul-moved-functions.txt are deleted by the deploy). HTTP
-// endpoints keep both regions for app builds cached before the move.
-const seoulTriggerFunctions = () => functions.region(SEOUL_REGION);
+// Everything runs in Seoul (docs/functions-seoul-migration.md, steps 2 and 3). The app always
+// loads the latest build and calls Seoul only. The two endpoints a Mac worker that has not pulled
+// yet still calls (it updates itself daily now) keep a us-central1 copy: workerFunctions().
+const seoulFunctions = () => functions.region(SEOUL_REGION);
+const seoulTriggerFunctions = seoulFunctions;
+const workerFunctions = () => functions.region(SEOUL_REGION, 'us-central1');
 const { defineString, defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const photoCommentItems = require('./photo-comment-items');
@@ -2743,9 +2743,7 @@ exports.pruneStaleRateLimitDocs = functions.region(SEOUL_REGION).pubsub.schedule
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
 const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets', 'mergeAssets']);
-// Both regions permanently: the app calls Seoul and falls back to us-central1, and app builds
-// cached before the move only know the us-central1 URL. An idle copy costs nothing.
-exports.mediaCommand = functions.region(SEOUL_REGION, 'us-central1').runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
+exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
@@ -2935,7 +2933,7 @@ async function ingestFaceSuggestions(req, res, calendarId, rawItems, now) {
   }
 }
 
-exports.ingestMediaAnalysis = seoulFunctions().runWith({
+exports.ingestMediaAnalysis = workerFunctions().runWith({
   timeoutSeconds: 60,
   memory: '256MB',
   secrets: [MEDIA_WORKER_TOKEN]
@@ -3148,7 +3146,7 @@ exports.recordFaceFeedback = seoulFunctions().runWith({
 
 // The local Mac receives only compact, user-reviewed calibration signals. The same worker secret
 // used for ingestion is required; no browser can enumerate this private feedback collection.
-exports.getMediaAnalysisCalibration = seoulFunctions().runWith({
+exports.getMediaAnalysisCalibration = workerFunctions().runWith({
   timeoutSeconds: 30,
   memory: '256MB',
   secrets: [MEDIA_WORKER_TOKEN]

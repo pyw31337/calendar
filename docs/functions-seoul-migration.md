@@ -39,7 +39,7 @@ Triggers now use `seoulTriggerFunctions()` (Seoul only); HTTP endpoints keep `se
 Rollback: put `us-central1` back (for schedules: switch them back and run with the Seoul copies
 deleted first) and deploy.
 
-## Step 3 — HTTP endpoints Seoul-only (ready; runs when the owner approves deleting the US copies)
+## Step 3 — HTTP endpoints Seoul-only (done 2026-10-04)
 
 The app loads its page fresh on every open (sw.js never serves a cached index.html while online)
 and has called Seoul since 2026-10-02, so `mediaCommand` no longer falls back to us-central1. To finish:
