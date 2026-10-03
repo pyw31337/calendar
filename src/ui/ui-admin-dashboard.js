@@ -3,6 +3,7 @@
  */
 
 import { MemeAdminPanel } from './ui-meme-admin.js';
+import { MacBackupPanel } from './ui-mac-backup-admin.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
 
@@ -866,7 +867,7 @@ export function AdminDashboard({ initialCalendars }) {
   // -- e.g. via the header picker -- returns to where the admin left off.
   const returnToGlobalAdminView = () => {
     setAdminViewMode('global');
-    setActiveTab(prev => (prev === 'metrics' || prev === 'meme' || prev === 'datapool') ? prev : 'metrics');
+    setActiveTab(prev => (prev === 'metrics' || prev === 'meme' || prev === 'datapool' || prev === 'macbackup') ? prev : 'metrics');
   };
   const setUnifiedSearchQuery = (query) => { setUnifiedSearchQueryState(query); pushSearchUrl({ query }); };
   const setUnifiedSearchCalFilter = (calFilter) => { setUnifiedSearchCalFilterState(calFilter); pushSearchUrl({ calFilter }); };
@@ -2197,10 +2198,20 @@ export function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("button", {
             key: "datapool", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('datapool'),
             style: styles.tabButton(activeTab === 'datapool')
-          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(DatabaseIcon, null)), "데이터풀")
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(DatabaseIcon, null)), "데이터풀"),
+          /*#__PURE__*/React.createElement("button", {
+            key: "macbackup", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('macbackup'),
+            style: styles.tabButton(activeTab === 'macbackup')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "맥 백업")
         ]
       )
     ),
+
+    activeTab === 'macbackup' && /*#__PURE__*/React.createElement(MacBackupPanel, {
+      password: getAdminSession()?.password,
+      cardStyle: styles.card,
+      titleStyle: styles.cardTitle
+    }),
 
     activeTab === 'meme' && /*#__PURE__*/React.createElement("section", { style: styles.card },
       /*#__PURE__*/React.createElement(MemeAdminPanel, {

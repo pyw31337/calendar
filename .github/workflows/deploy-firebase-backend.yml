@@ -37,6 +37,7 @@ on:
           - backfill-image-tag-map-dry-run
           - backfill-image-tag-map
           - audit-orphan-storage
+          - usage-report
       delete_us_copies:
         description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
@@ -236,3 +237,12 @@ jobs:
           printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           node scripts/audit-orphan-storage.mjs
+      # scripts/report-firebase-usage.mjs: read-only Cloud Monitoring usage (reads, egress, calls).
+      - name: Firebase usage report
+        if: inputs.post_deploy == 'usage-report'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          DAYS=7 node scripts/report-firebase-usage.mjs
