@@ -247,8 +247,8 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
 /**
  * 중복 의심 사진 (gallery-dedup.js: same file size + extension, same second or a retry within
  * minutes). Each group keeps the photo with tags/comments (chooseDedupWinner) and lists the rest.
- * `removable` only when no extra copy has comments of its own -- those stay for the admin merge,
- * which moves comments; here the other copies' tags are merged into the kept one before removal.
+ * Applying merges (mediaCommand mergeAssets): the server confirms the files are identical, then
+ * the copies show the kept photo, their tags and comments move to it, and nothing is deleted.
  */
 export function buildDuplicateSuggestions(photos, { findDuplicatePhotoGroups, chooseDedupWinner }) {
   if (typeof findDuplicatePhotoGroups !== 'function' || typeof chooseDedupWinner !== 'function') return [];
@@ -264,10 +264,30 @@ export function buildDuplicateSuggestions(photos, { findDuplicatePhotoGroups, ch
         keep,
         extra,
         mergedTags,
-        removable: picked.losers.every(c => !Number(c.commentCount || 0)),
       };
     })
     .filter(Boolean);
+}
+
+/**
+ * 비슷한 사진 (Mac worker look hash): different files of what looks like the same picture. Only a
+ * hint -- they are never merged automatically; the user opens them and decides. Groups whose
+ * photos are byte-identical copies are left to the 중복 사진 card above.
+ */
+export function buildSimilarPhotoSuggestions(photos, groups, { keyOf, exclude = new Set() } = {}) {
+  const byKey = new Map();
+  (Array.isArray(photos) ? photos : []).forEach(photo => {
+    const key = typeof keyOf === 'function' ? keyOf(photo) : photo?.assetKey;
+    if (key && !byKey.has(key)) byKey.set(key, photo);
+  });
+  const seen = new Set();
+  return (Array.isArray(groups) ? groups : [])
+    .map(group => (Array.isArray(group) ? group : []).filter(key => byKey.has(key) && !exclude.has(key) && !seen.has(key)))
+    .filter(keys => keys.length >= 2)
+    .map(keys => {
+      keys.forEach(key => seen.add(key));
+      return { id: `similar:${keys[0]}`, photos: keys.map(key => byKey.get(key)) };
+    });
 }
 
 function placeVisitTokens(place) {

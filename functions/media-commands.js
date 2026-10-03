@@ -6,7 +6,10 @@
 //   deleteAsset -> removes the file's slot from every owning message/memo (arrays kept aligned),
 //                  drops every meeting-album copy, re-links positional album references by file,
 //                  and queues the Storage objects for delayed garbage collection;
-//   tagAsset    -> writes the tag to every owning message/memo slot and every album copy.
+//   tagAsset    -> writes the tag to every owning message/memo slot and every album copy;
+//   mergeAssets -> turns byte-identical copies (same Storage md5) into one photo: every slot and
+//                  album entry showing a copy shows the kept file instead, tags are merged and
+//                  comments move to it. Nothing is deleted (no slot, document, comment or file).
 // Storage objects are never deleted inline. They go to `storageGc/{id}` with a grace period and
 // the sweeper deletes them only if no photoIndex row of any calendar still points at the file
 // (invariant I2).
@@ -449,6 +452,127 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
   });
 }
 
+// Point every slot showing `extra` at `keep` (same position, merged tags). Null when none matched.
+function repointAssetSlots(data, extra, keep, tags) {
+  const slots = slotsOf(data);
+  const hits = slots.map((slot, index) => (sameFile(slot, extra) ? index : -1)).filter(index => index >= 0);
+  if (!hits.length) return null;
+  const imageUrls = slots.map(slot => slot.imageUrl);
+  const thumbUrls = slots.map(slot => slot.thumbUrl);
+  const imageTags = Array.isArray(data.imageTags) ? data.imageTags.slice() : [];
+  while (imageTags.length < slots.length) imageTags.push('');
+  const imageTagMap = { ...(data.imageTagMap && typeof data.imageTagMap === 'object' && !Array.isArray(data.imageTagMap) ? data.imageTagMap : {}) };
+  hits.forEach(index => {
+    delete imageTagMap[getPhotoAssetKey(slots[index].imageUrl || slots[index].thumbUrl)];
+    imageUrls[index] = keep.imageUrl;
+    thumbUrls[index] = keep.thumbUrl || keep.imageUrl;
+    imageTags[index] = tags;
+  });
+  imageTagMap[getPhotoAssetKey(keep.imageUrl || keep.thumbUrl)] = tags;
+  return {
+    count: hits.length,
+    patch: { imageUrls, thumbUrls, imageTags, imageTagMap, imageUrl: imageUrls[0] || null, thumbUrl: thumbUrls[0] || null },
+  };
+}
+
+async function storageMd5(bucket, url) {
+  const path = storagePathFromUrl(url);
+  if (!path) return '';
+  try { return (await bucket.file(path).getMetadata())[0]?.md5Hash || ''; } catch (_) { return ''; }
+}
+
+const MAX_MERGE_EXTRAS = 10;
+
+// The 보관함 추천 "중복 사진 정리". Only copies whose Storage bytes equal the kept photo's
+// (md5) are merged; anything else is reported back untouched. A memo write claims the push it
+// would otherwise trigger (the kept URL looks like a newly added photo), so nobody is paged.
+async function mergeAssets({ db, bucket, calendarDocId, keep, extras, tags, now = Date.now(), claimMemoPush = null }) {
+  const root = db.collection('calendars').doc(calendarDocId);
+  const keepKey = getPhotoAssetKey(keep?.imageUrl || keep?.thumbUrl);
+  const list = (Array.isArray(extras) ? extras : []).slice(0, MAX_MERGE_EXTRAS);
+  if (!keepKey || !list.length) return { ok: false, reason: 'invalid-asset' };
+  const keepIndex = await root.collection('photoIndex').doc(keepKey).get();
+  if (!keepIndex.exists) return { ok: false, reason: 'keep-not-indexed' };
+  const keepFile = { imageUrl: keepIndex.data().full || keep.imageUrl, thumbUrl: keepIndex.data().thumb || keep.thumbUrl || keep.imageUrl };
+  const keepMd5 = await storageMd5(bucket, keepFile.imageUrl);
+  if (!keepMd5) return { ok: false, reason: 'keep-file-missing' };
+  const value = sanitizeTagText(tags);
+  const result = { ok: true, assetKey: keepKey, merged: [], notIdentical: [], slotsRepointed: 0, albumEntriesMoved: 0, commentsMoved: 0 };
+
+  for (const extra of list) {
+    const extraKey = getPhotoAssetKey(extra?.imageUrl || extra?.thumbUrl);
+    if (!extraKey || extraKey === keepKey) continue;
+    const extraIndex = await root.collection('photoIndex').doc(extraKey).get();
+    if (!extraIndex.exists) { result.notIdentical.push(extraKey); continue; }
+    const extraFile = { imageUrl: extraIndex.data().full || extra.imageUrl, thumbUrl: extraIndex.data().thumb || extra.thumbUrl };
+    if (storagePathFromUrl(extraFile.imageUrl) !== storagePathFromUrl(keepFile.imageUrl)
+      && await storageMd5(bucket, extraFile.imageUrl) !== keepMd5) {
+      result.notIdentical.push(extraKey);
+      continue;
+    }
+    const owners = ownerDocIds(extraIndex.data());
+    (extra.messageId ? [extra.messageId] : []).forEach(id => owners.messages.add(id));
+    (extra.memoId ? [extra.memoId] : []).forEach(id => owners.memos.add(id));
+    const meetingScope = meetingOwnerScope(extraIndex.data());
+    const comments = await root.collection('photoCommentItems').where('assetKey', '==', extraKey).get();
+    await db.runTransaction(async tx => {
+      const refs = [
+        ...Array.from(owners.messages).map(id => root.collection('messages').doc(id)),
+        ...Array.from(owners.memos).map(id => root.collection('memos').doc(id)),
+      ];
+      const [snaps, meetingRead] = await Promise.all([
+        Promise.all(refs.map(ref => tx.get(ref))),
+        readMeetingDocuments(tx, root, meetingScope),
+      ]);
+      const claims = [];
+      const writes = [];
+      let slots = 0;
+      let album = 0;
+      for (const snap of snaps) {
+        if (!snap.exists) continue;
+        const data = snap.data() || {};
+        const repointed = repointAssetSlots(data, extraFile, keepFile, value);
+        if (!repointed) continue;
+        slots += repointed.count;
+        if (snap.ref.parent.id === 'memos' && typeof claimMemoPush === 'function') {
+          const claimKey = claimMemoPush(data, { ...data, ...repointed.patch }, snap.id);
+          if (claimKey) claims.push(root.collection('push_delivery_claims').doc(claimKey));
+        }
+        writes.push(() => tx.update(snap.ref, { ...repointed.patch, updatedAt: now }));
+      }
+      meetingSnapshots(meetingRead).filter(doc => doc?.exists).forEach(doc => {
+        const photos = Array.isArray(doc.data()?.photos) ? doc.data().photos : [];
+        let moved = 0;
+        const next = photos.map(photo => {
+          if (!photo || typeof photo !== 'object' || !sameFile(photo, extraFile)) return photo;
+          moved += 1;
+          const patched = { ...photo, imageUrl: keepFile.imageUrl, thumbUrl: keepFile.thumbUrl, tags: value, updatedAt: now };
+          if ('full' in photo) patched.full = keepFile.imageUrl;
+          if ('url' in photo) patched.url = keepFile.imageUrl;
+          if ('thumb' in photo) patched.thumb = keepFile.thumbUrl;
+          return patched;
+        });
+        if (!moved) return;
+        album += moved;
+        writes.push(() => tx.update(doc.ref, { photos: next, updatedAt: now }));
+      });
+      const claimSnaps = await Promise.all(claims.map(ref => tx.get(ref)));
+      claimSnaps.forEach(snap => {
+        if (!snap.exists) writes.push(() => tx.set(snap.ref, { createdAt: now, claimKey: snap.id, reason: 'merge-duplicate-photos' }));
+      });
+      comments.docs.forEach(doc => writes.push(() => tx.update(doc.ref, { assetKey: keepKey, mergedFrom: extraKey })));
+      writes.forEach(write => write());
+      result.slotsRepointed += slots;
+      result.albumEntriesMoved += album;
+    });
+    result.commentsMoved += comments.size;
+    result.merged.push(extraKey);
+  }
+  // Every place the kept photo already appears carries the merged tags too.
+  if (result.merged.length) await tagAsset({ db, calendarDocId, asset: keepFile, tags: value, now });
+  return result;
+}
+
 // Every Storage path a value points at, wherever it sits (anniversary photos[], poster fields).
 function collectStoragePaths(value, into, depth = 0) {
   if (depth > 6 || value == null) return;
@@ -509,6 +633,10 @@ module.exports = {
   deleteAsset,
   tagAsset,
   bulkTagAssets,
+  mergeAssets,
+  repointAssetSlots,
   MAX_BULK_TAG_ITEMS,
+  MAX_MERGE_EXTRAS,
   sweepStorageGc,
+  collectStoragePaths,
 };

@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { isRetryableAssetFailure } from './analysis-retry-policy.mjs';
+import { lookHashOfFile, similarGroups } from './look-hash.mjs';
 
 const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
 const VISION_SCRIPT = join(WORKER_DIR, 'MediaInsight.swift');
@@ -343,13 +344,15 @@ async function inspectPhoto(photo, tempRoot, visionBinary) {
   try {
     const command = visionBinary || '/usr/bin/xcrun';
     const commandArgs = visionBinary ? [filename] : ['swift', VISION_SCRIPT, filename];
-    return JSON.parse(await shell(command, commandArgs));
+    const insight = JSON.parse(await shell(command, commandArgs));
+    const lookHash = await lookHashOfFile(filename);
+    return lookHash ? { ...insight, lookHash } : insight;
   } finally {
     await rm(filename, { force: true });
   }
 }
 
-async function upload(args, token, runId, items, window, { status = 'completed', error = '' } = {}) {
+async function upload(args, token, runId, items, window, { status = 'completed', error = '', similar = null } = {}) {
   const endpoint = args.endpoint || `https://asia-northeast3-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
   const { response, payload } = await timedRequest(endpoint, {
     method: 'POST',
@@ -362,7 +365,8 @@ async function upload(args, token, runId, items, window, { status = 'completed',
       window,
       status,
       error,
-      items
+      items,
+      ...(similar ? { similarGroups: similar } : {})
     })
   }, 'Analysis upload', async response => ({ response, payload: await response.json().catch(() => null) }));
   if (!response.ok || !payload?.ok) throw new Error(payload?.message || `Analysis upload failed: ${response.status}`);
@@ -447,6 +451,10 @@ async function main() {
     const previous = Number(nextFailures[failure.assetKey]?.attempts || 0);
     nextFailures[failure.assetKey] = { attempts: previous + 1, error: failure.error, updatedAt: now };
   }
+  // Every photo's look hash is kept locally, so "비슷한 사진" groups span all photos, not one page.
+  const lookHashes = { ...(current.lookHashes && typeof current.lookHashes === 'object' ? current.lookHashes : {}) };
+  for (const item of items) if (item.insight?.lookHash) lookHashes[item.assetKey] = item.insight.lookHash;
+  const lookHashesChanged = items.some(item => item.insight?.lookHash);
   const retryableFailure = failures.some(failure => isRetryableAssetFailure(failure.error)
     && Number(nextFailures[failure.assetKey]?.attempts || 0) < MAX_CONSECUTIVE_ASSET_FAILURES);
   const result = await upload(args, token, runId, items, 'scheduled', {
@@ -454,7 +462,8 @@ async function main() {
     // means the worker itself is alive.  This prevents a single corrupt image from masking a
     // healthy scheduler while the bounded retry counter handles recovery.
     status: rows.length ? 'completed' : 'idle',
-    error: failures[0]?.error || ''
+    error: failures[0]?.error || '',
+    similar: lookHashesChanged ? similarGroups(lookHashes) : null
   });
   const last = rows.at(-1);
   const pageMayHaveMore = rows.length === args.max;
@@ -470,6 +479,7 @@ async function main() {
         ? (current.cursor || null)
         : (last ? { updatedAt: Number(last.data.updatedAt) || 0, name: last.name } : current.cursor || null),
       failures: nextFailures,
+      lookHashes,
       lastRunAt: now,
       lastIdleHeartbeatAt: now
     }

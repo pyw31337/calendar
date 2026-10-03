@@ -36,6 +36,7 @@ on:
           - merge-duplicate-photos
           - backfill-image-tag-map-dry-run
           - backfill-image-tag-map
+          - audit-orphan-storage
       delete_us_copies:
         description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
@@ -226,3 +227,12 @@ jobs:
           if [ "${{ inputs.post_deploy }}" = "backfill-image-tag-map" ]; then
             APPLY=1 node scripts/backfill-image-tag-map.mjs
           fi
+      # scripts/audit-orphan-storage.mjs: read-only report of Storage files nothing points at.
+      - name: Audit orphan Storage files
+        if: inputs.post_deploy == 'audit-orphan-storage'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          node scripts/audit-orphan-storage.mjs

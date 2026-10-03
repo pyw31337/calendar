@@ -677,7 +677,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           payload: {
             memoId,
             memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: sourceMemo?.imageUrls || [], thumbUrls: sourceMemo?.thumbUrls || [], color: sourceMemo?.color || newColor, isPinned: sourceMemo?.isPinned ?? newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp, ...((() => { const p = buildMemoLinkPreviews(text, sourceMemo); return { linkPreview: p.linkPreview, linkPreviews: p.linkPreviews }; })()) }),
-            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null }))
+            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
           }
         });
         if (queued) {
@@ -781,7 +781,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           payload: {
             memoId: editingMemo.id,
             memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews }),
-            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null }))
+            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
           }
         });
         if (queued) {

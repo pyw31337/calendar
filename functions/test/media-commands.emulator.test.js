@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const admin = require('firebase-admin');
-const { deleteAsset, tagAsset, bulkTagAssets, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey } = require('../media-commands');
+const { deleteAsset, tagAsset, bulkTagAssets, mergeAssets, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey } = require('../media-commands');
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Run under `firebase emulators:exec` (FIRESTORE_EMULATOR_HOST unset).');
 const app = admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'demo-moyeora', storageBucket: 'demo-moyeora.appspot.com' }, 'media-commands-test');
@@ -16,7 +16,7 @@ const url = (name, token = 't') => `https://firebasestorage.googleapis.com/v0/b/
 const photo = n => ({ imageUrl: url(`${n}_original.jpg`), thumbUrl: url(`${n}_thumb.jpg`) });
 
 async function reset() {
-  const collections = ['messages', 'confirmedMeetings', 'photoIndex', 'memos'];
+  const collections = ['messages', 'confirmedMeetings', 'photoIndex', 'memos', 'photoCommentItems', 'push_delivery_claims'];
   for (const name of collections) {
     const snap = await root.collection(name).get();
     await Promise.all(snap.docs.map(doc => doc.ref.delete()));
@@ -202,4 +202,46 @@ test('GC sweep keeps a file an anniversary photo or a culture poster still point
   assert.equal((await bucket.file('chatImages/testcal/loose.jpg').exists())[0], false);
   await root.collection('anniversaries').doc('a1').delete();
   await root.collection('customCultureItems').doc('c1').delete();
+});
+
+test('mergeAssets points identical copies at the kept file, moves comments, and deletes nothing', async () => {
+  await reset();
+  const keep = photo('k');
+  const dup = photo('d');
+  const other = photo('o');
+  await bucket.file('chatImages/testcal/k_original.jpg').save(Buffer.from('same-bytes'));
+  await bucket.file('chatImages/testcal/d_original.jpg').save(Buffer.from('same-bytes'));
+  await bucket.file('chatImages/testcal/o_original.jpg').save(Buffer.from('other-bytes'));
+  const keyOf = p => getPhotoAssetKey(p.imageUrl);
+  await root.collection('messages').doc('mk').set({ text: '', imageUrls: [keep.imageUrl], thumbUrls: [keep.thumbUrl], imageTags: ['서준'] });
+  await root.collection('memos').doc('md').set({ text: '메모', imageUrls: [other.imageUrl, dup.imageUrl], thumbUrls: [other.thumbUrl, dup.thumbUrl], imageTags: ['', '고성'], imageTagMap: { [keyOf(dup)]: '고성' } });
+  await root.collection('confirmedMeetings').doc('2026-09-19').set({ photos: [{ id: 'x', ...dup, tags: '고성' }] });
+  await root.collection('photoIndex').doc(keyOf(keep)).set({ full: keep.imageUrl, thumb: keep.thumbUrl, owners: [{ sourceOwner: 'message:mk:0' }] });
+  await root.collection('photoIndex').doc(keyOf(dup)).set({ full: dup.imageUrl, thumb: dup.thumbUrl, owners: [{ sourceOwner: 'memo:md:1' }, { sourceOwner: 'meeting:2026-09-19:0' }] });
+  await root.collection('photoIndex').doc(keyOf(other)).set({ full: other.imageUrl, thumb: other.thumbUrl, owners: [{ sourceOwner: 'memo:md:0' }] });
+  await root.collection('photoCommentItems').doc('c1').set({ assetKey: keyOf(dup), text: '좋다' });
+
+  const result = await mergeAssets({
+    db, bucket, calendarDocId: CAL, keep, extras: [dup, other], tags: '서준 고성', now: 5,
+    claimMemoPush: (_before, _after, memoId) => `memo-${memoId}`,
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.merged, [keyOf(dup)]);
+  assert.deepEqual(result.notIdentical, [keyOf(other)], 'a different file is never merged');
+  assert.equal(result.slotsRepointed, 1);
+  assert.equal(result.albumEntriesMoved, 1);
+  assert.equal(result.commentsMoved, 1);
+  const memo = (await root.collection('memos').doc('md').get()).data();
+  assert.deepEqual(memo.imageUrls, [other.imageUrl, keep.imageUrl], 'slot kept in place, nothing removed');
+  assert.deepEqual(memo.imageTags, ['', '서준 고성']);
+  assert.equal(memo.imageTagMap[keyOf(keep)], '서준 고성');
+  assert.equal(memo.imageTagMap[keyOf(dup)], undefined);
+  assert.equal((await root.collection('push_delivery_claims').doc('memo-md').get()).exists, true);
+  const album = (await root.collection('confirmedMeetings').doc('2026-09-19').get()).data().photos;
+  assert.equal(album[0].imageUrl, keep.imageUrl);
+  assert.equal(album[0].id, 'x');
+  assert.equal((await root.collection('photoCommentItems').doc('c1').get()).data().assetKey, keyOf(keep));
+  assert.deepEqual((await root.collection('messages').doc('mk').get()).data().imageTags, ['서준 고성']);
+  assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], true, 'the file is kept');
+  assert.equal((await db.collection('storageGc').get()).size, 0);
 });
