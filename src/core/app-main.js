@@ -759,31 +759,6 @@ function CalendarApp() {
     } catch (_) {}
     return [];
   });
-  React.useEffect(() => {
-    let cancelled = false;
-    let lastFetchAt = 0;
-    const MIN_REFETCH_INTERVAL_MS = 10 * 60 * 1000; // 10분 주기 메타 검사 (탭 전환 시 불필요한 1,035건 재조회 방지)
-    const load = (force = false) => {
-      const now = Date.now();
-      if (!force && (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS)) return;
-      lastFetchAt = now;
-      fetchMemePoolRest().then(list => {
-        if (!cancelled && Array.isArray(list) && list.length > 0) setMemePool(list);
-      }).catch(() => {});
-    };
-    load(true);
-    const onVisibilityOrFocus = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      load(false);
-    };
-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityOrFocus);
-    if (typeof window !== 'undefined') window.addEventListener('focus', onVisibilityOrFocus);
-    return () => {
-      cancelled = true;
-      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityOrFocus);
-      if (typeof window !== 'undefined') window.removeEventListener('focus', onVisibilityOrFocus);
-    };
-  }, []);
   // id -> poster URL from crawled culture JSON (festivals + performances). Used to enrich
   // already-registered culture anniversaries that were saved before posters were copied.
   const [culturePosterById, setCulturePosterById] = React.useState(() => new Map());
@@ -875,6 +850,39 @@ function CalendarApp() {
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
   const [activeView, setActiveView] = React.useState(() => getInitialAppView(window.location, parseSharePathFromLocation));
+  // Only the chat composer uses the pool (hashtag chips while typing), so it loads on the first
+  // keystroke in chat instead of on every app start: without a warm cache that read is the whole
+  // collection (1,300+ documents), the largest single Firestore read of a cold app start.
+  const needsMemePool = (activeView === 'chat' || isChatSheetOpen) && Boolean(chatInput);
+  const memePoolWantedRef = React.useRef(false);
+  if (needsMemePool) memePoolWantedRef.current = true;
+  const memePoolWanted = memePoolWantedRef.current;
+  React.useEffect(() => {
+    if (!memePoolWanted) return undefined;
+    let cancelled = false;
+    let lastFetchAt = 0;
+    const MIN_REFETCH_INTERVAL_MS = 10 * 60 * 1000; // 10분 주기 메타 검사 (탭 전환 시 불필요한 1,035건 재조회 방지)
+    const load = (force = false) => {
+      const now = Date.now();
+      if (!force && (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS)) return;
+      lastFetchAt = now;
+      fetchMemePoolRest().then(list => {
+        if (!cancelled && Array.isArray(list) && list.length > 0) setMemePool(list);
+      }).catch(() => {});
+    };
+    load(true);
+    const onVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      load(false);
+    };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityOrFocus);
+    if (typeof window !== 'undefined') window.addEventListener('focus', onVisibilityOrFocus);
+    return () => {
+      cancelled = true;
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+      if (typeof window !== 'undefined') window.removeEventListener('focus', onVisibilityOrFocus);
+    };
+  }, [memePoolWanted]);
   const {
     resetMainHeader
   } = useMainHeaderState({ React, activeView, isMainSideMenuOpen });

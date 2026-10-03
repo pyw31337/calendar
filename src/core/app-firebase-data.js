@@ -1747,8 +1747,9 @@ async function fetchMemePoolRest(options = {}) {
   }
 
   // 2. Check remote metadata (1 read)
+  let remoteUpdatedAt = 0;
   if (!forceFresh && cache && cache.items.length > 0) {
-    const remoteUpdatedAt = await fetchMemePoolLatestUpdatedAt();
+    remoteUpdatedAt = await fetchMemePoolLatestUpdatedAt();
     if (remoteUpdatedAt > 0 && cache.metaUpdatedAt > 0 && remoteUpdatedAt <= cache.metaUpdatedAt) {
       // Remote has not changed: touch cachedAt and serve from local cache
       saveMemePoolCache(cache.items, cache.metaUpdatedAt);
@@ -1758,6 +1759,7 @@ async function fetchMemePoolRest(options = {}) {
 
   // 3. Cache missing, stale, or forceFresh: fetch all items from Firestore REST
   try {
+    if (!remoteUpdatedAt) remoteUpdatedAt = await fetchMemePoolLatestUpdatedAt();
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/memePool`;
     const list = [];
     let pageToken = '';
@@ -1783,7 +1785,10 @@ async function fetchMemePoolRest(options = {}) {
     } while (pageToken);
 
     if (list.length > 0) {
-      saveMemePoolCache(list, maxUpdatedAt || Date.now());
+      // Remember the version the server reported, not only the newest item: a delete stamps
+      // _metadata with the delete time, newer than every remaining item, and keying the cache to
+      // the items made every later check look stale -- a full re-read on every open, forever.
+      saveMemePoolCache(list, Math.max(maxUpdatedAt, remoteUpdatedAt) || Date.now());
     } else if (cache?.items?.length) {
       return cache.items;
     }
