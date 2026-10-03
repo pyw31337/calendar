@@ -9,6 +9,10 @@ const functions = require('firebase-functions/v1');
 const SEOUL_REGION = 'asia-northeast3';
 const SEOUL_MOVE_REGIONS = [SEOUL_REGION, 'us-central1'];
 const seoulFunctions = () => functions.region(...SEOUL_MOVE_REGIONS);
+// Step 2 of docs/functions-seoul-migration.md: Firestore triggers run only in Seoul (the
+// us-central1 copies listed in seoul-moved-functions.txt are deleted by the deploy). HTTP
+// endpoints keep both regions for app builds cached before the move.
+const seoulTriggerFunctions = () => functions.region(SEOUL_REGION);
 const { defineString, defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const photoCommentItems = require('./photo-comment-items');
@@ -543,22 +547,22 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   return true;
 }
 
-exports.onMessagePhotoIndexWrite = seoulFunctions().firestore
+exports.onMessagePhotoIndexWrite = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'message', 'messageId'));
 
-exports.onMemoPhotoIndexWrite = seoulFunctions().firestore
+exports.onMemoPhotoIndexWrite = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'memo', 'memoId'));
 
-exports.onMeetingPhotoIndexWrite = seoulFunctions().firestore
+exports.onMeetingPhotoIndexWrite = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
 
 // Existing meeting document ids are dates for backwards compatibility. Give each record a
 // stable opaque identity once, without rewriting the date or any legacy field. The guard avoids
 // a trigger loop and makes the migration safe to run alongside old installed clients.
-exports.ensureMeetingIdentity = seoulFunctions().firestore
+exports.ensureMeetingIdentity = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite(async change => {
     if (!change.after.exists || String(change.after.data()?.meetingId || '')) return null;
@@ -566,7 +570,7 @@ exports.ensureMeetingIdentity = seoulFunctions().firestore
     return null;
   });
 
-exports.onAnniversaryPhotoIndexWrite = seoulFunctions().firestore
+exports.onAnniversaryPhotoIndexWrite = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/anniversaries/{anniversaryId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'anniversary', 'anniversaryId'));
 
@@ -574,7 +578,7 @@ exports.onAnniversaryPhotoIndexWrite = seoulFunctions().firestore
 // photo's count in the summary doc (thumbnail badges) and on its photoIndex row.
 // A newly written photo comment also goes out as a 댓글 notification (channel: comment), never
 // to its author and never for comments copied in by the migration.
-exports.onPhotoCommentItemWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onPhotoCommentItemWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/photoCommentItems/{commentId}')
   .onWrite(async (change, context) => {
     const before = change.before.exists ? change.before.data() : null;
@@ -604,7 +608,7 @@ exports.onPhotoCommentItemWrite = seoulFunctions().runWith({ secrets: ['VAPID_PR
 // The old photoComments/{key} arrays are no longer the source of truth. An app that has not
 // updated yet may still write one; copy any comment it adds into photoCommentItems (create-only,
 // so its stale copy of the thread can never undo an edit or delete made in the new app).
-exports.onPhotoCommentIndexWrite = seoulFunctions().firestore
+exports.onPhotoCommentIndexWrite = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/photoComments/{photoKey}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;
@@ -630,11 +634,11 @@ function makeCalendarCountSyncTrigger() {
   };
 }
 
-exports.onSharedFileWrite = seoulFunctions().firestore
+exports.onSharedFileWrite = seoulTriggerFunctions().firestore
   .document('sharedFiles/{hash}')
   .onWrite(makeCalendarCountSyncTrigger());
 
-exports.onLinkPreviewWrite = seoulFunctions().firestore
+exports.onLinkPreviewWrite = seoulTriggerFunctions().firestore
   .document('linkPreviews/{urlHash}')
   .onWrite(makeCalendarCountSyncTrigger());
 
@@ -669,7 +673,7 @@ async function syncMeetingPhotoIndex(change, context) {
   await batch.commit();
 }
 
-exports.onMessageMeetingPhotoIndexWrite = seoulFunctions().firestore
+exports.onMessageMeetingPhotoIndexWrite = seoulTriggerFunctions().firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncMeetingPhotoIndex(change, context));
 
@@ -809,7 +813,7 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
 }
 
 
-exports.onMessageCreate = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onMessageCreate = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onCreate(async (snapshot, context) => {
     ensureVapidConfigured();
@@ -917,7 +921,7 @@ function isAnniversaryToday(ann, y, m, d) {
 
 // Memo created or edited → push (channel: memo). A write trigger is required because
 // memo edits are saved as updates; the old create-only trigger silently missed them.
-exports.onMemoWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
@@ -968,7 +972,7 @@ exports.onMemoWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] 
 // falsely announced "모임이 확정되었습니다" for those cases. Only a genuine
 // not-confirmed -> confirmed transition (client sets confirmed:true exclusively via
 // handleConfirmMeeting, the actual 확정 button) should page everyone.
-exports.onConfirmedMeetingWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onConfirmedMeetingWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
@@ -1007,7 +1011,7 @@ exports.onConfirmedMeetingWrite = seoulFunctions().runWith({ secrets: ['VAPID_PR
   });
 
 // Calendar document write → detect new polls
-exports.onCalendarDocWrite = seoulFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}')
   .onUpdate(async (change, context) => {
     const beforeCal = (change.before.data() || {}).calendar || {};
@@ -1725,7 +1729,7 @@ async function mapWithConcurrency(items, mapper, concurrency = 4) {
 // image upload. When EXIF GPS did arrive, this trusted server-side backstop completes only the
 // missing administrative tags. It runs only for a newly-added coordinate, so a later user tag
 // deletion is respected and never reintroduced by an unrelated message edit.
-exports.completePhotoLocationTags = seoulFunctions()
+exports.completePhotoLocationTags = seoulTriggerFunctions()
   .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'] })
   .firestore.document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite(async change => {

@@ -25,7 +25,11 @@ inter-region egress. Since 2026-10-03 every function is defined for Seoul.
 Order: deploy functions from the branch first, then merge, so the app never calls a Seoul URL
 that does not exist yet.
 
-## Step 2 — drop the duplicate US triggers (a few days later)
+## Step 2 — drop the duplicate US triggers (done 2026-10-03)
+
+Triggers now use `seoulTriggerFunctions()` (Seoul only); HTTP endpoints keep `seoulFunctions()`
+(both regions) for cached app builds and the Mac worker. Deployed with `delete_us_copies: triggers`.
+
 
 1. In `functions/index.js` set `SEOUL_MOVE_REGIONS = [SEOUL_REGION]` for triggers (keep HTTP
    endpoints in both regions, or move them too once old app builds are gone).
