@@ -58,10 +58,8 @@ function toCommandItem(change) {
   };
 }
 
-// mediaCommand runs next to Firestore in Seoul. The us-central1 copy stays deployed during the
-// move (functions/index.js SEOUL_MOVE_REGIONS) and is the fallback when Seoul cannot be reached
-// or is not deployed yet. bulkTagAssets sets tags, so sending it twice is harmless.
-const MEDIA_COMMAND_REGIONS = ['asia-northeast3', 'us-central1'];
+// mediaCommand runs next to Firestore in Seoul (the us-central1 copy is gone).
+const MEDIA_COMMAND_REGIONS = ['asia-northeast3'];
 async function postMediaCommand(fetchImpl, projectId, body) {
   let error = null;
   for (const region of MEDIA_COMMAND_REGIONS) {

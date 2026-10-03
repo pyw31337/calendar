@@ -38,3 +38,17 @@ Triggers now use `seoulTriggerFunctions()` (Seoul only); HTTP endpoints keep `se
 
 Rollback: put `us-central1` back (for schedules: switch them back and run with the Seoul copies
 deleted first) and deploy.
+
+## Step 3 — HTTP endpoints Seoul-only (ready; runs when the owner approves deleting the US copies)
+
+The app loads its page fresh on every open (sw.js never serves a cached index.html while online)
+and has called Seoul since 2026-10-02, so `mediaCommand` no longer falls back to us-central1. To finish:
+in `functions/index.js` make `seoulFunctions()` Seoul-only and `mediaCommand` Seoul-only, give
+`ingestMediaAnalysis`/`getMediaAnalysisCalibration` a `workerFunctions()` (Seoul + us-central1),
+then deploy with `delete_us_copies: http` (`functions/seoul-moved-http-functions.txt`). A tab left open since before the move gets the
+"새 버전" banner and works again after reloading.
+
+Exception: `ingestMediaAnalysis` and `getMediaAnalysisCalibration` keep a us-central1 copy
+(`workerFunctions()`) until the Mac worker has pulled; `run-media-worker.sh` now pulls main
+(fast-forward only, clean tree) once a day. Once its runs show up in asia-northeast3 only, move
+those two to `seoulFunctions()` and delete the copies.

@@ -47,6 +47,7 @@ on:
           - none
           - schedules
           - triggers
+          - http
 
 permissions:
   contents: read
@@ -100,6 +101,7 @@ jobs:
           case "${{ inputs.delete_us_copies }}" in
             schedules) list=functions/seoul-scheduled-functions.txt ;;
             triggers) list=functions/seoul-moved-functions.txt ;;
+            http) list=functions/seoul-moved-http-functions.txt ;;
             *) list= ;;
           esac
           if [ -n "$list" ]; then
