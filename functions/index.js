@@ -452,16 +452,22 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   };
 }
 
-// Index events are retried on failure (PHOTO_INDEX_TRIGGER_OPTIONS); one that is still failing
-// after this long is dropped and left to the nightly rebuild instead of retrying for days.
-const PHOTO_INDEX_EVENT_MAX_AGE_MS = 15 * 60 * 1000;
+// Concurrent events on one document contend for the same rows. A row transaction that gives up
+// is retried here with backoff (a deploy-level failurePolicy would need `firebase deploy --force`,
+// which this repo avoids); anything still failing is left to the nightly rebuild.
+const PHOTO_INDEX_ROW_ATTEMPTS = 4;
+async function withRowRetry(run) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (err) {
+      if (attempt >= PHOTO_INDEX_ROW_ATTEMPTS) throw err;
+      await new Promise(resolve => setTimeout(resolve, 200 * (2 ** attempt) + Math.floor(Math.random() * 200)));
+    }
+  }
+}
 
 async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
-  const eventAge = Date.now() - Date.parse(context.timestamp || '');
-  if (Number.isFinite(eventAge) && eventAge > PHOTO_INDEX_EVENT_MAX_AGE_MS) {
-    console.warn('photoIndex event dropped after retries; the nightly rebuild repairs it', context.eventId);
-    return false;
-  }
   const db = admin.firestore();
   const indexRef = db.collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
   const sourceId = context.params[idParam];
@@ -480,7 +486,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   // owners inside the canonical row prevents deleting one source from erasing the remaining
   // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
   if (!touchedKeys.size) return false;
-  await Promise.all(Array.from(touchedKeys).map(assetKey => db.runTransaction(async transaction => {
+  await Promise.all(Array.from(touchedKeys).map(assetKey => withRowRetry(() => db.runTransaction(async transaction => {
     const ref = indexRef.doc(assetKey);
     const snapshot = await transaction.get(ref);
     const existing = snapshot.exists ? (snapshot.data() || {}) : {};
@@ -529,7 +535,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       tagAuthoritative: tagState.authoritative,
       updatedAt: Date.now()
     });
-  })));
+  }))));
   await bumpPhotoIndexRevision(context.params.calendarDocId);
   // Never wait for client reads to regenerate this graph; the canonical source trigger owns
   // the dual-write so tag/photo edits stay tied to the same immutable asset key.
@@ -537,19 +543,15 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   return true;
 }
 
-// Retried on failure: concurrent events on one document contend for the same rows, and a
-// transaction that gives up must not leave an owner behind until the nightly rebuild.
-const PHOTO_INDEX_TRIGGER_OPTIONS = { failurePolicy: true };
-
-exports.onMessagePhotoIndexWrite = seoulFunctions().runWith(PHOTO_INDEX_TRIGGER_OPTIONS).firestore
+exports.onMessagePhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'message', 'messageId'));
 
-exports.onMemoPhotoIndexWrite = seoulFunctions().runWith(PHOTO_INDEX_TRIGGER_OPTIONS).firestore
+exports.onMemoPhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'memo', 'memoId'));
 
-exports.onMeetingPhotoIndexWrite = seoulFunctions().runWith(PHOTO_INDEX_TRIGGER_OPTIONS).firestore
+exports.onMeetingPhotoIndexWrite = seoulFunctions().firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
 
