@@ -452,16 +452,30 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   };
 }
 
+// Index events are retried on failure (PHOTO_INDEX_TRIGGER_OPTIONS); one that is still failing
+// after this long is dropped and left to the nightly rebuild instead of retrying for days.
+const PHOTO_INDEX_EVENT_MAX_AGE_MS = 15 * 60 * 1000;
+
 async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
+  const eventAge = Date.now() - Date.parse(context.timestamp || '');
+  if (Number.isFinite(eventAge) && eventAge > PHOTO_INDEX_EVENT_MAX_AGE_MS) {
+    console.warn('photoIndex event dropped after retries; the nightly rebuild repairs it', context.eventId);
+    return false;
+  }
   const db = admin.firestore();
   const indexRef = db.collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
   const sourceId = context.params[idParam];
   const before = change.before.exists ? getPhotoIndexEntries(sourceType, sourceId, change.before.data() || {}) : [];
   const after = change.after.exists ? getPhotoIndexEntries(sourceType, sourceId, change.after.data() || {}) : [];
+  // Events arrive unordered and a retried one may be old, so this document's owners are taken
+  // from its CURRENT state, not from the event's `after`: whatever order rapid edits (a bulk tag,
+  // a duplicate merge) are processed in, every row converges on what the document shows now.
+  // The event's before/after only widen the set of rows to touch.
+  const currentSnap = await change.after.ref.get();
+  const current = currentSnap.exists ? getPhotoIndexEntries(sourceType, sourceId, currentSnap.data() || {}) : [];
   const ownerRoot = `${sourceType}:${sourceId}:`;
-  const beforeKeys = new Set(before.map(entry => entry.assetKey));
-  const afterByKey = new Map(after.map(entry => [entry.assetKey, entry]));
-  const touchedKeys = new Set([...beforeKeys, ...afterByKey.keys()]);
+  const afterByKey = new Map(current.map(entry => [entry.assetKey, entry]));
+  const touchedKeys = new Set([...before.map(entry => entry.assetKey), ...after.map(entry => entry.assetKey), ...afterByKey.keys()]);
   // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
   // owners inside the canonical row prevents deleting one source from erasing the remaining
   // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
@@ -523,15 +537,19 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   return true;
 }
 
-exports.onMessagePhotoIndexWrite = seoulFunctions().firestore
+// Retried on failure: concurrent events on one document contend for the same rows, and a
+// transaction that gives up must not leave an owner behind until the nightly rebuild.
+const PHOTO_INDEX_TRIGGER_OPTIONS = { failurePolicy: true };
+
+exports.onMessagePhotoIndexWrite = seoulFunctions().runWith(PHOTO_INDEX_TRIGGER_OPTIONS).firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'message', 'messageId'));
 
-exports.onMemoPhotoIndexWrite = seoulFunctions().firestore
+exports.onMemoPhotoIndexWrite = seoulFunctions().runWith(PHOTO_INDEX_TRIGGER_OPTIONS).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'memo', 'memoId'));
 
-exports.onMeetingPhotoIndexWrite = seoulFunctions().firestore
+exports.onMeetingPhotoIndexWrite = seoulFunctions().runWith(PHOTO_INDEX_TRIGGER_OPTIONS).firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
 
