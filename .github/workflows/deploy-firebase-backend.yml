@@ -34,6 +34,8 @@ on:
           - reattach-photo-comments
           - merge-duplicate-photos-dry-run
           - merge-duplicate-photos
+          - backfill-image-tag-map-dry-run
+          - backfill-image-tag-map
       delete_us_copies:
         description: 'Seoul move (docs/functions-seoul-migration.md): before deploying, delete these us-central1 copies'
         required: false
@@ -211,4 +213,16 @@ jobs:
           node scripts/merge-duplicate-photos.mjs
           if [ "${{ inputs.post_deploy }}" = "merge-duplicate-photos" ]; then
             APPLY=1 node scripts/merge-duplicate-photos.mjs
+          fi
+      # scripts/backfill-image-tag-map.mjs: positional-only photo tags get keyed by photo too.
+      - name: Backfill image tag map
+        if: startsWith(inputs.post_deploy, 'backfill-image-tag-map')
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          node scripts/backfill-image-tag-map.mjs
+          if [ "${{ inputs.post_deploy }}" = "backfill-image-tag-map" ]; then
+            APPLY=1 node scripts/backfill-image-tag-map.mjs
           fi
