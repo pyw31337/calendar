@@ -1,0 +1,13 @@
+{
+  "calendar": "cw",
+  "note": "Comments filed under an old album key that names a message (or a removed album entry), not a photo. Target photo chosen from the photo's tags; the comment text is unchanged.",
+  "moves": [
+    { "commentId": "cmt_1788691772728_ei2ids", "from": "meeting:2026-09-06:meeting_cw_2026-09-06_1788678871296_0_iuaang", "to": "asset:v1:1nil5u2-1vxvakc-40", "why": "튀김 thread -> photo 0 '가지튀김 닭갈비'" },
+    { "commentId": "cmt_1788691844661_lwvbvq", "from": "meeting:2026-09-06:meeting_cw_2026-09-06_1788678871296_0_iuaang", "to": "asset:v1:1nil5u2-1vxvakc-40", "why": "same thread" },
+    { "commentId": "cmt_1788693254141_8q3zed", "from": "meeting:2026-09-06:meeting_cw_2026-09-06_1788678871296_0_iuaang", "to": "asset:v1:1nil5u2-1vxvakc-40", "why": "same thread (닭갈비 & 어향가지)" },
+    { "commentId": "cmt_1788757302129_6hdhos", "from": "meeting:date:meeting_cw_2026-09-04_1788490475885_0_61gou0", "to": "asset:v1:lkilij-1lknfd7-3z", "why": "the message has one photo" },
+    { "commentId": "cmt_1788757318249_4ns4y9", "from": "meeting:date:meeting_cw_2026-09-03_1788432027529_0_pfts2r", "to": "asset:v1:ckpdq1-1v1ejcx-41", "why": "'순심이' -> photo 10 tagged '도연 순심이'" },
+    { "commentId": "cmt_1788764992085_ml191e", "from": "meeting:date:meeting_cw_2026-09-07_1788761317606_0_wopxb7", "to": "asset:v1:oq2o17-1834ctj-40", "why": "'심은날짜' -> photo 0 tagged '심은날짜'" },
+    { "commentId": "cmt_1788757354695_aa5xke", "from": "meeting:2026-08-28:photo_cw_2026-08-28_1787914098318_0_0_dfowx", "to": "asset:v1:6qmt23-1bmxovz-40", "why": "album entry still exists; its file's photoIndex row" }
+  ]
+}

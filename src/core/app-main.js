@@ -909,7 +909,11 @@ function CalendarApp() {
       ...(activeCalendar?.anniversaries || []).flatMap(anniversary => (anniversary?.photos || []).map(photo => photo?.fingerprint))
     ];
     rememberKnownImageFingerprints(activeCalId, fingerprints);
-    rememberKnownImageOriginals(activeCalId, [...(allChatMessages || []), ...(memos || [])]);
+    const anniversaryRecords = (activeCalendar?.anniversaries || []).map(anniversary => {
+      const photos = Array.isArray(anniversary?.photos) ? anniversary.photos : [];
+      return { imageUrls: photos.map(photo => photo?.url || ''), thumbUrls: photos.map(photo => photo?.thumbUrl || ''), imageFingerprints: photos.map(photo => photo?.fingerprint || '') };
+    });
+    rememberKnownImageOriginals(activeCalId, [...(allChatMessages || []), ...(memos || []), ...anniversaryRecords]);
   }, [activeCalId, allChatMessages, memos, calendars]);
   const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,

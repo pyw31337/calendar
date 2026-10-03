@@ -449,10 +449,22 @@ async function bulkTagAssets({ db, calendarDocId, items, now = Date.now() }) {
   });
 }
 
-// Delete queued Storage objects whose grace period elapsed and that no photoIndex row of ANY
-// calendar still references (by original or thumb path). Photos and memos copied across
-// calendars keep the source file's URL, so checking only the queuing calendar deleted files
-// another calendar still showed.
+// Every Storage path a value points at, wherever it sits (anniversary photos[], poster fields).
+function collectStoragePaths(value, into, depth = 0) {
+  if (depth > 6 || value == null) return;
+  if (typeof value === 'string') {
+    if (value.includes('/o/')) { const path = storagePathFromUrl(value); if (path) into.add(path); }
+    return;
+  }
+  if (Array.isArray(value)) { value.forEach(item => collectStoragePaths(item, into, depth + 1)); return; }
+  if (typeof value === 'object') Object.values(value).forEach(item => collectStoragePaths(item, into, depth + 1));
+}
+
+// Delete queued Storage objects whose grace period elapsed and that nothing in ANY calendar
+// still references: no photoIndex row (messages, memos, albums), no anniversary photo and no
+// culture item poster. Photos copied across calendars keep the source file's URL, and a
+// re-upload (anniversaries and posters included) links the stored original, so checking only
+// the queuing calendar's index deleted files other records still showed.
 async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
   const due = await db.collection('storageGc').where('deleteAfter', '<=', now).limit(limit).get();
   const result = { examined: due.size, deleted: 0, kept: 0 };
@@ -460,8 +472,15 @@ async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
   const referenced = new Set();
   const calendars = await db.collection('calendars').listDocuments();
   for (const calendar of calendars) {
-    const index = await calendar.collection('photoIndex').get();
+    const [index, anniversaries, cultureItems, calendarDoc] = await Promise.all([
+      calendar.collection('photoIndex').get(),
+      calendar.collection('anniversaries').get(),
+      calendar.collection('customCultureItems').get(),
+      calendar.get(),
+    ]);
     index.docs.forEach(row => { const data = row.data() || {}; [data.full, data.thumb].forEach(url => { const p = storagePathFromUrl(url); if (p) referenced.add(p); }); });
+    [...anniversaries.docs, ...cultureItems.docs].forEach(doc => collectStoragePaths(doc.data(), referenced));
+    collectStoragePaths(calendarDoc.data()?.calendar?.anniversaries, referenced);
   }
   for (const doc of due.docs) {
     const { path } = doc.data() || {};

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 globalThis.window = globalThis.window || {};
 const {
   rememberKnownImageFingerprints, rememberKnownImageOriginals,
-  selectNonDuplicateCompressedImages, resolveChatImageBatch
+  selectNonDuplicateCompressedImages, resolveChatImageBatch, resolveAnniversaryImageBatch
 } = await import('../src/core/app-image-pipeline.js');
 const { removeAssetFromMeetings, replaceAssetInMeetings } = await import('../src/core/media-reference-integrity.js');
 
@@ -95,4 +95,15 @@ test('replacing a shared photo in one message leaves the other message album ent
   });
   assert.equal(next[0].photos[0].imageUrl, photo('new').imageUrl);
   assert.equal(next[0].photos[1].imageUrl, photo('s').imageUrl);
+});
+
+test('an anniversary photo or poster that is already stored links the original too', async () => {
+  const cal = 'dedupe-anniversary';
+  rememberKnownImageFingerprints(cal, [fp(5)]);
+  rememberKnownImageOriginals(cal, [{ imageUrls: [url('e_original.jpg')], thumbUrls: [url('e_thumb.jpg')], imageFingerprints: [fp(5)] }]);
+  await withFetch(async (input) => new Response(String(input).includes(':runQuery') ? '[]' : null, { status: 200 }), async () => {
+    const results = await resolveAnniversaryImageBatch(cal, [{ fingerprint: fp(5), original: 'blob:x', thumbnail: 'blob:x' }], null);
+    assert.equal(results[0].imageUrl, url('e_original.jpg'));
+    assert.equal(results[0].reused, true);
+  });
 });
