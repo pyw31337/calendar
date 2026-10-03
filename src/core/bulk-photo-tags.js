@@ -76,6 +76,24 @@ async function postMediaCommand(fetchImpl, projectId, body) {
   throw error;
 }
 
+// 보관함 추천 "중복 사진 정리": the server checks the copies are the same bytes, then points
+// every place showing a copy at the kept file, merges tags and moves comments. Nothing is
+// deleted. Returns the server's report ({ merged, notIdentical, ... }).
+export async function mergeDuplicatePhotosRemote({ calendarId, projectId, keep, extras, tags, fetchImpl = fetch } = {}) {
+  const ref = photo => {
+    const item = toCommandItem(photo);
+    return { imageUrl: item.imageUrl, thumbUrl: item.thumbUrl, messageId: item.messageId, memoId: item.memoId };
+  };
+  const list = (Array.isArray(extras) ? extras : []).map(ref);
+  if (!calendarId || !projectId || !keep || !list.length) return { ok: false, reason: 'invalid' };
+  const response = await postMediaCommand(fetchImpl, projectId, {
+    calendarId, op: 'mergeAssets', asset: ref(keep), extras: list, tags: joinPhotoTagTokens(tags),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) throw new Error(payload?.reason || `merge failed (${response.status})`);
+  return payload;
+}
+
 export async function saveBulkPhotoTagsRemote({ calendarId, projectId, changes, fetchImpl = fetch } = {}) {
   const list = (Array.isArray(changes) ? changes : []).map(toCommandItem)
     .filter(item => /^https?:\/\//i.test(item.imageUrl || item.thumbUrl));

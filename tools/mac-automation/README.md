@@ -24,6 +24,12 @@ zsh ~/Developer/calendar/tools/mac-automation/backup.sh --with-secrets   # 맥�
 - `--with-secrets`: 사진 분석 토큰(키체인)과 저장소의 `.env` 파일을 정한 암호로 잠가(AES-256) 함께 담는다. 암호를 잊으면 풀 수 없다.
   매주 자동 백업에는 비밀값을 넣지 않는다.
 
+### 어드민 '맥 백업' 버튼
+
+어드민 화면(전체 보기) > **맥 백업** 탭의 "지금 백업"을 누르면, 15분마다 도는 사진 분석 자동 실행이
+`mac-backup-sync.mjs`로 요청을 확인해 `backup.sh --auto`(비밀값 포함, 암호는 키체인)를 실행하고 결과를 어드민 화면에 보여준다.
+처음 `--auto` 백업 때 암호를 새로 만들어 키체인에 넣으니 `backup.sh --print-passphrase`로 확인해 따로 적어 둔다.
+
 ## 새 맥으로 옮기기
 
 1. 새 맥에 Xcode 명령어 도구(`xcode-select --install`), [Homebrew](https://brew.sh), GitHub 로그인(`gh auth login`)을 준비한다.

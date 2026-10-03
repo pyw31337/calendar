@@ -10,6 +10,8 @@ OUTPUT_FILE="${MOYEORA_MEDIA_SUGGESTIONS:-$HOME/Library/Application Support/Moye
 CONFIG_FILE="${1:-${MOYEORA_MEDIA_WORKER_CONFIG:-$HOME/Library/Application Support/Moyeora/media-worker.json}}"
 
 if [[ -f "$CONFIG_FILE" ]]; then
+  # 어드민 '맥 백업' 버튼: one small check per run; runs backup.sh --auto only when requested.
+  /usr/bin/env node "$WORKER_DIR/../mac-automation/mac-backup-sync.mjs" "$CONFIG_FILE" || true
   exec /usr/bin/env node "$WORKER_DIR/run-scheduled-media-analysis.mjs" "$CONFIG_FILE"
 fi
 

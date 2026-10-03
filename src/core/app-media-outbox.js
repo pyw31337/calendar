@@ -13,6 +13,9 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
     thumbnailBlob: image.thumbnailBlob,
     smallThumbBlob: image.smallThumbBlob || null,
     metadata: image.metadata || null,
+    // Kept through the queue so the replay still reuses an already stored original.
+    fingerprint: image.fingerprint || '',
+    fingerprintStrength: image.fingerprintStrength || '',
     variantProfile: payload.variantProfile || (payload.uploadSource && payload.uploadSource !== 'chat' ? 'grid' : 'chat')
   }));
   if (compressed.length === 0) return false;
@@ -30,6 +33,7 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
       imageUrls: images.map(image => image.imageUrl),
       thumbUrls: images.map(image => image.thumbUrl),
       imageTags: images.map(image => buildMetadataTags(image.metadata, tagOptions)),
+      imageFingerprints: images.map(image => image.fingerprint || ''),
       timestamp: (Number(payload.timestamp) || Date.now()) + i,
       ...(payload.uploadSource ? { uploadSource: payload.uploadSource } : {}),
       ...(i === 0 && payload.replyTo ? { replyTo: payload.replyTo } : {})
@@ -44,16 +48,22 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
   if (!payload?.memoData || !Array.isArray(payload.images) || typeof resolveImages !== 'function' || typeof writeMemo !== 'function') return false;
   const pending = payload.images.filter(image => !image.isExisting);
   const resolved = pending.length > 0
-    ? await resolveImages(operation.calendarId, pending.map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null })))
+    ? await resolveImages(operation.calendarId, pending.map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' })))
     : [];
   let next = 0;
-  const imageUrls = payload.images.map(image => image.isExisting ? image.original : resolved[next++]?.imageUrl).filter(Boolean);
-  next = 0;
-  const thumbUrls = payload.images.map(image => image.isExisting ? (image.thumbnail || image.original) : resolved[next++]?.thumbUrl).filter(Boolean);
+  // One entry per photo so urls, thumbs and fingerprints stay aligned slot by slot.
+  const slots = payload.images.map(image => {
+    if (image.isExisting) return { url: image.original, thumb: image.thumbnail || image.original, fingerprint: image.fingerprint || '' };
+    const item = resolved[next++];
+    return { url: item?.imageUrl, thumb: item?.thumbUrl || item?.imageUrl, fingerprint: item?.fingerprint || '' };
+  }).filter(slot => slot.url);
+  const imageUrls = slots.map(slot => slot.url);
+  const thumbUrls = slots.map(slot => slot.thumb);
   const result = await writeMemo(operation.calendarId, payload.memoId, {
     ...payload.memoData,
     imageUrls,
     thumbUrls,
+    imageFingerprints: slots.map(slot => slot.fingerprint),
     imageUrl: imageUrls[0] || null,
     thumbUrl: thumbUrls[0] || null
   });

@@ -2781,7 +2781,7 @@ function CalendarApp() {
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null })),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
@@ -3001,7 +3001,7 @@ function CalendarApp() {
             participantId: fallbackParticipantId,
             text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
             variantProfile: 'grid',
-            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null }))
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
           }
         });
         if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');

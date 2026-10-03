@@ -20,7 +20,7 @@ const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract'
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
 const { buildKakaoLocationTags, appendLocationTags } = require('./photo-location-tags');
-const { MAX_BATCH_ITEMS, MAX_TAGS, faceName, sanitizeAnalysisItem, sanitizeFaceItem, stableAnalysisId, summarize } = require('./media-analysis');
+const { MAX_BATCH_ITEMS, MAX_TAGS, faceName, sanitizeAnalysisItem, sanitizeFaceItem, sanitizeSimilarGroups, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
 const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
 const {
@@ -452,21 +452,41 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   };
 }
 
+// Concurrent events on one document contend for the same rows. A row transaction that gives up
+// is retried here with backoff (a deploy-level failurePolicy would need `firebase deploy --force`,
+// which this repo avoids); anything still failing is left to the nightly rebuild.
+const PHOTO_INDEX_ROW_ATTEMPTS = 4;
+async function withRowRetry(run) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (err) {
+      if (attempt >= PHOTO_INDEX_ROW_ATTEMPTS) throw err;
+      await new Promise(resolve => setTimeout(resolve, 200 * (2 ** attempt) + Math.floor(Math.random() * 200)));
+    }
+  }
+}
+
 async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   const db = admin.firestore();
   const indexRef = db.collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
   const sourceId = context.params[idParam];
   const before = change.before.exists ? getPhotoIndexEntries(sourceType, sourceId, change.before.data() || {}) : [];
   const after = change.after.exists ? getPhotoIndexEntries(sourceType, sourceId, change.after.data() || {}) : [];
+  // Events arrive unordered and a retried one may be old, so this document's owners are taken
+  // from its CURRENT state, not from the event's `after`: whatever order rapid edits (a bulk tag,
+  // a duplicate merge) are processed in, every row converges on what the document shows now.
+  // The event's before/after only widen the set of rows to touch.
+  const currentSnap = await change.after.ref.get();
+  const current = currentSnap.exists ? getPhotoIndexEntries(sourceType, sourceId, currentSnap.data() || {}) : [];
   const ownerRoot = `${sourceType}:${sourceId}:`;
-  const beforeKeys = new Set(before.map(entry => entry.assetKey));
-  const afterByKey = new Map(after.map(entry => [entry.assetKey, entry]));
-  const touchedKeys = new Set([...beforeKeys, ...afterByKey.keys()]);
+  const afterByKey = new Map(current.map(entry => [entry.assetKey, entry]));
+  const touchedKeys = new Set([...before.map(entry => entry.assetKey), ...after.map(entry => entry.assetKey), ...afterByKey.keys()]);
   // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
   // owners inside the canonical row prevents deleting one source from erasing the remaining
   // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
   if (!touchedKeys.size) return false;
-  await Promise.all(Array.from(touchedKeys).map(assetKey => db.runTransaction(async transaction => {
+  await Promise.all(Array.from(touchedKeys).map(assetKey => withRowRetry(() => db.runTransaction(async transaction => {
     const ref = indexRef.doc(assetKey);
     const snapshot = await transaction.get(ref);
     const existing = snapshot.exists ? (snapshot.data() || {}) : {};
@@ -515,7 +535,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       tagAuthoritative: tagState.authoritative,
       updatedAt: Date.now()
     });
-  })));
+  }))));
   await bumpPhotoIndexRevision(context.params.calendarDocId);
   // Never wait for client reads to regenerate this graph; the canonical source trigger owns
   // the dual-write so tag/photo edits stay tied to the same immutable asset key.
@@ -2718,14 +2738,14 @@ exports.pruneStaleRateLimitDocs = functions.region(SEOUL_REGION).pubsub.schedule
 // P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
-const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets']);
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets', 'mergeAssets']);
 // Both regions permanently: the app calls Seoul and falls back to us-central1, and app builds
 // cached before the move only know the us-central1 URL. An idle copy costs nothing.
 exports.mediaCommand = functions.region(SEOUL_REGION, 'us-central1').runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
-  const { calendarId, op, asset, tags, items } = req.body || {};
+  const { calendarId, op, asset, tags, items, extras } = req.body || {};
   if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !MEDIA_COMMAND_OPS.has(op)) { res.status(400).json({ ok: false, reason: 'invalid' }); return; }
   const isHttpUrl = value => /^https?:\/\//i.test(String(value || ''));
   const isStorageUrl = value => /^https:\/\/firebasestorage\.googleapis\.com\//i.test(String(value || ''));
@@ -2734,6 +2754,10 @@ exports.mediaCommand = functions.region(SEOUL_REGION, 'us-central1').runWith({ t
       || items.some(item => !isHttpUrl(item?.imageUrl || item?.full || item?.thumbUrl || item?.thumb))) {
       res.status(400).json({ ok: false, reason: 'invalid-items' }); return;
     }
+  }
+  if (op === 'mergeAssets' && (!Array.isArray(extras) || !extras.length || extras.length > mediaCommands.MAX_MERGE_EXTRAS
+    || extras.some(item => !isStorageUrl(item?.imageUrl) && !isStorageUrl(item?.thumbUrl)))) {
+    res.status(400).json({ ok: false, reason: 'invalid-items' }); return;
   }
   const imageUrl = String(asset?.imageUrl || '');
   const thumbUrl = String(asset?.thumbUrl || '');
@@ -2751,7 +2775,26 @@ exports.mediaCommand = functions.region(SEOUL_REGION, 'us-central1').runWith({ t
     messageId: typeof asset?.messageId === 'string' ? asset.messageId.slice(0, 200) : '',
     memoId: typeof asset?.memoId === 'string' ? asset.memoId.slice(0, 200) : '',
   };
+  const cleanRef = item => ({
+    imageUrl: String(item?.imageUrl || ''),
+    thumbUrl: String(item?.thumbUrl || ''),
+    messageId: typeof item?.messageId === 'string' ? item.messageId.slice(0, 200) : '',
+    memoId: typeof item?.memoId === 'string' ? item.memoId.slice(0, 200) : '',
+  });
   try {
+    if (op === 'mergeAssets') {
+      const merged = await mediaCommands.mergeAssets({
+        db,
+        bucket: admin.storage().bucket(),
+        calendarDocId,
+        keep: cleanAsset,
+        extras: extras.map(cleanRef),
+        tags: String(tags || ''),
+        claimMemoPush: (before, after, memoId) => decideMemoNotification(before, after, { memoId })?.claimKey || '',
+      });
+      res.status(merged.ok ? 200 : 400).json(merged);
+      return;
+    }
     const result = op === 'deleteAsset'
       ? await mediaCommands.deleteAsset({ db, calendarDocId, asset: cleanAsset })
       : (op === 'tagAsset'
@@ -2951,6 +2994,11 @@ exports.ingestMediaAnalysis = seoulFunctions().runWith({
     // watchdog uses the two timestamps together to distinguish a fresh failure from a stale
     // worker, and preserving this value makes recovery auditable.
     if (status === 'completed' || status === 'idle') workerState.lastSuccessAt = now;
+    if (Array.isArray(req.body?.similarGroups)) {
+      // Firestore cannot hold nested arrays, so each group is { assetKeys: [...] }.
+      workerState.similarGroups = sanitizeSimilarGroups(req.body.similarGroups);
+      workerState.similarGroupsAt = now;
+    }
     batch.set(calendarRef.collection('mediaAnalysisWorkerState').doc(workerId), workerState, { merge: true });
     batch.set(calendarRef.collection('mediaAnalysisRuns').doc(runId), {
       calendarId,

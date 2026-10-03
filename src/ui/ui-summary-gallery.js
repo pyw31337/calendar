@@ -7,9 +7,9 @@ import { getPhotoCommentIdentityFromList } from '../core/app-domain-helpers.js';
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
-import { applyPhotoTagOperation, buildBulkPhotoTagChanges, joinPhotoTagTokens } from '../core/bulk-photo-tags.js';
-import { buildDuplicateSuggestions, buildFaceSuggestions, buildPlaceVisitSuggestions, buildTagSuggestions } from './archive-tag-suggestions.js';
-import { fetchFaceSuggestions, rejectFaceSuggestions } from '../core/media-analysis-feed.js';
+import { applyPhotoTagOperation, buildBulkPhotoTagChanges, joinPhotoTagTokens, mergeDuplicatePhotosRemote } from '../core/bulk-photo-tags.js';
+import { buildDuplicateSuggestions, buildFaceSuggestions, buildPlaceVisitSuggestions, buildSimilarPhotoSuggestions, buildTagSuggestions } from './archive-tag-suggestions.js';
+import { fetchFaceSuggestions, fetchSimilarPhotoGroups, rejectFaceSuggestions } from '../core/media-analysis-feed.js';
 import { chooseDedupWinner, findDuplicatePhotoGroups } from '../core/gallery-dedup.js';
 import { ArchiveTagSuggestions } from './archive-tag-suggestions-view.js';
 import {
@@ -2379,6 +2379,23 @@ export function HistoryView({
   const duplicateSuggestions = React.useMemo(() => (historyTab === 'suggest'
     ? buildDuplicateSuggestions(historyPhotoEntries, { findDuplicatePhotoGroups, chooseDedupWinner })
     : []), [historyTab, historyPhotoEntries]);
+  // 비슷한 사진: different files that look alike (Mac worker). A hint only, never merged.
+  const [similarGroupKeys, setSimilarGroupKeys] = React.useState([]);
+  React.useEffect(() => {
+    if (historyTab !== 'suggest' || !calendar?.id) return undefined;
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    let alive = true;
+    fetchSimilarPhotoGroups({ calendarId: calendar.id, projectId })
+      .then(groups => { if (alive) setSimilarGroupKeys(groups); })
+      .catch(error => console.warn('Similar photo groups unavailable:', error?.message || error));
+    return () => { alive = false; };
+  }, [historyTab, calendar?.id]);
+  const similarSuggestions = React.useMemo(() => (historyTab === 'suggest' && similarGroupKeys.length
+    ? buildSimilarPhotoSuggestions(historyPhotoEntries, similarGroupKeys, {
+      keyOf: faceSuggestionKey,
+      exclude: new Set(duplicateSuggestions.flatMap(dup => [dup.keep, ...dup.extra].map(faceSuggestionKey)))
+    })
+    : []), [historyTab, historyPhotoEntries, similarGroupKeys, duplicateSuggestions]);
   const placeVisitSuggestions = React.useMemo(() => (historyTab === 'suggest' && typeof onSavePlace === 'function'
     ? buildPlaceVisitSuggestions({ places: getCalendarPlaces(calendar), photos: historyPhotoEntries, getPhotoDates: photo => parseHistoryDateTokens(photo?.tags || ''), today: todayStr })
     : []), [historyTab, historyPhotoEntries, calendar, onSavePlace, todayStr]);
@@ -2393,22 +2410,27 @@ export function HistoryView({
       return false;
     }
   };
-  // Keep one copy: the others' tags move onto it first, then the extra copies are removed through
-  // the regular photo delete (reference-checked, so a file another document still uses is kept).
-  const removeDuplicateCopies = async dup => {
-    const deleteFn = onDeletePhotos || window.__gatherBulkDeletePhotos;
-    if (typeof deleteFn !== 'function' || !dup.removable) return false;
-    const tagged = await applySuggestedTags([{ photos: [dup.keep], tag: dup.mergedTags }]);
-    if (!tagged) return false;
+  // Merge, never delete: the server checks the copies are the same file, points every chat,
+  // memo and album place showing a copy at the kept photo (same position), merges tags and moves
+  // comments. No message, memo, comment or file is removed; a copy whose bytes differ is left.
+  const mergeDuplicateCopies = async dup => {
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendar?.id || !projectId || !dup?.keep || !dup.extra?.length) return false;
     hideArchivePhotos(dup.extra);
     try {
-      const res = await deleteFn(dup.extra, {});
-      if (!Number(res?.deleted || 0) && Number(res?.failed || 0)) throw new Error('delete');
-      showToast?.(`중복 사진 ${dup.extra.length}장을 정리했어요.`, 'success');
-      return true;
+      const res = await mergeDuplicatePhotosRemote({ calendarId: calendar.id, projectId, keep: dup.keep, extras: dup.extra, tags: dup.mergedTags });
+      const merged = Array.isArray(res?.merged) ? res.merged.length : 0;
+      const notIdentical = new Set(res?.notIdentical || []);
+      const kept = dup.extra.filter(photo => notIdentical.has(String(photo?.assetKey || canonicalPhotoAssetKey(photo || {}))));
+      if (kept.length) restoreArchivePhotos(kept);
+      if (merged) publishArchiveTags([{ photo: dup.keep, tags: dup.mergedTags }]);
+      showToast?.(merged
+        ? `같은 사진 ${merged + 1}장을 1장으로 합쳤어요. 태그와 댓글은 모두 남겼어요.`
+        : '파일이 서로 달라서 합치지 않았어요.', merged ? 'success' : 'info');
+      return merged > 0;
     } catch (_) {
       restoreArchivePhotos(dup.extra);
-      showToast?.('중복 사진을 정리하지 못했습니다.', 'error');
+      showToast?.('중복 사진을 합치지 못했습니다.', 'error');
       return false;
     }
   };
@@ -3920,9 +3942,10 @@ export function HistoryView({
       formatDate: formatHistoryDate,
       selectKeyOf: archivePhotoSelectKey,
       duplicates: duplicateSuggestions,
+      similar: similarSuggestions,
       onRemoveDuplicate: dup => {
-        const run = () => { void removeDuplicateCopies(dup); };
-        if (typeof onRequestConfirm === 'function') onRequestConfirm('중복 사진 정리', `같은 사진 ${dup.extra.length + 1}장 중 1장만 남길까요? 다른 사진의 태그는 남기는 사진으로 합쳐요.`, run);
+        const run = () => { void mergeDuplicateCopies(dup); };
+        if (typeof onRequestConfirm === 'function') onRequestConfirm('중복 사진 합치기', `같은 사진 ${dup.extra.length + 1}장을 1장으로 합칠까요? 채팅·메모의 사진은 그대로 보이고, 태그와 댓글은 모두 합쳐져요. 지워지는 사진은 없어요.`, run);
         else run();
       },
       placeVisits: placeVisitSuggestions,

@@ -115,7 +115,7 @@ test('place visits come from tagged photo dates the place memo does not have yet
   assert.equal(visits[0].next.visitDate, '2026-09-26');
 });
 
-test('duplicates keep one photo with every tag, and copies with comments are not removable', () => {
+test('duplicates keep one photo with every tag (copies with comments merge too; comments move)', () => {
   const dup = buildDuplicateSuggestions([{ id: 'x' }], {
     findDuplicatePhotoGroups: () => [{ candidates: [] }],
     chooseDedupWinner: () => ({
@@ -125,7 +125,7 @@ test('duplicates keep one photo with every tag, and copies with comments are not
   });
   assert.equal(dup.length, 1);
   assert.equal(dup[0].mergedTags, '서준 260919 바이킹');
-  assert.equal(dup[0].removable, false);
+  assert.deepEqual(dup[0].extra.map(photo => photo.assetKey), ['l', 'm']);
 });
 
 test('face suggestions: one card per person, skip photos already tagged (any spelling) or rejected', () => {
@@ -147,4 +147,11 @@ test('face suggestions: one card per person, skip photos already tagged (any spe
     ['김유리', ['asset:v1:c', 'asset:v1:a']],
     ['서준', ['asset:v1:a']],
   ]);
+});
+
+test('similar photo hints map worker asset keys to loaded photos and skip duplicate-card photos', async () => {
+  const { buildSimilarPhotoSuggestions } = await import('../src/ui/archive-tag-suggestions.js');
+  const photos = [{ assetKey: 'a' }, { assetKey: 'b' }, { assetKey: 'c' }, { assetKey: 'd' }];
+  const out = buildSimilarPhotoSuggestions(photos, [['a', 'b', 'gone'], ['c', 'd'], ['b', 'x']], { exclude: new Set(['d']) });
+  assert.deepEqual(out.map(group => group.photos.map(photo => photo.assetKey)), [['a', 'b']]);
 });

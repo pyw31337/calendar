@@ -75,8 +75,24 @@ function sanitizeAnalysisItem(item = {}, now = Date.now()) {
     status: text(item.status || 'suggested', 24) || 'suggested',
     // A bounded error lets the server audit a failed asset without retaining a URL, filename,
     // or image content.  A successful retry overwrites this field for the same immutable key.
-    error: text(item.error, 280)
+    error: text(item.error, 280),
+    // 64-bit difference hash of the picture (Mac worker), only for "비슷한 사진" hints.
+    ...(/^[0-9a-f]{16}$/.test(String(item.lookHash || insight.lookHash || '')) ? { lookHash: String(item.lookHash || insight.lookHash) } : {})
   };
+}
+
+const MAX_SIMILAR_GROUPS = 60;
+const MAX_SIMILAR_GROUP_SIZE = 8;
+
+// Groups of photos that look alike but are different files (worker-computed). Asset keys only.
+function sanitizeSimilarGroups(value) {
+  return (Array.isArray(value) ? value : [])
+    .map(group => Array.from(new Set((Array.isArray(group) ? group : [])
+      .map(key => String(key || ''))
+      .filter(key => /^asset:v1:[A-Za-z0-9-]{1,80}$/.test(key)))).slice(0, MAX_SIMILAR_GROUP_SIZE))
+    .filter(group => group.length >= 2)
+    .slice(0, MAX_SIMILAR_GROUPS)
+    .map(assetKeys => ({ assetKeys }));
 }
 
 const MAX_FACE_PEOPLE = 8;
@@ -132,6 +148,7 @@ module.exports = {
   faceName,
   sanitizeAnalysisItem,
   sanitizeFaceItem,
+  sanitizeSimilarGroups,
   stableAnalysisId,
   summarize
 };

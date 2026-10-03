@@ -110,6 +110,26 @@ export async function fetchFaceSuggestions({ calendarId, projectId, force = fals
   return items;
 }
 
+/**
+ * "비슷한 사진" groups the Mac worker found (different files that look alike), as arrays of asset
+ * keys. One small listing of the worker-state documents; cached like the other feeds.
+ */
+export async function fetchSimilarPhotoGroups({ calendarId, projectId, force = false } = {}) {
+  if (!calendarId || !projectId) return [];
+  const key = `similar:${projectId}:${calendarId}`;
+  const cached = cache.get(key);
+  if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/mediaAnalysisWorkerState?pageSize=10`);
+  if (!response.ok) throw new Error(`비슷한 사진 요청 실패 (${response.status})`);
+  const payload = await response.json();
+  const items = (payload?.documents || [])
+    .flatMap(document => decodeDocument(document).similarGroups || [])
+    .map(group => (Array.isArray(group?.assetKeys) ? group.assetKeys.filter(Boolean) : []))
+    .filter(group => group.length >= 2);
+  cache.set(key, { savedAt: Date.now(), items });
+  return items;
+}
+
 /** "아니에요": this person is not in these photos; never suggest them for these photos again. */
 export async function rejectFaceSuggestions({ calendarId, projectId, name, assetKeys = [] } = {}) {
   const keys = Array.from(new Set((Array.isArray(assetKeys) ? assetKeys : []).filter(Boolean)));
