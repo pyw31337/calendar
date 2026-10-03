@@ -1,0 +1,29 @@
+# HTTP endpoints that ran in both regions during the Seoul move. Step 3 of
+# docs/functions-seoul-migration.md deletes exactly these names in us-central1
+# (delete_us_copies: http). ingestMediaAnalysis and getMediaAnalysisCalibration stay until every
+# Mac worker has pulled (they now update themselves daily).
+peekalinkProxy
+kakaoLocalSearchProxy
+googlePlacesSearchProxy
+tourApiSearchProxy
+listPublicCalendarSummaries
+auditEvent
+adminVerifyPassword
+listAllCalendars
+listServerAuditLogs
+memePoolUpsert
+memePoolDelete
+listUntaggedPhotoIndexEntries
+listPhotoIndexEntriesForDedup
+listSharedDataPool
+adminBulkTagPhotos
+mergeDedupPhotos
+listPushSubscriptionHealth
+adminChangePassword
+mediaCommand
+macBackupAdmin
+macWorkerSync
+recordMediaAnalysisFeedback
+recordFaceFeedback
+rebuildPhotoIndex
+prepareMediaIntegrityReview

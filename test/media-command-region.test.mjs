@@ -12,16 +12,14 @@ test('mediaCommand goes to Seoul first', async () => {
   assert.deepEqual(urls, ['https://asia-northeast3-p.cloudfunctions.net/mediaCommand']);
 });
 
-test('falls back to us-central1 when Seoul is missing, down or unreachable', async () => {
-  for (const seoul of [{ ok: false, status: 404, json: async () => ({}) }, { ok: false, status: 503, json: async () => ({}) }, 'throw']) {
+test('Seoul only: an outage is reported, never sent to the deleted us-central1 copy', async () => {
+  for (const seoul of [{ ok: false, status: 503, json: async () => ({}) }, 'throw']) {
     const urls = [];
-    const res = await saveBulkPhotoTagsRemote({
+    await assert.rejects(saveBulkPhotoTagsRemote({
       calendarId: 'cw', projectId: 'p', changes: [change],
-      fetchImpl: async url => { urls.push(url); if (url.includes('asia-northeast3')) { if (seoul === 'throw') throw new TypeError('Failed to fetch'); return seoul; } return ok(); },
-    });
-    assert.equal(res.ok, true);
-    assert.equal(urls.length, 2);
-    assert.match(urls[1], /^https:\/\/us-central1-p\.cloudfunctions\.net\/mediaCommand$/);
+      fetchImpl: async url => { urls.push(url); if (seoul === 'throw') throw new TypeError('Failed to fetch'); return seoul; },
+    }));
+    assert.deepEqual(urls, ['https://asia-northeast3-p.cloudfunctions.net/mediaCommand']);
   }
 });
 
