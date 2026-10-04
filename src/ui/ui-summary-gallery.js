@@ -4086,23 +4086,37 @@ export function ContentView({
   };
   // 일정 팝업의 기념일 제목 클릭 -> 컨텐츠 페이지 이동 시, app-main.js가 미리 저장해 둔 항목 id.
   // 한 번 소비하면 바로 지워서 이후 컨텐츠 페이지 재방문 때 엉뚱한 항목이 다시 열리지 않게 한다.
-  const [focusItemId] = React.useState(() => {
+  const [focusItemId, setFocusItemId] = React.useState(() => {
     try { return localStorage.getItem('gather_content_focus_item_id') || null; } catch (_) { return null; }
   });
   // id 매칭 실패에 대비한 안전망(app-main.js의 onFocusCultureSource 참고) -- 크롤링 스냅샷의 id
   // 생성 규칙이 과거에 바뀐 적이 있어, 그 이전에 등록된 기념일은 cultureSourceId가 오늘자
   // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않을 수 있다. 제목이 일치하는 항목을 찾는
   // 마지막 수단으로만 쓰인다(CulturePerformancesTab 참고).
-  const [focusTitle] = React.useState(() => {
+  const [focusTitle, setFocusTitle] = React.useState(() => {
     try { return localStorage.getItem('gather_content_focus_title') || ''; } catch (_) { return ''; }
   });
+  // The page may already be open when a date popup asks for an item (ui-app-shell-v2.js
+  // onFocusCultureSource): pick the request up from the same storage keys.
   React.useEffect(() => {
-    if (!focusItemId) return;
+    const onFocusRequest = () => {
+      try {
+        const tab = localStorage.getItem(CONTENT_TAB_STORAGE_KEY);
+        if (VALID_CONTENT_TABS.includes(tab)) setContentTab(tab);
+        setFocusItemId(localStorage.getItem('gather_content_focus_item_id') || null);
+        setFocusTitle(localStorage.getItem('gather_content_focus_title') || '');
+      } catch (_) { /* best-effort */ }
+    };
+    window.addEventListener('gather-content-focus', onFocusRequest);
+    return () => window.removeEventListener('gather-content-focus', onFocusRequest);
+  }, []);
+  React.useEffect(() => {
+    if (!focusItemId && !focusTitle) return;
     try {
       localStorage.removeItem('gather_content_focus_item_id');
       localStorage.removeItem('gather_content_focus_title');
     } catch (_) { /* best-effort */ }
-  }, [focusItemId]);
+  }, [focusItemId, focusTitle]);
   // 컨텐츠 메뉴를 다시 누르면 항상 지역축제 탭부터 보이도록.
   const handleContentChangeView = (view) => {
     if (view === 'content') changeContentTab('festival');
@@ -6321,10 +6335,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 있어(예: 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 기념일은 cultureSourceId가 오늘자
   // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않게 될 수 있다 -- 이때도 같은 제목의
   // 항목이 오늘자 스냅샷에 그대로 있다면 그거라도 열어 주는 게, 아무것도 안 열리는 것보다 낫다.
-  const focusAttemptedRef = React.useRef(false);
+  const focusAttemptedRef = React.useRef('');
   React.useEffect(() => {
-    if (!focusItemId || focusAttemptedRef.current || mergedItems === null) return;
-    focusAttemptedRef.current = true;
+    const focusKey = `${focusItemId || ''}|${focusTitle || ''}`;
+    if ((!focusItemId && !focusTitle) || focusAttemptedRef.current === focusKey || mergedItems === null) return;
+    focusAttemptedRef.current = focusKey;
     const match = mergedItems.find(i => i && i.id === focusItemId)
       || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null);
     if (match) {
