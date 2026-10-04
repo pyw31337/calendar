@@ -4,6 +4,7 @@
 
 import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
 import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core/gallery-data.js';
+import { filterSelectableSettlementExpenses, getReservedSettlementItemKeys } from '../core/settlement-card-selection.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CommonPagination } from './ui-shared.js';
 
@@ -53,6 +54,11 @@ function maskSettlementAccountNumber(value) {
 function getActiveParticipants(calendar) {
   const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
   return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarSettlementCardsForEditor(calendar) {
+  const f = __gatherUiDeps().getCalendarSettlementCards || GATHER_APP_UTILS.getCalendarSettlementCards;
+  const cards = typeof f === 'function' ? f(calendar) : calendar?.settlementCards;
+  return (Array.isArray(cards) ? cards : []).filter(card => card && !isTombstone(card));
 }
 function getCalendarPlaces(calendar) {
   const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
@@ -1972,22 +1978,38 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return list.filter(item => !item.isIncome && !item.isSelfPay);
   }, [confirmed, monthStr]);
 
+  // One expense entry may be claimed by only one settlement card.  Use its persisted
+  // item key rather than the label (labels can legitimately repeat) and omit the card
+  // currently being edited so its own selected items remain editable.
+  const reservedSettlementItemKeys = React.useMemo(() => (
+    getReservedSettlementItemKeys(getCalendarSettlementCardsForEditor(calendar), cardToEdit?.id)
+  ), [calendar, cardToEdit?.id]);
+  const selectableMonthlyExpenses = React.useMemo(() => (
+    filterSelectableSettlementExpenses(monthlyExpenses, reservedSettlementItemKeys)
+  ), [monthlyExpenses, reservedSettlementItemKeys]);
+  const excludedMonthlyExpenseCount = monthlyExpenses.length - selectableMonthlyExpenses.length;
+  // A card can have duplicate selections from data created before the reservation rule
+  // existed. Keep them out of totals, previews, and the next save as well as the picker.
+  const selectedCheckedItems = React.useMemo(() => Object.fromEntries(
+    Object.entries(checkedItems).filter(([key]) => !reservedSettlementItemKeys.has(key))
+  ), [checkedItems, reservedSettlementItemKeys]);
+
   React.useEffect(() => {
     // `confirmed` can be recreated while the modal is open. Hydrating on
     // every render would re-add an item immediately after the user unchecks
     // it, making persisted checked items impossible to turn off.
-    if (checkedItemsHydratedRef.current || monthlyExpenses.length === 0) return;
+    if (checkedItemsHydratedRef.current || selectableMonthlyExpenses.length === 0) return;
     checkedItemsHydratedRef.current = true;
     const savedKeys = Array.isArray(cardToEdit?.checkedItemKeys) ? cardToEdit.checkedItemKeys : [];
     if (savedKeys.length === 0) return;
     const initialChecked = {};
-    monthlyExpenses.forEach(item => {
+    selectableMonthlyExpenses.forEach(item => {
       if (savedKeys.includes(item.itemKey)) initialChecked[item.itemKey] = item;
     });
     if (Object.keys(initialChecked).length > 0) {
       setCheckedItems(prev => ({ ...initialChecked, ...prev }));
     }
-  }, [monthlyExpenses, cardToEdit]);
+  }, [selectableMonthlyExpenses, cardToEdit]);
 
   const formatShortDateWithDay = (dateStr) => {
     if (!dateStr || typeof dateStr !== 'string' || !dateStr.includes('-')) return dateStr || '';
@@ -2000,23 +2022,23 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
   const { totalExpense, settlementPerPerson } = React.useMemo(() => {
     let exp = 0;
-    Object.values(checkedItems).forEach(item => {
+    Object.values(selectedCheckedItems).forEach(item => {
       const amt = Number(item.amount || 0);
       if (!item.isIncome) exp += Math.abs(amt);
     });
     const count = Math.max(1, participantRows.length);
     const perPerson = Math.round(exp / count);
     return { totalExpense: exp, settlementPerPerson: perPerson };
-  }, [checkedItems, participantRows.length]);
+  }, [selectedCheckedItems, participantRows.length]);
 
   // Shared expenses that were tagged with a specific 지출자 (payer, not 공금지출) in the date
   // modal's 정산 tab already represent a personal advance -- fold them in as if they were
   // personalExpenses rows so the same amount never has to be re-typed here by hand.
   const autoPersonalItems = React.useMemo(() => {
-    return Object.values(checkedItems)
+    return Object.values(selectedCheckedItems)
       .filter(item => item && !item.isIncome && String(item.payerId || '').trim())
       .map(item => ({ ...item, participantId: String(item.payerId).trim() }));
-  }, [checkedItems]);
+  }, [selectedCheckedItems]);
   const unresolvedAutoPayers = React.useMemo(() => {
     const rowNames = new Set(participantRows.map(row => row?.participantId).filter(Boolean));
     return Array.from(new Set(autoPersonalItems.map(item => item.participantId).filter(name => !rowNames.has(name))));
@@ -2040,7 +2062,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return totals;
   }, [personalExpenses, autoPersonalItems]);
 
-  const hasSharedExpenses = Object.keys(checkedItems || {}).length > 0;
+  const hasSharedExpenses = Object.keys(selectedCheckedItems).length > 0;
   const settlementRows = React.useMemo(() => calculateSettlementRows(
     totalExpense,
     participantRows.map(row => row?.participantId),
@@ -2197,7 +2219,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       accountNumber: accountNumber.trim(),
       isAccountNumberHidden: isAccountNumberHidden,
       monthStr: monthStr,
-      checkedItemKeys: Object.keys(checkedItems)
+      checkedItemKeys: Object.keys(selectedCheckedItems)
     };
     setIsSavingSettlementCard(true);
     try {
@@ -2233,7 +2255,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   // technique as the settlement-summary share image) so it can be saved as a plain jpg and
   // shared outside the app without anyone needing account access.
   const handleDownloadSettlementCardImage = () => {
-    const items = Object.values(checkedItems);
+    const items = Object.values(selectedCheckedItems);
     // Draw in the established 720px design coordinate system, then export at 1280px.  Scaling
     // the canvas (rather than stretching a finished data URL) keeps text, rules and badges
     // sharp in the downloaded image on both Retina phones and desktop messengers.
@@ -2242,14 +2264,16 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const EXPORT_SCALE = EXPORT_W / W;
     const PAD = 40;
     const HEADER_H = 190;
-    // DATE_ROW_H: vertical space occupied by the date/amount line itself (date + gap below it).
-    // LABEL_ROW_H: vertical space occupied by each label (item name) line.
-    // Keeping them separate lets us tighten the date→item-name gap (was a single ROW_H=40 for both)
-    // without shrinking the space between items, giving a more compact readable card.
-    const DATE_ROW_H = 28;
-    const LABEL_ROW_H = 24;
-    const ROW_H = DATE_ROW_H + LABEL_ROW_H; // used only for summary-box height calculation
-    const summaryBoxH = 74 + Math.max(1, participantRows.length) * ROW_H;
+    const SUMMARY_ROW_H = 52;
+    // The exported list uses one measured row model: a short date-to-label gap and
+    // equal top/bottom breathing room between divider lines.  Previously the fixed
+    // date row left a visibly oversized empty band above each expense description.
+    const LIST_HEADER_H = 48;
+    const LIST_ROW_TOP_PADDING = 10;
+    const LIST_DATE_LINE_H = 16;
+    const LIST_LABEL_LINE_H = 19;
+    const LIST_ROW_BOTTOM_PADDING = 10;
+    const summaryBoxH = 74 + Math.max(1, participantRows.length) * SUMMARY_ROW_H;
     const cleanAccountDigits = String(accountNumber || '').replace(/[^0-9]/g, '');
     const hasTransferAccount = cleanAccountDigits.length >= 8;
     const bankBoxH = hasTransferAccount ? (depositorName ? 108 : 86) : 0;
@@ -2326,8 +2350,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         labelLines: wrapText(item.label || '정산 항목', 420)
       };
     });
-    // Each item occupies: 1 date row (DATE_ROW_H) + N label lines (LABEL_ROW_H each, min 1).
-    const listBoxH = 74 + imageItems.reduce((sum, entry) => sum + DATE_ROW_H + Math.max(1, entry.labelLines.length) * LABEL_ROW_H, imageItems.length === 0 ? DATE_ROW_H : 0);
+    const getListRowHeight = entry => (
+      LIST_ROW_TOP_PADDING + LIST_DATE_LINE_H + Math.max(1, entry.labelLines.length) * LIST_LABEL_LINE_H + LIST_ROW_BOTTOM_PADDING
+    );
+    const listBoxH = LIST_HEADER_H + (imageItems.length > 0
+      ? imageItems.reduce((sum, entry) => sum + getListRowHeight(entry), 0)
+      : LIST_ROW_TOP_PADDING + LIST_DATE_LINE_H + LIST_ROW_BOTTOM_PADDING);
     const bankSectionSpace = hasTransferAccount ? bankBoxH + 20 : 0;
     const H = HEADER_H + 34 + summaryBoxH + 20 + bankSectionSpace + listBoxH + 36;
 
@@ -2448,7 +2476,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         ctx.textAlign = 'right';
         ctx.fillText(`${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`, W - PAD - 20, rowY);
         ctx.textAlign = 'left';
-        rowY += ROW_H;
+        rowY += SUMMARY_ROW_H;
       });
     }
 
@@ -2486,23 +2514,25 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     ctx.font = '700 14px sans-serif';
     ctx.fillText(`정산목록 (${items.length}건)`, PAD + 20, y + 30);
 
-    let listRowY = y + 56;
+    let listRowY = y + LIST_HEADER_H;
     if (items.length === 0) {
       ctx.fillStyle = P.faint;
       ctx.font = '500 14px sans-serif';
-      ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
+      ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY + 26);
     } else {
       imageItems.forEach(({ item, parts, payerColor, payerBadge, labelLines }) => {
-        hLine(PAD + 20, W - PAD - 20, listRowY - Math.round(DATE_ROW_H * 0.6));
+        hLine(PAD + 20, W - PAD - 20, listRowY);
+        const dateBaselineY = listRowY + LIST_ROW_TOP_PADDING + 12;
+        const labelBaselineY = listRowY + LIST_ROW_TOP_PADDING + LIST_DATE_LINE_H + 14;
         let textX = PAD + 20;
         ctx.fillStyle = P.text;
         ctx.font = '600 14px sans-serif';
-        ctx.fillText(parts.date, textX, listRowY);
+        ctx.fillText(parts.date, textX, dateBaselineY);
         textX += ctx.measureText(parts.date).width + 5;
         if (parts.day) {
           ctx.fillStyle = payerColor;
           ctx.font = '800 16px sans-serif';
-          ctx.fillText(parts.day, textX, listRowY);
+          ctx.fillText(parts.day, textX, dateBaselineY);
           textX += ctx.measureText(parts.day).width + 7;
         }
         if (payerBadge) {
@@ -2510,7 +2540,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           // It stays crisp in the 1280px export and replaces the ambiguous text separator.
           const badgeSize = 18;
           const badgeCenterX = textX + badgeSize / 2;
-          const badgeCenterY = listRowY - 6;
+          const badgeCenterY = dateBaselineY - 6;
           ctx.fillStyle = payerBadge.color;
           ctx.beginPath();
           ctx.arc(badgeCenterX, badgeCenterY, badgeSize / 2, 0, Math.PI * 2);
@@ -2523,14 +2553,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         }
         ctx.fillStyle = P.text;
         ctx.font = '500 14px sans-serif';
-        // Label lines start DATE_ROW_H below the date line (not ROW_H=40) to reduce spacing.
-        labelLines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + DATE_ROW_H + lineIndex * LABEL_ROW_H));
+        labelLines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, labelBaselineY + lineIndex * LIST_LABEL_LINE_H));
         ctx.fillStyle = P.red;
         ctx.font = '800 15px sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, listRowY);
+        ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, dateBaselineY);
         ctx.textAlign = 'left';
-        listRowY += DATE_ROW_H + Math.max(1, labelLines.length) * LABEL_ROW_H;
+        listRowY += getListRowHeight({ labelLines });
       });
     }
 
@@ -2811,9 +2840,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             handleTitle: '드래그하여 지출 항목 높이 조절',
             handleAriaLabel: '지출 항목 목록 높이 조절'
           },
-            monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
-              : monthlyExpenses.map(item => {
-                const isChecked = !!checkedItems[item.itemKey];
+            selectableMonthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } },
+              monthlyExpenses.length === 0 ? '해당 월에 등록된 내역이 없습니다.' : '모든 지출 항목이 다른 정산에 포함되어 있습니다.'
+            )
+              : selectableMonthlyExpenses.map(item => {
+                const isChecked = !!selectedCheckedItems[item.itemKey];
+                const payerBadge = payerBadgeForItem(item);
                 return React.createElement('label', {
                   key: item.itemKey,
                   className: `settlement-expense-option${isChecked ? ' is-checked' : ''}`
@@ -2826,7 +2858,15 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                     className: 'settlement-expense-checkbox'
                   }),
                   React.createElement('span', { className: 'settlement-expense-option-copy' },
-                    React.createElement('span', { className: 'settlement-expense-option-date' }, formatShortDateWithDay(item.date)),
+                    React.createElement('span', { className: 'settlement-expense-option-meta' },
+                      React.createElement('span', { className: 'settlement-expense-option-date' }, formatShortDateWithDay(item.date)),
+                      payerBadge && React.createElement('span', {
+                        className: 'settlement-expense-option-payer',
+                        title: `${payerBadge.name} 지출`,
+                        'aria-label': `${payerBadge.name} 지출`,
+                        style: { backgroundColor: payerBadge.color }
+                      }, payerBadge.name)
+                    ),
                     React.createElement('span', { className: 'settlement-expense-option-label' }, item.label || '지출 내역')
                   ),
                   React.createElement('strong', { className: `settlement-expense-option-amount${item.isIncome ? ' is-income' : ''}` },
@@ -2834,7 +2874,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   )
                 );
               })
-          )
+          ),
+          excludedMonthlyExpenseCount > 0 && React.createElement('p', {
+            className: 'settlement-expense-option-reservation-note'
+          }, `다른 정산에 이미 포함된 지출 ${excludedMonthlyExpenseCount}건은 목록에서 제외했습니다.`)
         ),
         /* Personal Expense Editor Block */
         React.createElement('div', {
@@ -3058,22 +3101,25 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         depositorName && React.createElement('div', { style: { marginTop: '3px', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, `예금주: ${depositorName}`)
       ),
       React.createElement('div', { style: { padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
-        React.createElement('div', { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, `정산목록 (${Object.keys(checkedItems).length}건)`),
-        Object.values(checkedItems).length === 0
+        React.createElement('div', { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, `정산목록 (${Object.keys(selectedCheckedItems).length}건)`),
+        Object.values(selectedCheckedItems).length === 0
           ? React.createElement('div', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, '선택된 지출 항목이 없습니다.')
-          : Object.values(checkedItems).map((item, index) => {
+          : Object.values(selectedCheckedItems).map((item, index) => {
             const payerBadge = payerBadgeForItem(item);
-            return React.createElement('div', { key: item.itemKey || index, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: 'var(--font-size-md)' } },
-              React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0, overflowWrap: 'anywhere' } },
-                React.createElement('span', null, formatShortDateWithDay(item.date)),
-                payerBadge && React.createElement('span', {
-                  title: `${payerBadge.name} 결제`,
-                  'aria-label': `${payerBadge.name} 결제`,
-                  style: { width: '18px', height: '18px', minWidth: '18px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: payerBadge.color, color: '#FFFFFF', fontSize: '12px', fontWeight: 800, lineHeight: 1 }
-                }, payerBadge.initial),
-                React.createElement('span', null, item.label || '정산 항목')
+            return React.createElement('div', { key: item.itemKey || index, className: 'settlement-card-preview-expense-row' },
+              React.createElement('div', { className: 'settlement-card-preview-expense-copy' },
+                React.createElement('div', { className: 'settlement-card-preview-expense-meta' },
+                  React.createElement('span', { className: 'settlement-card-preview-expense-date' }, formatShortDateWithDay(item.date)),
+                  payerBadge && React.createElement('span', {
+                    title: `${payerBadge.name} 결제`,
+                    'aria-label': `${payerBadge.name} 결제`,
+                    className: 'settlement-card-preview-expense-payer',
+                    style: { background: payerBadge.color }
+                  }, payerBadge.initial)
+                ),
+                React.createElement('span', { className: 'settlement-card-preview-expense-label' }, item.label || '정산 항목')
               ),
-              React.createElement('strong', { style: { color: '#DC2626', whiteSpace: 'nowrap' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
+              React.createElement('strong', { className: 'settlement-card-preview-expense-amount' }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
             );
           })
       ),

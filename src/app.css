@@ -4012,8 +4012,8 @@ select.form-select {
 }
 .settlement-expense-option {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 20px minmax(0, 1fr) max-content;
+  align-items: center;
   gap: 8px;
   padding: 8px 8px 8px 4px;
   border-radius: 8px;
@@ -4032,15 +4032,38 @@ select.form-select {
   cursor: pointer;
 }
 .settlement-expense-option-copy {
+  grid-column: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
+.settlement-expense-option-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .settlement-expense-option-date {
   color: var(--text-muted);
   font-weight: 600;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.settlement-expense-option-payer {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 9rem;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  color: #FFFFFF;
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .settlement-expense-option-label {
   color: var(--text-main);
@@ -4048,16 +4071,69 @@ select.form-select {
   overflow-wrap: anywhere;
 }
 .settlement-expense-option-amount {
-  grid-column: 2;
-  justify-self: start;
-  align-self: start;
+  grid-column: 3;
+  grid-row: 1 / -1;
+  justify-self: end;
+  align-self: center;
   color: #DC2626;
   font-weight: 800;
   white-space: nowrap;
-  transform: translateY(-6px);
 }
 .settlement-expense-option-amount.is-income {
   color: var(--status-green);
+}
+.settlement-expense-option-reservation-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+.settlement-card-preview-expense-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--font-size-md);
+}
+.settlement-card-preview-expense-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.settlement-card-preview-expense-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.settlement-card-preview-expense-date {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.settlement-card-preview-expense-payer {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+.settlement-card-preview-expense-label {
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+.settlement-card-preview-expense-amount {
+  color: #DC2626;
+  white-space: nowrap;
 }
 /* Shared drag handle docked below any list that resizes independently of the modal it sits in
    (see ResizableListSection in ui-shared.js) -- used by the settlement expense list, the date
@@ -4119,8 +4195,8 @@ select.form-select {
     display: none;
   }
   .settlement-expense-option {
-    grid-template-columns: 20px minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: 20px minmax(0, 1fr) max-content;
+    align-items: center;
   }
   .settlement-expense-option-amount {
     font-size: 0.76rem;
@@ -8458,4 +8534,3 @@ body .modal-overlay.weather-detail-modal-overlay .weather-hourly-timeline::-webk
   width: 0 !important;
   height: 0 !important;
 }
-

@@ -26,6 +26,7 @@ import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap } from './photo-geo.js';
 import { sharesAsset, syncAssetTagsInMeetings } from './media-reference-integrity.js';
 import { buildSettlementDraftFromMeeting } from './settlement-draft.js';
+import { getReservedSettlementItemKeys } from './settlement-card-selection.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -4897,12 +4898,30 @@ function CalendarApp() {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 카드를 저장해 주세요.')) return false;
     const now = Date.now();
     const existingCards = getCalendarSettlementCards(activeCal);
-    const idx = existingCards.findIndex(item => item.id === cardData?.id);
+    // Recheck right before persisting. The picker normally hides reserved items, but another
+    // device can create a card while this editor is open; never let that stale form restore a
+    // duplicate expense into the calendar state.
+    const reservedItemKeys = getReservedSettlementItemKeys(existingCards, cardData?.id);
+    const requestedItemKeys = Array.isArray(cardData?.checkedItemKeys)
+      ? cardData.checkedItemKeys
+      : Object.keys(cardData?.checkedItems || {});
+    const seenItemKeys = new Set();
+    const checkedItemKeys = requestedItemKeys.map(key => String(key || '').trim()).filter(key => {
+      if (!key || reservedItemKeys.has(key) || seenItemKeys.has(key)) return false;
+      seenItemKeys.add(key);
+      return true;
+    });
+    const removedDuplicateCount = requestedItemKeys.length - checkedItemKeys.length;
+    const cleanCardData = { ...cardData, checkedItemKeys };
+    if (removedDuplicateCount > 0) {
+      showToast(`다른 정산에 이미 포함된 지출 ${removedDuplicateCount}건은 제외하고 저장했습니다.`, 'warning');
+    }
+    const idx = existingCards.findIndex(item => item.id === cleanCardData?.id);
     let nextCards;
     if (idx >= 0) {
-      nextCards = existingCards.map((item, i) => i === idx ? { ...item, ...cardData, updatedAt: now } : item);
+      nextCards = existingCards.map((item, i) => i === idx ? { ...item, ...cleanCardData, updatedAt: now } : item);
     } else {
-      nextCards = [{ ...cardData, updatedAt: now, createdAt: cardData.createdAt || now }, ...existingCards];
+      nextCards = [{ ...cleanCardData, updatedAt: now, createdAt: cleanCardData.createdAt || now }, ...existingCards];
     }
     const updatedCal = {
       ...activeCal,
