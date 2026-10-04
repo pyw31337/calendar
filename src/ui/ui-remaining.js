@@ -708,7 +708,8 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               key: w, style: { textAlign: 'center', fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--text-muted)' }
             }, w))
           ),
-          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '14px' } },
+          // 연일 모드는 가로 간격 0: 시작일~종료일 칸이 끊김 없이 이어져 하나의 캡슐로 보인다.
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', columnGap: rangeMode ? 0 : '4px', rowGap: '4px', marginBottom: '14px' } },
             Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
             Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -719,21 +720,32 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               const isRangeEndpoint = isStart || isEnd;
               const isInRange = rangeMode && localRangeStart && localRangeEnd && dateStr > localRangeStart && dateStr < localRangeEnd;
               const isSelected = rangeMode ? isRangeEndpoint : pDay === day;
-              // 시작일/종료일 두 칸이 하나의 구간 막대처럼 보이도록, 시작일은 좌측만, 종료일은
-              // 우측만 둥글게 -- 하루만 선택된 경우(시작=종료)에는 기존처럼 네 모서리 다 둥글게.
-              const rangeRadius = isStart && isEnd
-                ? 'var(--radius-sm)'
-                : isStart ? 'var(--radius-sm) 0 0 var(--radius-sm)'
-                : isEnd ? '0 var(--radius-sm) var(--radius-sm) 0'
-                : isInRange ? '0' : 'var(--radius-sm)';
+              // 연일: 시작일~종료일을 하나의 큰 캡슐로 -- 시작일은 좌측 위/아래만, 종료일은 우측
+              // 위/아래만 완전히 둥글고, 사이 날짜는 네 모서리 모두 직각. 테두리도 바깥쪽만 그려
+              // 칸 사이에 선이 생기지 않는다. 하루만 고른 경우(시작=종료, 종료 미선택)는 동그란 캡슐.
+              const PILL = '999px';
+              const hasEnd = !!localRangeEnd && localRangeEnd !== localRangeStart;
+              const inBand = rangeMode && (isRangeEndpoint || isInRange);
+              const bandBorder = '2px solid var(--accent-primary)';
+              const rangeStyle = !inBand ? null : (isStart && (!hasEnd || isEnd))
+                ? { borderRadius: PILL, border: bandBorder }
+                : isStart
+                  ? { borderRadius: `${PILL} 0 0 ${PILL}`, border: bandBorder, borderRight: 'none' }
+                  : isEnd
+                    ? { borderRadius: `0 ${PILL} ${PILL} 0`, border: bandBorder, borderLeft: 'none' }
+                    : { borderRadius: 0, border: bandBorder, borderLeft: 'none', borderRight: 'none' };
               return /*#__PURE__*/React.createElement('button', {
                 key: day, type: 'button', onClick: () => handleDayClick(day),
                 style: {
-                  padding: '6px 0', borderRadius: rangeMode ? rangeRadius : 'var(--radius-sm)',
-                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
-                  background: isSelected ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : (isInRange ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.06)' : 'transparent'),
+                  padding: '6px 0',
+                  borderRadius: 'var(--radius-sm)',
+                  border: isSelected ? '2px solid var(--accent-primary)' : (rangeMode ? '2px solid transparent' : '1px solid transparent'),
+                  background: inBand
+                    ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.12)'
+                    : (isSelected ? 'rgb(var(--a-brand-rgb, 99 102 241) / 0.15)' : 'transparent'),
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
-                  fontWeight: isSelected ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
+                  fontWeight: isSelected ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer',
+                  ...(rangeStyle || {})
                 }
               }, day);
             })
