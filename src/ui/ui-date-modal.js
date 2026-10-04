@@ -1936,6 +1936,90 @@ export function DateModal({
     document.addEventListener('pointercancel', attendanceDragHandlersRef.current.onCancel);
   };
 
+  // 장소 drag-to-reorder: the same pointer sort as 참석/정산 above. The handle used HTML5
+  // drag-and-drop, which never starts from a touch screen and needs dataTransfer data in
+  // Firefox/Safari, so the button did nothing for most people.
+  const placePointerSortRef = React.useRef({ sourceId: '', targetId: '', startY: 0, active: false });
+  const placeDragHandlersRef = React.useRef({});
+  // The click that ends a drag lands on a row; it must not open that row's editor.
+  const placeDragEndedAtRef = React.useRef(0);
+  const placeRowOf = id => (id ? document.querySelector(`.date-modal-place-row[data-place-id="${String(id).replace(/"/g, '')}"]`) : null);
+  const clearPlaceRowStyles = (sourceId, targetId) => {
+    const row = placeRowOf(sourceId);
+    if (row) ['zIndex', 'boxShadow', 'transform', 'transition', 'pointerEvents', 'opacity'].forEach(key => { row.style[key] = ''; });
+    const target = placeRowOf(targetId);
+    if (target) target.style.borderColor = '';
+  };
+  const stopPlaceListeners = () => {
+    const h = placeDragHandlersRef.current;
+    document.removeEventListener('pointermove', h.onMove);
+    document.removeEventListener('pointerup', h.onUp);
+    document.removeEventListener('pointercancel', h.onCancel);
+  };
+  React.useEffect(() => () => { if (placePointerSortRef.current.active) stopPlaceListeners(); }, []);
+  placeDragHandlersRef.current.onMove = e => {
+    const ref = placePointerSortRef.current;
+    if (!ref.active) return;
+    if (e.cancelable) e.preventDefault();
+    const row = placeRowOf(ref.sourceId);
+    if (row) row.style.transform = `translateY(${e.clientY - ref.startY}px) scale(1.02)`;
+    let nextTargetId = '';
+    for (const r of document.querySelectorAll('.date-modal-places-list .date-modal-place-row')) {
+      const id = r.getAttribute('data-place-id');
+      if (!id || id === ref.sourceId) continue;
+      const rect = r.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) { nextTargetId = id; break; }
+    }
+    if (nextTargetId !== ref.targetId) {
+      const prev = placeRowOf(ref.targetId);
+      if (prev) prev.style.borderColor = '';
+      ref.targetId = nextTargetId;
+      const next = placeRowOf(nextTargetId);
+      if (next) next.style.borderColor = 'var(--accent-primary)';
+      setDragOverPlaceId(nextTargetId);
+    }
+  };
+  placeDragHandlersRef.current.onUp = async () => {
+    const ref = placePointerSortRef.current;
+    if (!ref.active) return;
+    const { sourceId, targetId } = ref;
+    placeDragEndedAtRef.current = Date.now();
+    stopPlaceListeners();
+    clearPlaceRowStyles(sourceId, targetId);
+    placePointerSortRef.current = { sourceId: '', targetId: '', startY: 0, active: false };
+    setDraggingPlaceId('');
+    setDragOverPlaceId('');
+    if (sourceId && targetId && sourceId !== targetId) {
+      const ok = await movePlace(sourceId, targetId);
+      if (ok === false) showToast('장소 순서 변경에 실패했습니다.', 'error');
+      else showToast('장소 순서가 변경되었습니다.', 'success');
+    }
+  };
+  placeDragHandlersRef.current.onCancel = () => {
+    const { sourceId, targetId } = placePointerSortRef.current;
+    stopPlaceListeners();
+    clearPlaceRowStyles(sourceId, targetId);
+    placePointerSortRef.current = { sourceId: '', targetId: '', startY: 0, active: false };
+    setDraggingPlaceId('');
+    setDragOverPlaceId('');
+  };
+  const beginPlacePointerSort = (e, placeId) => {
+    if (registeredPlaces.length <= 1) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const row = e.currentTarget.closest('.date-modal-place-row');
+    if (!row) return;
+    Object.assign(row.style, { zIndex: '1000', boxShadow: '0 8px 20px rgba(0,0,0,0.12)', transform: 'scale(1.02)', transition: 'none', pointerEvents: 'none', opacity: '0.92' });
+    placePointerSortRef.current = { sourceId: placeId, targetId: '', startY: e.clientY, active: true };
+    setDraggingPlaceId(placeId);
+    setDragOverPlaceId('');
+    const h = placeDragHandlersRef.current;
+    document.addEventListener('pointermove', h.onMove, { passive: false });
+    document.addEventListener('pointerup', h.onUp);
+    document.addEventListener('pointercancel', h.onCancel);
+  };
+
   // Close-confirm only when form differs from last committed baseline.
   // Baseline: mount (real defaults), edit-load, successful save.
   const formBaselineRef = React.useRef(null);
@@ -2881,24 +2965,13 @@ export function DateModal({
               position: 'relative',
               cursor: !adminMode ? 'pointer' : undefined
             },
-            onClick: !adminMode ? () => beginEditLinkedPlace(place) : undefined,
+            onClick: !adminMode ? () => { if (Date.now() - placeDragEndedAtRef.current < 400) return; beginEditLinkedPlace(place); } : undefined,
             onKeyDown: !adminMode ? event => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 beginEditLinkedPlace(place);
               }
             } : undefined,
-            onDragOver: event => { event.preventDefault(); if (draggingPlaceId && draggingPlaceId !== place.id) setDragOverPlaceId(place.id); },
-            onDrop: async event => {
-              event.preventDefault();
-              const sourceId = draggingPlaceId;
-              setDraggingPlaceId(''); setDragOverPlaceId('');
-              if (sourceId && sourceId !== place.id) {
-                const ok = await movePlace(sourceId, place.id);
-                if (ok === false) showToast('장소 순서 변경에 실패했습니다.', 'error');
-                else showToast('장소 순서가 변경되었습니다.', 'success');
-              }
-            }
           },
             /* Category Tag */
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
@@ -2929,15 +3002,10 @@ export function DateModal({
             }, /*#__PURE__*/React.createElement("button", {
               type: 'button',
               className: 'poll-drag-handle',
-              draggable: true,
               title: '드래그하여 순서 변경',
               'aria-label': '장소 순서 변경',
               onClick: event => { event.preventDefault(); event.stopPropagation(); },
-              onDragStart: event => { event.stopPropagation(); setDraggingPlaceId(place.id); event.dataTransfer.effectAllowed = 'move'; },
-              onDragEnd: () => { setDraggingPlaceId(''); setDragOverPlaceId(''); },
-              // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
-              // while touch users can still reorder through the same control on browsers that
-              // promote draggable elements to a native long-press drag gesture.
+              onPointerDown: event => beginPlacePointerSort(event, place.id),
               style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
             }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               showEdit: false,
