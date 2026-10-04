@@ -64,16 +64,6 @@ import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem, resolveDai
 // Home gallery: 12 photos per page -- 4x3 on PC, 6x2 at mid widths, 3x4 on phones (dest-chrome-late.css).
 const HOME_GALLERY_PAGE_SIZE = 12;
 
-/** Legacy 5-tab labels kept for PlaceholderPane; primary IA is V2_PRIMARY side-nav. */
-const TABS = [
-  { id: 'calendar', label: '캘린더' },
-  { id: 'chat', label: '대화' },
-  { id: 'memo', label: '메모' },
-  { id: 'places', label: '장소' },
-  { id: 'records', label: '기록' },
-  { id: 'settlement', label: '정산' },
-  { id: 'more', label: '더보기' },
-];
 const BENTO_MAIN_ITEMS = V2_PRIMARY;
 const BENTO_SUB_ITEMS = V2_SECONDARY;
 const TAB_IDS = V2_DESTINATION_TABS;
@@ -2731,21 +2721,6 @@ function prefetchDestinationUi() {
   else setTimeout(run, 200);
 }
 
-/** Builds EmptyState's subtitle: "<캘린더명> · <설명>" once a calendar is loaded, else just <설명>. */
-function withCalendarPrefix(calendarName, text) {
-  return calendarName ? `${calendarName} · ${text}` : text;
-}
-
-function PlaceholderPane({ tabId, calendarName }) {
-  const React = window.React;
-  const label = TABS.find(t => t.id === tabId)?.label || tabId;
-  return React.createElement(EmptyState, {
-    icon: React.createElement(TabIcon, { id: tabId }),
-    title: `${label} (준비 중)`,
-    subtitle: withCalendarPrefix(calendarName, '이 기능은 준비가 끝나는 대로 이 화면에서 제공됩니다.'),
-  });
-}
-
 /** 기록 > 전체 is not a destination. Bare ?tab=records / sub=all is rewritten to the calendar. */
 
 /**
@@ -3177,7 +3152,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
  * `ChatPane`/`SettlementPane`. `MemoView` ships in its own lazy-loaded chunk
  * (`window.__gatherLoadViewUi('memo')`), so this waits for that chunk before rendering.
  */
-function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
+function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions, editorOnly = false, initialEditingMemo = null, onEditorClosed = null }) {
   const React = window.React;
   const loaded = useLazyUi(
     'memo',
@@ -3185,20 +3160,34 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideN
     () => window.__gatherLoadViewUi?.('memo'),
     () => recordsContext.showToast?.('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
-  if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'memo' });
+  if (!loaded) {
+    if (!editorOnly) return React.createElement(DestinationLoadingSurface, { shape: 'memo' });
+    return React.createElement('div', {
+      className: 'modal-overlay home-memo-editor-loading-overlay',
+      role: 'status',
+      'aria-live': 'polite',
+    }, React.createElement('div', { className: 'modal-container home-memo-editor-loading-card' }, '메모 편집기를 여는 중...'));
+  }
   const { MemoView, ShareModal } = bindUiComponentAliases(React);
   if (typeof MemoView !== 'function') {
     return React.createElement(EmptyState, { title: '메모 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
   }
+  const memoView = React.createElement(MemoView, {
+    ...recordsContext.memoProps,
+    // editorOnly keeps the home page behind the complete existing memo editor instead of
+    // mounting a second, incomplete form or creating a memo-page history entry.
+    renderV2: editorOnly ? () => null : (props) => renderMemoScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
+    editorOnly,
+    initialEditingMemo,
+    onEditorClosed,
+    onBack: editorOnly ? onEditorClosed : () => onChangeView('calendar'),
+    onOpenShare: recordsContext.onOpenMemoShare,
+    onOpenAppSettings,
+    onRegisterMenuActions,
+  });
+  if (editorOnly) return memoView;
   return React.createElement(React.Fragment, null,
-    React.createElement(MemoView, {
-      ...recordsContext.memoProps,
-      renderV2: (props) => renderMemoScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
-      onBack: () => onChangeView('calendar'),
-      onOpenShare: recordsContext.onOpenMemoShare,
-      onOpenAppSettings,
-      onRegisterMenuActions,
-    }),
+    memoView,
 
     recordsContext.isMemoShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'memo', showToast: recordsContext.showToast,
@@ -3746,7 +3735,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     mediaProps: { ...recordsContext?.mediaProps, setActiveLightbox: openV2Lightbox },
     memoProps: {
       ...recordsContext?.memoProps,
-      sharedMemo: homeFocusedMemo || recordsContext?.memoProps?.sharedMemo || null,
+      sharedMemo: homeFocusedMemo?._editOnHome ? (recordsContext?.memoProps?.sharedMemo || null) : (homeFocusedMemo || recordsContext?.memoProps?.sharedMemo || null),
       onDismissSharedMemo: () => {
         setHomeFocusedMemo(null);
         recordsContext?.memoProps?.onDismissSharedMemo?.();
@@ -4412,7 +4401,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
@@ -4427,7 +4416,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab) })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem, onOpenSideNav: () => setIsSideNavOpen(true) })
-          : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
+          : null,
 
         dateModalDate && React.createElement(SharedDateModal, {
           calendarContext: v2CalendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : dateModalTab,
@@ -4454,6 +4443,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     React.createElement(MoreModalsHost, {
       openModal: openMoreModal, onClose: () => setOpenMoreModal(null),
       modalProps: v2MoreContext.modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra,
+    }),
+    homeFocusedMemo?._editOnHome && React.createElement(MemoPane, {
+      recordsContext: v2RecordsContext,
+      editorOnly: true,
+      initialEditingMemo: homeFocusedMemo,
+      onEditorClosed: () => setHomeFocusedMemo(null),
     }),
     activeV2Lightbox && React.createElement(V2Lightbox, {
       urls: activeV2Lightbox.urls,

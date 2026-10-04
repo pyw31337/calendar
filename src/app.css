@@ -5272,6 +5272,9 @@ select.form-select {
   min-height: 0;
 }
 .memo-edit-modal-body {
+  /* Keep the natural content height on ordinary desktop/mobile viewports. The keyboard
+     override below intentionally switches this to the remaining-space region only when
+     the visual viewport has been reduced. */
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -5332,6 +5335,30 @@ select.form-select {
   .memo-edit-textarea {
     max-height: min(38svh, 360px) !important;
   }
+}
+
+/* A keyboard changes the visual viewport, not the layout viewport.  Without a definite
+   modal height the flexible body is allowed to shrink away while the tag/footer controls
+   retain their intrinsic height, leaving only the first line of an existing memo visible.
+   Use the already-synchronised visual-viewport token so the header, body and footer divide
+   the *visible* area.  The body remains independently scrollable for very long memos. */
+html[data-v2-keyboard] .memo-edit-modal-container {
+  height: min(
+    var(--gather-vv-modal-max, 780px),
+    calc(var(--app-vv-height, 100dvh) - 20px)
+  ) !important;
+  max-height: min(
+    var(--gather-vv-modal-max, 780px),
+    calc(var(--app-vv-height, 100dvh) - 20px)
+  ) !important;
+}
+html[data-v2-keyboard] .memo-edit-modal-body {
+  flex: 1 1 0 !important;
+  min-height: 116px;
+}
+html[data-v2-keyboard] .memo-edit-textarea {
+  min-height: 116px !important;
+  max-height: clamp(116px, calc(var(--app-vv-height, 100dvh) - 260px), 360px) !important;
 }
 
 /* Admin log/list rows (chat log, activity timeline, poll list): left content + right
