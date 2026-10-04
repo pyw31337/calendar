@@ -5765,6 +5765,14 @@ html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
     overflow: visible !important;
     z-index: 3 !important;
   }
+  /* A spanning title is painted from its first day cell.  The following day
+     cells are later grid siblings, so their background could otherwise paint
+     over the label even though the range itself has the correct width.  Raise
+     the owning cell as well as the bar to keep one uninterrupted title across
+     the whole weekly segment (for example 10/9–10/10). */
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell:has(.bp-ann-range.bp-label-spans) {
+    z-index: 4 !important;
+  }
   /* Cells abut (no column gap): cell width = segment width + its left inset - 1px (the right
      inset every continuing segment has), and the bar ends --ann-rend short of the last cell. */
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-label-spans > .bp-day-anniversary-label {
