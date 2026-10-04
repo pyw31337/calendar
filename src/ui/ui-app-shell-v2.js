@@ -2397,7 +2397,7 @@ function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, se
     onParticipantClick: (name, dateStr) => { if (dateStr) onSelectDate(dateStr); },
     onEditAnniversary,
     onAddAnniversaryForDate: (d) => { onClose(); onAddAnniversaryForDate(d); },
-    onFocusCultureSource: () => onFocusCultureSource(),
+    onFocusCultureSource: (ann) => onFocusCultureSource(ann),
   });
 }
 
@@ -3108,7 +3108,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
       onParticipantClick: (name, dateStr) => { if (dateStr) setHistoryDateModalDate(dateStr); },
       onEditAnniversary,
       onAddAnniversaryForDate: (d) => { setHistoryDateModalDate(null); onAddAnniversaryForDate(d); },
-      onFocusCultureSource: () => onFocusCultureSource(),
+      onFocusCultureSource: (ann) => onFocusCultureSource(ann),
     })
   );
 }
@@ -3167,7 +3167,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
       onParticipantClick,
       onEditAnniversary,
       onAddAnniversaryForDate: (d) => { setPlaceDateModalDate(null); onAddAnniversaryForDate(d); },
-      onFocusCultureSource: () => onFocusCultureSource(),
+      onFocusCultureSource: (ann) => onFocusCultureSource(ann),
     })
   );
 }
@@ -3520,7 +3520,7 @@ function SearchDateModal({ calendarContext, dateStr, onClose, onEditAnniversary,
     dateStr, initialTab: null, shellChrome: 'bento', onClose,
     onParticipantClick: () => {},
     onEditAnniversary, onAddAnniversaryForDate,
-    onFocusCultureSource: () => onFocusCultureSource(),
+    onFocusCultureSource: (ann) => onFocusCultureSource(ann),
   });
 }
 
@@ -3944,15 +3944,26 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     if (!dateStr) return;
     openAnniversariesWith({ initialEditId: null, initialDate: dateStr });
   };
-  // 컨텐츠 원본(지역축제/문화행사 등) 포커스는 아직 실제 컨텐츠 화면이 없어(WP-06), 기록 탭의
-  // 콘텐츠 서브탭으로만 이동시킨다 -- 특정 항목을 펼쳐서 보여주는 것은 그 화면이 실제로
-  // 연결될 때 함께 다룬다.
-  const onFocusCultureSource = () => {
+  // 기념일 제목(컨텐츠에서 등록한 축제·공연·스포츠·영화) -> 컨텐츠 페이지의 그 항목 상세 팝업.
+  // 통합검색의 onOpenContent와 같은 약속(localStorage의 focus id/title/tab)을 쓰고, 날짜 팝업은
+  // 닫는다. 이미 컨텐츠 페이지가 떠 있으면 'gather-content-focus' 이벤트로 바로 연다.
+  const CULTURE_CATEGORY_TAB = { festival: 'festival', event: 'culture', sports: 'sports', movie: 'movies' };
+  const onFocusCultureSource = (ann) => {
+    const tab = CULTURE_CATEGORY_TAB[ann?.category] || 'festival';
+    try {
+      const id = ann?.cultureSourceId || ann?.id;
+      if (id) localStorage.setItem('gather_content_focus_item_id', String(id));
+      else localStorage.removeItem('gather_content_focus_item_id');
+      if (ann?.title) localStorage.setItem('gather_content_focus_title', String(ann.title));
+      localStorage.setItem('gather_content_tab', tab);
+    } catch (_) { /* ignore */ }
+    setDateModalDate(null);
     navigateV2Destination('content', {
       push: true,
       setTab: setActiveTabState,
       setSub: setRecordsSubTabState,
     });
+    try { window.dispatchEvent(new CustomEvent('gather-content-focus')); } catch (_) { /* ignore */ }
   };
 
   // ChatRoomView's internal side menu (ChatSideMenu) calls this the same way app-main.js's own

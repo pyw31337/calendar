@@ -5808,6 +5808,19 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
 html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell {
   min-height: 0 !important;
   gap: 2px !important;
+  justify-content: flex-start !important;
+}
+/* Even weeks: a week with no pill or bar used to collapse to the date line (25px) next to
+   60px weeks. Every row now gets the height of a date + one pill/bar line + the dot row;
+   taller content (stacked bars) still grows its own row. The cell floor stays 0 above, so
+   pills keep sitting right under the date. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid {
+  grid-auto-rows: minmax(62px, auto) !important;
+}
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid {
+    grid-auto-rows: minmax(58px, auto) !important;
+  }
 }
 html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-bar-stack {
   margin-top: 2px !important;
