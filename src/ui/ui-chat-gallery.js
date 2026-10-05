@@ -1574,6 +1574,7 @@ export function ChatGalleryModal({
   const handleConfirmPastePreview = async () => {
     if (!pastePreview) return;
     const files = pastePreview.files;
+    files.forEach(file => { try { file.intakeSource = 'paste'; } catch (_) {} });
     setPastePreview(null);
     const ok = await uploadFiles(files);
     if (ok) setActiveTab('photos');
@@ -1857,6 +1858,7 @@ export function ChatGalleryModal({
     const api = (typeof window !== 'undefined' && window.GATHER_CHAT_FILE_ATTACHMENTS) || {};
     const classify = api.classifyChatComposerFiles;
     if (typeof classify !== 'function') {
+      files.forEach(file => { try { file.intakeSource = 'clip'; } catch (_) {} });
       const ok = await uploadFiles(files);
       if (ok) setActiveTab('photos');
       return;
@@ -1875,7 +1877,10 @@ export function ChatGalleryModal({
     setIsMenuOpen(false);
     let imageOk = false;
     let fileOk = false;
-    if (images.length) imageOk = await uploadFiles(images);
+    if (images.length) {
+      images.forEach(file => { try { file.intakeSource = 'clip'; } catch (_) {} });
+      imageOk = await uploadFiles(images);
+    }
     if (documents.length && typeof api.uploadChatFileAttachments === 'function' && calendar && calendar.id && typeof onAddFiles === 'function') {
       try {
         const ready = await api.uploadChatFileAttachments(calendar.id, documents);

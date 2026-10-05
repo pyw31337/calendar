@@ -1983,6 +1983,12 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
   const restMethod = method === 'add' ? 'set' : method;
   const restDocId = method === 'add' ? addDocumentId : docId;
   const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths, remainingWriteTime(), { merge: Boolean(options?.merge) });
+  if (!restResult?.success && data && typeof data === 'object' && data.imageIntake && isFirestoreRulesRejection(sdkError)) {
+    const withoutIntake = { ...data };
+    delete withoutIntake.imageIntake;
+    console.warn(`${warnLabel}: Firestore rules rejected imageIntake; saving the photo without that note`);
+    return writeCollectionDocumentWithFallback(collectionName, calId, docId, withoutIntake, method, warnLabel, options);
+  }
   if (restResult?.success || options?.skipQueue || !shouldQueueCollectionWrite(restResult?.error || null, sdkError)) {
     return restResult?.success ? restResult : false;
   }
@@ -2008,6 +2014,13 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
     return { success: false, queued: true, id: restDocId || operationId, transport: 'queue' };
   }
   return queued ? { success: true, queued: true, id: restDocId || operationId, transport: 'queue' } : restResult;
+}
+
+
+function isFirestoreRulesRejection(err) {
+  const code = String(err?.code || '');
+  const message = String(err?.message || '');
+  return code === 'permission-denied' || /permission-denied|insufficient permissions/i.test(message);
 }
 
 function shouldQueueCollectionWrite(...errors) {

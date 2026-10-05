@@ -9,6 +9,7 @@ import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { bindAppServiceWorker } from './service-worker-registration.js';
 import { normalizePushChannelPreferences } from './push-channel-preferences.js';
+import { sanitizeImageIntakeList } from './upload-intake.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -602,10 +603,12 @@ function sanitizeMessageForFirestore(messageData) {
     const thumbs = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
     const tags = Array.isArray(out.imageTags) ? out.imageTags : null;
     const fingerprints = Array.isArray(out.imageFingerprints) ? out.imageFingerprints : null;
+    const intake = Array.isArray(out.imageIntake) ? out.imageIntake : null;
     const nextUrls = [];
     const nextThumbs = [];
     const nextTags = tags ? [] : null;
     const nextFingerprints = fingerprints ? [] : null;
+    const nextIntake = intake ? [] : null;
     const slots = Math.max(urls.length, thumbs.length);
     for (let index = 0; index < slots; index += 1) {
       if (tooBig(urls[index]) || tooBig(thumbs[index])) continue;
@@ -613,6 +616,7 @@ function sanitizeMessageForFirestore(messageData) {
       if (Array.isArray(out.thumbUrls)) nextThumbs.push(thumbs[index]);
       if (nextTags) nextTags.push(tags[index] || '');
       if (nextFingerprints) nextFingerprints.push(fingerprints[index] || '');
+      if (nextIntake) nextIntake.push(intake[index] || { source: 'other', client: 'other', name: '', mime: '' });
     }
     if (Array.isArray(out.imageUrls)) {
       out.imageUrls = nextUrls;
@@ -624,6 +628,13 @@ function sanitizeMessageForFirestore(messageData) {
     }
     if (nextTags) out.imageTags = nextTags;
     if (nextFingerprints) out.imageFingerprints = nextFingerprints;
+    if (nextIntake) {
+      out.imageIntake = sanitizeImageIntakeList(nextIntake);
+      if (!out.imageIntake.length) delete out.imageIntake;
+    }
+  } else if (Array.isArray(out.imageIntake)) {
+    out.imageIntake = sanitizeImageIntakeList(out.imageIntake);
+    if (!out.imageIntake.length) delete out.imageIntake;
   }
   if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
     out.imageTagMap = reconcileMessageImageTagMap(out, normalizeImageTagMap(out.imageTagMap));

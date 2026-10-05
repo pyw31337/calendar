@@ -3280,7 +3280,8 @@ export function EditMessageModal({
         currentCount: images.length,
         setImageProcessing: setImageProcessingEdit,
         setChatImages: setImages,
-        showToast
+        showToast,
+        intakeSource: 'paste'
       });
     } catch (err) {
       console.error('handlePasteImagesEdit unexpected error:', err);
@@ -3299,7 +3300,8 @@ export function EditMessageModal({
         currentCount: images.length,
         setImageProcessing: setImageProcessingEdit,
         setChatImages: setImages,
-        showToast
+        showToast,
+        intakeSource: 'paste'
       });
     } catch (err) {
       console.error('handleClickPasteImagesEdit unexpected error:', err);
