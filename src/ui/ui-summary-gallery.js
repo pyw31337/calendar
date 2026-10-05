@@ -6724,7 +6724,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
             /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              className: "culture-card-meta",
+              title: isMovieCard
+                ? `개봉일 ${formatDateWithDayName(item.releaseDate || item.startDate) || CULTURE_MISSING_LABEL}`
+                : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, isMovieCard
               ? `개봉일 ${formatDateWithDayName(item.releaseDate || item.startDate) || CULTURE_MISSING_LABEL}`
               : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL)),
@@ -6733,10 +6737,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             }, highlightKeyword(item.title, searchQuery)),
             isMovieCard ? /*#__PURE__*/React.createElement(React.Fragment, null,
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                className: "culture-card-meta",
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
               }, highlightKeyword(item.ageRating || '등급 정보 없음', searchQuery)),
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                className: "culture-card-meta",
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
               }, highlightKeyword(`[${item.director || '감독 정보 없음'}] ${Array.isArray(item.cast) && item.cast.length ? item.cast.join(', ') : '출연 정보 없음'}`, searchQuery))
             ) : /*#__PURE__*/React.createElement(React.Fragment, null,
             // 지역축제는 '장소'와 '주소'가 사실상 같은 정보를 가리키는 경우가 대부분이라
@@ -6744,10 +6750,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // 생략하고 주소만 보여준다. 문화공연(anniversaryCategory 'event')은 공연장 이름이
             // 주소만으로는 알 수 없는 별도 정보라 계속 둘 다 보여준다.
             anniversaryCategory !== 'festival' && anniversaryCategory !== 'movie' && /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              className: "culture-card-meta",
+              title: item.venue || CULTURE_MISSING_LABEL,
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, highlightKeyword(item.venue || CULTURE_MISSING_LABEL, searchQuery)),
             /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              className: "culture-card-meta",
+              title: item.address || CULTURE_MISSING_LABEL,
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, highlightKeyword(item.address || CULTURE_MISSING_LABEL, searchQuery)))
           )
         );
