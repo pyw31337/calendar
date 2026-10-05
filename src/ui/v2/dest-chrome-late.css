@@ -1600,12 +1600,13 @@ html:has(.renewal-shell.v2-design) .v2-settings-modal .modal-body {
   max-height: calc(92dvh - 120px) !important;
   padding: 14px 16px 28px !important;
 }
+/* Popups center on the screen at every width, side-nav open or collapsed (no 280px
+   side-nav offset: the blurred overlay already covers the nav). */
 @media (min-width: 1200px) {
   html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .modal-overlay:not(.meme-preview-overlay) {
     left: 0 !important;
     right: 0 !important;
     width: 100vw !important;
-    padding-left: 280px !important;
     box-sizing: border-box !important;
   }
 }
@@ -1654,7 +1655,6 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     left: 0 !important;
     right: 0 !important;
     width: 100vw !important;
-    padding-left: 280px !important;
     box-sizing: border-box !important;
   }
 }
@@ -2627,11 +2627,13 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
   }
 }
 
+/* Tablet / small-PC widths: popups are centered cards like on wide PC (they used to dock to
+   the bottom edge as a phone-style sheet, which on a 1024px PC window looked pushed down). */
 @media (min-width: 768px) and (max-width: 1199px) {
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
   html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
-    align-items: flex-end !important;
-    padding: 0 16px !important;
+    align-items: center !important;
+    padding: 16px !important;
   }
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
@@ -2646,9 +2648,9 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     transform: none !important;
     width: min(520px, calc(100vw - 32px)) !important;
     max-width: 520px !important;
-    max-height: 88dvh !important;
+    max-height: min(88dvh, calc(var(--app-vv-height, 100dvh) - 32px)) !important;
     margin: 0 auto !important;
-    border-radius: 20px 20px 0 0 !important;
+    border-radius: 20px !important;
   }
 }
 
@@ -7565,14 +7567,10 @@ html:has(.renewal-shell.v2-design) .v2-more .v2-more-note {
 
 /* ---------- 320px phones ----------
    The month grid's columns were sized by content, so a long holiday ("대체공휴일(개천절)") widened
-   its column to twice the others; every column is now an equal share and corner labels clip. */
+   its column to twice the others; every column is now an equal share. Corner labels wrap to two
+   lines instead of clipping (see "Calendar holiday labels" at the end of this file). */
 html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid {
   grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-}
-html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* Date sheet header: "26. 10.03(토)" + holiday badge + 기념일 등록 + close on one row; the
    기념일 등록 button keeps only its icon on narrow phones. */
@@ -7863,10 +7861,10 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .date-modal-field-with-acti
   box-shadow: 0 -6px 12px color-mix(in srgb, var(--bg-card) 88%, transparent) !important;
 }
 
-/* Expand tap targets to >=40px via ::before hit area; icon glyph size unchanged. */
-html:has(.renewal-shell.v2-design) .memo-card-share-btn,
-html:has(.renewal-shell.v2-design) .memo-card-pin-btn,
-html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn,
+/* Expand tap targets to >=40px via ::before hit area; icon glyph size unchanged.
+   Memo-card 공유/좋아요/고정 are NOT in this position list: they are absolutely placed in the
+   card's top-right row (inline style / .memo-card-like-btn), and forcing them to relative
+   dropped them into the text flow. Being absolute they already anchor their hit area. */
 html:has(.renewal-shell.v2-design) .memo-comment-edit-btn,
 html:has(.renewal-shell.v2-design) .item-edit-delete-actions > button,
 html:has(.renewal-shell.v2-design) .date-modal-attendance-actions > button,
@@ -7923,5 +7921,82 @@ html:has(.renewal-shell.v2-design) .expense-row-delete-btn::before {
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-btn {
     margin-bottom: 0 !important;
+  }
+}
+
+/* Memo-card top-right row (좋아요 · 공유 · 고정) sits ~22px apart, so a 40px circle would let
+   the pin swallow taps aimed at 공유. Keep the 40px height but only the slot's own width. */
+html:has(.renewal-shell.v2-design) .memo-card-share-btn::before,
+html:has(.renewal-shell.v2-design) .memo-card-pin-btn::before,
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn::before {
+  width: 22px !important;
+  border-radius: 8px !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Popups: always centered on the screen.
+ * A position:fixed overlay is laid out against the nearest ancestor that has a
+ * transform / filter / backdrop-filter / perspective / contain / will-change.
+ * Screens and cards run enter animations (bp-screen-fade-in, bp-rise-in, ...)
+ * with fill-mode "both", which leaves a transform on them for good, so modals
+ * that are rendered inside a screen (정산 수정, 정산카드, ...) were centered in
+ * that box instead of the viewport. While an overlay is open, its ancestors
+ * drop those properties so every popup centers on the viewport.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .renewal-shell :not(.modal-overlay):not(.bottom-sheet-overlay):has(.modal-overlay, .bottom-sheet-overlay) {
+  transform: none !important;
+  animation: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  perspective: none !important;
+  contain: none !important;
+  will-change: auto !important;
+}
+
+/* 정산카드 image preview: the card image is taller than the screen; the sheet itself scrolls
+   (wheel, trackpad, touch) instead of clipping the bottom of the list. */
+html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container.settlement-image-preview {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+}
+html:has(.renewal-shell.v2-design) .modal-container.settlement-image-preview > * {
+  flex-shrink: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .modal-container.settlement-image-preview > img {
+  height: auto !important;
+  max-width: 100% !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Calendar holiday labels (대체공휴일(개천절), 추석 연휴, solar terms): never
+ * truncated, up to two centered lines. keep-all keeps Korean words whole; the
+ * cell renders a <wbr> before "(" so "대체공휴일 / (개천절)" breaks there.
+ * Font sizes are unchanged (mobile 0.6rem rule above still applies).
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row .bp-day-corner-label,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
+  display: block !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row {
+  align-items: flex-start !important;
+}
+/* Phones are where labels actually wrap: reserve the second line on every labelled cell so
+   week rows with one- and two-line holidays get the same height and the dots line up. */
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
+    min-height: calc(1.15em * 2) !important;
   }
 }
