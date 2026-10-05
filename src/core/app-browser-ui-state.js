@@ -1,3 +1,5 @@
+import { installToolbarOffsetSync } from './viewport-height.js';
+
 // Browser-only UI compatibility effects. Keeping these DOM observers outside CalendarApp
 // prevents general shell behavior from consuming the feature coordinator's line budget.
 export function useBrowserUiCompatibility(React) {
@@ -92,28 +94,7 @@ export function useBrowserUiCompatibility(React) {
   // to know how much bottom chrome is covering the page right now; --v2-toolbar-bottom-offset
   // (consumed by .bp-fab in screens.css) adds that gap on top of the safe-area inset so the
   // floating action button stays clear of it. A software keyboard produces the same kind of
-  // gap and gets pushed clear the same way, which is a harmless side effect here.
-  React.useEffect(() => {
-    if (!window.visualViewport) return undefined;
-    let raf = null;
-    const measure = () => {
-      raf = null;
-      const vv = window.visualViewport;
-      const offsetTop = vv.offsetTop || 0;
-      const gap = Math.max(0, window.innerHeight - vv.height - offsetTop);
-      document.documentElement.style.setProperty('--v2-toolbar-bottom-offset', `${Math.round(gap)}px`);
-    };
-    const onChange = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(measure);
-    };
-    window.visualViewport.addEventListener('resize', onChange);
-    window.visualViewport.addEventListener('scroll', onChange);
-    measure();
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      window.visualViewport.removeEventListener('resize', onChange);
-      window.visualViewport.removeEventListener('scroll', onChange);
-    };
-  }, []);
+  // gap and gets pushed clear the same way only while a text field is focused; a stale short
+  // viewport after an app switch (notification tap) is ignored. See viewport-height.js.
+  React.useEffect(() => installToolbarOffsetSync(window, document), []);
 }
