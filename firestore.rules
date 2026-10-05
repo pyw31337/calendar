@@ -118,7 +118,10 @@ service cloud.firestore {
           && (!('directMediaTags' in data) || (
             (data.directMediaTags is string && data.directMediaTags.size() <= 640)
             || (data.directMediaTags is map && data.directMediaTags.size() <= 50)
-          ));
+          ))
+          // How the photo entered (paperclip, paste, camera-named capture) plus client and a
+          // short Storage failure note. Bytes are never stored here. Capped like imageTags.
+          && (!('imageIntake' in data) || (data.imageIntake is list && data.imageIntake.size() <= 50));
       }
       // In-app chat document attachments (pdf/office/text). Kept separate from imageUrls so
       // photo galleries/lightbox contracts stay unchanged (see chat-file-attachments.js).
@@ -181,7 +184,7 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType', 'imageIntake'])
           && hasValidImageGeoMap(request.resource.data)
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
@@ -194,7 +197,7 @@ service cloud.firestore {
           && hasValidReplyTo(request.resource.data)
           && hasValidFileAttachments(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments', 'imageIntake'])
           && hasValidImageGeoMap(request.resource.data)
           && (
             hasValidMessageMediaMetadataPatch()
@@ -344,7 +347,8 @@ service cloud.firestore {
           // in ui-memo-view.js) so a memo with fresh activity can be queried without loading its
           // whole comments array. No hasOnly() lock above means this was already writable before
           // this line existed -- it just adds the same type check every other optional field gets.
-          && (!('lastCommentAt' in data) || data.lastCommentAt is number);
+          && (!('lastCommentAt' in data) || data.lastCommentAt is number)
+          && (!('imageIntake' in data) || (data.imageIntake is list && data.imageIntake.size() <= 50));
       }
       match /memos/{memoId} {
         allow read: if isCalendarDoc(calendarDocId);

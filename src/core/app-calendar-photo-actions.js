@@ -382,8 +382,8 @@ export function createCalendarPhotoActions({
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
       const allowed = asCreate
-        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
-        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
+        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo', 'imageIntake']
+        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments', 'imageIntake'];
       const out = {};
       for (const key of allowed) {
         if (msg && msg[key] !== undefined) out[key] = msg[key];

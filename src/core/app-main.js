@@ -44,8 +44,10 @@ import {
   uploadInlineChatImageToStorage, readClipboardImageFiles,
   migrateBase64ChatImagesForCalendar, backfillMeetingUploadSourcesForCalendar,
   resolveChatImageBatch, resolveMemoImageBatch, deleteAllChatImagesFromStorage,
-  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION, limitImageUploadSelection
+  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION, limitImageUploadSelection,
+  revokeCompressedObjectUrls
 } from './app-image-pipeline.js';
+import { storedPhotoPayload } from './upload-intake.js';
 import {
   computeKoreanHolidaysForYear,
   getHolidayNamesForDate,
@@ -2790,11 +2792,12 @@ function CalendarApp() {
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' })),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
         if (!queued) throw new Error('사진 오프라인 저장 공간이 부족합니다.');
+        chatImages.forEach(img => revokeCompressedObjectUrls(img));
         setChatInput('');
         setChatImages([]);
         setChatFileAttachments([]);
@@ -2854,7 +2857,7 @@ function CalendarApp() {
           // iOS suspended the PWA just after an otherwise successful image upload.
           const imageGeoMap = buildImageGeoMap(chunkImages);
           const messageOperationId = `chat_${activeCalId}_${baseTimestamp}_${i}_${Math.random().toString(36).slice(2, 8)}`;
-          const messageData = {
+          const draftedMessage = {
             participantId: effectiveParticipantId,
             text: i === 0 ? chatInput.trim() : '',
             imageUrl: chunkImages[0].imageUrl,
@@ -2868,6 +2871,12 @@ function CalendarApp() {
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
+          const messageData = storedPhotoPayload(draftedMessage, chunkImages);
+          if (!messageData) {
+            const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+            err.code = 'PHOTO_NOT_STORED';
+            throw err;
+          }
           messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
           if (i === 0 && uploadedFileAttachments.length) messageData.fileAttachments = uploadedFileAttachments;
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
@@ -2892,6 +2901,7 @@ function CalendarApp() {
             }, 'update', '채팅 링크 미리보기 후처리');
           }).catch(error => console.warn('Background chat link preview failed:', error));
         }
+        chatImages.forEach(img => revokeCompressedObjectUrls(img));
         setChatInput('');
         setChatImages([]);
         setChatFileAttachments([]);
@@ -3011,7 +3021,7 @@ function CalendarApp() {
             participantId: fallbackParticipantId,
             text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
             variantProfile: 'grid',
-            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' }))
           }
         });
         if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');
@@ -3046,7 +3056,7 @@ function CalendarApp() {
           current: Math.min(resolvedImages.length, savedCount),
           total: resolvedImages.length
         });
-        const messageData = {
+        const draftedMessage = {
           participantId: fallbackParticipantId,
           text: i === 0 ? '갤러리 사진' : '',
           imageUrl: chunkImages[0].imageUrl,
@@ -3060,6 +3070,12 @@ function CalendarApp() {
           // Distinguishes gallery uploads so the Lightbox can show their source accurately.
           uploadSource: 'gallery'
         };
+        const messageData = storedPhotoPayload(draftedMessage, chunkImages);
+        if (!messageData) {
+          const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+          err.code = 'PHOTO_NOT_STORED';
+          throw err;
+        }
         messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
@@ -3078,11 +3094,12 @@ function CalendarApp() {
       } else {
         showToast('갤러리에 사진이 추가되었습니다.', 'success');
       }
+      compressed.forEach(img => revokeCompressedObjectUrls(img));
       forgetPreprocessedImages(files);
       return true;
     } catch (err) {
       console.error('handleUploadGalleryImages failed:', err);
-      showRetryableUploadToast('갤러리 업로드 실패', () => handleUploadGalleryImages(files), 5000);
+      showRetryableUploadToast(err?.code === 'PHOTO_NOT_STORED' ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '갤러리 업로드 실패', () => handleUploadGalleryImages(files), 5000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -3464,6 +3481,16 @@ function CalendarApp() {
         uploadedFileAttachments = uploadedFileAttachments.concat((uploaded || []).map(item => item ? { ...item, tags: withUploadDateTag(item.tags) } : item));
       }
 
+      const freshResolved = resolvedImages.filter(resolved => {
+        const src = (newImages || [])[resolved?.sourceIndex];
+        return src && !src.isExisting;
+      });
+      if (freshResolved.length && !storedPhotoPayload({ text: newText || 'photo' }, freshResolved)) {
+        const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+        err.code = 'PHOTO_NOT_STORED';
+        throw err;
+      }
+      const editIntake = storedPhotoPayload({ text: newText || 'photo' }, firstChunk)?.imageIntake;
       const data = {
         text: newText,
         imageUrl: firstChunk[0]?.imageUrl || '',
@@ -3473,7 +3500,8 @@ function CalendarApp() {
         imageTags: firstChunk.map(resolved => tagByResolvedImage.get(resolved) || ''),
         imageFingerprints: firstChunk.map(resolved => fingerprintByResolvedImage.get(resolved) || ''),
         linkPreview: linkPreview || null,
-        fileAttachments: uploadedFileAttachments
+        fileAttachments: uploadedFileAttachments,
+        ...(editIntake ? { imageIntake: editIntake } : {})
       };
       data.imageTagMap = reconcileMessageImageTagMap({ ...editingMessage, ...data }, editingMessage.imageTagMap);
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
@@ -3512,7 +3540,8 @@ function CalendarApp() {
         const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
         for (let i = 0; i < extraChunks.length; i++) {
           const chunkImages = extraChunks[i];
-          const sent = await writeCollectionDocumentWithFallback('messages', calId, '', {
+          const extraIntake = storedPhotoPayload({ text: 'photo' }, chunkImages)?.imageIntake;
+          const extraDraft = {
             participantId: resolvedParticipantId,
             text: '',
             imageUrl: chunkImages[0].imageUrl,
@@ -3526,8 +3555,10 @@ function CalendarApp() {
               thumbUrls: chunkImages.map(r => r.thumbUrl),
               imageTags: chunkImages.map(resolved => tagByResolvedImage.get(resolved) || '')
             }),
-            timestamp: baseTimestamp + i
-          }, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
+            timestamp: baseTimestamp + i,
+            ...(extraIntake ? { imageIntake: extraIntake } : {})
+          };
+          const sent = await writeCollectionDocumentWithFallback('messages', calId, '', extraDraft, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
           if (!sent) {
             ok = false;
             break;
@@ -4519,7 +4550,7 @@ function CalendarApp() {
           current: Math.min(successfulImages.length, savedCount),
           total: successfulImages.length
         });
-        const messageData = {
+        const draftedMessage = {
           participantId: fallbackParticipantId,
           text: i === 0 ? '일정 사진' : '',
           imageUrl: chunkImages[0].imageUrl,
@@ -4532,6 +4563,12 @@ function CalendarApp() {
           timestamp: now + i,
           uploadSource: 'meeting'
         };
+        const messageData = storedPhotoPayload(draftedMessage, chunkImages);
+        if (!messageData) {
+          const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+          err.code = 'PHOTO_NOT_STORED';
+          throw err;
+        }
         messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장', { documentId: messageOperationId });
         if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);

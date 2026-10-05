@@ -1135,7 +1135,8 @@ export function ChatRoomView({
         currentCount: chatImages.length,
         setImageProcessing: setImageProcessingChat,
         setChatImages,
-        showToast
+        showToast,
+        intakeSource: 'paste'
       });
     } catch (err) {
       console.error('handlePasteImagesChat unexpected error:', err);
@@ -1153,7 +1154,8 @@ export function ChatRoomView({
         currentCount: chatImages.length,
         setImageProcessing: setImageProcessingChat,
         setChatImages,
-        showToast
+        showToast,
+        intakeSource: 'paste'
       });
     } catch (err) {
       console.error('handleClickPasteImagesChat unexpected error:', err);

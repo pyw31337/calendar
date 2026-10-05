@@ -1390,6 +1390,7 @@ export function DateModal({
 
   const handleMeetingPhotoFiles = async event => {
     const files = Array.from(event.target.files || []);
+    files.forEach(file => { try { file.intakeSource = 'clip'; } catch (_) {} });
     event.target.value = '';
     if (!files.length || typeof onAddMeetingPhotos !== 'function') return;
     setIsSavingMeetingPhotos(true);
@@ -1430,6 +1431,7 @@ export function DateModal({
   const handleConfirmPastePreview = async () => {
     if (!pastePreview || typeof onAddMeetingPhotos !== 'function') return;
     const files = pastePreview.files;
+    files.forEach(file => { try { file.intakeSource = 'paste'; } catch (_) {} });
     setPastePreview(null);
     setIsSavingMeetingPhotos(true);
     try {

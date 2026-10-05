@@ -2,6 +2,7 @@
  * injected by app-main so this module remains small and independently testable. */
 
 import { buildMetadataTags, todayUploadTagOptions } from './photo-metadata-tags.js';
+import { storedPhotoPayload } from './upload-intake.js';
 
 export async function replayQueuedMediaMessage(operation, { resolveImages, chunkImages, writeMessage } = {}) {
   const payload = operation?.payload;
@@ -16,6 +17,10 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
     // Kept through the queue so the replay still reuses an already stored original.
     fingerprint: image.fingerprint || '',
     fingerprintStrength: image.fingerprintStrength || '',
+    intakeSource: image.intakeSource || '',
+    intakeClient: image.intakeClient || '',
+    intakeName: image.intakeName || '',
+    intakeMime: image.intakeMime || '',
     variantProfile: payload.variantProfile || (payload.uploadSource && payload.uploadSource !== 'chat' ? 'grid' : 'chat')
   }));
   if (compressed.length === 0) return false;
@@ -27,10 +32,7 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
   const tagOptions = todayUploadTagOptions(new Date(Number(payload.timestamp) || Date.now()));
   for (let i = 0; i < chunks.length; i += 1) {
     const images = chunks[i];
-    const stored = images.every(image => typeof image?.imageUrl === 'string' && image.imageUrl.startsWith('https://')
-      && typeof image?.thumbUrl === 'string' && image.thumbUrl.startsWith('https://'));
-    if (!stored) return false;
-    const result = await writeMessage(operation.calendarId, {
+    const message = storedPhotoPayload({
       participantId: payload.participantId || '',
       text: i === 0 ? (payload.text || '') : '',
       imageUrl: images[0].imageUrl,
@@ -42,7 +44,9 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
       timestamp: (Number(payload.timestamp) || Date.now()) + i,
       ...(payload.uploadSource ? { uploadSource: payload.uploadSource } : {}),
       ...(i === 0 && payload.replyTo ? { replyTo: payload.replyTo } : {})
-    }, `${operation.id}_${i}`);
+    }, images);
+    if (!message) return false;
+    const result = await writeMessage(operation.calendarId, message, `${operation.id}_${i}`);
     if (!result?.success) return false;
   }
   return true;
@@ -58,10 +62,12 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
   let next = 0;
   // One entry per photo so urls, thumbs and fingerprints stay aligned slot by slot.
   const slots = payload.images.map(image => {
-    if (image.isExisting) return { url: image.original, thumb: image.thumbnail || image.original, fingerprint: image.fingerprint || '' };
+    if (image.isExisting) return { url: image.original, thumb: image.thumbnail || image.original, fingerprint: image.fingerprint || '', intake: null };
     const item = resolved[next++];
-    return { url: item?.imageUrl, thumb: item?.thumbUrl || item?.imageUrl, fingerprint: item?.fingerprint || '' };
-  }).filter(slot => slot.url);
+    if (!item || typeof item.imageUrl !== 'string' || !item.imageUrl.startsWith('https://')) return null;
+    return { url: item.imageUrl, thumb: item.thumbUrl || item.imageUrl, fingerprint: item.fingerprint || '', intake: item.intake || null };
+  });
+  if (slots.some(slot => !slot || !slot.url || !String(slot.url).startsWith('https://'))) return false;
   const imageUrls = slots.map(slot => slot.url);
   const thumbUrls = slots.map(slot => slot.thumb);
   const result = await writeMemo(operation.calendarId, payload.memoId, {
@@ -70,7 +76,8 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
     thumbUrls,
     imageFingerprints: slots.map(slot => slot.fingerprint),
     imageUrl: imageUrls[0] || null,
-    thumbUrl: thumbUrls[0] || null
+    thumbUrl: thumbUrls[0] || null,
+    ...(slots.some(slot => slot.intake) ? { imageIntake: slots.map(slot => slot.intake || { source: 'other', client: 'other', name: '', mime: '' }) } : {})
   });
   return Boolean(result?.success ?? result);
 }

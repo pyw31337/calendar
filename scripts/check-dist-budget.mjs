@@ -61,7 +61,9 @@ const LAZY_CHUNK_PATTERNS = [
 // few KB of headroom.
 // Refusing an unstored chat photo (no inline data URL, no empty bubble) added ~1 KB eager
 // (1677033 > 1676000); 1.679 MB keeps the same few KB of headroom.
-const TOTAL_JS_MAX_BYTES = 1_679_000;
+// Recording how a photo was sent, and keeping the original when the thumb fails,
+// added ~2.5 KB eager (1681486 > 1679000); 1.685 MB keeps the same few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_685_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

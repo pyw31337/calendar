@@ -448,26 +448,27 @@ export function AnniversaryModal({
     setActiveTab('add');
   }, [initialDate]); // intentional once when set
 
-  const handleAttachPhotoFiles = async (files) => {
+  const handleAttachPhotoFiles = async (files, intakeSource = 'clip') => {
     if (!files || files.length === 0) return;
     await appendChatImageFiles({
       files,
       currentCount: photos.length,
       setImageProcessing: setPhotoProcessing,
       setChatImages: setPhotos,
-      showToast
+      showToast,
+      intakeSource
     });
     setPhotoProcessing(null);
   };
   const handleClickPastePhotoButton = async () => {
     const files = await readClipboardImageFiles(showToast);
-    if (files && files.length > 0) handleAttachPhotoFiles(files);
+    if (files && files.length > 0) handleAttachPhotoFiles(files, 'paste');
   };
   const handlePhotoPaste = e => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
     if (pastedFiles.length === 0) return;
     e.preventDefault();
-    handleAttachPhotoFiles(pastedFiles);
+    handleAttachPhotoFiles(pastedFiles, 'paste');
   };
   const [isSavingAnniversary, setIsSavingAnniversary] = React.useState(false);
 
@@ -517,6 +518,7 @@ export function AnniversaryModal({
               || null;
             const out = { url: p.imageUrl, thumbUrl: p.thumbUrl };
             if (p.fingerprint) out.fingerprint = p.fingerprint;
+            if (p.intake) out.intake = p.intake;
             const tags = (formPhoto && formPhoto.tags) || (prev && prev.tags) || '';
             if (tags) out.tags = tags;
             const photoId = (formPhoto && formPhoto.photoId) || (prev && prev.id) || '';
