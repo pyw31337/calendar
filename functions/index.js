@@ -33,9 +33,10 @@ const {
   buildPushTargetUrl,
   decidePollNotifications,
   decideScheduleNotification,
-  selectDeliverableSubscriptions
+  selectDeliverableSubscriptions,
+  claimDocId
 } = require('./push-notify-policy');
-const { planSettlementReminders } = require('./settlement-reminders');
+const { planSettlementReminders, planNewSettlementNotifications } = require('./settlement-reminders');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -919,20 +920,21 @@ function isAnniversaryToday(ann, y, m, d) {
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
 
-// Memo created, a new comment, or a newly added photo → push. The trigger is onWrite
-// because comments and photos are saved as updates, but a title/body edit of an existing
-// memo must not push (decideMemoNotification returns null; kind "edit" is refused here too).
+// Memo created or a new comment → push. The trigger is onWrite because comments
+// are saved as updates. A title/body edit, or a photo added to an existing memo,
+// must not push (decideMemoNotification returns null; kind "edit" and "images"
+// are refused here too).
 exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const memo = change.after.data() || {};
-    // New memo, new comment, or a newly added photo only. Tag, GPS, link preview,
+    // New memo or a new comment only. A photo added to an existing memo, tag, GPS, link preview,
     // asset-graph, updatedAt, and title/body edits must not page anyone. The same
     // revision is claimed once so a retried trigger cannot send it again.
     const decision = decideMemoNotification(before, memo, { memoId: context.params.memoId });
-    if (!decision || decision.kind === 'edit') return;
+    if (!decision || decision.kind === 'edit' || decision.kind === 'images') return;
     const calendarDocId = context.params.calendarDocId;
     const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
     if (!claimed) {
@@ -947,11 +949,7 @@ exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE
     const author = decision.authorName || (named && named.name) || '참여자';
     const title = decision.kind === 'comment'
       ? `${author}의 메모 댓글`
-      : decision.kind === 'images'
-        ? `${author}의 메모 사진`
-        : decision.kind === 'edit'
-          ? `${author}의 메모 수정`
-          : `${author}의 새 메모`;
+      : `${author}의 새 메모`;
     await broadcastCalendarPush(calendarDocId, {
       title,
       body: decision.body,
@@ -1020,7 +1018,8 @@ exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_
     const beforePolls = Array.isArray(beforeCal.polls) ? beforeCal.polls : [];
     const afterPolls = Array.isArray(afterCal.polls) ? afterCal.polls : [];
     const decisions = decidePollNotifications(beforePolls, afterPolls);
-    if (decisions.length === 0) return;
+    const settlementDecisions = planNewSettlementNotifications(beforeCal.settlementCards, afterCal.settlementCards);
+    if (decisions.length === 0 && settlementDecisions.length === 0) return;
     const calendarDocId = context.params.calendarDocId;
     for (const decision of decisions) {
       const poll = decision.poll;
@@ -1036,6 +1035,20 @@ exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_
         tag: `poll-${calendarDocId}-${decision.tag}`,
         renotify: false
       }, { skipParticipantId: decision.skipParticipantId, channel: 'poll' });
+    }
+    for (const decision of settlementDecisions) {
+      const claimed = await claimPushDelivery(calendarDocId, claimDocId(decision.claimKey));
+      if (!claimed) {
+        console.log('Skipping duplicate settlement push', decision.claimKey);
+        continue;
+      }
+      await broadcastCalendarPush(calendarDocId, {
+        title: '정산 알림',
+        body: decision.body,
+        url: `./?id=${calendarDocId.replace('cal_', '')}&tab=settlement`,
+        tag: `settlement-${calendarDocId}-${decision.id}`,
+        renotify: false
+      }, { skipParticipantId: decision.skipParticipantId || null, channel: 'schedule' });
     }
   });
 
@@ -1186,26 +1199,35 @@ exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secr
   return null;
 });
 
-// Monday evening: settlement cards still 진행중 a few days after they were opened
-// (settlement-reminders.js). Uses the schedule channel, like the meeting reminders above.
-exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('10 19 * * 1').timeZone('Asia/Seoul').onRun(async () => {
+// Unpaid settlement cards: one push on the Seoul date 3 days after the card was
+// created, and one on the date 5 days after, while it is still not 마감.
+// 06:30 KST, same morning slot as the anniversary job. Each card/day is claimed
+// once, so a retry or a second run the same morning cannot send it again.
+exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const db = admin.firestore();
   const snap = await db.collection('calendars').get();
   const promises = [];
-  snap.forEach(doc => {
+  for (const doc of snap.docs) {
     const calendar = (doc.data() || {}).calendar || {};
-    planSettlementReminders(calendar).forEach(reminder => {
+    for (const reminder of planSettlementReminders(calendar)) {
+      const claimKey = claimDocId(reminder.claimKey);
+      const claimed = await claimPushDelivery(doc.id, claimKey);
+      if (!claimed) {
+        console.log('Skipping duplicate settlement reminder', claimKey);
+        continue;
+      }
       promises.push(broadcastCalendarPush(doc.id, {
         title: '정산 알림',
         body: reminder.body,
         url: `./?id=${doc.id.replace('cal_', '')}&tab=settlement`,
-        tag: `settlement-open-${doc.id}-${reminder.id}`
+        tag: `settlement-unpaid-${doc.id}-${reminder.id}-day${reminder.days}`,
+        renotify: false
       }, { channel: 'schedule' }));
-    });
-  });
+    }
+  }
   if (!promises.length) {
-    console.log('No open settlement cards to remind');
+    console.log('No unpaid settlement reminders for today');
     return null;
   }
   await Promise.all(promises);
