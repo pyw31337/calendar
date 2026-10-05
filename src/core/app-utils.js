@@ -314,8 +314,10 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     };
   }
 
-  function normalizeExpenseCategories(categories) {
+  function normalizeExpenseCategories(categories, options = {}) {
     const defaultCategories = getDefaultExpenseCategories();
+    // allowEmpty: preserve [] on save so an intentionally empty list is not expanded to defaults.
+    if (options && options.allowEmpty && Array.isArray(categories) && categories.length === 0) return [];
     const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
     const seen = new Set();
     const normalized = source.map((category, index) => {
@@ -430,7 +432,8 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   ];
   const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
 
-  function normalizePlaceCategories(categories) {
+  function normalizePlaceCategories(categories, options = {}) {
+    if (options && options.allowEmpty && Array.isArray(categories) && categories.length === 0) return [];
     const defaultCategories = DEFAULT_PLACE_CATEGORIES;
     const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
     const seen = new Set();

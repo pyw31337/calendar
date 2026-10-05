@@ -5,7 +5,7 @@ import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { buildPhotoCommentItem, visiblePhotoComments, cleanPhotoCommentKey } from '../src/core/photo-comment-items.js';
 import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries, preserveAnniversaryCurationFields, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../src/core/gallery-data.js';
-import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
+import { filterDeletedPhotoFromIndexItems, queueOwnedChatFileForStorageGc } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/core/app-data-bootstrap.js';
@@ -932,19 +932,23 @@ assert(galleryBulkDeleteSource.includes('filterDeletedPhotoFromIndexItems'), 'ph
   assert(after.find(photo => photo.full === 'd.jpg')?.imageIndex === 0, 'photos on other messages must keep their index');
 }
 {
-  let deleted = false;
-  const fakeStorage = { ref: () => ({ delete: async () => { deleted = true; } }) };
-  await deleteOwnedChatFileFromStorage({ storagePath: 'chatFiles/cw/file.pdf' }, {
-    activeCalId: 'kkot',
-    getStorage: () => fakeStorage
+  const bodies = [];
+  const fetchImpl = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return { ok: true, status: 200, json: async () => ({ ok: true, queued: 1 }) };
+  };
+  const foreign = await queueOwnedChatFileForStorageGc({ storagePath: 'chatFiles/cw/file.pdf' }, {
+    activeCalId: 'kkot', projectId: 'demo', fetchImpl
   });
-  assert(!deleted, 'pasted files from another calendar must not delete the source Storage object');
-  await deleteOwnedChatFileFromStorage({ storagePath: 'chatFiles/kkot/file.pdf' }, {
-    activeCalId: 'kkot',
-    getStorage: () => fakeStorage
+  assert(foreign.ok === false && foreign.reason === 'not-owned', 'pasted files from another calendar must not queue the source Storage object');
+  const owned = await queueOwnedChatFileForStorageGc({ storagePath: 'chatFiles/kkot/file.pdf' }, {
+    activeCalId: 'kkot', projectId: 'demo', fetchImpl
   });
-  assert(deleted, 'files owned by the active calendar must be removable from Storage');
+  assert(owned.ok === true, 'files owned by the active calendar must be queueable for Storage GC');
+  assert(bodies[0].op === 'queueStorageGc', 'chat file deletes must go through the 7-day storageGc queue');
 }
+assert(galleryBulkDeleteSource.includes('queueStorageGc') || galleryBulkDeleteSource.includes('queueOwnedChatFileForStorageGc'), 'gallery file deletes must queue storageGc instead of hard-deleting');
+assert(!/storage\.ref\(path\)\.delete\(/.test(galleryBulkDeleteSource), 'gallery file deletes must not call Storage.delete immediately');
 assert(domainHelpersScript.includes('fileAttachments'), 'message sanitizer must preserve fileAttachments');
 const chatFilesUi = fs.readFileSync('src/ui/ui-chat-files.js', 'utf8');
 assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAttachmentCard'), 'document lightbox and attachment cards must ship');

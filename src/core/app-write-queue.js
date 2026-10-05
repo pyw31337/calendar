@@ -281,9 +281,10 @@ export function shouldQueueCalendarWriteFailure(error) {
 export async function replayQueuedCalendarWrite(operation) {
   if (operation?.type === 'root-collection-write' && operation.payload) return replayQueuedRootCollectionWrite(operation, { writeDocument: (collectionName, docId, data, label, options) => writeRootCollectionDocumentWithFallback(collectionName, docId, data, label, { ...options, skipQueue: true }) });
   if (operation?.type === 'media-memo-save' && operation.payload) {
+    const memoWriteMethod = operation.payload.writeMethod === 'update' ? 'update' : 'set';
     return replayQueuedMemoSave(operation, {
       resolveImages: resolveMemoImageBatch,
-      writeMemo: (calendarId, memoId, data) => writeCollectionDocumentWithFallback('memos', calendarId, memoId, data, 'set', '메모 사진 대기 저장', { skipQueue: true })
+      writeMemo: (calendarId, memoId, data) => writeCollectionDocumentWithFallback('memos', calendarId, memoId, data, memoWriteMethod, '메모 사진 대기 저장', { skipQueue: true })
     });
   }
   if (operation?.type === 'media-chat-send' && operation.payload) {

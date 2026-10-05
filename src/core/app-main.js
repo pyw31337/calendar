@@ -25,6 +25,8 @@ import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap } from './photo-geo.js';
 import { sharesAsset, syncAssetTagsInMeetings } from './media-reference-integrity.js';
+import { persistMemoCommentsChange, latestMemoCommentAt } from './memo-comments.js';
+import { diffCalendarSettingsFields } from './calendar-settings-diff.js';
 import { buildSettlementDraftFromMeeting } from './settlement-draft.js';
 import { getReservedSettlementItemKeys } from './settlement-card-selection.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
@@ -2548,12 +2550,18 @@ function CalendarApp() {
     setMemos(prev => (Array.isArray(prev) ? prev.filter(m => m.id !== memoId) : []));
   };
   const handleMemoCommentsChangeFromMemoPreview = async (memo, nextComments) => {
-    let latest = 0;
-    for (const c of (nextComments || [])) { const t = Number(c?.createdAt) || 0; if (t > latest) latest = t; }
+    const latest = latestMemoCommentAt(nextComments);
     patchLocalMemo(memo.id, { comments: nextComments, lastCommentAt: latest });
     try {
-      const updated = await writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, { comments: nextComments, lastCommentAt: latest }, 'update', '메모 댓글 저장');
-      if (!updated?.success) throw new Error('Memo comment update failed');
+      const result = await persistMemoCommentsChange({
+        db: firebaseDb,
+        calendarId: activeCal.id,
+        memoId: memo.id,
+        previousComments: memo.comments,
+        nextComments,
+        writeUpdate: (data) => writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, data, 'update', '메모 댓글 저장')
+      });
+      if (!result?.success) throw new Error(result?.reason || 'Memo comment update failed');
       return true;
     } catch (err) {
       console.error('Failed to update memo comments:', err);
@@ -3203,6 +3211,7 @@ function CalendarApp() {
   const handleDeleteGalleryFiles = items => deleteGalleryFileAttachments(items, {
     activeCal,
     activeCalId,
+    projectId: firebaseConfig?.projectId || '',
     guardLoadedCalendar,
     findChatMessageById,
     getMessageImageEntries,
@@ -5125,9 +5134,16 @@ function CalendarApp() {
         return false;
       }
       const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
-      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings', [], {
-        settingsFields: ['title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget']
-      });
+      // Only patch fields the modal actually changed — always sending categories from a stale
+      // local snapshot was resetting expense/place categories edited elsewhere.
+      const settingsFields = diffCalendarSettingsFields(activeCal, stampedCal, [
+        'title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget'
+      ]);
+      if (!settingsFields.length) {
+        showToast('변경된 설정이 없습니다.', 'info');
+        return true;
+      }
+      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings', [], { settingsFields });
     }
   };
   const handleUpdateWeatherLocation = async (location) => {

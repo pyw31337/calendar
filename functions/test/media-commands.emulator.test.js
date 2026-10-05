@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const admin = require('firebase-admin');
-const { deleteAsset, tagAsset, bulkTagAssets, mergeAssets, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey } = require('../media-commands');
+const { deleteAsset, tagAsset, bulkTagAssets, mergeAssets, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey, isOriginalStoragePath } = require('../media-commands');
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Run under `firebase emulators:exec` (FIRESTORE_EMULATOR_HOST unset).');
 const app = admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'demo-moyeora', storageBucket: 'demo-moyeora.appspot.com' }, 'media-commands-test');
@@ -141,7 +141,7 @@ test('deleteAsset removes every copy, re-links positional refs by file, and queu
   const d20 = (await root.collection('confirmedMeetings').doc('2026-09-20').get()).data().photos;
   assert.deepEqual(d20, []);
   const gc = await db.collection('storageGc').get();
-  assert.deepEqual(gc.docs.map(d => d.data().path).sort(), ['chatImages/testcal/b_original.jpg', 'chatImages/testcal/b_thumb.jpg']);
+  assert.deepEqual(gc.docs.map(d => d.data().path).sort(), ['chatImages/testcal/b_thumb.jpg']);
   assert.ok(gc.docs.every(d => d.data().deleteAfter === now + GC_GRACE_MS));
 });
 
@@ -167,7 +167,7 @@ test('GC sweep deletes only unreferenced files after the grace period', async ()
   // kept.jpg was re-uploaded / still indexed somewhere -> must survive.
   await root.collection('photoIndex').doc('asset:v1:kept').set({ full: url('kept.jpg'), thumb: url('kept.jpg') });
   const result = await sweepStorageGc({ db, bucket, now: 100 });
-  assert.deepEqual(result, { examined: 2, deleted: 1, kept: 1 });
+  assert.deepEqual(result, { examined: 2, deleted: 1, kept: 1, skippedOriginal: 0 });
   assert.equal((await bucket.file('chatImages/testcal/gone.jpg').exists())[0], false);
   assert.equal((await bucket.file('chatImages/testcal/kept.jpg').exists())[0], true);
   assert.equal((await db.collection('storageGc').get()).size, 1);
@@ -181,7 +181,7 @@ test('GC sweep keeps a file another calendar still shows (photos copied across c
   const sharedUrl = 'https://firebasestorage.googleapis.com/v0/b/demo-moyeora.appspot.com/o/memoImages%2Ftestcal%2Fshared.jpg?alt=media';
   await other.collection('photoIndex').doc('asset:v1:shared').set({ full: sharedUrl, thumb: sharedUrl });
   const result = await sweepStorageGc({ db, bucket, now: 100 });
-  assert.deepEqual(result, { examined: 1, deleted: 0, kept: 1 });
+  assert.deepEqual(result, { examined: 1, deleted: 0, kept: 1, skippedOriginal: 0 });
   assert.equal((await bucket.file('memoImages/testcal/shared.jpg').exists())[0], true);
   await other.collection('photoIndex').doc('asset:v1:shared').delete();
 });
@@ -196,7 +196,7 @@ test('GC sweep keeps a file an anniversary photo or a culture poster still point
   await root.collection('anniversaries').doc('a1').set({ title: 'x', photos: [{ url: file('ann.jpg'), thumbUrl: file('ann.jpg') }] });
   await root.collection('customCultureItems').doc('c1').set({ title: 'y', image: file('poster.jpg'), imageUrl: file('poster.jpg') });
   const result = await sweepStorageGc({ db, bucket, now: 100 });
-  assert.deepEqual(result, { examined: 3, deleted: 1, kept: 2 });
+  assert.deepEqual(result, { examined: 3, deleted: 1, kept: 2, skippedOriginal: 0 });
   assert.equal((await bucket.file('chatImages/testcal/ann.jpg').exists())[0], true);
   assert.equal((await bucket.file('chatImages/testcal/poster.jpg').exists())[0], true);
   assert.equal((await bucket.file('chatImages/testcal/loose.jpg').exists())[0], false);
@@ -244,4 +244,38 @@ test('mergeAssets points identical copies at the kept file, moves comments, and 
   assert.deepEqual((await root.collection('messages').doc('mk').get()).data().imageTags, ['서준 고성']);
   assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], true, 'the file is kept');
   assert.equal((await db.collection('storageGc').get()).size, 0);
+});
+
+
+test('GC sweep never deletes an original even if queued', async () => {
+  await reset();
+  const original = 'chatImages/testcal/shot_original_12b.jpg';
+  const thumb = 'chatImages/testcal/shot_thumb_3b.jpg';
+  await bucket.file(original).save(Buffer.from('orig'));
+  await bucket.file(thumb).save(Buffer.from('thumb'));
+  const queue = (path, deleteAfter) => db.collection('storageGc').doc(Buffer.from(path).toString('base64url')).set({ path, calendarDocId: CAL, deleteAfter });
+  await queue(original, 10);
+  await queue(thumb, 10);
+  assert.equal(isOriginalStoragePath(original), true);
+  const result = await sweepStorageGc({ db, bucket, now: 100 });
+  assert.equal(result.skippedOriginal, 1);
+  assert.equal(result.deleted, 1);
+  assert.equal((await bucket.file(original).exists())[0], true);
+  assert.equal((await bucket.file(thumb).exists())[0], false);
+});
+
+test('GC sweep keeps a chat file still referenced by a message fileAttachment', async () => {
+  await reset();
+  const path = 'chatFiles/testcal/shared.pdf';
+  await bucket.file(path).save(Buffer.from('%PDF'));
+  await db.collection('storageGc').doc('cf').set({ path, calendarDocId: CAL, deleteAfter: 10 });
+  await root.collection('messages').doc('m1').set({
+    text: 'file',
+    fileAttachments: [{ id: 'f1', name: 'shared.pdf', url: 'https://x', storagePath: path, uploadedAt: 1 }],
+  });
+  const result = await sweepStorageGc({ db, bucket, now: 100 });
+  assert.equal(result.kept, 1);
+  assert.equal(result.deleted, 0);
+  assert.equal((await bucket.file(path).exists())[0], true);
+  await root.collection('messages').doc('m1').delete();
 });
