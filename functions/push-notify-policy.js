@@ -3,8 +3,10 @@
 // fan out to every push_subscriptions doc. Maintenance writes (link preview,
 // image tags, GPS, asset graph, updatedAt) re-sent the same memo text, and iOS
 // does not reliably collapse Web Push tags, so one unchanged memo became a
-// lock-screen storm. Decisions here notify only on a user-visible revision and
-// collapse duplicate device subscriptions before anything is sent.
+// lock-screen storm. Decisions here notify only on a new registration
+// (a new memo, a newly added photo, or a new comment) and collapse duplicate
+// device subscriptions before anything is sent. Editing an existing memo's
+// title or body, or editing/deleting a comment, does not notify.
 
 const crypto = require('crypto');
 
@@ -73,16 +75,19 @@ function decideMemoNotification(before, after, context = {}) {
   // saved the memo once per removed photo) paged everyone once per write with the same text.
   const beforeImages = new Set(imageSignature(before).split('\u0001').filter(Boolean));
   const imagesChanged = !before || imageSignature(after).split('\u0001').some(url => url && !beforeImages.has(url));
-  const commentsChanged = !before || commentSignature(before) !== commentSignature(after);
+  const freshComment = before ? addedComment(before, after) : null;
+  // A write to an existing memo notifies only for a new registration: a comment id that
+  // was not there before, or a photo URL that was not there before. Title/body edits,
+  // comment text edits, and comment deletes are the same memo and must not push.
+  // A body edit that also adds a photo is still that edit, not a separate registration.
   let kind = 'create';
   if (before) {
-    if (textChanged) kind = 'edit';
-    else if (imagesChanged) kind = 'images';
-    else if (commentsChanged) kind = 'comment';
+    if (freshComment) kind = 'comment';
+    else if (imagesChanged && !textChanged) kind = 'images';
     else return null;
   }
 
-  const comment = kind === 'comment' ? addedComment(before, after) : null;
+  const comment = kind === 'comment' ? freshComment : null;
   const commentBody = String(comment?.text || '').trim();
   const bodySource = kind === 'comment' && commentBody
     ? commentBody
