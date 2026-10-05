@@ -189,11 +189,6 @@
     });
   };
 
-  const onVp = () => {
-    if (raf) cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(apply);
-  };
-
   const isTextControl = (el) => {
     if (!el || el === document.body || el === document.documentElement) return false;
     if (el.isContentEditable) return true;
@@ -241,6 +236,16 @@
       }
       node = node.parentElement;
     }
+  };
+
+  const onVp = () => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      apply();
+      // Keep the focused field (and its action row) inside the visual viewport when
+      // the keyboard opens or the viewport is shortened while typing.
+      revealFocusedControl();
+    });
   };
 
   const onFocusIn = () => {

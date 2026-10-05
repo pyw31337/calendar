@@ -7849,8 +7849,10 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .admin-settings-save-bt
   font-weight: 700 !important;
 }
 
-/* Date detail: keep the memo field + 추가 row in the visual viewport while typing. */
-html:has(.renewal-shell.v2-design)[data-v2-keyboard] .date-modal-field-with-actions {
+/* Date detail: keep the memo field + 추가 row in the visual viewport while typing.
+   :focus-within covers short viewports even when vv-sync has not marked data-v2-keyboard. */
+html:has(.renewal-shell.v2-design) .date-modal-field-with-actions:focus-within,
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .date-modal-field-with-actions:focus-within {
   position: sticky !important;
   bottom: 0 !important;
   z-index: 6 !important;
