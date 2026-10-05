@@ -1315,25 +1315,9 @@ async function ensureFirebaseStorageReady() {
   }
 }
 
-function storageProbeLooksLikeIphone() {
-  try {
-    return typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(String(navigator.userAgent || ''));
-  } catch (_) {
-    return false;
-  }
-}
-
-// 1x1 PNG. A Blob of the text "1" labeled image/png is not an image; iOS Safari drops that
-// content type on upload, storage.rules then deny the probe, and the health check used to mark
-// Storage disabled for the whole session. Real photo uploads send an explicit image content type
-// and succeed -- the probe must not be allowed to veto them.
-const STORAGE_HEALTH_PROBE_PNG = Uint8Array.from([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-  0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xfc, 0xcf, 0xc0, 0x50,
-  0x0f, 0x00, 0x04, 0x85, 0x01, 0x80, 0x84, 0xa9, 0x8c, 0x21, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
-  0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
-]);
+// Real 1x1 PNG. The old probe was the text "1" labeled image/png; iOS dropped that content
+// type, storage.rules denied it, and the failure latched Storage off for the session.
+const STORAGE_HEALTH_PROBE_PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), c => c.charCodeAt(0));
 
 async function checkFirebaseStorageHealth() {
   const now = Date.now();
@@ -1361,14 +1345,12 @@ async function checkFirebaseStorageHealth() {
     const blob = new Blob([STORAGE_HEALTH_PROBE_PNG], { type: 'image/png' });
     const probeTask = probeRef.put(blob, { contentType: 'image/png' });
     let probeTimeoutId;
-    // iPhone's first Storage connection often exceeds 5s (radio wake + lazy SDK). A short
-    // timeout used to mark Storage disabled and throw the photo away.
-    const probeTimeoutMs = storageProbeLooksLikeIphone() ? 15000 : 8000;
+    // First Storage connection on a phone often exceeds 5s. That timeout used to disable uploads.
     const timeoutPromise = new Promise((_, reject) => {
       probeTimeoutId = setTimeout(() => {
         try { probeTask.cancel(); } catch (_) {}
         reject(new Error('PROBE_TIMEOUT'));
-      }, probeTimeoutMs);
+      }, 12000);
     });
     try {
       await Promise.race([probeTask, timeoutPromise]);
