@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <base href="../../" />
+    <meta name="gather-app-paths" content="1" />
+    <meta charset="utf-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="build-sha" content="aac7cf06787f716b9e9df4dc7825f4ae2e39f20e" />
+    <meta name="v2-polish" content="2026-09-21-search-page" />
+    <title>모여라 캘린더</title>
+    <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
+         Vite entry actually served by dist/), so the deployed site never linked a manifest at
+         all -- beforeinstallprompt/"홈 화면에 추가" had no valid installability signal to fire
+         on regardless of browser. See copy-static-to-dist.mjs for how manifest*.json/icons/
+         reach dist/. No beforeinstallprompt capture script here on purpose: this app has no
+         custom install-prompt UI (see PR #236), so Chromium's own default install affordance
+         (address-bar icon / mini-infobar) is left to handle itself undisturbed. -->
+    <link rel="apple-touch-icon" href="icons/icon-v6-apple-touch.png" />
+    <!-- iOS home-screen launch images (scripts/generate-ios-splash.mjs): without them iOS shows a
+         white screen from the tap until this page paints and #app-splash appears. Each one is that
+         splash's first frame for one iPhone screen size. -->
+    <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1320x2868.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1206x2622.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1290x2796.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1179x2556.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1284x2778.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1170x2532.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1125x2436.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1242x2688.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/splash/launch-828x1792.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1242x2208.jpg" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/splash/launch-750x1334.jpg" />
+    <!-- Browser tab only. No large rel="icon" here: Samsung Internet uses the biggest rel="icon"
+         for "홈 화면에 추가" instead of the manifest, which put the transparent favicon on the
+         home screen. Home-screen icons come from manifest*.json / apple-touch-icon. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v3-32.png" />
+    <!-- 96px transparent M: large enough that mobile browsers (tab strip, history) use it
+         instead of borrowing the filled apple-touch/manifest icon, still well below the
+         192px they take for a home-screen shortcut. -->
+    <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-v3-96.png" />
+    <link rel="icon" href="favicon.ico" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="모여라 캘린더" />
+    <script>
+      window.__GATHER_SPLASH_START__ = Date.now();
+      (function () {
+        try {
+          var ua = navigator.userAgent || '';
+          var isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          if (!isMobile) {
+            document.documentElement.classList.add('is-pc-device');
+          }
+          if (location.search.indexOf('splash') !== -1 || location.search.indexOf('demo') !== -1) {
+            document.documentElement.classList.add('force-splash-preview');
+          }
+        } catch (_) {}
+      })();
+      (function () {
+        try {
+          // V2 is the only shell (the V1 tree and `?shell=v1` were removed), so this script never
+          // touches the `shell` param. Its only job is defaulting `id` for old bookmarked/shared links on custom domains that predate
+          // the `id`/`cal` param. Production github.io / local preview already carry an explicit
+          // `id`, so this only ever fires for other hosts.
+          var host = String(location.hostname || '');
+          if (host === 'pyw31337.github.io' || host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
+          var params = new URLSearchParams(location.search);
+          var missingId = !params.get('id') && !params.get('cal');
+          if (!missingId) return;
+          params.set('id', 'cw');
+          location.replace(location.pathname + '?' + params.toString() + location.hash);
+        } catch (_) {}
+      })();
+    </script>
+    <script>
+      // The <link rel="manifest"> tag is created here, in JS, instead of sitting in the HTML
+      // source and having its href mutated afterward (the previous approach). That mutation
+      // approach measurably failed on a real device: even after confirming the page had fully
+      // loaded real per-calendar data and the DOM's manifest link's href correctly read
+      // "manifest-cw.json", "홈 화면에 추가" still showed the generic name and a bare URL with no
+      // id. The most consistent explanation is WebKit eagerly resolving/caching the manifest
+      // tied to whatever href the <link> element had at the moment it was first inserted into
+      // the DOM (here, that always used to be the static "manifest.json" in the HTML source),
+      // and continuing to use that cached read for "Add to Home Screen" regardless of a later
+      // href mutation on the same element. Creating and inserting the element only once the
+      // correct per-calendar href is already known removes that wrong initial value entirely --
+      // there is no window where a <link rel="manifest"> with the generic href ever exists in
+      // the DOM for a calendar-scoped visit.
+      //
+      // Recognizes both the ?id=/?cal= query-string format and the /share/{calId}/... slash-path
+      // format (getCalendarShareUrl in app-utils.js) -- the latter is what this app's own
+      // "공유하기"/KakaoTalk share feature hands out, so most first-time visitors arrive via that
+      // path, not a ?id= query string.
+      //
+      // apple-mobile-web-app-title/document.title are also set here, synchronously, rather than
+      // only from app-main.js's activeCal effect (which waits for real Firestore data to load) --
+      // iOS reads apple-mobile-web-app-title at the moment the share sheet opens.
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get('id') || params.get('cal');
+        var appMatch = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+        if (!id && appMatch) {
+          id = appMatch[1];
+          params.set('id', id);
+          try { history.replaceState(history.state, '', window.location.pathname + '?' + params.toString() + window.location.hash); } catch (_) {}
+        }
+        if (!id) {
+          var shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
+          if (shareMatch) id = shareMatch[1];
+        }
+        var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+        // Per-calendar install scope. Every manifest used to share scope "./" (/calendar/), so on
+        // Android (Chrome/Samsung Internet/Whale) the first installed calendar claimed every
+        // /calendar/ URL: visiting ?id=cw offered "open 제이헤어" instead of installing 모아엘가.
+        // Each calendar now lives under its own path, /calendar/app/<id>/ (a copy of this page
+        // with <base href="../../">, written by copy-static-to-dist.mjs), and its manifest's scope
+        // is that path. Browser visits can be moved there in place. A pre-existing iOS home-screen
+        // web clip must stay at its original root URL though: changing it to a newer install path
+        // during launch can make an old standalone shell look offline before its page bootstraps.
+        // Only when the build shipped the app/ copies (the meta below), so vite dev and older
+        // deploys are left alone.
+        var hasAppPaths = !!document.querySelector('meta[name="gather-app-paths"]');
+        var isStandaloneApp = !!((window.navigator && window.navigator.standalone === true)
+          || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+        if (hasAppPaths && id && manifestByCalendar[id] && !appMatch && window.top === window
+          && !isStandaloneApp && !/\/share\//.test(window.location.pathname)
+          && !params.has('admin') && params.get('mode') !== 'admin') {
+          var rootPath = window.location.pathname.replace(/[^/]*$/, '');
+          try {
+            if (!document.querySelector('base')) {
+              var baseEl = document.createElement('base');
+              baseEl.setAttribute('href', rootPath);
+              document.head.insertBefore(baseEl, document.head.firstChild);
+            }
+            history.replaceState(history.state, '', rootPath + 'app/' + id + '/' + window.location.search + window.location.hash);
+          } catch (_) {}
+        }
+        var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
+        var manifestHref = (id && manifestByCalendar[id]) || 'manifest.json';
+        var link = document.createElement('link');
+        link.setAttribute('rel', 'manifest');
+        link.setAttribute('href', manifestHref);
+        document.head.appendChild(link);
+        if (id && titleByCalendar[id]) {
+          var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);
+          // No " 캘린더" suffix -- iOS's "홈 화면에 추가" pre-fills its editable name field from
+          // document.title, and whatever is in that field at "추가" time becomes the installed
+          // icon's permanent label (see the matching note in app-main.js's activeCal effect).
+          document.title = titleByCalendar[id];
+        }
+      })();
+    </script>
+    <!-- Pretendard: the V2 font stack (design.css --font-sans) names it first, but it was never
+         loaded -- Mac/iOS then took line metrics from SF while drawing Hangul in Noto Sans KR, so
+         Korean text sat visibly high in every fixed-height badge/pill/field. Dynamic subset: the
+         browser downloads only the unicode-range chunks a page actually uses. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+    <!-- Same-origin Firebase SDK preload. main.jsx skips these when they are already ready, so
+         mobile browsers do not depend on a third-party CDN or duplicate the SDK scripts. -->
+    <script  src="vendor/firebase-app-compat.js?v=20260903-sdk-10-14-1" defer></script>
+    <script  src="vendor/firebase-firestore-compat.js?v=20260903-sdk-10-14-1" defer></script>
+    <!-- Firebase SDK scripts are loaded from main.jsx (loadFirebaseSdk), vendored under
+         vendor/ (same origin) instead of from www.gstatic.com -- a real device consistently got
+         `window.firebase undefined` even after every retry/timeout adjustment tried, tracing back
+         to something on that network path blocking www.gstatic.com specifically while the site's
+         own origin loaded fine. See main.jsx for the loader. -->
+    <!-- async, not a plain blocking <script src> (and not defer -- defer scripts still execute in
+         document order among the "list of scripts to execute in order" that module scripts belong
+         to as well, so a defer script placed here would still make <script type="module"
+         src="/main.jsx"> at the bottom of <body> wait for it to finish downloading before running,
+         same blocking problem one step removed; measured directly with this app's own boot-ready
+         flag). async scripts run independently the moment they're ready, entirely outside that
+         ordering, so they can never delay main.jsx. These three are also non-critical (confetti
+         effect, lunar-calendar date conversion, QR code generation; every call site already
+         guards for the library not being loaded yet), so nothing here needs them before first
+         paint or before the app boots -- if jsdelivr.net is ever slow or unreachable for a
+         visitor, that no longer holds up Firebase SDK loading or anything else. -->
+    <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+    <style id="app-splash-style">
+      /* PC / Desktop: Suppress splash screen to avoid intrusive flicker */
+      html.is-pc-device .app-splash {
+        display: none !important;
+      }
+      @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+        .app-splash {
+          display: none !important;
+        }
+      }
+      html.force-splash-preview .app-splash,
+      html.force-splash-preview.is-pc-device .app-splash {
+        display: flex !important;
+      }
+      @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+        html.force-splash-preview .app-splash {
+          display: flex !important;
+        }
+      }
+      .app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 18vh);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 42px);
+        background: radial-gradient(circle at 50% 32%, rgba(124, 47, 229, 0.48) 0%, rgba(18, 205, 240, 0.16) 38%, rgba(7, 2, 26, 0.98) 72%), #07021A;
+        color: #FFFFFF;
+        font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard, "Plus Jakarta Sans", sans-serif;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: opacity 0.54s cubic-bezier(0.16, 1, 0.3, 1), transform 0.54s cubic-bezier(0.16, 1, 0.3, 1), filter 0.54s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.54s;
+        will-change: opacity, transform, filter;
+      }
+      .app-splash.is-hidden {
+        opacity: 0;
+        transform: scale(1.14);
+        filter: blur(14px) brightness(1.25);
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .app-splash-bg {
+        position: absolute;
+        inset: -45%;
+        background: radial-gradient(ellipse 65% 55% at 50% 35%, rgba(124, 47, 229, 0.4) 0%, transparent 60%),
+                    radial-gradient(ellipse 55% 45% at 75% 20%, rgba(18, 205, 240, 0.3) 0%, transparent 50%),
+                    radial-gradient(ellipse 50% 50% at 25% 65%, rgba(54, 4, 253, 0.35) 0%, transparent 55%);
+        pointer-events: none;
+        animation: bp-splash-aura 7s ease-in-out infinite alternate;
+      }
+      .app-splash-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 0 24px;
+      }
+      .app-splash-icon-wrap {
+        position: relative;
+        margin-bottom: 24px;
+      }
+      .app-splash-ring {
+        position: absolute;
+        inset: -14px;
+        border-radius: 34px;
+        background: conic-gradient(from 0deg at 50% 50%, #12CDF0, #7C2FE5, #3604FD, #12CDF0);
+        opacity: 0.65;
+        filter: blur(14px);
+        animation: bp-splash-ring-spin 4.5s linear infinite;
+        pointer-events: none;
+      }
+      .app-splash-icon-box {
+        position: relative;
+        width: 92px;
+        height: 92px;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 20px 48px rgba(124, 47, 229, 0.6), 0 0 0 1.5px rgba(255, 255, 255, 0.28);
+        animation: bp-splash-icon-pop 0.8s cubic-bezier(0.16, 1.3, 0.3, 1) forwards, bp-splash-icon-breathe 2.8s ease-in-out infinite 0.8s;
+      }
+      .app-splash-icon {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 24px;
+        object-fit: cover;
+      }
+      .app-splash-glint {
+        position: absolute;
+        inset: -60%;
+        background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.85) 48%, rgba(18, 205, 240, 0.9) 52%, transparent 62%);
+        transform: translateX(-120%) rotate(15deg);
+        pointer-events: none;
+        animation: bp-splash-glint 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s forwards;
+      }
+      .app-splash-title {
+        margin: 0;
+        font-size: 1.65rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        background: linear-gradient(110deg, #FFFFFF 15%, #12CDF0 45%, #C084FC 60%, #FFFFFF 85%);
+        background-size: 220% 100%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: bp-splash-shimmer 2.4s ease-in-out infinite, bp-splash-fade-up 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        will-change: background-position, transform, opacity;
+      }
+      .app-splash-sub {
+        margin: 8px 0 0;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.76);
+        letter-spacing: -0.01em;
+        animation: bp-splash-sub-reveal 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+      }
+      .app-splash-footer {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        animation: bp-splash-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+      }
+      .app-splash-loader {
+        width: 150px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        position: relative;
+      }
+      .app-splash-loader-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 50%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #12CDF0, #8B5CF6, #EC4899);
+        box-shadow: 0 0 12px #12CDF0, 0 0 20px #8B5CF6;
+        animation: bp-splash-bar-slide 1.2s ease-in-out infinite;
+      }
+      .app-splash-status {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .app-splash-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #12CDF0;
+        box-shadow: 0 0 8px #12CDF0;
+        animation: bp-splash-pulse-dot 1s ease-in-out infinite;
+      }
+      @keyframes bp-splash-ring-spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes bp-splash-icon-pop {
+        0% { transform: scale(0.65); filter: brightness(1.7) blur(4px); opacity: 0; }
+        60% { transform: scale(1.06); filter: brightness(1.15) blur(0); opacity: 1; }
+        100% { transform: scale(1); filter: brightness(1); opacity: 1; }
+      }
+      @keyframes bp-splash-icon-breathe {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 12px 28px rgba(124, 47, 229, 0.45)); }
+        50% { transform: scale(1.04); filter: drop-shadow(0 18px 40px rgba(18, 205, 240, 0.6)); }
+      }
+      @keyframes bp-splash-glint {
+        0% { transform: translateX(-120%) rotate(15deg); opacity: 0; }
+        20% { opacity: 1; }
+        100% { transform: translateX(120%) rotate(15deg); opacity: 0; }
+      }
+      @keyframes bp-splash-shimmer {
+        0% { background-position: 120% 0; }
+        100% { background-position: -120% 0; }
+      }
+      @keyframes bp-splash-fade-up {
+        0% { transform: translateY(12px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes bp-splash-sub-reveal {
+        0% { transform: translateY(8px); opacity: 0; letter-spacing: 0.05em; }
+        100% { transform: translateY(0); opacity: 0.76; letter-spacing: -0.01em; }
+      }
+      @keyframes bp-splash-aura {
+        0% { transform: scale(1) rotate(0deg); opacity: 0.7; }
+        50% { transform: scale(1.12) rotate(3deg); opacity: 0.9; }
+        100% { transform: scale(1) rotate(0deg); opacity: 0.7; }
+      }
+      @keyframes bp-splash-bar-slide {
+        0% { left: -50%; width: 45%; }
+        50% { left: 35%; width: 60%; }
+        100% { left: 105%; width: 45%; }
+      }
+      @keyframes bp-splash-pulse-dot {
+        0%, 100% { transform: scale(0.85); opacity: 0.5; }
+        50% { transform: scale(1.3); opacity: 1; }
+      }
+    </style>
+    <script type="module" crossorigin src="/calendar/pr-preview/pr-874/assets/index-bTxI2Dem.js"></script>
+    <link rel="modulepreload" crossorigin href="/calendar/pr-preview/pr-874/assets/rolldown-runtime-D1y7pCx4.js">
+    <link rel="modulepreload" crossorigin href="/calendar/pr-preview/pr-874/assets/vendor-react-DfXFE28X.js">
+    <link rel="modulepreload" crossorigin href="/calendar/pr-preview/pr-874/assets/vendor-BlvjZ7S5.js">
+    <link rel="modulepreload" crossorigin href="/calendar/pr-preview/pr-874/assets/vendor-react-dom-BlcO6tF5.js">
+    <link rel="stylesheet" crossorigin href="/calendar/pr-preview/pr-874/assets/index-BrMInzrA.css">
+  </head>
+  <body>
+    <div id="app-splash" class="app-splash" aria-hidden="true">
+      <div class="app-splash-bg"></div>
+      <div class="app-splash-content">
+        <div class="app-splash-icon-wrap">
+          <div class="app-splash-ring"></div>
+          <div class="app-splash-icon-box">
+            <img class="app-splash-icon" src="icons/icon-v6-192.png" alt="모여라 캘린더" width="92" height="92" />
+            <div class="app-splash-glint"></div>
+          </div>
+        </div>
+        <h1 id="app-splash-title" class="app-splash-title">모여라 캘린더</h1>
+        <p class="app-splash-sub">만남의 처음부터 끝까지 · 올인원 캘린더</p>
+      </div>
+      <div class="app-splash-footer">
+        <div class="app-splash-loader">
+          <div class="app-splash-loader-bar"></div>
+        </div>
+        <span class="app-splash-status"><span class="app-splash-dot"></span>실시간 데이터를 안전하게 연결하고 있습니다</span>
+      </div>
+    </div>
+    <script>
+      (function () {
+        try {
+          var ua = navigator.userAgent || '';
+          var isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          var isPC = !isMobile || document.documentElement.classList.contains('is-pc-device') ||
+            (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches);
+          if (isPC) {
+            var splashEl = document.getElementById('app-splash');
+            if (splashEl) splashEl.remove();
+            return;
+          }
+          var p = new URLSearchParams(window.location.search);
+          var calId = p.get('id') || p.get('cal');
+          if (!calId) {
+            var m = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)/) || window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
+            if (m) calId = m[1];
+          }
+          var titles = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
+          if (calId && titles[calId]) {
+            var el = document.getElementById('app-splash-title');
+            if (el) el.textContent = titles[calId];
+          }
+        } catch (_) {}
+      })();
+    </script>
+    <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:0.88rem;">모여라 캘린더 불러오는 중…</div></div>
+  </body>
+</html>
