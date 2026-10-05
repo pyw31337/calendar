@@ -3143,7 +3143,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     onClick: () => setSettlementCardImageUrl(null),
     style: { zIndex: 12500 }
   }, React.createElement(ResizableModalContainer, {
-    className: 'modal-container',
+    className: 'modal-container settlement-image-preview',
     onClick: e => e.stopPropagation(),
     style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
   },
@@ -4184,7 +4184,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     onClick: () => setShareImageUrl(null),
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
+    className: "modal-container settlement-image-preview",
     onClick: e => e.stopPropagation(),
     style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
   },

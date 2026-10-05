@@ -1574,9 +1574,12 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.15;
+  text-align: center;
 }
 .v2-design .bp-day-head-row .bp-day-meeting-pill {
   display: inline-flex;
