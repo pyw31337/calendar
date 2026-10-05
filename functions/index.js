@@ -2765,7 +2765,7 @@ exports.pruneStaleRateLimitDocs = functions.region(SEOUL_REGION).pubsub.schedule
 // P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
-const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets', 'mergeAssets']);
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets', 'mergeAssets', 'queueStorageGc']);
 exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -2789,7 +2789,13 @@ exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 
   // Keep the established mutation surface for the original one-photo commands. Only the
   // new batch command supports externally hosted direct-media URLs, and it still resolves the
   // owner from its canonical photoIndex row before writing (media-commands.js).
-  if (op !== 'bulkTagAssets' && ![imageUrl, thumbUrl].some(isStorageUrl)) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  if (op !== 'bulkTagAssets' && op !== 'queueStorageGc' && ![imageUrl, thumbUrl].some(isStorageUrl)) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  if (op === 'queueStorageGc') {
+    const paths = Array.isArray(req.body?.paths) ? req.body.paths : [];
+    if (!paths.length || paths.length > 50 || paths.some(p => typeof p !== 'string' || !p.trim() || p.length > 500)) {
+      res.status(400).json({ ok: false, reason: 'invalid-paths' }); return;
+    }
+  }
   if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
   const db = admin.firestore();
   const calendarDocId = `cal_${calendarId}`;
@@ -2807,6 +2813,19 @@ exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 
     memoId: typeof item?.memoId === 'string' ? item.memoId.slice(0, 200) : '',
   });
   try {
+    if (op === 'queueStorageGc') {
+      const paths = (Array.isArray(req.body?.paths) ? req.body.paths : [])
+        .map(p => String(p || '').trim())
+        // Only accept paths under this calendar's chatFiles / chatImages / memoImages prefixes.
+        .filter(p => (
+          p.startsWith(`chatFiles/${calendarId}/`)
+          || p.startsWith(`chatImages/${calendarId}/`)
+          || p.startsWith(`memoImages/${calendarId}/`)
+        ));
+      const queued = await mediaCommands.queueStorageGcPaths({ db, calendarDocId, paths });
+      res.status(200).json(queued);
+      return;
+    }
     if (op === 'mergeAssets') {
       const merged = await mediaCommands.mergeAssets({
         db,
@@ -3391,6 +3410,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
 exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 540, memory: '1GB' })
   .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
     const calendars = await admin.firestore().collection('calendars').select().get();
+    const rebuildFailures = [];
     for (const doc of calendars.docs) {
       const calendarId = doc.id.startsWith('cal_') ? doc.id.slice(4) : doc.id;
       if (!CALENDAR_ID_RE.test(calendarId)) continue;
@@ -3399,7 +3419,14 @@ exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeo
         console.log('nightly photoIndex rebuild', JSON.stringify({ calendarId, indexedPhotos: report.indexedPhotos, staleRows: report.staleRows }));
       } catch (err) {
         console.error(`nightly photoIndex rebuild failed for ${calendarId}:`, err);
+        rebuildFailures.push(calendarId);
       }
+    }
+    // Abort GC when any rebuild failed — sweeping against a partial/stale in-use set can
+    // queue live originals for deletion.
+    if (rebuildFailures.length) {
+      console.error('nightly storage GC aborted; photoIndex rebuild failed for', JSON.stringify(rebuildFailures));
+      return null;
     }
     const gc = await mediaCommands.sweepStorageGc({ db: admin.firestore(), bucket: admin.storage().bucket() });
     console.log('nightly storage GC', JSON.stringify(gc));

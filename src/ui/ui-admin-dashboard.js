@@ -6,6 +6,7 @@ import { MemeAdminPanel } from './ui-meme-admin.js';
 import { MacBackupPanel } from './ui-mac-backup-admin.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
+import { diffCalendarSettingsFields } from '../core/calendar-settings-diff.js';
 
 /**
  * Icon unification pass (2026-09-17): a handful of admin icons that used to come from the
@@ -644,6 +645,7 @@ export function AdminDashboard({ initialCalendars }) {
   const [googlePlacesStats, setGooglePlacesStats] = React.useState(null);
 
   const lastSyncedRef = React.useRef(null);
+  const settingsBaselineRef = React.useRef(null);
 
   React.useEffect(() => {
     return () => {
@@ -1232,6 +1234,15 @@ export function AdminDashboard({ initialCalendars }) {
 	        setNewPlaceCategoryName('');
 	        setNewPartName('');
         lastSyncedRef.current = key;
+        settingsBaselineRef.current = {
+          title: cal.title,
+          description: cal.description || '',
+          accentColor: normalizeColorValue(cal.accentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
+          participants: getActiveParticipants(cal),
+          settlementBaseBudget: Number(cal.settlementBaseBudget || 0),
+          expenseCategories: getExpenseCategories(cal),
+          placeCategories: getPlaceCategories(cal)
+        };
       }
     }
   }, [selectedCalId, serverCalendars]);
@@ -1390,17 +1401,33 @@ export function AdminDashboard({ initialCalendars }) {
 	      accentColor: normalizeColorValue(calAccentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
 	      participants: calParticipants,
 	      settlementBaseBudget: Number((calSettlementBaseBudget || '').replace(/[^0-9]/g, '')) || 0,
-	      expenseCategories: normalizeExpenseCategories(calExpenseCategories),
-	      placeCategories: normalizePlaceCategories(calPlaceCategories),
+	      expenseCategories: normalizeExpenseCategories(calExpenseCategories, { allowEmpty: true }),
+	      placeCategories: normalizePlaceCategories(calPlaceCategories, { allowEmpty: true }),
 	      updatedAt: now,
       revision: (cal.revision || 0) + 1
     };
 
-    const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings', [], {
-      settingsFields: ['title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget']
-    });
+    const baseline = settingsBaselineRef.current || cal;
+    const settingsFields = diffCalendarSettingsFields(baseline, stampedCal, [
+      'title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget'
+    ]);
+    if (!settingsFields.length) {
+      showAdminToast('변경된 설정이 없습니다.', 'info');
+      return;
+    }
+
+    const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings', [], { settingsFields });
     if (saved) {
       setServerCalendars(prev => prev.map(c => c.id === selectedCalId ? stampedCal : c));
+      settingsBaselineRef.current = {
+        title: stampedCal.title,
+        description: stampedCal.description || '',
+        accentColor: stampedCal.accentColor,
+        participants: stampedCal.participants,
+        settlementBaseBudget: stampedCal.settlementBaseBudget,
+        expenseCategories: stampedCal.expenseCategories,
+        placeCategories: stampedCal.placeCategories
+      };
       showAdminToast('설정 저장완료', 'success');
     } else {
       showAdminToast('설정 저장 실패', 'error');

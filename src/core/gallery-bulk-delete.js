@@ -1,15 +1,44 @@
-export async function deleteOwnedChatFileFromStorage(attachment, { activeCalId, getStorage, ensureStorage }) {
+async function postQueueStorageGc(fetchImpl, projectId, body) {
+  const response = await fetchImpl(
+    `https://asia-northeast3-${encodeURIComponent(projectId)}.cloudfunctions.net/mediaCommand`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+  return response;
+}
+
+/**
+ * Queue a chat-file Storage path for the 7-day storageGc sweeper.
+ * Never delete Storage objects immediately — the same path can be referenced by other
+ * messages/memos (see chat-file-attachments.js dedupe). Clients cannot write storageGc
+ * directly (Firestore rules deny it); mediaCommand queueStorageGc does it server-side.
+ */
+export async function queueOwnedChatFileForStorageGc(attachment, { activeCalId, projectId, fetchImpl = fetch } = {}) {
   const path = String(attachment && attachment.storagePath || '');
-  if (!path || !activeCalId) return;
-  if (path.indexOf('chatFiles/' + activeCalId + '/') !== 0) return;
+  if (!path || !activeCalId || !projectId) return { ok: false, reason: 'missing' };
+  if (path.indexOf('chatFiles/' + activeCalId + '/') !== 0) return { ok: false, reason: 'not-owned' };
   try {
-    const storage = (typeof getStorage === 'function' ? getStorage() : null)
-      || (typeof ensureStorage === 'function' ? await ensureStorage() : null);
-    if (!storage) return;
-    await storage.ref(path).delete();
+    const response = await postQueueStorageGc(fetchImpl, projectId, {
+      calendarId: activeCalId,
+      op: 'queueStorageGc',
+      paths: [path],
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) {
+      console.warn('queueStorageGc failed:', payload?.reason || response.status);
+      return { ok: false, reason: payload?.reason || String(response.status) };
+    }
+    return { ok: true, queued: payload?.queued || 1 };
   } catch (err) {
-    console.warn('Failed to delete chat file from Storage:', err);
+    console.warn('Failed to queue chat file for Storage GC:', err);
+    return { ok: false, reason: String(err?.message || err) };
   }
+}
+
+/** @deprecated Immediate Storage deletes are unsafe for shared paths — use queueOwnedChatFileForStorageGc. */
+export async function deleteOwnedChatFileFromStorage(attachment, deps) {
+  // No-op shim: never hard-delete Storage objects from the client.
+  void attachment;
+  void deps;
 }
 
 export async function deleteGalleryFileAttachments(items, deps) {
@@ -25,6 +54,10 @@ export async function deleteGalleryFileAttachments(items, deps) {
     byMessage.get(messageId).push(item);
   });
   let deleted = 0;
+  const projectId = deps.projectId
+    || (typeof deps.getFirebaseConfig === 'function' ? deps.getFirebaseConfig()?.projectId : null)
+    || (typeof window !== 'undefined' && window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.FIREBASE_CONFIG?.projectId)
+    || '';
   for (const [messageId, group] of byMessage) {
     const sourceMessage = await deps.findChatMessageById(messageId);
     if (!sourceMessage) continue;
@@ -59,10 +92,10 @@ export async function deleteGalleryFileAttachments(items, deps) {
         deleted += removed.length;
       }
       for (const att of removed) {
-        await deleteOwnedChatFileFromStorage(att, {
-          activeCalId: deps.activeCalId,
-          getStorage: deps.getLiveFirebaseStorage,
-          ensureStorage: deps.ensureFirebaseStorageReady
+        await queueOwnedChatFileForStorageGc(att, {
+          activeCalId: deps.activeCalId || activeCal.id,
+          projectId,
+          fetchImpl: deps.fetchImpl || fetch,
         });
       }
     } catch (err) {

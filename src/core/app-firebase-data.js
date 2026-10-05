@@ -59,6 +59,7 @@ import {
   omitUndefinedDeep,
 } from './app-domain-helpers.js';
 import { enqueueWriteOperation } from './app-write-queue.js';
+import { mergeCategoriesById } from './calendar-settings-diff.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const FIRESTORE_REQUEST_TIMEOUT_MS = 12000;
@@ -416,9 +417,13 @@ function normalizeCalendarForSave(calendar) {
 	    activityLogs: normalizedActivityLogs,
 	    polls: normalizedPolls,
 	    confirmedMeeting: normalizedConfirmedMeetings,
-	    expenseCategories: normalizeExpenseCategories(cloned.expenseCategories),
+	    expenseCategories: Array.isArray(cloned.expenseCategories) && cloned.expenseCategories.length === 0
+	      ? []
+	      : normalizeExpenseCategories(cloned.expenseCategories),
 	    places: normalizePlaces(cloned.places),
-	    placeCategories: normalizePlaceCategories(cloned.placeCategories),
+	    placeCategories: Array.isArray(cloned.placeCategories) && cloned.placeCategories.length === 0
+	      ? []
+	      : normalizePlaceCategories(cloned.placeCategories),
 	    settlementBaseBudget: Number.isFinite(Number(cloned.settlementBaseBudget)) ? Math.max(0, Math.round(Number(cloned.settlementBaseBudget))) : 0,
 	    deletedActivityLogIds
 	  });
@@ -787,6 +792,13 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar, settingsFi
   };
   intendedFields.forEach(field => {
     if (field === 'participants' || field === 'confirmedMeeting' || field === 'settlementCards' || field === 'places') return;
+    if (field === 'expenseCategories' || field === 'placeCategories') {
+      // Merge by id so a stale form snapshot cannot wipe categories added on another device.
+      if (Object.prototype.hasOwnProperty.call(incoming, field)) {
+        merged[field] = mergeCategoriesById(server[field] || [], incoming[field] || []);
+      }
+      return;
+    }
     if (Object.prototype.hasOwnProperty.call(incoming, field)) merged[field] = incoming[field];
   });
   return merged;

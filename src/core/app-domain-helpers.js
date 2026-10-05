@@ -105,8 +105,9 @@ const DEFAULT_PLACE_CATEGORIES = GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [
   { id: 'etc', name: '기타', color: '#64748B' }
 ];
 const PLACE_CATEGORY_ICONS = GATHER_APP_UTILS.PLACE_CATEGORY_ICONS || { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
-const normalizePlaceCategories = GATHER_APP_UTILS.normalizePlaceCategories || function normalizePlaceCategories(categories) {
+const normalizePlaceCategories = GATHER_APP_UTILS.normalizePlaceCategories || function normalizePlaceCategories(categories, options = {}) {
   const defaultCategories = DEFAULT_PLACE_CATEGORIES;
+  if (options && options.allowEmpty && Array.isArray(categories) && categories.length === 0) return [];
   const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
   const seen = new Set();
   const normalized = source.map((category, index) => {

@@ -7,6 +7,8 @@ import { useParticipantSync } from '../core/current-participant.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 import { markFileIntakeSource, storedPhotoPayload } from '../core/upload-intake.js';
+import { buildMemoEditPatch } from '../core/memo-edit-patch.js';
+import { persistMemoCommentsChange, latestMemoCommentAt } from '../core/memo-comments.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -785,13 +787,20 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         const tagsArray = editTags.map(t => t.startsWith('#') ? t : '#' + t);
         const participantId = editParticipantId || 'anonymous';
         const previewPack = buildMemoLinkPreviews(editText.trim(), editingMemo);
+        const queuedPatch = buildMemoEditPatch({
+          participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [],
+          color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp,
+          linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews,
+          createdAt: editingMemo.createdAt || editingMemo.updatedAt || stamp
+        });
         const queued = await enqueueMemoMediaSave({
           id: `memo_media_${calendarId}_${editingMemo.id}_${stamp}`,
           type: 'media-memo-save',
           calendarId,
           payload: {
             memoId: editingMemo.id,
-            memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews }),
+            writeMethod: 'update',
+            memoData: sanitizeMemoForFirestore(queuedPatch),
             images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' }))
           }
         });
@@ -831,8 +840,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       const previewPack = buildMemoLinkPreviews(editText.trim(), editingMemo);
 
       const createdAt = editingMemo.createdAt || editingMemo.updatedAt || stamp;
-      const memoData = {
-        ...editingMemo,
+      // Field patch only — never spread editingMemo / rewrite comments (concurrent comment writers).
+      const memoData = buildMemoEditPatch({
         participantId,
         title: editTitle.trim(),
         text: editText.trim(),
@@ -846,15 +855,18 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         createdAt,
         updatedAt: stamp,
         linkPreview: previewPack.linkPreview,
-        linkPreviews: previewPack.linkPreviews
-      };
+        linkPreviews: previewPack.linkPreviews,
+        imageUrl: uploadedUrls[0] || null,
+        thumbUrl: uploadedThumbs[0] || null
+      });
+      const localMemo = { ...editingMemo, ...memoData, id: editingMemo.id };
 
-      if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
+      if (typeof onUpsertMemo === 'function') onUpsertMemo(localMemo);
       else if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, memoData);
 
-      const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'set', '메모 수정');
+      const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'update', '메모 수정');
       if (!saved?.success) throw new Error('Memo update failed');
-      hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), memoData);
+      hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), localMemo);
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -986,15 +998,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
     // lastCommentAt is a denormalized copy of the newest comment's createdAt (0 once every
-    // comment is deleted). It exists purely so app-main.js's memo subscription can load an old
-    // memo that just received a comment even when it's well outside the paginated recent-by-
-    // createdAt window -- see the lastCommentAt-ordered query there. Comparing memo.comments
-    // itself (the array) isn't queryable in Firestore the way a plain field is.
-    const nextLastCommentAt = getLatestMemoCommentTimestamp({ comments: nextComments });
+    // comment is deleted). Appends use arrayUnion; edits/deletes run a server transaction by id
+    // so a concurrent comment from another device is not wiped by a stale full-array write.
+    const nextLastCommentAt = latestMemoCommentAt(nextComments);
     if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: nextComments, lastCommentAt: nextLastCommentAt });
     try {
-      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments, lastCommentAt: nextLastCommentAt }, 'update', '메모 댓글 저장');
-      if (!updated?.success) throw new Error('Memo comment update failed');
+      const db = __fb();
+      const result = await persistMemoCommentsChange({
+        db,
+        calendarId: calendar.id,
+        memoId: memo.id,
+        previousComments: memo.comments,
+        nextComments,
+        writeUpdate: (data) => writeMemoDocument('memos', calendar.id, memo.id, data, 'update', '메모 댓글 저장')
+      });
+      if (!result?.success) throw new Error(result?.reason || 'Memo comment update failed');
       return true;
     } catch (err) {
       console.error('Failed to update memo comments:', err);

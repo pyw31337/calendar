@@ -70,8 +70,10 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
   if (slots.some(slot => !slot || !slot.url || !String(slot.url).startsWith('https://'))) return false;
   const imageUrls = slots.map(slot => slot.url);
   const thumbUrls = slots.map(slot => slot.thumb);
+  // Never replay comments from a queued snapshot — those belong to concurrent writers.
+  const { comments: _dropComments, id: _dropId, ...memoFields } = payload.memoData || {};
   const result = await writeMemo(operation.calendarId, payload.memoId, {
-    ...payload.memoData,
+    ...memoFields,
     imageUrls,
     thumbUrls,
     imageFingerprints: slots.map(slot => slot.fingerprint),

@@ -63,7 +63,10 @@ const LAZY_CHUNK_PATTERNS = [
 // (1677033 > 1676000); 1.679 MB keeps the same few KB of headroom.
 // Recording how a photo was sent, and keeping the original when the thumb fails,
 // added ~2.5 KB eager (1681486 > 1679000); 1.685 MB keeps the same few KB of headroom.
-const TOTAL_JS_MAX_BYTES = 1_685_000;
+// Memo field-patch updates, concurrent comment persistence, settings field-diff, and chat-file
+// storageGc queueing added ~5.5 KB eager (1690477 > 1685000); 1.695 MB keeps the same few KB
+// of headroom.
+const TOTAL_JS_MAX_BYTES = 1_695_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
