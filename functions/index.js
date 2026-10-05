@@ -599,7 +599,7 @@ exports.onPhotoCommentItemWrite = seoulTriggerFunctions().runWith({ secrets: ['V
     await broadcastCalendarPush(calendarDocId, {
       title: `${author}의 사진 댓글`,
       body: String(after.text || '').slice(0, 120),
-      url: buildPushTargetUrl(calendarDocId, { view: 'gallery' }),
+      url: buildPushTargetUrl(calendarDocId, { view: 'gallery', img: after.assetKey || '' }),
       tag: `photo-comment-${calendarDocId}-${context.params.commentId}`,
       renotify: false
     }, { skipParticipantId: after.participantId || null, channel: 'comment' });
@@ -801,9 +801,12 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
           lastPushChannel: channel,
           lastPushError: String(err && err.message || 'unknown').slice(0, 500)
         }, { merge: true }).catch(() => {});
-        if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
+        // 404/410 = endpoint gone. 400/403 are often payload/VAPID misconfig — deleting
+        // every subscription on those would wipe devices after a bad deploy/key rotation.
+        if (err.statusCode === 410 || err.statusCode === 404) {
           return record.then(() => doc.ref.delete());
         }
+        console.warn('Push fail kept subscription', doc.id, err && err.statusCode);
         return record;
       });
     promises.push(p);
@@ -1060,6 +1063,7 @@ exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secr
   const y = Number(kstParts.find(p => p.type === 'year').value);
   const m = Number(kstParts.find(p => p.type === 'month').value);
   const d = Number(kstParts.find(p => p.type === 'day').value);
+  const todayKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   const db = admin.firestore();
   const annSnap = await db.collectionGroup('anniversaries').get();
@@ -1079,45 +1083,33 @@ exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secr
     return null;
   }
 
+  // Route through broadcastCalendarPush so per-device channel prefs apply (schedule), and
+  // claim once per anniversary/day so a schedule retry cannot double-send.
   const promises = [];
   for (const [calendarDocId, entry] of byCalendar) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-
-    const subSnap = await entry.ref.collection('push_subscriptions').get();
-    if (subSnap.empty) continue;
-
-    entry.anniversaries.forEach(ann => {
-      const payload = JSON.stringify({
+    for (const ann of entry.anniversaries) {
+      const claimKey = claimDocId(`anniversary_${ann.id}_${todayKey}`);
+      const claimed = await claimPushDelivery(calendarDocId, claimKey);
+      if (!claimed) {
+        console.log('Skipping duplicate anniversary reminder', claimKey);
+        continue;
+      }
+      promises.push(broadcastCalendarPush(calendarDocId, {
         title: '오늘의 기념일',
         body: `🎉 ${ann.title || '기념일'}`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
-        tag: `anniversary-${calendarDocId}-${ann.id}`
-      });
-      subSnap.forEach(subDoc => {
-        const data = subDoc.data();
-        const pushSubscription = {
-          endpoint: data.endpoint,
-          keys: { auth: data.keys?.auth, p256dh: data.keys?.p256dh }
-        };
-        // Same urgency: 'high' reasoning as onMessageCreate above -- a same-day anniversary
-        // reminder is only useful if it actually arrives that day.
-        const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
-          .then(() => {
-            console.log(`Anniversary push sent to subscription: ${subDoc.id}`);
-          })
-          .catch(err => {
-            console.error(`Failed to send anniversary push to sub ${subDoc.id}:`, err);
-            if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
-              console.log(`Removing expired subscription: ${subDoc.id}`);
-              return subDoc.ref.delete();
-            }
-          });
-        promises.push(p);
-      });
-    });
+        tag: `anniversary-${calendarDocId}-${ann.id}`,
+        renotify: false
+      }, { channel: 'schedule' }));
+    }
   }
 
+  if (!promises.length) {
+    console.log('No anniversary pushes after claims for', todayKey);
+    return null;
+  }
   await Promise.all(promises);
   return null;
 });

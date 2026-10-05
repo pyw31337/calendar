@@ -1,3 +1,4 @@
+import { readAppVvHeight, subscribeAppVvRemeasure } from '../core/app-vv-measure.js';
 /**
  * Places map + places view (P4-10)
  */
@@ -1007,10 +1008,11 @@ export function PlacesView({
       setPlacesInitialQuery('');
     }
   }, [placesInitialQuery, setPlacesInitialQuery]);
-  const [mapHeight, setMapHeight] = React.useState(Math.round(window.innerHeight * 0.4));
+  const [mapHeight, setMapHeight] = React.useState(() => Math.round((readAppVvHeight(window, document) || window.innerHeight || 800) * 0.4));
   
   const isDraggingRef = React.useRef(false);
   const mapResizeMovedRef = React.useRef(false);
+  const mapUserResizedRef = React.useRef(false);
   const startYRef = React.useRef(0);
   const startHeightRef = React.useRef(mapHeight);
   const mapHeightRef = React.useRef(mapHeight);
@@ -1018,6 +1020,13 @@ export function PlacesView({
   React.useEffect(() => {
     mapHeightRef.current = mapHeight;
   }, [mapHeight]);
+  React.useEffect(() => {
+    return subscribeAppVvRemeasure(() => {
+      if (mapUserResizedRef.current || isDraggingRef.current) return;
+      const next = Math.round((readAppVvHeight(window, document) || window.innerHeight || 800) * 0.4);
+      setMapHeight(next);
+    }, window, document);
+  }, []);
 
   // V2 desktop: size the map once so the category bar's bottom hairline sits on the same pixel
   // row as the side nav's divider under 메모 -- one continuous line across rail and page.
@@ -1051,6 +1060,7 @@ export function PlacesView({
     const deltaY = event.clientY - startYRef.current;
     if (Math.abs(deltaY) > 4) mapResizeMovedRef.current = true;
     const nextHeight = Math.max(160, Math.min(window.innerHeight - 220, startHeightRef.current + deltaY));
+    mapUserResizedRef.current = true;
     setMapHeight(nextHeight);
   };
   const endMapResize = () => {
@@ -1622,7 +1632,8 @@ export function PlacesView({
             if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
             event.preventDefault();
             const delta = event.key === 'ArrowDown' ? 24 : -24;
-            setMapHeight(height => Math.max(160, Math.min(window.innerHeight - 220, height + delta)));
+            mapUserResizedRef.current = true;
+          setMapHeight(height => Math.max(160, Math.min((readAppVvHeight(window, document) || window.innerHeight) - 220, height + delta)));
           }
         })
       )

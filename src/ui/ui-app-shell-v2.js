@@ -60,6 +60,7 @@ import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../cor
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
+const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 
 // Home gallery: 12 photos per page -- 4x3 on PC, 6x2 at mid widths, 3x4 on phones (dest-chrome-late.css).
 const HOME_GALLERY_PAGE_SIZE = 12;
@@ -1065,8 +1066,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     });
   }
 
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = localTodaySeoul();
 
   const festivalBars = React.useMemo(
     () => computeFestivalBars(days, anniversariesList),
@@ -1630,8 +1630,7 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
 
 function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   const React = window.React;
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = localTodaySeoul();
 
   const todayMeeting = React.useMemo(() => {
     const fromUpcoming = Array.isArray(upcomingMeetings) ? upcomingMeetings.find(m => m.date === todayStr) : null;
@@ -1755,8 +1754,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = localTodaySeoul();
 
   const mergedCalendar = React.useMemo(() => {
     const base = calendarContext?.calendar || {};

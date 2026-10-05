@@ -1332,17 +1332,14 @@ function CalendarApp() {
     }
   }, [activeCal, activeCalLoaded]);
 
-  // Local schedule reminder: D-day anytime, or D-1 after 18:00 local, for confirmed meetings
-  // and type:repeat anniversary occurrences. Best-effort while the tab is open -- server push
-  // at 18:00 KST (sendEveScheduleReminders) covers devices that aren't open.
+  // Local D-day / D-1 (after 18:00 KST) reminder; server sendEveScheduleReminders covers closed tabs.
   React.useEffect(() => {
     if (!activeCalLoaded || !activeCal) return;
     const meetings = getTrulyConfirmedMeetings(activeCal);
-    const now = new Date();
-    const toDateStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const todayStr = toDateStr(now);
-    const tomorrowStr = toDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
-    const hour = now.getHours();
+    const utils = window.GATHER_APP_UTILS || {};
+    const todayStr = utils.getTodayString?.() || '';
+    const tomorrowStr = utils.addDaysToDateKey?.(todayStr, 1) || todayStr;
+    const hour = utils.seoulHour?.() ?? new Date().getHours();
     const candidates = [];
     const todayMeeting = meetings.find(m => m.date === todayStr);
     if (todayMeeting) candidates.push({ kind: 'meeting', meeting: todayMeeting, whenLabel: '오늘', key: todayMeeting.date });

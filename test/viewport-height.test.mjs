@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toolbarKeyboardGap, isTextEntryFocused, installToolbarOffsetSync, SETTLE_DELAYS_MS } from '../src/core/viewport-height.js';
+import { readAppVvHeight, subscribeAppVvRemeasure } from '../src/core/app-vv-measure.js';
 
 // WebKit bug 254868: an installed iOS app opened from a notification can report a short,
 // stale visualViewport. Only a focused text control may make the toolbar follow a keyboard gap.
@@ -73,4 +74,35 @@ test('offset is re-measured on return signals with late settle passes', () => {
   assert.equal(props.get('--v2-toolbar-bottom-offset'), '0px');
   cleanup();
   assert.equal(listeners.size, 0);
+});
+
+test('readAppVvHeight prefers --app-vv-height over raw visualViewport', () => {
+  const doc = { documentElement: { style: { getPropertyValue: (k) => k === '--app-vv-height' ? '800px' : '' } } };
+  const win = { visualViewport: { height: 510 }, innerHeight: 510 };
+  assert.equal(readAppVvHeight(win, doc), 800);
+});
+
+test('subscribeAppVvRemeasure listens for pageshow/visibility/focus/notification-open', () => {
+  const listeners = new Map();
+  const on = scope => ({
+    addEventListener: (t, fn) => listeners.set(`${scope}:${t}`, fn),
+    removeEventListener: t => listeners.delete(`${scope}:${t}`),
+  });
+  const vv = { height: 800, ...on('vv') };
+  const win = {
+    visualViewport: vv, innerHeight: 800, ...on('win'),
+    navigator: { serviceWorker: on('sw') },
+    requestAnimationFrame: fn => { fn(); return 1; }, cancelAnimationFrame() {},
+    setTimeout: () => 1, clearTimeout() {},
+  };
+  const doc = { visibilityState: 'visible', ...on('doc'), documentElement: { style: { getPropertyValue: () => '' } } };
+  let calls = 0;
+  const cleanup = subscribeAppVvRemeasure(() => { calls += 1; }, win, doc);
+  for (const key of ['vv:resize', 'win:resize', 'win:pageshow', 'win:focus', 'win:orientationchange', 'doc:visibilitychange', 'sw:message']) {
+    assert.ok(listeners.has(key), key);
+  }
+  const before = calls;
+  listeners.get('sw:message')({ data: { type: 'notification-open' } });
+  assert.ok(calls > before);
+  cleanup();
 });

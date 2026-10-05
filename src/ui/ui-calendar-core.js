@@ -4,6 +4,8 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { LikeButton } from './like-button.js';
 import { useParticipantSync } from '../core/current-participant.js';
+const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
+const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
@@ -907,8 +909,7 @@ export function CalendarGrid({
     dateStr,
     isCurrentMonth
   }, idx) => {
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = localTodaySeoul();
     const isToday = isCurrentMonth && dateStr === todayStr;
     const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID);
     const uniqueActiveParts = new Set(entries.filter(e => participantsMap[e.participantId]).map(e => e.participantId));
@@ -2744,15 +2745,8 @@ export function GlobalSearchModal({
       fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
     )).then(payloads => {
       const feedKinds = ['performance', 'festival', 'sports', 'movie'];
-      const today = (() => {
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      })();
-      const addDays = (iso, days) => {
-        const d = new Date(`${iso}T00:00:00`);
-        d.setDate(d.getDate() + days);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      };
+      const today = localTodaySeoul();
+      const addDays = (iso, days) => localAddDays(iso, days) || iso;
       const stillListed = (item, kind) => {
         if (kind === 'movie' || item.genre === 'movie') {
           const release = /^\d{4}-\d{2}-\d{2}$/.test(String(item.releaseDate || item.startDate || '')) ? String(item.releaseDate || item.startDate) : '';

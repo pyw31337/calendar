@@ -382,3 +382,13 @@ test('gallery thumb resolver module is the single render-resolution path', async
   assert.match(archive, /PhotoAssetThumb/);
   assert.doesNotMatch(shell, /e\.currentTarget\.style\.opacity = '0'/);
 });
+
+test('gallery photo-comment deep link keeps img assetKey', () => {
+  const gallery = buildAppViewUrl(location('?id=example&view=gallery&img=asset:v1:abc'), 'gallery');
+  const params = new URL(gallery, 'https://example.test').searchParams;
+  assert.equal(params.get('tab'), 'records');
+  assert.equal(params.get('sub'), 'media');
+  assert.equal(params.get('img'), 'asset:v1:abc');
+  const chat = buildAppViewUrl(location('?id=example&view=gallery&img=asset:v1:abc'), 'chat');
+  assert.equal(new URL(chat, 'https://example.test').searchParams.get('img'), null);
+});

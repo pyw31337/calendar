@@ -30,6 +30,8 @@ import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 import { isExcludedFromPeople, personNameVariants, tagMatchesPerson, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
 import { CommonPagination } from './ui-shared.js';
 import { getCulturePosterBadge, CULTURE_POSTER_BADGE_COLORS } from './culture-poster-badge.js';
+const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
+const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
@@ -1580,12 +1582,14 @@ export function HistoryView({
   };
   const [historyTab, setHistoryTab] = React.useState(readHistoryTabFromUrl);
   const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(() => new URLSearchParams(window.location.search).get('memory') || null);
+  const memoryHistoryRef = React.useRef(false);
   const pushHistoryState = (tab, memoryId = null) => {
     const params = new URLSearchParams(window.location.search);
     params.set('historyTab', tab);
     if (memoryId) params.set('memory', memoryId); else params.delete('memory');
     const qs = params.toString();
-    window.history.pushState({ historyTab: tab, memory: memoryId || null }, '', `${window.location.pathname}?${qs}`);
+    window.history.pushState({ historyTab: tab, memory: memoryId || null, __moyeoraMemory: Boolean(memoryId) }, '', `${window.location.pathname}?${qs}`);
+    if (memoryId) memoryHistoryRef.current = true;
   };
   const openMemoryGroup = id => {
     setSelectedMemoryGroupId(id);
@@ -1593,14 +1597,18 @@ export function HistoryView({
   };
   const clearMemoryGroup = (useBrowserBack = false) => {
     const params = new URLSearchParams(window.location.search);
-    if (useBrowserBack && params.get('memory')) {
+    const memoryId = params.get('memory');
+    if (useBrowserBack && memoryId && memoryHistoryRef.current
+        && window.history.state?.__moyeoraMemory) {
+      memoryHistoryRef.current = false;
       window.history.back();
       return;
     }
+    memoryHistoryRef.current = false;
     setSelectedMemoryGroupId(null);
     params.delete('memory');
     const qs = params.toString();
-    window.history.replaceState({ historyTab }, '', `${window.location.pathname}?${qs}`);
+    window.history.replaceState({ historyTab, __moyeoraMemory: false }, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
   };
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
@@ -1637,7 +1645,9 @@ export function HistoryView({
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('historyTab');
       setHistoryTab(VALID_HISTORY_TABS.includes(tab) ? tab : 'memories');
-      setSelectedMemoryGroupId(params.get('memory') || null);
+      const nextMemory = params.get('memory') || null;
+      if (!nextMemory) memoryHistoryRef.current = false;
+      setSelectedMemoryGroupId(nextMemory);
     };
     window.addEventListener('popstate', handleHistoryPopState);
     return () => window.removeEventListener('popstate', handleHistoryPopState);
@@ -4946,9 +4956,8 @@ function getCultureItemKind(item) {
   return byCategory[item.category] || byCategory[item.anniversaryCategory] || (item.genre === 'movie' ? 'movie' : '');
 }
 
-function todayIsoLocal() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+function todayIsoLocal(now = new Date()) {
+  return localTodaySeoul(now);
 }
 
 // Keep in step with MOVIE_THEATRICAL_DAYS in scripts/lib/culture-normalize.mjs. Snapshots
@@ -4956,10 +4965,7 @@ function todayIsoLocal() {
 // those fields — a release older than this window is not still 상영중.
 const MOVIE_THEATRICAL_DAYS = 28;
 function addDaysIsoLocal(iso, days) {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return localAddDays(iso, days) || iso;
 }
 function movieScreeningEnd(item) {
   const release = cultureItemDay(item);

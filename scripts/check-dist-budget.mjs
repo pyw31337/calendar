@@ -40,7 +40,10 @@ const LAZY_CHUNK_PATTERNS = [
   /^ui-memo-view-.*\.js$/,
   /^ui-event-modals-.*\.js$/,
   /^ui-lightbox-.*\.js$/,
-  /^ui-date-modal-.*\.js$/
+  /^ui-date-modal-.*\.js$/,
+  // Shared by ui-lightbox + ui-places only (both lazy). Vite emits it as its own chunk; without
+  // this exclusion it was counted as eager even though nothing on the critical path imports it.
+  /^app-vv-measure-.*\.js$/
 ];
 
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
@@ -66,7 +69,9 @@ const LAZY_CHUNK_PATTERNS = [
 // Memo field-patch updates, concurrent comment persistence, settings field-diff, and chat-file
 // storageGc queueing added ~5.5 KB eager (1690477 > 1685000); 1.695 MB keeps the same few KB
 // of headroom.
-const TOTAL_JS_MAX_BYTES = 1_695_000;
+// Shared Asia/Seoul today/date-key helper + memory deep-link history markers added ~2 KB eager
+// (1692k+); 1.700 MB keeps the same few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_700_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

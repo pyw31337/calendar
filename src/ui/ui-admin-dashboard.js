@@ -7,6 +7,7 @@ import { MacBackupPanel } from './ui-mac-backup-admin.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
 import { diffCalendarSettingsFields } from '../core/calendar-settings-diff.js';
+import { todaySeoulDateKey, seoulMonthKey } from '../core/seoul-date.js';
 
 /**
  * Icon unification pass (2026-09-17): a handful of admin icons that used to come from the
@@ -2014,7 +2015,7 @@ export function AdminDashboard({ initialCalendars }) {
   // Must match the +9h KST offset incrementKakaoLocalSearchStat uses server-side (functions/
   // index.js), or this card would show "0건" for several hours around KST midnight even right
   // after a real search -- toISOString() alone is UTC regardless of the browser's local timezone.
-  const kakaoTodayBucket = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const kakaoTodayBucket = todaySeoulDateKey();
   const kakaoDailyUsage = (kakaoSearchStats && kakaoSearchStats.dailyUsageBucket === kakaoTodayBucket)
     ? (kakaoSearchStats.dailyUsageCount || 0) : 0;
 
@@ -2022,7 +2023,7 @@ export function AdminDashboard({ initialCalendars }) {
   // Kakao this is a genuinely paid API past its free SKU threshold, so this card exists mainly as
   // an early-warning signal rather than a hard limit display (the real number lives in Google
   // Cloud 콘솔's billing view, which can change independently of this code).
-  const googlePlacesThisMonthBucket = new Date().toISOString().slice(0, 7);
+  const googlePlacesThisMonthBucket = seoulMonthKey();
   const googlePlacesMonthlyUsage = (googlePlacesStats && googlePlacesStats.monthlyUsageBucket === googlePlacesThisMonthBucket)
     ? (googlePlacesStats.monthlyUsageCount || 0) : 0;
 
