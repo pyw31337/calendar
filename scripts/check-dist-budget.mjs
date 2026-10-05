@@ -59,7 +59,9 @@ const LAZY_CHUNK_PATTERNS = [
 // One copy per photo (a re-upload links the stored original; shared-file delete/album guards)
 // added ~4 KB to the eager upload/photo-action code (1671684 > 1668000); 1.676 MB keeps the same
 // few KB of headroom.
-const TOTAL_JS_MAX_BYTES = 1_676_000;
+// Refusing an unstored chat photo (no inline data URL, no empty bubble) added ~1 KB eager
+// (1677033 > 1676000); 1.679 MB keeps the same few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_679_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

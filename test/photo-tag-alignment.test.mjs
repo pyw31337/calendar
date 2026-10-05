@@ -69,3 +69,36 @@ test('sanitizeMessageForFirestore drops an oversized image and its tag together,
   assert.deepEqual(out.thumbUrls, ['https://cdn.test/keep-1-thumb.jpg', 'https://cdn.test/keep-2-thumb.jpg']);
   assert.deepEqual(out.imageTags, ['첫번째', '세번째'], 'the dropped oversized photo\'s tag is dropped too, not left to shift onto the next photo');
 });
+
+test('an oversized inline photo with no other content is refused instead of saved empty', () => {
+  const oversized = `data:image/png;base64,${'A'.repeat(20000)}`;
+  assert.throws(() => sanitizeMessageForFirestore({
+    text: '',
+    uploadSource: 'chat',
+    imageUrl: oversized,
+    thumbUrl: oversized,
+    imageUrls: [oversized],
+    thumbUrls: [oversized],
+    imageFingerprints: [],
+    imageTags: []
+  }), (err) => err && err.code === 'PHOTO_NOT_STORED');
+});
+
+test('a caption is kept when an oversized inline photo is dropped beside a real text message', () => {
+  const oversized = `data:image/png;base64,${'A'.repeat(20000)}`;
+  const out = sanitizeMessageForFirestore({
+    text: '캡션',
+    imageUrls: [oversized],
+    thumbUrls: [oversized]
+  });
+  assert.equal(out.text, '캡션');
+  assert.equal(out.imageUrls, undefined);
+  assert.equal(out.thumbUrls, undefined);
+});
+
+test('a small legacy inline photo under the cap is still kept', () => {
+  const small = 'data:image/png;base64,AAAA';
+  const out = sanitizeMessageForFirestore({ text: '', imageUrl: small, thumbUrl: small, imageUrls: [small], thumbUrls: [small] });
+  assert.equal(out.imageUrl, small);
+  assert.deepEqual(out.imageUrls, [small]);
+});

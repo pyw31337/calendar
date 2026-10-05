@@ -1315,35 +1315,42 @@ async function ensureFirebaseStorageReady() {
   }
 }
 
+// Real 1x1 PNG. The old probe was the text "1" labeled image/png; iOS dropped that content
+// type, storage.rules denied it, and the failure latched Storage off for the session.
+const STORAGE_HEALTH_PROBE_PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), c => c.charCodeAt(0));
+
 async function checkFirebaseStorageHealth() {
   const now = Date.now();
   if (lastStorageHealthOk === true) return true;
   if (lastStorageHealthOk === false && (now - lastStorageHealthCheckAt) < STORAGE_HEALTH_RECHECK_COOLDOWN_MS) {
-    return false;
+    // A failed probe is not proof Storage is down. Keep encoding and uploading photos.
+    isStorageDisabled = false;
+    return true;
   }
   if (!firebaseStorage) await ensureFirebaseStorageReady();
   if (!firebaseStorage) {
     lastStorageHealthOk = false;
     lastStorageHealthCheckAt = now;
-    isStorageDisabled = true;
-    return false;
+    // SDK not ready yet (common on a cold iPhone start). Do not latch "storage disabled":
+    // the real upload loads the SDK again and must still store the file.
+    isStorageDisabled = false;
+    return true;
   }
   try {
     // Path must satisfy storage.rules' chatImages/{calendarId}/{fileName} shape (two segments
     // after chatImages/) or it falls through to the deny-all catch-all rule, and the blob's
     // contentType must match storage.rules' `image/.*` requirement for this path -- either one
-    // being wrong makes this probe always "fail" even when Storage itself is perfectly healthy,
-    // silently capping every chat/memo image at the low-res inline-base64 fallback instead of
-    // the high-quality upload.
+    // being wrong makes this probe always "fail" even when Storage itself is perfectly healthy.
     const probeRef = firebaseStorage.ref('chatImages/_health/probe.png');
-    const blob = new Blob(['1'], { type: 'image/png' });
-    const probeTask = probeRef.put(blob);
+    const blob = new Blob([STORAGE_HEALTH_PROBE_PNG], { type: 'image/png' });
+    const probeTask = probeRef.put(blob, { contentType: 'image/png' });
     let probeTimeoutId;
+    // First Storage connection on a phone often exceeds 5s. That timeout used to disable uploads.
     const timeoutPromise = new Promise((_, reject) => {
       probeTimeoutId = setTimeout(() => {
         try { probeTask.cancel(); } catch (_) {}
         reject(new Error('PROBE_TIMEOUT'));
-      }, 5000);
+      }, 12000);
     });
     try {
       await Promise.race([probeTask, timeoutPromise]);
@@ -1353,12 +1360,12 @@ async function checkFirebaseStorageHealth() {
     isStorageDisabled = false;
     lastStorageHealthOk = true;
   } catch (e) {
-    console.warn('Firebase Storage health check failed (will retry after cooldown):', e);
-    isStorageDisabled = true;
+    console.warn('Firebase Storage health check failed; photo upload will still be attempted:', e);
+    isStorageDisabled = false;
     lastStorageHealthOk = false;
   }
   lastStorageHealthCheckAt = now;
-  return !isStorageDisabled;
+  return true;
 }
 
 // No enableNetwork() on foreground. The network is never disabled (disabling it while hidden
@@ -1897,6 +1904,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     }, timeoutMs);
     return patchRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
   } catch (err) {
+    if (err && err.code === 'PHOTO_NOT_STORED') return false;
     console.warn('writeCollectionDocumentRest error:', err);
     return { success: false, retryable: true, error: err };
   }
@@ -1904,7 +1912,20 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
 
 async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write', options = {}) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
-  const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  let cleanData = null;
+  if (method !== 'delete') {
+    try {
+      cleanData = sanitizeMessageForFirestore(data);
+    } catch (err) {
+      // Oversized inline photos are stripped by sanitize. Writing what remains saved an empty
+      // chat bubble (text "", no image) and looked like the photo had sent. Refuse that write.
+      if (err && err.code === 'PHOTO_NOT_STORED') {
+        console.warn(`Refusing ${warnLabel || 'write'}: photo was not stored`);
+        return false;
+      }
+      throw err;
+    }
+  }
   // An add() can time out after Firestore has already committed it. Give every
   // add attempt one shared id so SDK -> REST -> queue retries remain idempotent,
   // including future callers that do not provide their own operation id.

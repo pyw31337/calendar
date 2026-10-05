@@ -1,10 +1,10 @@
-import { withTimeout, MAX_CHAT_THUMB_BASE64_LENGTH, getConfirmedMeetings } from './app-domain-helpers.js';
+import { withTimeout, getConfirmedMeetings } from './app-domain-helpers.js';
 import {
   buildMetadataTags as buildPhotoMetadataTags,
   parseNominatimLocation
 } from './photo-metadata-tags.js';
 import { reverseGeocodeCoords } from './app-place-search.js';
-import { firebaseConfig, isStorageDisabled, ensureFirebaseStorageReady, checkFirebaseStorageHealth, writeCollectionDocumentWithFallback, fetchMessageRest } from './app-firebase-data.js';
+import { firebaseConfig, ensureFirebaseStorageReady, checkFirebaseStorageHealth, writeCollectionDocumentWithFallback, fetchMessageRest } from './app-firebase-data.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
 import { CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY, SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY } from './image-variants.js';
 
@@ -272,7 +272,7 @@ async function buildImageFingerprint(file, metadata, sniffed) {
   return { value: `descriptor:${fallback}`, strength: 'descriptor', fallback };
 }
 
-async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
+async function compressImageToDataUrls(file) {
   // Messengers often rewrite the bytes (JPEG/HEIC) while keeping a .png name or a wrong MIME.
   // Sniff the header so decode/encode follow the real format instead of the filename.
   const sniffed = await sniffImageFormat(file).catch(() => null);
@@ -388,36 +388,10 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     }
   }
 
-  // Encodes `img` as a JPEG data URL within `budget` (fallback path only).
-  const yieldToMain = () => new Promise(r => setTimeout(r, 0));
-  const encodeWithinBudget = async (maxDimStart, qualitySteps, budget, minDim) => {
-    let maxDim = maxDimStart;
-    let best = null;
-    while (true) {
-      let w = img.width, h = img.height;
-      if (w > maxDim || h > maxDim) {
-        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-        else { w = Math.round(w * maxDim / h); h = maxDim; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      for (const quality of qualitySteps) {
-        const base64 = canvas.toDataURL('image/jpeg', quality);
-        best = { base64, canvas, quality };
-        if (base64.length <= budget) return best;
-        await yieldToMain();
-      }
-      if (maxDim <= minDim) return best;
-      maxDim = Math.max(minDim, Math.round(maxDim * 0.75));
-    }
-  };
-
-  const preferStorage = !isStorageDisabled;
-
+  // A failed health probe must not switch this photo onto an inline data URL. iPhone often
+  // fails the startup probe while Storage itself is fine; skipping the Storage-sized encode
+  // was what made a large photo get thrown away. Always build the Storage blobs.
   const getHighQualityBlob = () => {
-    if (isStorageDisabled) return Promise.resolve(null);
     // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers).
     // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is,
     // so every stored still-image original uses this 2000px / WebP 0.85 encode. A camera
@@ -460,7 +434,6 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
   };
 
   const encodeScaledWebpBlob = (maxEdge, quality) => {
-    if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
       if (w > maxEdge || h > maxEdge) {
@@ -492,13 +465,6 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
   const getHighQualityThumbBlob = () => encodeScaledWebpBlob(CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY);
   const getSmallThumbBlob = () => encodeScaledWebpBlob(SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY);
 
-  let originalMeta = null;
-  let thumbnailMeta = null;
-  if (!preferStorage) {
-    originalMeta = await encodeWithinBudget(600, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], 48 * 1024, 320);
-    thumbnailMeta = await encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
-  }
-
   const highQualityBlob = await getHighQualityBlob();
   const highQualityThumbBlob = await getHighQualityThumbBlob();
   const highQualitySmallBlob = await getSmallThumbBlob();
@@ -506,27 +472,22 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
   return new Promise((resolve) => {
     const objectUrls = [];
     const finish = (origBlob, thumbBlob, smallBlob) => {
-      let originalStr = originalMeta ? originalMeta.base64 : null;
-      let thumbnailStr = thumbnailMeta ? thumbnailMeta.base64 : null;
-      if (preferStorage) {
-        const previewBlob = thumbBlob || origBlob || file;
-        try {
-          const previewUrl = URL.createObjectURL(previewBlob);
-          objectUrls.push(previewUrl);
-          originalStr = previewUrl;
-          thumbnailStr = previewUrl;
-        } catch (_) {
-          originalStr = originalStr || '';
-          thumbnailStr = thumbnailStr || originalStr;
-        }
-      }
+      let originalStr = '';
+      let thumbnailStr = '';
+      const previewBlob = thumbBlob || origBlob || file;
+      try {
+        const previewUrl = URL.createObjectURL(previewBlob);
+        objectUrls.push(previewUrl);
+        originalStr = previewUrl;
+        thumbnailStr = previewUrl;
+      } catch (_) { /* preview is optional; the Storage upload uses the blobs */ }
       resolve({
         original: originalStr,
         thumbnail: thumbnailStr,
         originalBlob: origBlob,
         thumbnailBlob: thumbBlob,
         smallThumbBlob: smallBlob || null,
-        needsBase64Fallback: preferStorage,
+        needsBase64Fallback: true,
         metadata,
         // Persisted beside the eventual URL in the message/memo record.  Tags and comments are
         // still keyed to their asset URL; this field is only for duplicate prevention.
@@ -538,12 +499,10 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 
     const getOrig = (cb) => {
       if (highQualityBlob) cb(highQualityBlob);
-      else if (originalMeta && originalMeta.canvas) originalMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', originalMeta.quality);
       else cb(file);
     };
     const getThumb = (cb) => {
       if (highQualityThumbBlob) cb(highQualityThumbBlob);
-      else if (thumbnailMeta && thumbnailMeta.canvas) thumbnailMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnailMeta.quality);
       else getOrig(cb);
     };
     const getSmall = (cb) => {
@@ -1155,13 +1114,16 @@ function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
   };
 }
 
-// Uploads a compressed chat image pair to Firebase Storage and returns download URLs, or null
-// if Storage isn't available/the upload fails -- callers should fall back to the base64 data
-// URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
-// total)` is called as each upload progresses so a caller can aggregate progress across a batch.
+// Uploads a compressed image pair to Firebase Storage and returns download URLs, or null if
+// the upload fails. Chat sends treat null as failure (requireStorage) and do not embed the
+// photo in Firestore. `onBytes(taskKey, transferred, total)` reports progress for one blob.
 
 function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, profile) {
-  return new Promise((resolve) => {
+  return (async () => {
+    // The health probe can run before the lazy Storage SDK finishes loading on iPhone.
+    // Load it here instead of giving up and falling through to an inline data URL.
+    if (!getLiveFirebaseStorage()) await ensureFirebaseStorageReady().catch(() => null);
+    return await new Promise((resolve) => {
     const storage = getLiveFirebaseStorage();
     const grid = profile === 'grid';
     const originalBlob = compressed?.originalBlob || null;
@@ -1214,7 +1176,8 @@ function uploadImageAssetSet(basePath, compressed, index, onBytes, timeoutMs, pr
       console.warn('Image Storage upload failed', profile, basePath);
       resolve(null);
     });
-  });
+    });
+  })();
 }
 
 function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
@@ -1428,6 +1391,11 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
   try {
     const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
+      if (options.requireStorage && (!isStorageDownloadUrl(uploaded.imageUrl) || !isStorageDownloadUrl(uploaded.thumbUrl))) {
+        const err = new Error('이미지 저장소를 사용할 수 없어 사진을 저장하지 않았습니다.');
+        err.code = 'PHOTO_NOT_STORED';
+        throw err;
+      }
       if (compressed && typeof compressed === 'object') {
         compressed.uploadedUrls = { imageUrl: uploaded.imageUrl, thumbUrl: uploaded.thumbUrl, smallThumbUrl: uploaded.smallThumbUrl || '', uploadedAt: Date.now() };
       }
@@ -1436,12 +1404,16 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
     }
   } catch (e) {
     if (options.requireStorage) {
-      throw new Error('이미지 저장소 연결에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.', { cause: e });
+      const err = new Error('이미지 저장소를 사용할 수 없어 사진을 저장하지 않았습니다.', { cause: e });
+      err.code = 'PHOTO_NOT_STORED';
+      throw err;
     }
     console.warn('Image Storage upload attempt failed, falling back to base64 data URL:', e);
   }
   if (options.requireStorage) {
-    throw new Error('이미지 저장소를 사용할 수 없어 사진을 저장하지 않았습니다.');
+    const err = new Error('이미지 저장소를 사용할 수 없어 사진을 저장하지 않았습니다.');
+    err.code = 'PHOTO_NOT_STORED';
+    throw err;
   }
   let original = compressed && compressed.original;
   let thumbnail = compressed && compressed.thumbnail;
@@ -1599,7 +1571,8 @@ async function resolveChatImageBatch(calendarId, compressedList, onProgress, opt
       ? { ...item, variantProfile: profile }
       : item
   ));
-  return resolveImageBatch(calendarId, tagged, onProgress, uploadChatImageAssets, options);
+  // Chat photos are Storage files (original + thumb). Never an inline data URL in Firestore.
+  return resolveImageBatch(calendarId, tagged, onProgress, uploadChatImageAssets, { requireStorage: true, ...options });
 }
 
 async function resolveMemoImageBatch(calendarId, compressedList, onProgress, options = {}) {
