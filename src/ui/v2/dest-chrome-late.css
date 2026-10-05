@@ -8075,6 +8075,16 @@ html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child
   text-overflow: ellipsis !important;
   max-width: 100% !important;
 }
+/* The generic v2 card skin ([class*="culture-card"]) also matches .culture-card-meta and paints a
+   bordered 14px-radius box with zero padding around the date/address text, so 2-line text sat
+   on/under the rounded edge. Meta lines are plain muted text inside the card. */
+html:has(.renewal-shell.v2-design) .culture-items-grid .culture-card-meta {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
 /* Title already uses 2-line clamp in JS; keep it. */
 html:has(.renewal-shell.v2-design) .culture-items-grid {
   align-items: stretch !important;
