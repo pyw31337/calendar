@@ -39,6 +39,7 @@ import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
+import { useOverlayHistory } from './ui-shared.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
@@ -3480,9 +3481,31 @@ export function buildRenewalMoreContext(calendar, deps) {
   };
 }
 
+// Modals that don't wire browser Back themselves (AnniversaryModal already calls useOverlayHistory;
+// search keeps its own URL handling) get a history marker here, so Back closes the popup first
+// instead of leaving the app.
+const MORE_MODALS_WITH_BACK_MARKER = new Set(['share', 'app-settings', 'calendar-settings']);
+
+function MoreModalBackGate({ modalKey, onClose, render }) {
+  const requestClose = useOverlayHistory(onClose, { enabled: true, key: `more-${modalKey}` });
+  return render(requestClose);
+}
+
 function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra }) {
   const React = window.React;
   if (!openModal) return null;
+  if (MORE_MODALS_WITH_BACK_MARKER.has(openModal)) {
+    return React.createElement(MoreModalBackGate, {
+      key: openModal,
+      modalKey: openModal,
+      onClose,
+      render: (requestClose) => renderMoreModal(React, openModal, requestClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra),
+    });
+  }
+  return renderMoreModal(React, openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra);
+}
+
+function renderMoreModal(React, openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra) {
   const { ShareModal, AnniversaryModal, AppSettingsModal, AdminModal, GlobalSearchModal } = bindUiComponentAliases(React);
   if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
   if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, ...anniversaryOverride, onClose });
