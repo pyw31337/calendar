@@ -156,9 +156,18 @@ export function useChatMessageWindow({
 
         // Browser notification for a genuinely new incoming message from someone else --
         // skip the very first snapshot (that's just the existing history loading, not a
-        // new message) and skip anything sent by the current participant themselves.
+        // new message), skip in-place edits (docChanges type "modified"), and skip
+        // anything sent by the current participant themselves.
         const latest = list[list.length - 1];
-        if (hasSeenInitialChatSnapshot && latest && latest.id !== lastNotifiedMessageId
+        let latestIsCreate = true;
+        if (hasSeenInitialChatSnapshot && typeof snapshot.docChanges === 'function') {
+          const addedIds = new Set();
+          snapshot.docChanges().forEach(change => {
+            if (change && change.type === 'added' && change.doc && change.doc.id) addedIds.add(change.doc.id);
+          });
+          latestIsCreate = !!(latest && addedIds.has(latest.id));
+        }
+        if (hasSeenInitialChatSnapshot && latestIsCreate && latest && latest.id !== lastNotifiedMessageId
           && latest.participantId !== chatParticipantIdRef.current) {
           const sender = getActiveParticipants(getActiveCal()).find(p => p.id === latest.participantId);
           notifyNewChatMessage(getActiveCal(), latest, sender?.name || '알수없음');

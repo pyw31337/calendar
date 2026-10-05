@@ -919,19 +919,20 @@ function isAnniversaryToday(ann, y, m, d) {
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
 
-// Memo created or edited → push (channel: memo). A write trigger is required because
-// memo edits are saved as updates; the old create-only trigger silently missed them.
+// Memo created, a new comment, or a newly added photo → push. The trigger is onWrite
+// because comments and photos are saved as updates, but a title/body edit of an existing
+// memo must not push (decideMemoNotification returns null; kind "edit" is refused here too).
 exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const memo = change.after.data() || {};
-    // Notify only when title/text/photos/comments actually change. Tag, GPS, link
-    // preview, asset-graph and updatedAt maintenance must not page anyone, and the
-    // same revision is claimed once so a retried trigger cannot send it again.
+    // New memo, new comment, or a newly added photo only. Tag, GPS, link preview,
+    // asset-graph, updatedAt, and title/body edits must not page anyone. The same
+    // revision is claimed once so a retried trigger cannot send it again.
     const decision = decideMemoNotification(before, memo, { memoId: context.params.memoId });
-    if (!decision) return;
+    if (!decision || decision.kind === 'edit') return;
     const calendarDocId = context.params.calendarDocId;
     const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
     if (!claimed) {
