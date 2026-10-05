@@ -2562,7 +2562,19 @@ export function DateModal({
               maxLength: 500,
               value: note,
               disabled: isSubmitting,
-              onChange: e => { markDirty(); setNote(e.target.value); }
+              onChange: e => { markDirty(); setNote(e.target.value); },
+              onFocus: e => {
+                const row = e?.currentTarget?.closest?.('.date-modal-field-with-actions');
+                if (!row) return;
+                const reveal = () => {
+                  try { row.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_) {
+                    try { row.scrollIntoView(true); } catch (__) {}
+                  }
+                };
+                reveal();
+                setTimeout(reveal, 50);
+                setTimeout(reveal, 320);
+              }
             }),
             /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
               /*#__PURE__*/React.createElement(FormAddEditActionButtons, {

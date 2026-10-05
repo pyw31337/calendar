@@ -254,7 +254,9 @@ test('touch devices floor every text control at 16px, including landscape and po
 test('a focused field is revealed by its scroll ancestor, not by scrolling the window', () => {
   assert.match(source, /const revealFocusedControl = \(\) =>/);
   assert.match(source, /node\.scrollTop \+= delta/);
+  assert.match(source, /date-modal-field-with-actions/);
   assert.doesNotMatch(source, /scrollIntoView/);
+  assert.doesNotMatch(source, /style\.position === 'fixed'\) return/);
 });
 
 test('the home scrollport uses overflow-x clip so the sticky hero survives in WebKit', () => {
