@@ -209,15 +209,21 @@
   const mayRaiseKeyboard = (el) => isTextControl(el) || String(el?.tagName || '') === 'IFRAME';
 
   // iOS scrolls the layout viewport to reveal a focused field, which fights the
-  // pinned shell. Nudge only the nearest overflow ancestor, and skip fixed
-  // chrome (the field would not move, but the page behind it would).
+  // pinned shell. Nudge the nearest overflow ancestor (including .modal-body inside
+  // a fixed sheet). Measure the field together with its primary action row so the
+  // 추가/저장 button stays on-screen with the input above the keyboard.
   const revealFocusedControl = () => {
     const el = document.activeElement;
     if (!isTextControl(el) || typeof el.getBoundingClientRect !== 'function' || typeof window.getComputedStyle !== 'function') return;
     const vv = window.visualViewport;
     const topLimit = Math.round(vv?.offsetTop || 0) + 8;
     const bottomLimit = Math.round((vv?.offsetTop || 0) + (vv?.height || window.innerHeight || 0)) - 12;
-    const rect = el.getBoundingClientRect();
+    const group = (typeof el.closest === 'function' && (
+      el.closest('.date-modal-field-with-actions')
+      || el.closest('.comment-composer')
+      || el.closest('.admin-settings-save-footer')
+    )) || el;
+    const rect = group.getBoundingClientRect();
     let delta = 0;
     if (rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
     else if (rect.top < topLimit) delta = rect.top - topLimit;
@@ -225,10 +231,11 @@
     let node = el.parentElement;
     while (node && node !== document.body && node !== document.documentElement) {
       const style = window.getComputedStyle(node);
-      if (style.position === 'fixed') return;
       const canScroll = /(auto|scroll|overlay)/.test(`${style.overflowY} ${style.overflow}`)
         && node.scrollHeight > node.clientHeight + 1;
       if (canScroll) {
+        // Prefer scrolling inside a fixed sheet (modal-body) over the page behind it.
+        // Do not bail on position:fixed ancestors — sheets are fixed, their body scrolls.
         node.scrollTop += delta;
         return;
       }

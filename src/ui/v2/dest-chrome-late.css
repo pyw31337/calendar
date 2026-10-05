@@ -7819,3 +7819,107 @@ html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-photo-grid 
 html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-thumb { border-radius: 8px; }
 /* 좋아요 tab: its 내|모두 toggle sits 16px under the tabs like every other gallery toolbar. */
 html:has(.renewal-shell.v2-design) .visit-filter-toggle-mobile.gallery-likes-scope { margin-top: 12px; }
+
+
+/* --------------------------------------------------------------------------
+ * Mobile 320 layout: sticky settings save, larger icon hit areas, side-nav 접기
+ * reachable without scrolling. Visible icon sizes stay unchanged.
+ * -------------------------------------------------------------------------- */
+
+/* Calendar settings: save row is a real modal-footer (outside the scroll body)
+   so it stays above the keyboard while typing. */
+html:has(.renewal-shell.v2-design) .admin-settings-modal .admin-settings-save-footer {
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 12 !important;
+  background: var(--bg-card) !important;
+  border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
+  padding: 12px 16px !important;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .admin-settings-modal .admin-settings-save-footer {
+  padding-bottom: 12px !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .admin-settings-save-btn {
+  width: 100% !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  font-weight: 700 !important;
+}
+
+/* Date detail: keep the memo field + 추가 row in the visual viewport while typing. */
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .date-modal-field-with-actions {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 6 !important;
+  background: var(--bg-card) !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 -6px 12px color-mix(in srgb, var(--bg-card) 88%, transparent) !important;
+}
+
+/* Expand tap targets to >=40px via ::before hit area; icon glyph size unchanged. */
+html:has(.renewal-shell.v2-design) .memo-card-share-btn,
+html:has(.renewal-shell.v2-design) .memo-card-pin-btn,
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn,
+html:has(.renewal-shell.v2-design) .memo-comment-edit-btn,
+html:has(.renewal-shell.v2-design) .item-edit-delete-actions > button,
+html:has(.renewal-shell.v2-design) .date-modal-attendance-actions > button,
+html:has(.renewal-shell.v2-design) .place-card-action-btn,
+html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn,
+html:has(.renewal-shell.v2-design) .expense-row-delete-btn {
+  position: relative !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+html:has(.renewal-shell.v2-design) .memo-card-share-btn::before,
+html:has(.renewal-shell.v2-design) .memo-card-pin-btn::before,
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn::before,
+html:has(.renewal-shell.v2-design) .memo-comment-edit-btn::before,
+html:has(.renewal-shell.v2-design) .item-edit-delete-actions > button::before,
+html:has(.renewal-shell.v2-design) .date-modal-attendance-actions > button::before,
+html:has(.renewal-shell.v2-design) .place-card-action-btn::before,
+html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn::before,
+html:has(.renewal-shell.v2-design) .expense-row-delete-btn::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 40px !important;
+  height: 40px !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 999px !important;
+  /* Hit area only — no paint change */
+  background: transparent !important;
+}
+
+/* Mobile drawer: pin 공유/설정/접기; only the main item list scrolls if needed. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .bp-side-nav,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed {
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-group.bp-is-main {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-group.bp-is-sub,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-head,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-footer {
+    flex-shrink: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-footer {
+    margin-top: auto !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-btn {
+    margin-bottom: 0 !important;
+  }
+}

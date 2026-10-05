@@ -1847,6 +1847,7 @@ export function PlacesView({
               }),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
+                className: "place-card-action-btn",
                 onClick: event => {
                   event.preventDefault();
                   event.stopPropagation();
@@ -1863,6 +1864,7 @@ export function PlacesView({
               }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14, style: { pointerEvents: 'none' } })),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
+                className: "place-card-action-btn",
                 onClick: event => {
                   event.preventDefault();
                   event.stopPropagation();

@@ -685,12 +685,7 @@ export function AdminModal({
               )
             ),
 
-            /* Save Button for Settings */
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-primary", disabled: isSubmitting,
-              onClick: handleSubmitSettings,
-              style: { marginTop: '16px', width: '100%', height: '44px', fontWeight: 'bold' }
-            }, isSubmitting ? "저장 중..." : "설정 저장")
+            /* Save moved to sticky modal-footer so it stays above the keyboard. */
           )
         )
       ),
@@ -1019,6 +1014,29 @@ export function AdminModal({
       )
     )
   ),
+
+    /* Sticky save row: stays reachable while typing above the keyboard (V2 purple primary). */
+    activeTab === 'settings' && /*#__PURE__*/React.createElement("div", {
+      className: "modal-footer admin-settings-save-footer",
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'stretch',
+        gap: '8px',
+        flexShrink: 0,
+        padding: '12px 16px',
+        borderTop: '1px solid var(--border-subtle)',
+        background: 'var(--bg-card)'
+      }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-primary admin-settings-save-btn",
+        disabled: isSubmitting,
+        onClick: handleSubmitSettings,
+        style: { width: '100%', height: '44px', minHeight: '44px', fontWeight: 'bold' }
+      }, isSubmitting ? "저장 중..." : "설정 저장")
+    ),
 
     /* ========================================== */
     /* TAB 5: CALENDAR-BASED SCHEDULE DELETION      */
