@@ -570,12 +570,10 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
   bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
   buildsPerHour: 10
 });
-// Chat/memo images normally upload to Firebase Storage (short download URL stored on the
-// message/memo document); base64 is only the fallback embedded directly in the document when
-// that upload fails (see compressImageToDataUrls/resolveImageUrls). That fallback is always kept
-// small -- a live "last N messages" listener re-downloads and re-parses every matching document
-// on every page load, so a single oversized embedded image taxes every future visitor's load
-// forever, not just the one degraded send.
+// Chat/memo photos are Firebase Storage files (original + thumb). A data: URL in the document
+// is a legacy fallback only, and anything over the cap below is dropped rather than raising
+// that cap. Dropping the only photo must not leave an empty message -- sanitize throws
+// PHOTO_NOT_STORED in that case so the write is refused and the sender can resend.
 const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 8000);
 const CHAT_LIVE_MESSAGE_LIMIT = readConfigNumber('CHAT_LIVE_MESSAGE_LIMIT', 30);
 const ADMIN_MESSAGE_LIVE_LIMIT = readConfigNumber('ADMIN_MESSAGE_LIVE_LIMIT', 50);
@@ -589,6 +587,10 @@ const MAX_FIRESTORE_DATA_URL_CHARS = readConfigNumber('MAX_FIRESTORE_DATA_URL_CH
 function sanitizeMessageForFirestore(messageData) {
   if (!messageData || typeof messageData !== 'object') return messageData;
   const out = { ...messageData };
+  const inlinePhoto = (v) => typeof v === 'string' && v.startsWith('data:');
+  const hadInlinePhoto = inlinePhoto(out.imageUrl) || inlinePhoto(out.thumbUrl)
+    || (Array.isArray(out.imageUrls) && out.imageUrls.some(inlinePhoto))
+    || (Array.isArray(out.thumbUrls) && out.thumbUrls.some(inlinePhoto));
   const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
   if (tooBig(out.imageUrl)) delete out.imageUrl;
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
@@ -676,6 +678,20 @@ function sanitizeMessageForFirestore(messageData) {
     };
     out.fileAttachments = out.fileAttachments.map(sanitizeOne).filter(Boolean).slice(0, 20);
     if (out.fileAttachments.length === 0) delete out.fileAttachments;
+  }
+  const keptPhoto = [out.imageUrl, out.thumbUrl]
+    .concat(Array.isArray(out.imageUrls) ? out.imageUrls : [], Array.isArray(out.thumbUrls) ? out.thumbUrls : [])
+    .some(v => typeof v === 'string' && v);
+  // Do not raise the inline size cap. A photo that does not fit in the document must not be
+  // saved as an empty message either -- the caller surfaces a resend instead of writing it.
+  if (hadInlinePhoto && !keptPhoto) {
+    const hasText = typeof out.text === 'string' && out.text.trim();
+    const hasFiles = Array.isArray(out.fileAttachments) && out.fileAttachments.length > 0;
+    if (!hasText && !hasFiles) {
+      const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+      err.code = 'PHOTO_NOT_STORED';
+      throw err;
+    }
   }
   return omitUndefinedDeep(out);
 }

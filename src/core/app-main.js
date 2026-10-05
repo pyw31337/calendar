@@ -2834,7 +2834,7 @@ function CalendarApp() {
         // message in the normal case. Images that fall back to inline base64 (Storage
         // unavailable) keep their full quality -- instead the batch is split across multiple
         // chat messages if needed so no single message can exceed Firestore's 1MiB/doc limit.
-        const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
+        const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress, { requireStorage: true });
         notifyDedupedImages(resolvedImages);
         if (resolvedImages.length === 0) {
           throw new Error('이미 업로드된 사진입니다. 새 사진을 선택해 주세요.');
@@ -2909,11 +2909,12 @@ function CalendarApp() {
           showToast('네트워크가 불안정하여 전송을 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
         }
       } else {
-        showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
+        showRetryableUploadToast(imageCount > 0 ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '등록 실패', () => handleSendChatMessage(), 5000);
       }
     } catch (err) {
       console.error('handleSendChatMessage failed:', err);
-      showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
+      const duplicatePhoto = /이미 업로드된 사진/.test(String(err?.message || ''));
+      showRetryableUploadToast(duplicatePhoto ? err.message : (imageCount > 0 ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '등록 실패'), () => handleSendChatMessage(), 5000);
     } finally {
       setIsChatSubmitting(false);
       setChatUploadProgress(null);

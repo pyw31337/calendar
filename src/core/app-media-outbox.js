@@ -20,11 +20,16 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
   }));
   if (compressed.length === 0) return false;
   const chunks = chunkImages(await resolveImages(operation.calendarId, compressed, null, {
-    profile: payload.variantProfile || (payload.uploadSource && payload.uploadSource !== 'chat' ? 'grid' : 'chat')
+    profile: payload.variantProfile || (payload.uploadSource && payload.uploadSource !== 'chat' ? 'grid' : 'chat'),
+    // Queued chat photos must land in Storage too. A data URL is not a successful send.
+    requireStorage: true
   }));
   const tagOptions = todayUploadTagOptions(new Date(Number(payload.timestamp) || Date.now()));
   for (let i = 0; i < chunks.length; i += 1) {
     const images = chunks[i];
+    const stored = images.every(image => typeof image?.imageUrl === 'string' && image.imageUrl.startsWith('https://')
+      && typeof image?.thumbUrl === 'string' && image.thumbUrl.startsWith('https://'));
+    if (!stored) return false;
     const result = await writeMessage(operation.calendarId, {
       participantId: payload.participantId || '',
       text: i === 0 ? (payload.text || '') : '',
