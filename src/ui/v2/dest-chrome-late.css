@@ -8000,3 +8000,199 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
     min-height: calc(1.15em * 2) !important;
   }
 }
+
+
+/* ==== pc-polish-1005 ====
+ * 1) Anniversary/place bars: up to 2 lines + keep-all (title tooltip already on parent).
+ * 2) Contents cards: 2-line clamp for date/address; equal card heights in a row.
+ * 3) Places header/toolbar: icon/button vertical centers on one baseline.
+ * 4) Very-wide screens: cap main dest column so cards don't stretch endlessly.
+ * 6) Confetti below modals; pointer-events none (JS also skips when modal open).
+ * 7) Memo/link/file names: flex-grow + 2-line clamp (extension stays visible via wrap).
+ * Do NOT touch holiday corner labels / modal centering / memo action row / settlement image.
+ * ========================================================================= */
+
+/* 1 — anniversary / place bar labels */
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-has-label .bp-day-anniversary-label {
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    line-clamp: 2 !important;
+    white-space: normal !important;
+    word-break: keep-all !important;
+    overflow-wrap: anywhere !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.2 !important;
+    max-width: 100% !important;
+    max-height: calc(1.2em * 2) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only),
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary,
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-has-label {
+    height: auto !important;
+    min-height: 1.05rem !important;
+    align-items: flex-start !important;
+    padding-top: 0.12rem !important;
+    padding-bottom: 0.12rem !important;
+  }
+}
+
+/* 2 — contents cards: date / venue / address wrap intentionally */
+html:has(.renewal-shell.v2-design) .culture-items-grid > button {
+  height: 100% !important;
+  align-self: stretch !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child > div {
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+/* Title already uses 2-line clamp in JS; keep it. */
+html:has(.renewal-shell.v2-design) .culture-items-grid {
+  align-items: stretch !important;
+}
+
+/* 3 — places header actions + list toolbar vertical align */
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions,
+html:has(.renewal-shell.v2-design) .bp-header.v2-page-header .bp-header-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions .bp-icon-btn,
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions .bp-icon-btn svg,
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions > button svg {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar,
+html:has(.renewal-shell.v2-design) .v2-places .places-list-toolbar {
+  display: flex !important;
+  align-items: center !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar .segmented-toggle,
+html:has(.renewal-shell.v2-design) .places-list-toolbar [role="tablist"],
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn-action,
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn {
+  align-self: center !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn-action,
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn {
+  height: 42px !important;
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar .segmented-toggle,
+html:has(.renewal-shell.v2-design) .places-list-toolbar [role="tablist"]:not(.underline-tabs) {
+  min-height: 42px !important;
+  height: 42px !important;
+}
+
+/* 4 — wide screens: cap dest main column (centered in pane right of side-nav) */
+@media (min-width: 1600px) {
+  html:has(.renewal-shell.v2-design) {
+    --v2-dest-content-max: 1280px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-dest-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-legacy-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .history-page-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .gallery-page-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-list-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-dest-controls,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-list-toolbar,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-category-sticky-tabs,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .culture-items-grid {
+    max-width: var(--v2-dest-content-max, 1280px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* 6 — confetti under modals/controls (base canvas rule lives in app.css) */
+html:has(.renewal-shell.v2-design) canvas.bp-confetti-layer {
+  pointer-events: none !important;
+  z-index: 9000 !important; /* modals start ~11000 */
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.renewal-shell.v2-design) canvas.bp-confetti-layer { display: none !important; }
+}
+
+/* 7 — memo / link / file name room */
+html:has(.renewal-shell.v2-design) .link-preview-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .link-preview-card > div {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+html:has(.renewal-shell.v2-design) .link-preview-card > div > div:first-child {
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+}
+html:has(.renewal-shell.v2-design) .chat-file-attachment-card {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+html:has(.renewal-shell.v2-design) .chat-file-attachment-card > div {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+html:has(.renewal-shell.v2-design) .chat-file-attachment-name {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  white-space: normal !important;
+}

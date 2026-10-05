@@ -1060,6 +1060,8 @@ export function GamifiedConfirmButtonContent({ label }) {
 }
 
 export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null, wrapTitle = false }) {
+  // Stretch cards (memo/chat full-width) always get intentional 2-line titles so long
+  // Korean names are not hard-clipped to ~70px; callers can still pass wrapTitle.
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1169,7 +1171,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         padding: imageSrc ? '8px 10px 8px 0' : '8px 10px',
         minWidth: 0,
         maxWidth: stretch ? 'none' : (imageSrc ? '198px' : '270px'),
-        flex: stretch ? '1 1 0' : '0 1 auto',
+        flex: stretch ? '1 1 0%' : '0 1 auto',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -1180,16 +1182,20 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
+        className: (stretch || wrapTitle) ? 'link-preview-card-title is-wrap' : 'link-preview-card-title',
         style: {
           fontSize: 'var(--font-size-md)',
           fontWeight: 700,
-          lineHeight: 1.3,
+          lineHeight: 1.25,
           color: 'var(--text-main)',
-          overflow: wrapTitle ? 'visible' : 'hidden',
-          textOverflow: wrapTitle ? 'clip' : 'ellipsis',
-          whiteSpace: wrapTitle ? 'normal' : 'nowrap',
-          wordBreak: wrapTitle ? 'break-word' : undefined,
-          overflowWrap: wrapTitle ? 'anywhere' : undefined
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: (stretch || wrapTitle) ? 'normal' : 'nowrap',
+          wordBreak: (stretch || wrapTitle) ? 'keep-all' : undefined,
+          overflowWrap: (stretch || wrapTitle) ? 'anywhere' : undefined,
+          display: (stretch || wrapTitle) ? '-webkit-box' : undefined,
+          WebkitLineClamp: (stretch || wrapTitle) ? 2 : undefined,
+          WebkitBoxOrient: (stretch || wrapTitle) ? 'vertical' : undefined
         }
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
@@ -2240,6 +2246,76 @@ export function ResizableListSection({
   );
 }
 
+
+/**
+ * Browser Back closes the top overlay first (same pattern as the gallery lightbox).
+ * Pushes a same-URL history marker when the overlay mounts; popstate calls onClose.
+ * Closing via UI calls history.back() when our marker is still on top so PWA Back
+ * never exits the app unexpectedly. Ephemeral dialogs should pass enabled:false.
+ * Deep links (?memory=, notification ?tab=) keep their own URL entries unchanged.
+ */
+export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } = {}) {
+  const React = window.React;
+  const markerRef = React.useRef(false);
+  const closingViaBackRef = React.useRef(false);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  const stateKey = `__moyeoraOverlay_${key}`;
+
+  React.useEffect(() => {
+    if (!enabled || typeof window === 'undefined' || !window.history) return undefined;
+    try {
+      window.history.pushState({ ...(window.history.state || {}), [stateKey]: true }, '', window.location.href);
+      markerRef.current = true;
+    } catch (_) {
+      markerRef.current = false;
+    }
+    const handlePopState = () => {
+      if (!markerRef.current) return;
+      markerRef.current = false;
+      closingViaBackRef.current = true;
+      try {
+        if (typeof onCloseRef.current === 'function') onCloseRef.current();
+      } finally {
+        closingViaBackRef.current = false;
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      // If the overlay unmounts without going through history.back (parent navigated),
+      // drop the marker quietly so a later Back does not reopen a ghost close.
+      if (markerRef.current && window.history.state && window.history.state[stateKey]) {
+        markerRef.current = false;
+        try {
+          const next = { ...(window.history.state || {}) };
+          delete next[stateKey];
+          window.history.replaceState(next, '', window.location.href);
+        } catch (_) { /* best-effort */ }
+      } else {
+        markerRef.current = false;
+      }
+    };
+  }, [enabled, stateKey]);
+
+  const requestClose = React.useCallback(() => {
+    if (closingViaBackRef.current) {
+      if (typeof onCloseRef.current === 'function') onCloseRef.current();
+      return;
+    }
+    if (markerRef.current && window.history.state && window.history.state[stateKey]) {
+      markerRef.current = false;
+      try {
+        window.history.back();
+        return;
+      } catch (_) { /* fall through */ }
+    }
+    if (typeof onCloseRef.current === 'function') onCloseRef.current();
+  }, [stateKey]);
+
+  return requestClose;
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ResizableModalContainer: ResizableModalContainer,
@@ -2262,6 +2338,7 @@ export function ResizableListSection({
     SyncStatusChip: SyncStatusChip,
     SyncStatusBanner: SyncStatusBanner,
     LinkPreviewCard: LinkPreviewCard,
+    useOverlayHistory: useOverlayHistory,
     LinkPreviewProgressOverlay: LinkPreviewProgressOverlay,
     AdminLoginGate: AdminLoginGate,
     DonutChart: DonutChart,

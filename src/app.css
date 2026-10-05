@@ -398,7 +398,7 @@ canvas.bp-confetti-layer {
   width: 100% !important;
   height: 100% !important;
   pointer-events: none !important;
-  z-index: 2147483646 !important;
+  z-index: 9000 !important;
 }
 
 /* Motion system ---------------------------------------------------------

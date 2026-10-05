@@ -6,6 +6,7 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
 import { DateTitle } from './date-title.js';
+import { useOverlayHistory } from './ui-shared.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -279,6 +280,7 @@ export function DateModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const ParticipantBackdrop = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantBackdrop) || __deps.ParticipantBackdrop;
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const finishClose = useOverlayHistory(onClose, { enabled: true, key: 'date-modal' });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const ResizableListSection = __comp.ResizableListSection || __deps.ResizableListSection;
   const AutoGrowTextarea = __deps.AutoGrowTextarea;
@@ -2073,7 +2075,7 @@ export function DateModal({
     if (isSubmitting) return;
     const b = formBaselineRef.current;
     if (!b) {
-      onClose();
+      finishClose();
       return;
     }
     const dirty = (
@@ -2094,10 +2096,10 @@ export function DateModal({
       String(expensePayerInput || '') !== String(b.expensePayerInput || '')
     );
     if (dirty && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
+      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => finishClose());
       return;
     }
-    onClose();
+    finishClose();
   };
 
   const isBentoSheet = shellChrome === 'bento';
