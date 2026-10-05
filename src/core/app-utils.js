@@ -1,3 +1,4 @@
+import { todaySeoulDateKey, diffDaysFromSeoulToday, addDaysToDateKey, seoulHour } from './seoul-date.js';
 const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   // Firestore rejects `undefined` anywhere in an SDK payload, while the REST encoder used by
@@ -67,13 +68,10 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return `[모임확정] ${y}.${m}.${d} (${dayName})`;
   }
 
-  function formatDDayLabel(dateStr) {
+  function formatDDayLabel(dateStr, now = new Date()) {
     if (!dateStr || typeof dateStr !== 'string') return '';
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const target = new Date(y, m - 1, d);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diffDays = Math.round((target - today) / 86400000);
+    const diffDays = diffDaysFromSeoulToday(dateStr, now);
+    if (diffDays == null) return '';
     if (diffDays === 0) return 'D-Day';
     if (diffDays < 0) return `D+${Math.abs(diffDays)}`;
     return `D-${diffDays}`;
@@ -717,12 +715,8 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return [...datedEntriesByKey.values(), ...datelessEntries];
   }
 
-  function getTodayString() {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+  function getTodayString(now = new Date()) {
+    return todaySeoulDateKey(now);
   }
 
   function derivePlaceVisitStatus(place, todayStr = getTodayString()) {
@@ -1197,6 +1191,10 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     removePlaceMemoEntry,
     getMemoDateMatches,
     getTodayString,
+    todaySeoulDateKey,
+    addDaysToDateKey,
+    seoulHour,
+    diffDaysFromSeoulToday,
     derivePlaceVisitStatus,
     countPlaceVisits,
     getPlaceMemoEntryForDate,

@@ -1140,6 +1140,42 @@ export function ChatGalleryModal({
   }, [sharedPhotos]);
   photoByAssetKeyRef.current = photoByAssetKey;
 
+  // Photo-comment push deep link: ?view=gallery&img=<assetKey> opens that photo's lightbox
+  // (comments render in the lightbox by default). Chat uses img as a numeric message index —
+  // only treat non-numeric / asset-like values here.
+  const galleryDeepLinkHandledRef = React.useRef('');
+  React.useEffect(() => {
+    if (typeof setActiveLightbox !== 'function') return undefined;
+    if (!Array.isArray(sharedPhotos) || sharedPhotos.length === 0) return undefined;
+    let imgParam = '';
+    try {
+      imgParam = String(new URLSearchParams(window.location.search).get('img') || '').trim();
+    } catch (_) { return undefined; }
+    if (!imgParam || /^\d+$/.test(imgParam)) return undefined;
+    if (galleryDeepLinkHandledRef.current === imgParam) return undefined;
+    const matchKey = (photo) => {
+      const keys = [photo?.assetKey, photo?.mediaKey, photo?.refKey, ...(Array.isArray(photo?.legacyKeys) ? photo.legacyKeys : [])]
+        .map(k => String(k || '').trim()).filter(Boolean);
+      return keys.includes(imgParam);
+    };
+    const index = sharedPhotos.findIndex(matchKey);
+    if (index < 0) return undefined;
+    galleryDeepLinkHandledRef.current = imgParam;
+    setActiveLightbox({
+      urls: sharedPhotos.map(p => p.full),
+      index,
+      meta: sharedPhotos.map(p => ({
+        timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
+        tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+        meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
+        sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey,
+        refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey
+      }))
+    });
+    return undefined;
+  }, [sharedPhotos, setActiveLightbox]);
+
+
   React.useEffect(() => {
     if (activeTab !== 'analysis' || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
     const calendarId = String(calendar?.id || '').trim();

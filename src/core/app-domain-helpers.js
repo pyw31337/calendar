@@ -165,12 +165,10 @@ const getDisplayPlaceAddress = GATHER_APP_UTILS.getDisplayPlaceAddress || functi
 // meaningful, but a place can also be dropped by raw coordinates with no name/address at all.
 // visitStatus distinguishes an already-visited place from one that's only planned; visitDate is
 // only meaningful (and only ever shown) when visitStatus is 'visited'.
-function getTodayString() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+function getTodayString(now = new Date()) {
+  if (typeof GATHER_APP_UTILS.todaySeoulDateKey === 'function') return GATHER_APP_UTILS.todaySeoulDateKey(now);
+  const d = now instanceof Date ? now : new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function derivePlaceVisitStatus(place, todayStr = getTodayString()) {

@@ -21,7 +21,12 @@ export function buildAppViewUrl(locationLike, view, currentMonthDate) {
   // Notification and search deep links (?msg=&memo=&comment=) must survive the
   // view switch that opens them. Leaving the destination drops them.
   const keepMsg = view === 'chat' ? params.get('msg') : null;
-  const keepImg = view === 'chat' ? params.get('img') : null;
+  // Chat deep links use img as a numeric message image index; gallery photo-comment pushes use
+  // img as an assetKey. Do not carry a gallery assetKey into chat (Number(assetKey)||0 => 0).
+  const rawImg = params.get('img');
+  const keepImg = view === 'gallery'
+    ? rawImg
+    : (view === 'chat' && rawImg != null && /^\d+$/.test(rawImg) ? rawImg : null);
   const keepMemo = view === 'memo' ? params.get('memo') : null;
   const keepMemoFocus = view === 'memo' ? params.get('memoFocus') : null;
   const keepComment = view === 'memo' ? params.get('comment') : null;

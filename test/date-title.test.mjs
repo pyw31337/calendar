@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { relativeDayLabel, shortDateTitleParts } from '../src/ui/date-title.js';
 
-const now = new Date(2026, 9, 2, 14, 0);
+const now = new Date('2026-10-02T14:00:00+09:00');
 
 test('relative badge only for 어제/오늘/내일/모레', () => {
   assert.equal(relativeDayLabel('2026-10-01', now), '어제');

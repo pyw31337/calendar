@@ -1,3 +1,4 @@
+import { todaySeoulDateKey } from './seoul-date.js';
 import {
   getCalendarPlaces,
   getCalendarPolls,
@@ -64,7 +65,7 @@ export function buildMainCalendarScreenState({
   const mainMenuGalleryCount = localGalleryCount > 0
     ? localGalleryCount
     : (typeof totalGalleryCount === 'number' && totalGalleryCount >= 0 ? totalGalleryCount : localGalleryCount);
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const today = todaySeoulDateKey(now);
   const visibleConfirmedMeetings = getTrulyConfirmedMeetings(calendar)
     .filter(meeting => isValidDateString(meeting?.date) && meeting.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));

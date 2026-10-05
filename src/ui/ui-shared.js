@@ -367,37 +367,37 @@ export function ResizableModalContainer({ className, style, children, ...props }
     };
   }, []);
 
-  // Fit modal to currently visible viewport (address bar / toolbars on or off).
+  // Fit modal using --app-vv-height; re-run on the same return signals as #870 (no settle fan-out).
   React.useEffect(() => {
     if (dimensions) return undefined;
     const root = document.documentElement;
     const apply = () => {
-      const vv = window.visualViewport;
-      const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
-      const vvTop = vv && typeof vv.offsetTop === 'number' ? Math.max(0, vv.offsetTop) : 0;
-      const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
-      const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
-      const maxPx = Math.max(180, Math.floor(isMemoEdit
-          ? Math.min(780, vvH - vvTop - reserved)
-        : Math.min(860, vvH - vvTop - reserved)));
+      const vvH = getVisibleHeight();
+      const topRaw = Number.parseFloat(root.style.getPropertyValue('--app-vv-offset-top'));
+      const vvTop = Number.isFinite(topRaw) && topRaw > 0 ? topRaw : 0;
+      const isMemoEdit = containerRef.current?.classList.contains('memo-edit-modal-container');
+      const reserved = window.matchMedia?.('(max-width: 640px)').matches ? 20 : 32;
+      const maxPx = Math.max(180, Math.floor(Math.min(isMemoEdit ? 780 : 860, vvH - vvTop - reserved)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
-      if (containerRef.current) {
-        containerRef.current.style.maxHeight = `${maxPx}px`;
-      }
+      if (containerRef.current) containerRef.current.style.maxHeight = `${maxPx}px`;
     };
-    apply();
+    const onVis = () => { if (document.visibilityState !== 'hidden') apply(); };
+    const onSw = (e) => { if (e?.data?.type === 'notification-open') apply(); };
     const vv = window.visualViewport;
-    if (vv) {
-      vv.addEventListener('resize', apply);
-      vv.addEventListener('scroll', apply);
-    }
+    vv?.addEventListener('resize', apply);
     window.addEventListener('resize', apply);
+    window.addEventListener('pageshow', apply);
+    window.addEventListener('focus', apply);
+    document.addEventListener('visibilitychange', onVis);
+    try { navigator.serviceWorker?.addEventListener('message', onSw); } catch (_) {}
+    apply();
     return () => {
-      if (vv) {
-        vv.removeEventListener('resize', apply);
-        vv.removeEventListener('scroll', apply);
-      }
+      vv?.removeEventListener('resize', apply);
       window.removeEventListener('resize', apply);
+      window.removeEventListener('pageshow', apply);
+      window.removeEventListener('focus', apply);
+      document.removeEventListener('visibilitychange', onVis);
+      try { navigator.serviceWorker?.removeEventListener('message', onSw); } catch (_) {}
     };
   }, [dimensions]);
 

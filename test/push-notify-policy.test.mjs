@@ -146,3 +146,10 @@ test('editing or deleting an existing memo comment does not notify', () => {
   assert.equal(decideMemoNotification(before, memo({ comments: [{ id: 'cmt_old', text: '고침', participantId: 'person_author' }] }), { memoId: 'memo_place' }), null);
   assert.equal(decideMemoNotification(before, memo({ comments: [] }), { memoId: 'memo_place' }), null);
 });
+
+test('photo comment push URL carries gallery view and asset img', () => {
+  assert.equal(
+    buildPushTargetUrl('cal_cw', { view: 'gallery', img: 'asset:v1:photo1' }),
+    './?id=cw&view=gallery&img=asset%3Av1%3Aphoto1'
+  );
+});
