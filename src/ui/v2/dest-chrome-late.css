@@ -8003,7 +8003,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
 
 
 /* ==== pc-polish-1005 ====
- * 1) Anniversary/place bars: up to 2 lines + keep-all (title tooltip already on parent).
+ * 1) (reverted 1006) Calendar anniversary/event/place bars stay thin single-line capsules; title tooltip shows full name.
  * 2) Contents cards: 2-line clamp for date/address; equal card heights in a row.
  * 3) Places header/toolbar: icon/button vertical centers on one baseline.
  * 4) Very-wide screens: cap main dest column so cards don't stretch endlessly.
@@ -8012,46 +8012,9 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
  * Do NOT touch holiday corner labels / modal centering / memo action row / settlement image.
  * ========================================================================= */
 
-/* 1 — anniversary / place bar labels (beats "Anniversary badges, final say" nowrap). Tablet/PC
-   only: every bar gets one fixed two-line lane height so solo stacks and 연일 lanes stay aligned
-   (reserved space); one-line titles sit vertically centered, long ones wrap to 2 lines (keep-all)
-   and ellipsize only after the second line. Full title stays in the bar's title tooltip. */
-@media (min-width: 768px) {
-  html:has(.renewal-shell.v2-design) {
-    --ann-bar-h: 30px; /* 2 x (11px * 1.2) + 2px padding */
-  }
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range,
-  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary {
-    height: var(--ann-bar-h) !important;
-    min-height: var(--ann-bar-h) !important;
-    max-height: var(--ann-bar-h) !important;
-    align-items: center !important;
-    padding-top: 1px !important;
-    padding-bottom: 1px !important;
-    border-radius: 10px !important;
-  }
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-is-start { border-radius: 10px 0 0 10px !important; }
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-is-end { border-radius: 0 10px 10px 0 !important; }
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range.bp-is-mid { border-radius: 0 !important; }
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-anniversary > .bp-day-anniversary-label,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-ann-range .bp-day-anniversary-label,
-  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label {
-    display: -webkit-box !important;
-    -webkit-box-orient: vertical !important;
-    -webkit-line-clamp: 2 !important;
-    line-clamp: 2 !important;
-    white-space: normal !important;
-    word-break: keep-all !important;
-    overflow-wrap: anywhere !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    line-height: 1.2 !important;
-    max-width: 100% !important;
-    max-height: calc(1.2em * 2) !important;
-    min-width: 0 !important;
-  }
-}
+/* 1 — reverted (anniv-capsule-1006): calendar bars keep the original thin 999px capsule,
+   single line + ellipsis (rules earlier in this file). Full name stays in the title tooltip.
+   Do not re-add fixed 30px / 2-line wrap here. */
 
 /* 2 — contents cards: date / venue / address wrap intentionally */
 html:has(.renewal-shell.v2-design) .culture-items-grid > button {
