@@ -15,6 +15,7 @@ import { ChatBubbleFrame } from './chat-bubble-modules.js';
 import {
   extractChatSlots, extractMemoSlots, extractSettlementSlots,
 } from './shell-nav.js';
+import { useOverlayHistory } from '../ui-shared.js';
 
 const h = (...args) => window.React.createElement(...args);
 const MEMO_PAGE_SIZE = 20;
@@ -254,12 +255,13 @@ function headerExtra(nodes) {
   return h(window.React.Fragment, null, ...items);
 }
 
-function layerPopup({ label, title, onClose, children }) {
+function LayerPopupInner({ label, title, onClose, children }) {
+  const closeOverlay = useOverlayHistory(onClose, { enabled: true, key: 'layer-popup' });
   const ReactDOM = window.ReactDOM;
   const Box = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || 'div';
   const dialog = h(
     'div',
-    { className: 'modal-overlay', onClick: onClose, style: { zIndex: 12000 } },
+    { className: 'modal-overlay', onClick: closeOverlay, style: { zIndex: 12000 } },
     h(
       Box,
       {
@@ -274,7 +276,7 @@ function layerPopup({ label, title, onClose, children }) {
         'div',
         { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: 'none' } },
         h('h3', { style: { margin: 0, fontSize: '1.02rem', fontWeight: 900, color: 'var(--text-main)' } }, title),
-        h(IconButton, { label: '닫기', icon: 'close', onClick: onClose })
+        h(IconButton, { label: '닫기', icon: 'close', onClick: closeOverlay })
       ),
       h('div', { className: 'modal-body', style: { overflowY: 'auto', padding: '14px 16px 18px' } }, children)
     )
@@ -283,6 +285,10 @@ function layerPopup({ label, title, onClose, children }) {
     return ReactDOM.createPortal(dialog, document.body);
   }
   return dialog;
+}
+
+function layerPopup(props) {
+  return h(LayerPopupInner, props);
 }
 
 /** Strip leading emoji/symbols from calendar title for header/side badges. */
@@ -559,7 +565,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
             onClick: unifiedSearch ? toggleUnifiedSearch : onSearch,
           }),
           extra,
-          showMenu && onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
+          showMenu && onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 18, onClick: onMenu })
         )
       ),
       unifiedSearch && h(

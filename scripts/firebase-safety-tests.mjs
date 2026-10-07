@@ -5,7 +5,7 @@ import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { buildPhotoCommentItem, visiblePhotoComments, cleanPhotoCommentKey } from '../src/core/photo-comment-items.js';
 import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries, preserveAnniversaryCurationFields, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../src/core/gallery-data.js';
-import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
+import { filterDeletedPhotoFromIndexItems, queueOwnedChatFileForStorageGc } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/core/app-data-bootstrap.js';
@@ -468,7 +468,7 @@ const photoActionsSource = fs.readFileSync(new URL('../src/core/app-calendar-pho
 // wiring these asserts guard lives in the V2 shell's records context.
 const calendarViewsSource = fs.readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
 const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
-const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
+const chatRenderSource = fs.readFileSync(new URL('../src/ui/chat-render.js', import.meta.url), 'utf8');
 // The gallery page spans ui-chat-gallery.js (view) and gallery-collections.js (its 사진/링크/파일
 // lists, split out in the 2026-10 rewrite), so these pins read both.
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8')
@@ -808,9 +808,10 @@ const miscUiScript = fs.readFileSync('src/ui/ui-misc.js', 'utf8');
 assert(miscUiScript.includes('meta[name="build-sha"]') && miscUiScript.includes('extractUpdateBuildId'), 'update banner must compare the loaded build SHA before hashed chunk fallbacks');
 assert(/isAppleWebKit/.test(firebaseDataScript) && /experimentalAutoDetectLongPolling: isAppleWebKit/.test(firebaseDataScript), 'Safari/WebKit must avoid forced Firestore long polling');
 assert(!/push_subscriptions.*get\(\)/s.test(sideMenuScript), 'settings must not fetch implementation-level push device inventory');
-assert(functionsSource.includes('parsePublicHttpUrl') && functionsSource.includes('metadata.google.internal'), 'public proxies must validate URLs and block cloud metadata SSRF targets');
+const publicProxySource = fs.readFileSync('functions/public-proxy-contract.js', 'utf8');
+assert(functionsSource.includes("require('./public-proxy-contract')") && functionsSource.includes('parsePublicHttpUrl') && publicProxySource.includes('metadata.google.internal'), 'public proxies must validate URLs and block cloud metadata SSRF targets');
 assert(functionsSource.includes("timeoutSeconds: 15") && functionsSource.includes("maxInstances: 20") && functionsSource.includes("memory: '256MB'"), 'public proxy functions must have bounded runtime resources');
-assert(functionsSource.includes('setPublicCacheHeaders') && functionsSource.includes('stale-while-revalidate'), 'public proxy responses must advertise bounded browser/shared caching');
+assert(functionsSource.includes('setPublicCacheHeaders') && publicProxySource.includes('stale-while-revalidate'), 'public proxy responses must advertise bounded browser/shared caching');
 assert(/collection\('push_subscriptions'\)\.limit\(500\)/.test(functionsSource), 'push fan-out must have a bounded subscription query');
 assert(/new AbortController\(\)[\s\S]{0,220}api\.peekalink\.io/.test(functionsSource), 'paid link preview requests must have an upstream timeout');
 assert(firestoreRules.includes("data.uploadSource == 'chat'"), 'message rules must permit the explicit chat channel');
@@ -932,19 +933,23 @@ assert(galleryBulkDeleteSource.includes('filterDeletedPhotoFromIndexItems'), 'ph
   assert(after.find(photo => photo.full === 'd.jpg')?.imageIndex === 0, 'photos on other messages must keep their index');
 }
 {
-  let deleted = false;
-  const fakeStorage = { ref: () => ({ delete: async () => { deleted = true; } }) };
-  await deleteOwnedChatFileFromStorage({ storagePath: 'chatFiles/cw/file.pdf' }, {
-    activeCalId: 'kkot',
-    getStorage: () => fakeStorage
+  const bodies = [];
+  const fetchImpl = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return { ok: true, status: 200, json: async () => ({ ok: true, queued: 1 }) };
+  };
+  const foreign = await queueOwnedChatFileForStorageGc({ storagePath: 'chatFiles/cw/file.pdf' }, {
+    activeCalId: 'kkot', projectId: 'demo', fetchImpl
   });
-  assert(!deleted, 'pasted files from another calendar must not delete the source Storage object');
-  await deleteOwnedChatFileFromStorage({ storagePath: 'chatFiles/kkot/file.pdf' }, {
-    activeCalId: 'kkot',
-    getStorage: () => fakeStorage
+  assert(foreign.ok === false && foreign.reason === 'not-owned', 'pasted files from another calendar must not queue the source Storage object');
+  const owned = await queueOwnedChatFileForStorageGc({ storagePath: 'chatFiles/kkot/file.pdf' }, {
+    activeCalId: 'kkot', projectId: 'demo', fetchImpl
   });
-  assert(deleted, 'files owned by the active calendar must be removable from Storage');
+  assert(owned.ok === true, 'files owned by the active calendar must be queueable for Storage GC');
+  assert(bodies[0].op === 'queueStorageGc', 'chat file deletes must go through the 7-day storageGc queue');
 }
+assert(galleryBulkDeleteSource.includes('queueStorageGc') || galleryBulkDeleteSource.includes('queueOwnedChatFileForStorageGc'), 'gallery file deletes must queue storageGc instead of hard-deleting');
+assert(!/storage\.ref\(path\)\.delete\(/.test(galleryBulkDeleteSource), 'gallery file deletes must not call Storage.delete immediately');
 assert(domainHelpersScript.includes('fileAttachments'), 'message sanitizer must preserve fileAttachments');
 const chatFilesUi = fs.readFileSync('src/ui/ui-chat-files.js', 'utf8');
 assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAttachmentCard'), 'document lightbox and attachment cards must ship');

@@ -16,6 +16,7 @@
 // memosRef, findChatMessageById) stay in CalendarApp and are passed in. getFirebaseDb reads
 // app-main's module-level Firestore handle live at call time, like the inline code did.
 import { createActivityLog, getConfirmedMeetings, getMessageImageEntries, isValidDateString, reconcileMessageImageTagMap, sanitizeMemoForFirestore, sanitizeMessageForFirestore, withTimeout } from './app-domain-helpers.js';
+import { buildMemoImageRestorePatch } from './memo-edit-patch.js';
 import { fetchGalleryPhotoOrdinal, fetchMessageOrdinal, fetchMessageRest, firebaseConfig, firestoreDocumentToJs, writeCollectionDocumentWithFallback } from './app-firebase-data.js';
 import { resolveChatImageBatch } from './app-image-pipeline.js';
 import { isChatImageUpload } from './image-variants.js';
@@ -382,8 +383,8 @@ export function createCalendarPhotoActions({
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
       const allowed = asCreate
-        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
-        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
+        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo', 'imageIntake']
+        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageShareUrls', 'imageTags', 'imageTagMap', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments', 'imageIntake'];
       const out = {};
       for (const key of allowed) {
         if (msg && msg[key] !== undefined) out[key] = msg[key];
@@ -686,10 +687,11 @@ export function createCalendarPhotoActions({
       }
       showUndoableDeleteToast('사진이 삭제되었습니다.', async () => {
         try {
-          const restored = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore(memoSnapshot), 'set', '메모 사진 복원');
+          const restorePatch = sanitizeMemoForFirestore(buildMemoImageRestorePatch(memoSnapshot));
+          const restored = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, restorePatch, 'update', '메모 사진 복원');
           if (!restored) throw new Error('Memo photo restore failed');
-          setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...memoSnapshot } : m));
-          if (typeof patchGalleryArchiveMemo === 'function') patchGalleryArchiveMemo(memoId, memoSnapshot);
+          setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...restorePatch } : m));
+          if (typeof patchGalleryArchiveMemo === 'function') patchGalleryArchiveMemo(memoId, restorePatch);
           showToast('사진 삭제를 되돌렸습니다.', 'success', 3000);
         } catch (err) {
           console.error('handleDeleteMemoPhoto undo failed:', err);

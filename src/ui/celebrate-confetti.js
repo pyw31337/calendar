@@ -6,7 +6,8 @@
  */
 import confetti from 'canvas-confetti';
 
-export const CONFETTI_Z_INDEX = 2147483646;
+/** Below modal overlays (~11000+) so particles never cover controls. */
+export const CONFETTI_Z_INDEX = 9000;
 
 if (typeof window !== 'undefined') window.confetti = confetti;
 
@@ -14,8 +15,18 @@ const COUNT = 350;
 const defaults = {
   origin: { y: 0.8 },
   zIndex: CONFETTI_Z_INDEX,
-  disableForReducedMotion: false,
+  disableForReducedMotion: true,
 };
+
+function shouldSkipConfetti() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return true;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+  } catch (_) { /* ignore */ }
+  // Skip while a modal/sheet/settings overlay is open so particles never sit on controls.
+  if (document.querySelector('.modal-overlay, .bottom-sheet-overlay, .admin-side-menu-overlay')) return true;
+  return false;
+}
 
 function fire(particleRatio, opts) {
   confetti({
@@ -35,6 +46,7 @@ function pinConfettiLayer() {
 }
 
 export function launchClipboardConfetti() {
+  if (shouldSkipConfetti()) return;
   try {
     fire(0.25, {
       spread: 26,

@@ -18,6 +18,14 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
   const imageEntryCount = getMessageImageEntries(msg).length;
   const textMaxWidth = imageEntryCount >= 2 ? computeChatImageGridMaxWidth(imageEntryCount) : null;
   const hasText = !!msg.text;
+  // A photo send that never stored an image used to leave a blank bubble (no text, no image).
+  // Say so instead of painting empty chrome. New sends refuse to write that shell at all.
+  if (!hasText && !msgImages && !fileNodes && !msg?.linkPreview && !(Array.isArray(msg?.linkPreviews) && msg.linkPreviews.length)) {
+    return /*#__PURE__*/React.createElement('span', {
+      className: 'chat-photo-send-failed',
+      style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', lineHeight: 1.45 }
+    }, '사진이 안 올라갔어요. 다시 보내 주세요.');
+  }
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: (hasText || fileNodes) ? '8px' : '0' } }, msgImages) : null,
     fileNodes ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: hasText ? '8px' : '0' } }, fileNodes) : null,

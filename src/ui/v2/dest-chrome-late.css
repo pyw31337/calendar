@@ -1600,12 +1600,13 @@ html:has(.renewal-shell.v2-design) .v2-settings-modal .modal-body {
   max-height: calc(92dvh - 120px) !important;
   padding: 14px 16px 28px !important;
 }
+/* Popups center on the screen at every width, side-nav open or collapsed (no 280px
+   side-nav offset: the blurred overlay already covers the nav). */
 @media (min-width: 1200px) {
   html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .modal-overlay:not(.meme-preview-overlay) {
     left: 0 !important;
     right: 0 !important;
     width: 100vw !important;
-    padding-left: 280px !important;
     box-sizing: border-box !important;
   }
 }
@@ -1654,7 +1655,6 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     left: 0 !important;
     right: 0 !important;
     width: 100vw !important;
-    padding-left: 280px !important;
     box-sizing: border-box !important;
   }
 }
@@ -2627,11 +2627,13 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
   }
 }
 
+/* Tablet / small-PC widths: popups are centered cards like on wide PC (they used to dock to
+   the bottom edge as a phone-style sheet, which on a 1024px PC window looked pushed down). */
 @media (min-width: 768px) and (max-width: 1199px) {
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
   html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
-    align-items: flex-end !important;
-    padding: 0 16px !important;
+    align-items: center !important;
+    padding: 16px !important;
   }
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
@@ -2646,9 +2648,9 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     transform: none !important;
     width: min(520px, calc(100vw - 32px)) !important;
     max-width: 520px !important;
-    max-height: 88dvh !important;
+    max-height: min(88dvh, calc(var(--app-vv-height, 100dvh) - 32px)) !important;
     margin: 0 auto !important;
-    border-radius: 20px 20px 0 0 !important;
+    border-radius: 20px !important;
   }
 }
 
@@ -7565,14 +7567,10 @@ html:has(.renewal-shell.v2-design) .v2-more .v2-more-note {
 
 /* ---------- 320px phones ----------
    The month grid's columns were sized by content, so a long holiday ("대체공휴일(개천절)") widened
-   its column to twice the others; every column is now an equal share and corner labels clip. */
+   its column to twice the others; every column is now an equal share. Corner labels wrap to two
+   lines instead of clipping (see "Calendar holiday labels" at the end of this file). */
 html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid {
   grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-}
-html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* Date sheet header: "26. 10.03(토)" + holiday badge + 기념일 등록 + close on one row; the
    기념일 등록 button keeps only its icon on narrow phones. */
@@ -7819,3 +7817,393 @@ html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-photo-grid 
 html:has(.renewal-shell.v2-design) .bp-skel-page.is-gallery .bp-skel-thumb { border-radius: 8px; }
 /* 좋아요 tab: its 내|모두 toggle sits 16px under the tabs like every other gallery toolbar. */
 html:has(.renewal-shell.v2-design) .visit-filter-toggle-mobile.gallery-likes-scope { margin-top: 12px; }
+
+
+/* --------------------------------------------------------------------------
+ * Mobile 320 layout: sticky settings save, larger icon hit areas, side-nav 접기
+ * reachable without scrolling. Visible icon sizes stay unchanged.
+ * -------------------------------------------------------------------------- */
+
+/* Calendar settings: save row is a real modal-footer (outside the scroll body)
+   so it stays above the keyboard while typing. */
+html:has(.renewal-shell.v2-design) .admin-settings-modal .admin-settings-save-footer {
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 12 !important;
+  background: var(--bg-card) !important;
+  border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
+  padding: 12px 16px !important;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .admin-settings-modal .admin-settings-save-footer {
+  padding-bottom: 12px !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .admin-settings-save-btn {
+  width: 100% !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  font-weight: 700 !important;
+}
+
+/* Date detail: keep the memo field + 추가 row in the visual viewport while typing.
+   :focus-within covers short viewports even when vv-sync has not marked data-v2-keyboard. */
+html:has(.renewal-shell.v2-design) .date-modal-field-with-actions:focus-within,
+html:has(.renewal-shell.v2-design)[data-v2-keyboard] .date-modal-field-with-actions:focus-within {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 6 !important;
+  background: var(--bg-card) !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 -6px 12px color-mix(in srgb, var(--bg-card) 88%, transparent) !important;
+}
+
+/* Expand tap targets to >=40px via ::before hit area; icon glyph size unchanged.
+   Memo-card 공유/좋아요/고정 are NOT in this position list: they are absolutely placed in the
+   card's top-right row (inline style / .memo-card-like-btn), and forcing them to relative
+   dropped them into the text flow. Being absolute they already anchor their hit area. */
+html:has(.renewal-shell.v2-design) .memo-comment-edit-btn,
+html:has(.renewal-shell.v2-design) .item-edit-delete-actions > button,
+html:has(.renewal-shell.v2-design) .date-modal-attendance-actions > button,
+html:has(.renewal-shell.v2-design) .place-card-action-btn,
+html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn,
+html:has(.renewal-shell.v2-design) .expense-row-delete-btn {
+  position: relative !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+html:has(.renewal-shell.v2-design) .memo-card-share-btn::before,
+html:has(.renewal-shell.v2-design) .memo-card-pin-btn::before,
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn::before,
+html:has(.renewal-shell.v2-design) .memo-comment-edit-btn::before,
+html:has(.renewal-shell.v2-design) .item-edit-delete-actions > button::before,
+html:has(.renewal-shell.v2-design) .date-modal-attendance-actions > button::before,
+html:has(.renewal-shell.v2-design) .place-card-action-btn::before,
+html:has(.renewal-shell.v2-design) .gather-like-btn.place-card-like-btn::before,
+html:has(.renewal-shell.v2-design) .expense-row-delete-btn::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 40px !important;
+  height: 40px !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 999px !important;
+  /* Hit area only — no paint change */
+  background: transparent !important;
+}
+
+/* Mobile drawer: pin 공유/설정/접기; only the main item list scrolls if needed. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .bp-side-nav,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed {
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-group.bp-is-main {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-group.bp-is-sub,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-head,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-footer {
+    flex-shrink: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-footer {
+    margin-top: auto !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-btn {
+    margin-bottom: 0 !important;
+  }
+}
+
+/* Memo-card top-right row (좋아요 · 공유 · 고정) sits ~22px apart, so a 40px circle would let
+   the pin swallow taps aimed at 공유. Keep the 40px height but only the slot's own width. */
+html:has(.renewal-shell.v2-design) .memo-card-share-btn::before,
+html:has(.renewal-shell.v2-design) .memo-card-pin-btn::before,
+html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn::before {
+  width: 22px !important;
+  border-radius: 8px !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Popups: always centered on the screen.
+ * A position:fixed overlay is laid out against the nearest ancestor that has a
+ * transform / filter / backdrop-filter / perspective / contain / will-change.
+ * Screens and cards run enter animations (bp-screen-fade-in, bp-rise-in, ...)
+ * with fill-mode "both", which leaves a transform on them for good, so modals
+ * that are rendered inside a screen (정산 수정, 정산카드, ...) were centered in
+ * that box instead of the viewport. While an overlay is open, its ancestors
+ * drop those properties so every popup centers on the viewport.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .renewal-shell :not(.modal-overlay):not(.bottom-sheet-overlay):has(.modal-overlay, .bottom-sheet-overlay) {
+  transform: none !important;
+  animation: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  perspective: none !important;
+  contain: none !important;
+  will-change: auto !important;
+}
+
+/* 정산카드 image preview: the card image is taller than the screen; the sheet itself scrolls
+   (wheel, trackpad, touch) instead of clipping the bottom of the list. */
+html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container.settlement-image-preview {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+}
+html:has(.renewal-shell.v2-design) .modal-container.settlement-image-preview > * {
+  flex-shrink: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .modal-container.settlement-image-preview > img {
+  height: auto !important;
+  max-width: 100% !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Calendar holiday labels (대체공휴일(개천절), 추석 연휴, solar terms): never
+ * truncated, up to two centered lines. keep-all keeps Korean words whole; the
+ * cell renders a <wbr> before "(" so "대체공휴일 / (개천절)" breaks there.
+ * Font sizes are unchanged (mobile 0.6rem rule above still applies).
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row .bp-day-corner-label,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
+  display: block !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row {
+  align-items: flex-start !important;
+}
+/* Phones are where labels actually wrap: reserve the second line on every labelled cell so
+   week rows with one- and two-line holidays get the same height and the dots line up. */
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-corner-label {
+    min-height: calc(1.15em * 2) !important;
+  }
+}
+
+
+/* ==== pc-polish-1005 ====
+ * 1) (reverted 1006) Calendar anniversary/event/place bars stay thin single-line capsules; title tooltip shows full name.
+ * 2) Contents cards: 2-line clamp for date/address; equal card heights in a row.
+ * 3) Places header/toolbar: icon/button vertical centers on one baseline.
+ * 4) Very-wide screens: cap main dest column so cards don't stretch endlessly.
+ * 6) Confetti below modals; pointer-events none (JS also skips when modal open).
+ * 7) Memo/link/file names: flex-grow + 2-line clamp (extension stays visible via wrap).
+ * Do NOT touch holiday corner labels / modal centering / memo action row / settlement image.
+ * ========================================================================= */
+
+/* 1 — reverted (anniv-capsule-1006): calendar bars keep the original thin 999px capsule,
+   single line + ellipsis (rules earlier in this file). Full name stays in the title tooltip.
+   Do not re-add fixed 30px / 2-line wrap here. */
+
+/* 2 — contents cards: date / venue / address wrap intentionally */
+html:has(.renewal-shell.v2-design) .culture-items-grid > button {
+  height: 100% !important;
+  align-self: stretch !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child > div {
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+/* The generic v2 card skin ([class*="culture-card"]) also matches .culture-card-meta and paints a
+   bordered 14px-radius box with zero padding around the date/address text, so 2-line text sat
+   on/under the rounded edge. Meta lines are plain muted text inside the card. */
+html:has(.renewal-shell.v2-design) .culture-items-grid .culture-card-meta {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+/* Title already uses 2-line clamp in JS; keep it. */
+html:has(.renewal-shell.v2-design) .culture-items-grid {
+  align-items: stretch !important;
+}
+
+/* 3 — places header actions + list toolbar vertical align */
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions,
+html:has(.renewal-shell.v2-design) .bp-header.v2-page-header .bp-header-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  align-self: center !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions .bp-icon-btn,
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions .bp-icon-btn svg,
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions > button svg {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar,
+html:has(.renewal-shell.v2-design) .v2-places .places-list-toolbar {
+  display: flex !important;
+  align-items: center !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar .segmented-toggle,
+html:has(.renewal-shell.v2-design) .places-list-toolbar [role="tablist"],
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn-action,
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn {
+  align-self: center !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn-action,
+html:has(.renewal-shell.v2-design) .places-list-toolbar .btn {
+  height: 42px !important;
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .places-list-toolbar .segmented-toggle,
+html:has(.renewal-shell.v2-design) .places-list-toolbar [role="tablist"]:not(.underline-tabs) {
+  min-height: 42px !important;
+  height: 42px !important;
+}
+
+/* 4 — wide screens: cap dest main column (centered in pane right of side-nav) */
+@media (min-width: 1600px) {
+  html:has(.renewal-shell.v2-design) {
+    --v2-dest-content-max: 1280px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-dest-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-legacy-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .history-page-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .gallery-page-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-list-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-dest-controls,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-list-toolbar,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-category-sticky-tabs,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .culture-items-grid {
+    max-width: var(--v2-dest-content-max, 1280px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* 6 — confetti under modals/controls (base canvas rule lives in app.css) */
+html:has(.renewal-shell.v2-design) canvas.bp-confetti-layer {
+  pointer-events: none !important;
+  z-index: 9000 !important; /* modals start ~11000 */
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.renewal-shell.v2-design) canvas.bp-confetti-layer { display: none !important; }
+}
+
+/* 7 — memo / link / file name room */
+html:has(.renewal-shell.v2-design) .link-preview-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .link-preview-card > div {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+html:has(.renewal-shell.v2-design) .link-preview-card > div > div:first-child {
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+}
+html:has(.renewal-shell.v2-design) .chat-file-attachment-card {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+html:has(.renewal-shell.v2-design) .chat-file-attachment-card > div {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+html:has(.renewal-shell.v2-design) .chat-file-attachment-name {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  white-space: normal !important;
+}
+
+
+/* 7b — memo cards: fewer wider columns so link/file names get real width; stack preview media */
+@media (min-width: 1024px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-memo .bp-memo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .v2-memo .link-preview-card,
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap .link-preview-card {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .link-preview-card > img,
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap .link-preview-card > img {
+  width: 100% !important;
+  height: 120px !important;
+  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-memo .link-preview-card > div,
+html:has(.renewal-shell.v2-design) .v2-memo-card-wrap .link-preview-card > div {
+  padding: 8px 10px !important;
+  max-width: none !important;
+  width: 100% !important;
+  min-height: 0 !important;
+}

@@ -118,18 +118,38 @@ test('memo comment notifications name that comment and keep the memo deep link',
   );
 });
 
-test('memo photos: an added photo notifies, a removed or reordered one does not', () => {
+test('memo photos: adding, removing, or reordering photos on an existing memo does not notify', () => {
   const base = { id: 'm1', text: '이용시간', participantId: 'p1', imageUrls: ['a', 'b', 'c'] };
   assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'c'] }, { memoId: 'm1' }), null);
   assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['c', 'b', 'a'] }, { memoId: 'm1' }), null);
-  assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'b', 'c', 'd'] }, { memoId: 'm1' })?.kind, 'images');
-  // A body edit is not a registration, with or without a photo removal in the same save.
-  assert.equal(decideMemoNotification(base, { ...base, text: '새 내용', imageUrls: ['a'] }, { memoId: 'm1' }), null);
+  assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'b', 'c', 'd'] }, { memoId: 'm1' }), null);
+  // A body edit is not a registration, with or without a photo in the same save.
+  assert.equal(decideMemoNotification(base, { ...base, text: '새 내용', imageUrls: ['a', 'b', 'c', 'd'] }, { memoId: 'm1' }), null);
   assert.equal(decideMemoNotification(base, { ...base, text: '새 내용' }, { memoId: 'm1' }), null);
+  // A brand-new memo still notifies, including one that is only a photo.
+  assert.equal(decideMemoNotification(null, { id: 'm2', participantId: 'p1', imageUrls: ['only'] }, { memoId: 'm2' })?.kind, 'create');
+});
+
+test('a new memo comment still notifies when the same save also adds a photo', () => {
+  const before = memo({ imageUrls: ['a'], comments: [] });
+  const after = memo({
+    imageUrls: ['a', 'b'],
+    comments: [{ id: 'cmt_new', text: '사진 봤어', participantId: 'person_other' }]
+  });
+  const decision = decideMemoNotification(before, after, { memoId: 'memo_place' });
+  assert.equal(decision.kind, 'comment');
+  assert.equal(decision.commentId, 'cmt_new');
 });
 
 test('editing or deleting an existing memo comment does not notify', () => {
   const before = memo({ comments: [{ id: 'cmt_old', text: '이전', participantId: 'person_author' }] });
   assert.equal(decideMemoNotification(before, memo({ comments: [{ id: 'cmt_old', text: '고침', participantId: 'person_author' }] }), { memoId: 'memo_place' }), null);
   assert.equal(decideMemoNotification(before, memo({ comments: [] }), { memoId: 'memo_place' }), null);
+});
+
+test('photo comment push URL carries gallery view and asset img', () => {
+  assert.equal(
+    buildPushTargetUrl('cal_cw', { view: 'gallery', img: 'asset:v1:photo1' }),
+    './?id=cw&view=gallery&img=asset%3Av1%3Aphoto1'
+  );
 });

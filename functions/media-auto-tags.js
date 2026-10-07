@@ -6,6 +6,7 @@ const { stableAnalysisId } = require('./media-analysis');
 const { readImageGeo, isIndexGeoPair } = require('./photo-index-geo');
 const MAX_OWNERS = 12;
 const MAX_ATTEMPTS = 3;
+const completed = (automatic, signature) => automatic?.signature === signature && ['applied', 'unchanged', 'review-required'].includes(automatic.status);
 const active = data => data && !data.deletedAt && !data.removedAt && !data.isDeleted;
 const tagsOf = value => [...new Set(String(value || '').split(/[\s,#]+/).filter(Boolean))];
 const timestamp = value => value?.toMillis ? value.toMillis() : Number(value) || 0;
@@ -45,27 +46,40 @@ async function completeAnalysisLocationTags({ db, calendarDocId, assetKey, looku
   if (!initial.exists) return { status: 'skipped', reason: 'photo-deleted' };
   const signature = geoSignature(initial.data());
   if (!signature) return { status: 'skipped', reason: 'no-gps' };
-  const initialAnalysis = await analysisRef.get();
-  const initialCalendar = await root.get();
-  const policy = automationPolicy(initialCalendar.data()?.calendar, initial.data());
-  if (policy) return { status: 'skipped', reason: policy };
-  if (initialAnalysis.data()?.review || legacy) return { status: 'skipped', reason: 'preserve-human-or-legacy-tags' };
-  const prior = initialAnalysis.data()?.automatic;
-  if (prior?.signature === signature && ['applied', 'unchanged', 'review-required'].includes(prior.status)) return prior;
-  if (prior?.signature === signature && prior.attempts >= MAX_ATTEMPTS) return prior;
-  const attempts = (prior?.signature === signature ? Number(prior.attempts) || 0 : 0) + 1;
+  // Reserve the external-call budget atomically. Duplicate trigger deliveries may run in
+  // parallel: counting only after geocoding allows all of them to spend the same attempt.
+  const reservation = await db.runTransaction(async tx => {
+    const [calendar, photo, analysis] = await Promise.all([tx.get(root), tx.get(photoRef), tx.get(analysisRef)]);
+    if (!calendar.exists || !photo.exists || !analysis.exists) return { status: 'skipped', reason: 'source-deleted' };
+    if (geoSignature(photo.data()) !== signature) return { status: 'skipped', reason: 'gps-changed' };
+    const policy = automationPolicy(calendar.data()?.calendar, photo.data());
+    if (policy) return { status: 'skipped', reason: policy };
+    if (analysis.data()?.review || legacy) return { status: 'skipped', reason: 'preserve-human-or-legacy-tags' };
+    if (!active(photo.data()) || analysis.data().status !== 'suggested' || Number(analysis.data().analysisVersion) < 5) return { status: 'skipped', reason: 'ineligible-analysis' };
+    const prior = analysis.data()?.automatic;
+    if (completed(prior, signature) || (prior?.signature === signature && prior.attempts >= MAX_ATTEMPTS)) return prior;
+    const attempts = (prior?.signature === signature ? Number(prior.attempts) || 0 : 0) + 1;
+    tx.set(analysisRef, { automatic: { signature, status: 'processing', attempts, updatedAt: now, addedTags: [], policyVersion: 1 } }, { merge: true });
+    return { reserved: true, attempts };
+  });
+  if (!reservation.reserved) return reservation;
+  const { attempts } = reservation;
   let candidates;
   try {
     candidates = tagsOf((await lookupTags(initial.data().latitude, initial.data().longitude)).join(' ')).slice(0, 5);
   } catch (error) {
     // Audit the bounded failure without retaining credentials/HTTP payloads in a public feed.
-    await db.runTransaction(async tx => {
+    const failure = await db.runTransaction(async tx => {
       const current = await tx.get(analysisRef);
-      if (!current.exists || ['applied', 'unchanged', 'review-required'].includes(current.data()?.automatic?.status)) return;
-      tx.set(analysisRef, { automatic: { signature, status: 'failed', reason: 'geocoder-unavailable', attempts, updatedAt: now, addedTags: [] } }, { merge: true });
+      const automatic = current.data()?.automatic;
+      if (!current.exists || automatic?.signature !== signature) return { status: 'skipped', reason: 'source-changed' };
+      if (completed(automatic, signature)) return automatic;
+      const result = { signature, status: 'failed', reason: 'geocoder-unavailable', attempts: Math.max(attempts, automatic.attempts || 0), updatedAt: now, addedTags: [] };
+      tx.set(analysisRef, { automatic: result }, { merge: true });
+      return result;
     });
-    if (attempts < MAX_ATTEMPTS) throw error;
-    return { status: 'failed', reason: 'geocoder-unavailable' };
+    if (failure.status === 'failed' && failure.attempts < MAX_ATTEMPTS) throw error;
+    return failure;
   }
   return db.runTransaction(async tx => {
     const [calendar, photoSnap, analysisSnap] = await Promise.all([tx.get(root), tx.get(photoRef), tx.get(analysisRef)]);
@@ -73,11 +87,12 @@ async function completeAnalysisLocationTags({ db, calendarDocId, assetKey, looku
     const photo = photoSnap.data();
     const analysis = analysisSnap.data();
     if (geoSignature(photo) !== signature) return { status: 'skipped', reason: 'gps-changed' };
-    if (analysis.automatic?.signature === signature && ['applied', 'unchanged', 'review-required'].includes(analysis.automatic.status)) return analysis.automatic;
+    if (completed(analysis.automatic, signature)) return analysis.automatic;
     const currentPolicy = automationPolicy(calendar.data()?.calendar, photo);
     if (currentPolicy) return { status: 'skipped', reason: currentPolicy };
     const audit = (status, reason, addedTags = []) => {
-      const result = { signature, status, reason, addedTags, attempts, updatedAt: now, policyVersion: 1 };
+      const recordedAttempts = analysis.automatic?.signature === signature ? analysis.automatic.attempts || 0 : 0;
+      const result = { signature, status, reason, addedTags, attempts: Math.max(attempts, recordedAttempts), updatedAt: now, policyVersion: 1 };
       tx.set(analysisRef, { automatic: result }, { merge: true });
       return result;
     };

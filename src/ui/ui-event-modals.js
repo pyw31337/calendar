@@ -6,7 +6,7 @@ import { calculateSettlementRows, calculateSettlementTransfers } from '../core/s
 import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core/gallery-data.js';
 import { filterSelectableSettlementExpenses, getReservedSettlementItemKeys } from '../core/settlement-card-selection.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
-import { CommonPagination } from './ui-shared.js';
+import { CommonPagination, useOverlayHistory } from './ui-shared.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -226,6 +226,7 @@ export function AnniversaryModal({
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const closeOverlay = useOverlayHistory(onClose, { enabled: !embedded, key: 'anniversary' });
   const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
   const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker || (function () { return null; });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
@@ -343,7 +344,7 @@ export function AnniversaryModal({
     bulkEndDate
   ]);
   const { requestClose, overlayOnClick } = useModalDirtyGuard(
-    onClose,
+    closeOverlay,
     onRequestConfirm,
     undefined,
     true,
@@ -448,26 +449,27 @@ export function AnniversaryModal({
     setActiveTab('add');
   }, [initialDate]); // intentional once when set
 
-  const handleAttachPhotoFiles = async (files) => {
+  const handleAttachPhotoFiles = async (files, intakeSource = 'clip') => {
     if (!files || files.length === 0) return;
     await appendChatImageFiles({
       files,
       currentCount: photos.length,
       setImageProcessing: setPhotoProcessing,
       setChatImages: setPhotos,
-      showToast
+      showToast,
+      intakeSource
     });
     setPhotoProcessing(null);
   };
   const handleClickPastePhotoButton = async () => {
     const files = await readClipboardImageFiles(showToast);
-    if (files && files.length > 0) handleAttachPhotoFiles(files);
+    if (files && files.length > 0) handleAttachPhotoFiles(files, 'paste');
   };
   const handlePhotoPaste = e => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
     if (pastedFiles.length === 0) return;
     e.preventDefault();
-    handleAttachPhotoFiles(pastedFiles);
+    handleAttachPhotoFiles(pastedFiles, 'paste');
   };
   const [isSavingAnniversary, setIsSavingAnniversary] = React.useState(false);
 
@@ -517,6 +519,7 @@ export function AnniversaryModal({
               || null;
             const out = { url: p.imageUrl, thumbUrl: p.thumbUrl };
             if (p.fingerprint) out.fingerprint = p.fingerprint;
+            if (p.intake) out.intake = p.intake;
             const tags = (formPhoto && formPhoto.tags) || (prev && prev.tags) || '';
             if (tags) out.tags = tags;
             const photoId = (formPhoto && formPhoto.photoId) || (prev && prev.id) || '';
@@ -1772,6 +1775,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const closeOverlay = useOverlayHistory(onClose, { enabled: true, key: 'settlement-editor' });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || ((props) => React.createElement('div', props, props.children));
   const ResizableListSection = __comp.ResizableListSection || __deps.ResizableListSection;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (() => '×');
@@ -2573,7 +2577,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   return React.createElement(React.Fragment, null,
   React.createElement('div', {
     className: 'modal-overlay',
-    onClick: onClose,
+    onClick: closeOverlay,
     style: { zIndex: 11000 }
   }, React.createElement(ResizableModalContainer, {
     className: 'modal-container',
@@ -2596,7 +2600,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           style: { border: '1px solid var(--border-subtle)', borderRadius: '7px', background: 'var(--bg-card)', color: 'var(--text-main)', padding: '5px 9px', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }
         }, '정산 카드'),
         React.createElement('button', {
-          type: 'button', onClick: onClose,
+          type: 'button', onClick: closeOverlay,
           style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }
         }, React.createElement(SmallXIcon, { size: 20 }))
       )
@@ -3141,7 +3145,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     onClick: () => setSettlementCardImageUrl(null),
     style: { zIndex: 12500 }
   }, React.createElement(ResizableModalContainer, {
-    className: 'modal-container',
+    className: 'modal-container settlement-image-preview',
     onClick: e => e.stopPropagation(),
     style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
   },
@@ -4182,7 +4186,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     onClick: () => setShareImageUrl(null),
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
+    className: "modal-container settlement-image-preview",
     onClick: e => e.stopPropagation(),
     style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
   },

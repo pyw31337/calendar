@@ -39,6 +39,7 @@ import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from './component-aliases.js';
+import { useOverlayHistory } from './ui-shared.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
@@ -62,6 +63,7 @@ import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 import { fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
 import { getWeatherIcon } from './weather-icon.js';
+const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 
 // Home gallery: 12 photos per page -- 4x3 on PC, 6x2 at mid widths, 3x4 on phones (dest-chrome-late.css).
 const HOME_GALLERY_PAGE_SIZE = 12;
@@ -750,6 +752,16 @@ const ANNIVERSARY_BAR_COLORS = {
   other: '#6B7280'
 };
 
+// Calendar corner labels wrap to at most two lines with word-break: keep-all, which removes the
+// break opportunity before "(" -- "대체공휴일(개천절)" gets a <wbr> there so it splits as
+// "대체공휴일 / (개천절)" when the cell is narrow and stays on one line when it fits.
+function withBreakBeforeParen(React, label) {
+  const text = String(label ?? '');
+  const at = text.indexOf('(');
+  if (at <= 0) return text;
+  return [text.slice(0, at), React.createElement('wbr', { key: 'wbr' }), text.slice(at)];
+}
+
 function anniversaryBarPaint(ann) {
   const raw = String(ann && ann.category || '').toLowerCase();
   const category = raw === 'trip' ? 'travel' : raw;
@@ -1067,8 +1079,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     });
   }
 
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = localTodaySeoul();
 
   const festivalBars = React.useMemo(
     () => computeFestivalBars(days, anniversariesList),
@@ -1250,7 +1261,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           // Holiday + 모임확정 share one row (no stacked lines). Never render participant
           // schedule memos / meeting.note as free cell-body text under v2.
           (cornerLabel || hasMeeting) ? React.createElement('div', { className: bentoClass('day-head-row') },
-            cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim()) }, cornerLabel) : null,
+            cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim()) }, withBreakBeforeParen(React, cornerLabel)) : null,
             hasMeeting ? React.createElement('span', {
               className: bentoClass('day-meeting-pill'),
               title: meeting.title || meeting.note || '모임확정',
@@ -1632,8 +1643,7 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
 
 function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   const React = window.React;
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = localTodaySeoul();
 
   const todayMeeting = React.useMemo(() => {
     const fromUpcoming = Array.isArray(upcomingMeetings) ? upcomingMeetings.find(m => m.date === todayStr) : null;
@@ -1757,8 +1767,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, onOpenGalleryAnalysis, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = localTodaySeoul();
 
   const mergedCalendar = React.useMemo(() => {
     const base = calendarContext?.calendar || {};
@@ -3472,9 +3481,31 @@ export function buildRenewalMoreContext(calendar, deps) {
   };
 }
 
+// Modals that don't wire browser Back themselves (AnniversaryModal already calls useOverlayHistory;
+// search keeps its own URL handling) get a history marker here, so Back closes the popup first
+// instead of leaving the app.
+const MORE_MODALS_WITH_BACK_MARKER = new Set(['share', 'app-settings', 'calendar-settings']);
+
+function MoreModalBackGate({ modalKey, onClose, render }) {
+  const requestClose = useOverlayHistory(onClose, { enabled: true, key: `more-${modalKey}` });
+  return render(requestClose);
+}
+
 function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra }) {
   const React = window.React;
   if (!openModal) return null;
+  if (MORE_MODALS_WITH_BACK_MARKER.has(openModal)) {
+    return React.createElement(MoreModalBackGate, {
+      key: openModal,
+      modalKey: openModal,
+      onClose,
+      render: (requestClose) => renderMoreModal(React, openModal, requestClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra),
+    });
+  }
+  return renderMoreModal(React, openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra);
+}
+
+function renderMoreModal(React, openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra) {
   const { ShareModal, AnniversaryModal, AppSettingsModal, AdminModal, GlobalSearchModal } = bindUiComponentAliases(React);
   if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
   if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, ...anniversaryOverride, onClose });

@@ -4,6 +4,7 @@
  */
 
 import { resolveFileTypeIconUrl } from './file-type-icons.js';
+import { useOverlayHistory } from './ui-shared.js';
 
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function __chatFiles() { return window.GATHER_CHAT_FILE_ATTACHMENTS || {}; }
@@ -517,10 +518,12 @@ export function FileAttachmentCard(props) {
       ),
       React.createElement("div", { style: { minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: "2px" } },
         React.createElement("div", {
+          className: "chat-file-attachment-name",
+          title: attachment.name || "파일",
           style: {
             fontSize: "var(--font-size-md)", fontWeight: 800, color: "var(--text-main)",
             whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word",
-            lineHeight: 1.35
+            lineHeight: 1.25, minWidth: 0, flex: "1 1 0%"
           }
         }, highlightKeyword(attachment.name || "파일", searchQuery)),
         React.createElement("div", {
@@ -536,6 +539,7 @@ export function DocumentLightbox(props) {
   var React = window.React;
   var attachment = props && props.attachment;
   var onClose = props && props.onClose;
+  var closeOverlay = useOverlayHistory(onClose, { enabled: true, key: "document-lightbox" });
   var attachments = props && props.attachments;
   var index = props && props.index;
   var onNavigate = props && props.onNavigate;
@@ -577,7 +581,7 @@ export function DocumentLightbox(props) {
 
   React.useEffect(function() {
     var onKey = function(e) {
-      if (e.key === "Escape" && onClose) onClose();
+      if (e.key === "Escape" && closeOverlay) closeOverlay();
       if (e.key === "ArrowLeft" && typeof onNavigate === "function" && safeIndex > 0) onNavigate(safeIndex - 1);
       if (e.key === "ArrowRight" && typeof onNavigate === "function" && safeIndex < list.length - 1) onNavigate(safeIndex + 1);
       if (e.key === "+" || e.key === "=") {
@@ -624,7 +628,7 @@ export function DocumentLightbox(props) {
   var ModalBox = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div";
 
   return React.createElement("div", {
-    role: "dialog", "aria-modal": "true", "aria-label": "파일 미리보기", onClick: onClose,
+    role: "dialog", "aria-modal": "true", "aria-label": "파일 미리보기", onClick: closeOverlay,
     style: {
       position: "fixed", inset: 0, zIndex: 12000, backgroundColor: "rgba(15, 23, 42, 0.72)",
       display: "flex", alignItems: "center", justifyContent: "center",
@@ -716,7 +720,7 @@ export function DocumentLightbox(props) {
             }, "다운로드")
           ),
           React.createElement("button", {
-            type: "button", onClick: onClose, "aria-label": "닫기",
+            type: "button", onClick: closeOverlay, "aria-label": "닫기",
             style: {
               width: "32px", height: "32px", minWidth: "32px", borderRadius: "8px",
               border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",

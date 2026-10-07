@@ -38,7 +38,9 @@ html:has(.v2-design) #root {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
-  animation: bp-screen-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* backwards, not both: a kept end-state transform would make every screen a containing
+     block for its position:fixed popups (off-center modals). */
+  animation: bp-screen-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 @keyframes bp-screen-fade-in {

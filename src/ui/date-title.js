@@ -1,3 +1,4 @@
+import { diffDaysFromSeoulToday } from '../core/seoul-date.js';
 /**
  * One date title for the popups that open on a single day (날씨 상세, 일정 상세):
  *   [내일] 26.10.03 (토) [개천절]
@@ -21,9 +22,9 @@ function parseDateStr(dateStr) {
 export function relativeDayLabel(dateStr, now = new Date()) {
   const parsed = parseDateStr(dateStr);
   if (!parsed) return '';
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.round((parsed.date.getTime() - today.getTime()) / 86400000);
-  return RELATIVE_LABELS[diff] || '';
+  const diff = diffDaysFromSeoulToday(dateStr, now);
+  if (diff == null) return '';
+  return RELATIVE_LABELS[String(diff)] || '';
 }
 
 /** { year: '26.', rest: '10.03 (토)' }, or null for an invalid date. */

@@ -9,6 +9,7 @@ import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { bindAppServiceWorker } from './service-worker-registration.js';
 import { normalizePushChannelPreferences } from './push-channel-preferences.js';
+import { sanitizeImageIntakeList } from './upload-intake.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -104,8 +105,9 @@ const DEFAULT_PLACE_CATEGORIES = GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [
   { id: 'etc', name: '기타', color: '#64748B' }
 ];
 const PLACE_CATEGORY_ICONS = GATHER_APP_UTILS.PLACE_CATEGORY_ICONS || { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
-const normalizePlaceCategories = GATHER_APP_UTILS.normalizePlaceCategories || function normalizePlaceCategories(categories) {
+const normalizePlaceCategories = GATHER_APP_UTILS.normalizePlaceCategories || function normalizePlaceCategories(categories, options = {}) {
   const defaultCategories = DEFAULT_PLACE_CATEGORIES;
+  if (options && options.allowEmpty && Array.isArray(categories) && categories.length === 0) return [];
   const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
   const seen = new Set();
   const normalized = source.map((category, index) => {
@@ -163,12 +165,10 @@ const getDisplayPlaceAddress = GATHER_APP_UTILS.getDisplayPlaceAddress || functi
 // meaningful, but a place can also be dropped by raw coordinates with no name/address at all.
 // visitStatus distinguishes an already-visited place from one that's only planned; visitDate is
 // only meaningful (and only ever shown) when visitStatus is 'visited'.
-function getTodayString() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+function getTodayString(now = new Date()) {
+  if (typeof GATHER_APP_UTILS.todaySeoulDateKey === 'function') return GATHER_APP_UTILS.todaySeoulDateKey(now);
+  const d = now instanceof Date ? now : new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function derivePlaceVisitStatus(place, todayStr = getTodayString()) {
@@ -570,12 +570,10 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
   bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
   buildsPerHour: 10
 });
-// Chat/memo images normally upload to Firebase Storage (short download URL stored on the
-// message/memo document); base64 is only the fallback embedded directly in the document when
-// that upload fails (see compressImageToDataUrls/resolveImageUrls). That fallback is always kept
-// small -- a live "last N messages" listener re-downloads and re-parses every matching document
-// on every page load, so a single oversized embedded image taxes every future visitor's load
-// forever, not just the one degraded send.
+// Chat/memo photos are Firebase Storage files (original + thumb). A data: URL in the document
+// is a legacy fallback only, and anything over the cap below is dropped rather than raising
+// that cap. Dropping the only photo must not leave an empty message -- sanitize throws
+// PHOTO_NOT_STORED in that case so the write is refused and the sender can resend.
 const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 8000);
 const CHAT_LIVE_MESSAGE_LIMIT = readConfigNumber('CHAT_LIVE_MESSAGE_LIMIT', 30);
 const ADMIN_MESSAGE_LIVE_LIMIT = readConfigNumber('ADMIN_MESSAGE_LIVE_LIMIT', 50);
@@ -589,6 +587,10 @@ const MAX_FIRESTORE_DATA_URL_CHARS = readConfigNumber('MAX_FIRESTORE_DATA_URL_CH
 function sanitizeMessageForFirestore(messageData) {
   if (!messageData || typeof messageData !== 'object') return messageData;
   const out = { ...messageData };
+  const inlinePhoto = (v) => typeof v === 'string' && v.startsWith('data:');
+  const hadInlinePhoto = inlinePhoto(out.imageUrl) || inlinePhoto(out.thumbUrl)
+    || (Array.isArray(out.imageUrls) && out.imageUrls.some(inlinePhoto))
+    || (Array.isArray(out.thumbUrls) && out.thumbUrls.some(inlinePhoto));
   const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
   if (tooBig(out.imageUrl)) delete out.imageUrl;
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
@@ -600,10 +602,12 @@ function sanitizeMessageForFirestore(messageData) {
     const thumbs = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
     const tags = Array.isArray(out.imageTags) ? out.imageTags : null;
     const fingerprints = Array.isArray(out.imageFingerprints) ? out.imageFingerprints : null;
+    const intake = Array.isArray(out.imageIntake) ? out.imageIntake : null;
     const nextUrls = [];
     const nextThumbs = [];
     const nextTags = tags ? [] : null;
     const nextFingerprints = fingerprints ? [] : null;
+    const nextIntake = intake ? [] : null;
     const slots = Math.max(urls.length, thumbs.length);
     for (let index = 0; index < slots; index += 1) {
       if (tooBig(urls[index]) || tooBig(thumbs[index])) continue;
@@ -611,6 +615,7 @@ function sanitizeMessageForFirestore(messageData) {
       if (Array.isArray(out.thumbUrls)) nextThumbs.push(thumbs[index]);
       if (nextTags) nextTags.push(tags[index] || '');
       if (nextFingerprints) nextFingerprints.push(fingerprints[index] || '');
+      if (nextIntake) nextIntake.push(intake[index] || { source: 'other', client: 'other', name: '', mime: '' });
     }
     if (Array.isArray(out.imageUrls)) {
       out.imageUrls = nextUrls;
@@ -622,6 +627,13 @@ function sanitizeMessageForFirestore(messageData) {
     }
     if (nextTags) out.imageTags = nextTags;
     if (nextFingerprints) out.imageFingerprints = nextFingerprints;
+    if (nextIntake) {
+      out.imageIntake = sanitizeImageIntakeList(nextIntake);
+      if (!out.imageIntake.length) delete out.imageIntake;
+    }
+  } else if (Array.isArray(out.imageIntake)) {
+    out.imageIntake = sanitizeImageIntakeList(out.imageIntake);
+    if (!out.imageIntake.length) delete out.imageIntake;
   }
   if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
     out.imageTagMap = reconcileMessageImageTagMap(out, normalizeImageTagMap(out.imageTagMap));
@@ -676,6 +688,20 @@ function sanitizeMessageForFirestore(messageData) {
     };
     out.fileAttachments = out.fileAttachments.map(sanitizeOne).filter(Boolean).slice(0, 20);
     if (out.fileAttachments.length === 0) delete out.fileAttachments;
+  }
+  const keptPhoto = [out.imageUrl, out.thumbUrl]
+    .concat(Array.isArray(out.imageUrls) ? out.imageUrls : [], Array.isArray(out.thumbUrls) ? out.thumbUrls : [])
+    .some(v => typeof v === 'string' && v);
+  // Do not raise the inline size cap. A photo that does not fit in the document must not be
+  // saved as an empty message either -- the caller surfaces a resend instead of writing it.
+  if (hadInlinePhoto && !keptPhoto) {
+    const hasText = typeof out.text === 'string' && out.text.trim();
+    const hasFiles = Array.isArray(out.fileAttachments) && out.fileAttachments.length > 0;
+    if (!hasText && !hasFiles) {
+      const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+      err.code = 'PHOTO_NOT_STORED';
+      throw err;
+    }
   }
   return omitUndefinedDeep(out);
 }

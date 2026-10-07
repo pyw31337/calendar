@@ -1,6 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { setTimeout: delay } = require('node:timers/promises');
 const { completeAnalysisLocationTags, appendTags } = require('../media-auto-tags');
 const { getPhotoAssetKey } = require('../media-commands');
 const { stableAnalysisId } = require('../media-analysis');
@@ -97,6 +98,40 @@ module.exports = function registerAutoTagContract(createDb) {
     assert.deepEqual((await fixture.source.get()).data().imageTags, ['가족']);
     assert.equal((await fixture.album.get()).data().photos[0].tags, text);
     assert.equal(appendTags('경기도 #광명시', ['경기도', '광명시']), '경기도 #광명시');
+  });
+
+  test('concurrent duplicate deliveries reserve at most three external calls', async () => {
+    const fixture = await seed();
+    let calls = 0;
+    let release;
+    const barrier = new Promise(resolve => { release = resolve; });
+    const lookupTags = async () => { calls += 1; await barrier; throw new Error('offline'); };
+    const runs = Array.from({ length: 8 }, () => fixture.run({ lookupTags }));
+    // Every request starts before any external call resolves, exposing stale-read counters.
+    const outcomes = Promise.allSettled(runs);
+    for (let count = 0; count < 200 && calls < 3; count += 1) await delay(10);
+    release();
+    await outcomes;
+    assert.equal(calls, 3);
+    assert.equal((await fixture.analysis.get()).data().automatic.attempts, 3);
+    assert.equal((await fixture.analysis.get()).data().automatic.status, 'failed');
+    assert.deepEqual((await fixture.source.get()).data().imageTags, ['가족']);
+  });
+
+  test('late failure never overwrites concurrent success or lowers the attempt count', async () => {
+    const fixture = await seed();
+    let started;
+    let release;
+    const barrier = new Promise(resolve => { release = resolve; });
+    const begun = new Promise(resolve => { started = resolve; });
+    const late = fixture.run({ lookupTags: async () => { started(); await barrier; throw new Error('offline'); } });
+    await begun;
+    assert.equal((await fixture.run()).status, 'applied');
+    release();
+    assert.equal((await late).status, 'applied');
+    const audit = (await fixture.analysis.get()).data().automatic;
+    assert.equal(audit.status, 'applied');
+    assert.equal(audit.attempts, 2);
   });
 
   test('recovering from a transient geocoder failure applies exactly once', async () => {

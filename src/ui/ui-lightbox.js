@@ -4,6 +4,8 @@
 
 import { resolveLightboxPhotoOrigin } from './lightbox-photo-origin.js';
 import { useParticipantSync } from '../core/current-participant.js';
+import { readAppVvHeight, readAppVvWidth, subscribeAppVvRemeasure } from '../core/app-vv-measure.js';
+import { todaySeoulDateKey } from '../core/seoul-date.js';
 import {
   subscribePhotoCommentThread, addPhotoComment, editPhotoComment, deletePhotoComment, restorePhotoComment,
   resolvePhotoCommentCalendarId
@@ -13,8 +15,7 @@ import {
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getTodayYmd() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return todaySeoulDateKey();
 }
 /* __fb() bridge */
 function __fb() {
@@ -747,26 +748,18 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     };
   }, []);
   const [viewportSize, setViewportSize] = React.useState(() => ({
-    width: typeof window !== 'undefined' ? (window.visualViewport?.width || window.innerWidth) : 390,
-    height: typeof window !== 'undefined' ? (window.visualViewport?.height || window.innerHeight) : 800
+    width: typeof window !== 'undefined' ? (readAppVvWidth(window) || window.innerWidth || 390) : 390,
+    height: typeof window !== 'undefined' ? (readAppVvHeight(window, document) || window.innerHeight || 800) : 800
   }));
   React.useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const updateSize = () => {
       setViewportSize({
-        width: Math.round(window.visualViewport?.width || window.innerWidth),
-        height: Math.round(window.visualViewport?.height || window.innerHeight)
+        width: Math.round(readAppVvWidth(window) || window.innerWidth || 390),
+        height: Math.round(readAppVvHeight(window, document) || window.innerHeight || 800)
       });
     };
-    window.addEventListener('resize', updateSize);
-    window.addEventListener('orientationchange', updateSize);
-    const vv = window.visualViewport;
-    if (vv) vv.addEventListener('resize', updateSize);
-    return () => {
-      window.removeEventListener('resize', updateSize);
-      window.removeEventListener('orientationchange', updateSize);
-      if (vv) vv.removeEventListener('resize', updateSize);
-    };
+    return subscribeAppVvRemeasure(updateSize, window, document);
   }, []);
   // ZOOM_DEFAULT (100%, fit-view) is the neutral/reset value -- ZOOM_MIN lets the user zoom
   // further OUT than that too (shrinking the photo within its frame), so it's no longer the

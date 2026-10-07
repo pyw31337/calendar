@@ -1,3 +1,4 @@
+import { todaySeoulDateKey } from '../core/seoul-date.js';
 /**
  * 보관함 "추천" 탭: tag suggestions computed from the photos' own context, so most photos get their
  * 날짜/장소/인물 tags in a few taps instead of one lightbox edit each.
@@ -309,7 +310,7 @@ function placeVisitTokens(place) {
  * visitDate) does not have. Applying appends "YY.MM.DD 사진" entries, marks the place 방문, and
  * moves visitDate to the latest visit. Future dates are ignored.
  */
-export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoDates, today = new Date().toISOString().slice(0, 10) }) {
+export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoDates, today = todaySeoulDateKey() }) {
   const list = Array.isArray(photos) ? photos : [];
   const datesOf = photo => ((typeof getPhotoDates === 'function' ? getPhotoDates(photo) : []) || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today);
   return (Array.isArray(places) ? places : [])

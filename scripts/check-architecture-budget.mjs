@@ -14,6 +14,7 @@ const targets = [
   { file: 'src/core/app-shell-state.js', maxLines: 240, label: 'app-shell-state.js' },
   { file: 'src/core/app-feedback-state.js', maxLines: 120, label: 'app-feedback-state.js' },
   { file: 'src/core/app-browser-ui-state.js', maxLines: 120, label: 'app-browser-ui-state.js' },
+  { file: 'src/core/viewport-height.js', maxLines: 120, label: 'viewport-height.js' },
   { file: 'src/core/app-calendar-screen-state.js', maxLines: 120, label: 'app-calendar-screen-state.js' }
 ];
 

@@ -59,6 +59,7 @@ import {
   omitUndefinedDeep,
 } from './app-domain-helpers.js';
 import { enqueueWriteOperation } from './app-write-queue.js';
+import { mergeCategoriesById } from './calendar-settings-diff.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const FIRESTORE_REQUEST_TIMEOUT_MS = 12000;
@@ -416,9 +417,13 @@ function normalizeCalendarForSave(calendar) {
 	    activityLogs: normalizedActivityLogs,
 	    polls: normalizedPolls,
 	    confirmedMeeting: normalizedConfirmedMeetings,
-	    expenseCategories: normalizeExpenseCategories(cloned.expenseCategories),
+	    expenseCategories: Array.isArray(cloned.expenseCategories) && cloned.expenseCategories.length === 0
+	      ? []
+	      : normalizeExpenseCategories(cloned.expenseCategories),
 	    places: normalizePlaces(cloned.places),
-	    placeCategories: normalizePlaceCategories(cloned.placeCategories),
+	    placeCategories: Array.isArray(cloned.placeCategories) && cloned.placeCategories.length === 0
+	      ? []
+	      : normalizePlaceCategories(cloned.placeCategories),
 	    settlementBaseBudget: Number.isFinite(Number(cloned.settlementBaseBudget)) ? Math.max(0, Math.round(Number(cloned.settlementBaseBudget))) : 0,
 	    deletedActivityLogIds
 	  });
@@ -787,6 +792,13 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar, settingsFi
   };
   intendedFields.forEach(field => {
     if (field === 'participants' || field === 'confirmedMeeting' || field === 'settlementCards' || field === 'places') return;
+    if (field === 'expenseCategories' || field === 'placeCategories') {
+      // Merge by id so a stale form snapshot cannot wipe categories added on another device.
+      if (Object.prototype.hasOwnProperty.call(incoming, field)) {
+        merged[field] = mergeCategoriesById(server[field] || [], incoming[field] || []);
+      }
+      return;
+    }
     if (Object.prototype.hasOwnProperty.call(incoming, field)) merged[field] = incoming[field];
   });
   return merged;
@@ -1315,35 +1327,42 @@ async function ensureFirebaseStorageReady() {
   }
 }
 
+// Real 1x1 PNG. The old probe was the text "1" labeled image/png; iOS dropped that content
+// type, storage.rules denied it, and the failure latched Storage off for the session.
+const STORAGE_HEALTH_PROBE_PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), c => c.charCodeAt(0));
+
 async function checkFirebaseStorageHealth() {
   const now = Date.now();
   if (lastStorageHealthOk === true) return true;
   if (lastStorageHealthOk === false && (now - lastStorageHealthCheckAt) < STORAGE_HEALTH_RECHECK_COOLDOWN_MS) {
-    return false;
+    // A failed probe is not proof Storage is down. Keep encoding and uploading photos.
+    isStorageDisabled = false;
+    return true;
   }
   if (!firebaseStorage) await ensureFirebaseStorageReady();
   if (!firebaseStorage) {
     lastStorageHealthOk = false;
     lastStorageHealthCheckAt = now;
-    isStorageDisabled = true;
-    return false;
+    // SDK not ready yet (common on a cold iPhone start). Do not latch "storage disabled":
+    // the real upload loads the SDK again and must still store the file.
+    isStorageDisabled = false;
+    return true;
   }
   try {
     // Path must satisfy storage.rules' chatImages/{calendarId}/{fileName} shape (two segments
     // after chatImages/) or it falls through to the deny-all catch-all rule, and the blob's
     // contentType must match storage.rules' `image/.*` requirement for this path -- either one
-    // being wrong makes this probe always "fail" even when Storage itself is perfectly healthy,
-    // silently capping every chat/memo image at the low-res inline-base64 fallback instead of
-    // the high-quality upload.
+    // being wrong makes this probe always "fail" even when Storage itself is perfectly healthy.
     const probeRef = firebaseStorage.ref('chatImages/_health/probe.png');
-    const blob = new Blob(['1'], { type: 'image/png' });
-    const probeTask = probeRef.put(blob);
+    const blob = new Blob([STORAGE_HEALTH_PROBE_PNG], { type: 'image/png' });
+    const probeTask = probeRef.put(blob, { contentType: 'image/png' });
     let probeTimeoutId;
+    // First Storage connection on a phone often exceeds 5s. That timeout used to disable uploads.
     const timeoutPromise = new Promise((_, reject) => {
       probeTimeoutId = setTimeout(() => {
         try { probeTask.cancel(); } catch (_) {}
         reject(new Error('PROBE_TIMEOUT'));
-      }, 5000);
+      }, 12000);
     });
     try {
       await Promise.race([probeTask, timeoutPromise]);
@@ -1353,12 +1372,12 @@ async function checkFirebaseStorageHealth() {
     isStorageDisabled = false;
     lastStorageHealthOk = true;
   } catch (e) {
-    console.warn('Firebase Storage health check failed (will retry after cooldown):', e);
-    isStorageDisabled = true;
+    console.warn('Firebase Storage health check failed; photo upload will still be attempted:', e);
+    isStorageDisabled = false;
     lastStorageHealthOk = false;
   }
   lastStorageHealthCheckAt = now;
-  return !isStorageDisabled;
+  return true;
 }
 
 // No enableNetwork() on foreground. The network is never disabled (disabling it while hidden
@@ -1897,6 +1916,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     }, timeoutMs);
     return patchRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
   } catch (err) {
+    if (err && err.code === 'PHOTO_NOT_STORED') return false;
     console.warn('writeCollectionDocumentRest error:', err);
     return { success: false, retryable: true, error: err };
   }
@@ -1904,7 +1924,20 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
 
 async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write', options = {}) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
-  const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  let cleanData = null;
+  if (method !== 'delete') {
+    try {
+      cleanData = sanitizeMessageForFirestore(data);
+    } catch (err) {
+      // Oversized inline photos are stripped by sanitize. Writing what remains saved an empty
+      // chat bubble (text "", no image) and looked like the photo had sent. Refuse that write.
+      if (err && err.code === 'PHOTO_NOT_STORED') {
+        console.warn(`Refusing ${warnLabel || 'write'}: photo was not stored`);
+        return false;
+      }
+      throw err;
+    }
+  }
   // An add() can time out after Firestore has already committed it. Give every
   // add attempt one shared id so SDK -> REST -> queue retries remain idempotent,
   // including future callers that do not provide their own operation id.
@@ -1962,6 +1995,12 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
   const restMethod = method === 'add' ? 'set' : method;
   const restDocId = method === 'add' ? addDocumentId : docId;
   const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths, remainingWriteTime(), { merge: Boolean(options?.merge) });
+  if (!restResult?.success && data && typeof data === 'object' && data.imageIntake && isFirestoreRulesRejection(sdkError)) {
+    const withoutIntake = { ...data };
+    delete withoutIntake.imageIntake;
+    console.warn(`${warnLabel}: Firestore rules rejected imageIntake; saving the photo without that note`);
+    return writeCollectionDocumentWithFallback(collectionName, calId, docId, withoutIntake, method, warnLabel, options);
+  }
   if (restResult?.success || options?.skipQueue || !shouldQueueCollectionWrite(restResult?.error || null, sdkError)) {
     return restResult?.success ? restResult : false;
   }
@@ -1987,6 +2026,13 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
     return { success: false, queued: true, id: restDocId || operationId, transport: 'queue' };
   }
   return queued ? { success: true, queued: true, id: restDocId || operationId, transport: 'queue' } : restResult;
+}
+
+
+function isFirestoreRulesRejection(err) {
+  const code = String(err?.code || '');
+  const message = String(err?.message || '');
+  return code === 'permission-denied' || /permission-denied|insufficient permissions/i.test(message);
 }
 
 function shouldQueueCollectionWrite(...errors) {

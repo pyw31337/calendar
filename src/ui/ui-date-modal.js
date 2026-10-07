@@ -6,6 +6,7 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
 import { DateTitle } from './date-title.js';
+import { useOverlayHistory } from './ui-shared.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -279,6 +280,7 @@ export function DateModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const ParticipantBackdrop = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantBackdrop) || __deps.ParticipantBackdrop;
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const finishClose = useOverlayHistory(onClose, { enabled: true, key: 'date-modal' });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const ResizableListSection = __comp.ResizableListSection || __deps.ResizableListSection;
   const AutoGrowTextarea = __deps.AutoGrowTextarea;
@@ -1390,6 +1392,7 @@ export function DateModal({
 
   const handleMeetingPhotoFiles = async event => {
     const files = Array.from(event.target.files || []);
+    files.forEach(file => { try { file.intakeSource = 'clip'; } catch (_) {} });
     event.target.value = '';
     if (!files.length || typeof onAddMeetingPhotos !== 'function') return;
     setIsSavingMeetingPhotos(true);
@@ -1430,6 +1433,7 @@ export function DateModal({
   const handleConfirmPastePreview = async () => {
     if (!pastePreview || typeof onAddMeetingPhotos !== 'function') return;
     const files = pastePreview.files;
+    files.forEach(file => { try { file.intakeSource = 'paste'; } catch (_) {} });
     setPastePreview(null);
     setIsSavingMeetingPhotos(true);
     try {
@@ -2071,7 +2075,7 @@ export function DateModal({
     if (isSubmitting) return;
     const b = formBaselineRef.current;
     if (!b) {
-      onClose();
+      finishClose();
       return;
     }
     const dirty = (
@@ -2092,10 +2096,10 @@ export function DateModal({
       String(expensePayerInput || '') !== String(b.expensePayerInput || '')
     );
     if (dirty && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
+      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => finishClose());
       return;
     }
-    onClose();
+    finishClose();
   };
 
   const isBentoSheet = shellChrome === 'bento';
@@ -2560,7 +2564,19 @@ export function DateModal({
               maxLength: 500,
               value: note,
               disabled: isSubmitting,
-              onChange: e => { markDirty(); setNote(e.target.value); }
+              onChange: e => { markDirty(); setNote(e.target.value); },
+              onFocus: e => {
+                const row = e?.currentTarget?.closest?.('.date-modal-field-with-actions');
+                if (!row) return;
+                const reveal = () => {
+                  try { row.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_) {
+                    try { row.scrollIntoView(true); } catch (__) {}
+                  }
+                };
+                reveal();
+                setTimeout(reveal, 50);
+                setTimeout(reveal, 320);
+              }
             }),
             /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
               /*#__PURE__*/React.createElement(FormAddEditActionButtons, {

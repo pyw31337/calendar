@@ -42,15 +42,23 @@
   const MAX_STANDALONE_SHORTFALL_PX = 140;
   const COMPACT_IOS_SCREEN_WIDTH_PX = 600;
 
-  const standaloneScreenHeight = (layoutH) => {
-    if (!isIOSWebKit) return 0;
+  const isStandaloneDisplay = () => {
     try {
-      const standalone = window.navigator.standalone === true
-        || (window.matchMedia && (
+      return window.navigator.standalone === true
+        || !!(window.matchMedia && (
           window.matchMedia('(display-mode: standalone)').matches
           || window.matchMedia('(display-mode: fullscreen)').matches
         ));
-      if (!standalone || !window.screen) return 0;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  // `textFocused` = a field that can raise the software keyboard has focus.
+  const standaloneScreenHeight = (layoutH, textFocused) => {
+    if (!isIOSWebKit) return 0;
+    try {
+      if (!isStandaloneDisplay() || !window.screen) return 0;
       const landscape = window.matchMedia && window.matchMedia('(orientation: landscape)').matches;
       const sw = Number(window.screen.width) || 0;
       const sh = Number(window.screen.height) || 0;
@@ -62,15 +70,30 @@
       // not the fact that a standalone app owns the physical screen.
       if (!screenH || (!isIPhoneOrIPod && screenW > COMPACT_IOS_SCREEN_WIDTH_PX && !hasFullWidth)) return 0;
       const shortfall = screenH - layoutH;
-      return shortfall > 0 && shortfall <= MAX_STANDALONE_SHORTFALL_PX ? Math.round(screenH) : 0;
+      if (shortfall <= 0) return 0;
+      if (shortfall <= MAX_STANDALONE_SHORTFALL_PX) return Math.round(screenH);
+      // A bigger shortfall with no text field focused is not a keyboard. It is
+      // WebKit handing back a stale, short innerHeight / visualViewport.height
+      // (WebKit bug 254868): seen when the installed app is opened by tapping a
+      // push notification from another app (KakaoTalk), when it returns from
+      // the background, or mid-rotation. Locking the shell to that number cut
+      // every page off at ~60% of the screen with a blank band below the tab
+      // bar. The installed app owns the whole screen, so use the screen.
+      return textFocused ? 0 : Math.round(screenH);
     } catch (_) {
       return 0;
     }
   };
 
+  // Last status-bar-sized standalone correction seen, so a stale short
+  // innerHeight is never mistaken for a huge status bar (see apply()).
+  let lastStandaloneTopInset = 0;
+
   const apply = () => {
     const vv = window.visualViewport;
-    const layoutH = window.innerHeight || root.clientHeight || 0;
+    // Prefer the larger of layout metrics: a stale short innerHeight must not win
+    // over documentElement.clientHeight when the latter has already settled.
+    const layoutH = Math.max(Number(window.innerHeight) || 0, Number(root.clientHeight) || 0);
     const vvH = Math.max(1, Math.round(vv?.height || layoutH));
     const rawTop = Math.max(0, Math.round(vv?.offsetTop || 0));
     const rawLeft = Math.round(vv?.offsetLeft || 0);
@@ -81,14 +104,24 @@
     // keyboard keeps visualViewport.scale at 1; an auto/manual zoom does not.
     const viewportScale = Number(vv?.scale || 1);
     const chromeShrink = layoutH - vvH - rawTop;
+    // Only a focused text field can raise the keyboard. Without one, a short
+    // visual viewport is stale (an app switch or notification tap that has not
+    // settled yet) and must never shrink the shell: the chat/memo composers
+    // still follow the keyboard because their field is focused.
+    const textFocused = mayRaiseKeyboard(document.activeElement);
+    const standalone = isStandaloneDisplay();
     // A real keyboard is most of the screen. Samsung/Safari toolbars can shrink
     // ~140px; treating that as a keyboard jumps the shell. Address bars under
     // ~8px are noise (scrollbar, rounding).
-    const keyboard = viewportScale <= 1.01 && chromeShrink > 180;
-    const browserChrome = !keyboard && viewportScale <= 1.01 && chromeShrink > 8;
+    const keyboard = textFocused && viewportScale <= 1.01 && chromeShrink > 180;
+    // Toolbars only exist in a browser tab (an installed app has none) and are
+    // never keyboard-sized. While a field is focused, a smaller shrink (iPad
+    // shortcut bar, accessory bar) still follows the visible viewport.
+    const browserChrome = !keyboard && viewportScale <= 1.01 && chromeShrink > 8
+      && (textFocused || (!standalone && chromeShrink <= 180));
     const height = keyboard || browserChrome
       ? vvH
-      : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH));
+      : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH, textFocused));
     const offsetTop = keyboard ? rawTop : 0;
     // How far the real screen extends past what WebKit reports (iOS standalone only, see
     // standaloneScreenHeight). viewport-shell.css uses the class to stretch fixed layers too.
@@ -98,7 +131,15 @@
     // that fact as a separate token: fixed sheets and drawers must reserve it
     // even on installations where env(safe-area-inset-top) incorrectly
     // resolves to zero.
-    const standaloneTopInset = extended ? Math.max(0, height - Math.round(layoutH)) : 0;
+    // A stale short innerHeight makes `height - layoutH` far bigger than any
+    // status bar; keep the last real inset instead of reserving that much.
+    const rawStandaloneTopInset = extended ? Math.max(0, height - Math.round(layoutH)) : 0;
+    if (rawStandaloneTopInset > 0 && rawStandaloneTopInset <= MAX_STANDALONE_SHORTFALL_PX) {
+      lastStandaloneTopInset = rawStandaloneTopInset;
+    }
+    const standaloneTopInset = rawStandaloneTopInset > MAX_STANDALONE_SHORTFALL_PX
+      ? lastStandaloneTopInset
+      : rawStandaloneTopInset;
     if (root.hasAttribute('data-v2-keyboard') !== keyboard) {
       if (keyboard) root.setAttribute('data-v2-keyboard', '');
       else root.removeAttribute('data-v2-keyboard');
@@ -148,11 +189,6 @@
     });
   };
 
-  const onVp = () => {
-    if (raf) cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(apply);
-  };
-
   const isTextControl = (el) => {
     if (!el || el === document.body || el === document.documentElement) return false;
     if (el.isContentEditable) return true;
@@ -163,16 +199,26 @@
     return !['checkbox', 'radio', 'range', 'color', 'file', 'hidden', 'button', 'submit', 'reset'].includes(type);
   };
 
+  // A focused cross-origin iframe (map search, embedded form) can hold the
+  // keyboard too; activeElement only shows the iframe itself.
+  const mayRaiseKeyboard = (el) => isTextControl(el) || String(el?.tagName || '') === 'IFRAME';
+
   // iOS scrolls the layout viewport to reveal a focused field, which fights the
-  // pinned shell. Nudge only the nearest overflow ancestor, and skip fixed
-  // chrome (the field would not move, but the page behind it would).
+  // pinned shell. Nudge the nearest overflow ancestor (including .modal-body inside
+  // a fixed sheet). Measure the field together with its primary action row so the
+  // 추가/저장 button stays on-screen with the input above the keyboard.
   const revealFocusedControl = () => {
     const el = document.activeElement;
     if (!isTextControl(el) || typeof el.getBoundingClientRect !== 'function' || typeof window.getComputedStyle !== 'function') return;
     const vv = window.visualViewport;
     const topLimit = Math.round(vv?.offsetTop || 0) + 8;
     const bottomLimit = Math.round((vv?.offsetTop || 0) + (vv?.height || window.innerHeight || 0)) - 12;
-    const rect = el.getBoundingClientRect();
+    const group = (typeof el.closest === 'function' && (
+      el.closest('.date-modal-field-with-actions')
+      || el.closest('.comment-composer')
+      || el.closest('.admin-settings-save-footer')
+    )) || el;
+    const rect = group.getBoundingClientRect();
     let delta = 0;
     if (rect.bottom > bottomLimit) delta = rect.bottom - bottomLimit;
     else if (rect.top < topLimit) delta = rect.top - topLimit;
@@ -180,15 +226,26 @@
     let node = el.parentElement;
     while (node && node !== document.body && node !== document.documentElement) {
       const style = window.getComputedStyle(node);
-      if (style.position === 'fixed') return;
       const canScroll = /(auto|scroll|overlay)/.test(`${style.overflowY} ${style.overflow}`)
         && node.scrollHeight > node.clientHeight + 1;
       if (canScroll) {
+        // Prefer scrolling inside a fixed sheet (modal-body) over the page behind it.
+        // Do not bail on position:fixed ancestors — sheets are fixed, their body scrolls.
         node.scrollTop += delta;
         return;
       }
       node = node.parentElement;
     }
+  };
+
+  const onVp = () => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      apply();
+      // Keep the focused field (and its action row) inside the visual viewport when
+      // the keyboard opens or the viewport is shortened while typing.
+      revealFocusedControl();
+    });
   };
 
   const onFocusIn = () => {
@@ -200,9 +257,41 @@
   };
 
   const onFocusOut = () => {
-    onVp();
-    setTimeout(onVp, 100);
+    // Keyboard closed (or focus left a field). Re-settle with the same late
+    // iOS delays as an app switch: a single 100ms pass is not enough.
+    settle();
   };
+
+  // iOS reports the final window size late after an app switch -- tapping a
+  // push notification, coming back from another app or the background, a
+  // bfcache restore, a rotation -- and sometimes fires no resize at all once it
+  // settles. Re-measure right away and again while it settles, so a height
+  // captured mid-transition never sticks.
+  const SETTLE_DELAYS_MS = [100, 350, 800, 1500];
+  let settleTimers = [];
+  const clearSettle = () => {
+    if (typeof clearTimeout === 'function') settleTimers.forEach(id => clearTimeout(id));
+    settleTimers = [];
+  };
+  const settle = () => {
+    onVp();
+    clearSettle();
+    if (typeof setTimeout !== 'function') return;
+    settleTimers = SETTLE_DELAYS_MS.map(ms => setTimeout(onVp, ms));
+  };
+  const onVisibility = () => {
+    if (document.visibilityState !== 'hidden') settle();
+  };
+  // sw.js posts this to an already-open window when a notification is tapped.
+  const onSwMessage = (event) => {
+    if (event && event.data && event.data.type === 'notification-open') settle();
+  };
+  const serviceWorker = (() => {
+    try { return window.navigator?.serviceWorker || null; } catch (_) { return null; }
+  })();
+  // The root box follows the real window even when WebKit skips the resize
+  // event, so watch it as a last resort.
+  let rootObserver = null;
 
   let started = false;
   const start = () => {
@@ -214,24 +303,53 @@
       window.visualViewport.addEventListener('scroll', onVp);
     }
     window.addEventListener('resize', onVp);
+    window.addEventListener('orientationchange', settle);
+    window.addEventListener('pageshow', settle);
+    window.addEventListener('focus', settle);
     if (typeof document !== 'undefined' && document.addEventListener) {
       document.addEventListener('focusin', onFocusIn);
       document.addEventListener('focusout', onFocusOut);
+      document.addEventListener('visibilitychange', onVisibility);
     }
+    if (serviceWorker && typeof serviceWorker.addEventListener === 'function') {
+      serviceWorker.addEventListener('message', onSwMessage);
+    }
+    if (typeof ResizeObserver === 'function') {
+      try {
+        rootObserver = new ResizeObserver(() => onVp());
+        rootObserver.observe(root);
+      } catch (_) {
+        rootObserver = null;
+      }
+    }
+    // A cold start from a notification tap can measure mid-transition too.
+    settle();
   };
 
   const stop = () => {
     if (!started) return;
     started = false;
     if (raf) cancelAnimationFrame(raf);
+    clearSettle();
     if (window.visualViewport) {
       window.visualViewport.removeEventListener('resize', onVp);
       window.visualViewport.removeEventListener('scroll', onVp);
     }
     window.removeEventListener('resize', onVp);
+    window.removeEventListener('orientationchange', settle);
+    window.removeEventListener('pageshow', settle);
+    window.removeEventListener('focus', settle);
     if (typeof document !== 'undefined' && document.removeEventListener) {
       document.removeEventListener('focusin', onFocusIn);
       document.removeEventListener('focusout', onFocusOut);
+      document.removeEventListener('visibilitychange', onVisibility);
+    }
+    if (serviceWorker && typeof serviceWorker.removeEventListener === 'function') {
+      serviceWorker.removeEventListener('message', onSwMessage);
+    }
+    if (rootObserver) {
+      rootObserver.disconnect();
+      rootObserver = null;
     }
     root.style.removeProperty('--app-vv-height');
     root.style.removeProperty('--app-vv-offset-top');

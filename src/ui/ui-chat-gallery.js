@@ -1092,6 +1092,42 @@ export function ChatGalleryModal({
   }, [sharedPhotos]);
   photoByAssetKeyRef.current = photoByAssetKey;
 
+  // Photo-comment push deep link: ?view=gallery&img=<assetKey> opens that photo's lightbox
+  // (comments render in the lightbox by default). Chat uses img as a numeric message index —
+  // only treat non-numeric / asset-like values here.
+  const galleryDeepLinkHandledRef = React.useRef('');
+  React.useEffect(() => {
+    if (typeof setActiveLightbox !== 'function') return undefined;
+    if (!Array.isArray(sharedPhotos) || sharedPhotos.length === 0) return undefined;
+    let imgParam = '';
+    try {
+      imgParam = String(new URLSearchParams(window.location.search).get('img') || '').trim();
+    } catch (_) { return undefined; }
+    if (!imgParam || /^\d+$/.test(imgParam)) return undefined;
+    if (galleryDeepLinkHandledRef.current === imgParam) return undefined;
+    const matchKey = (photo) => {
+      const keys = [photo?.assetKey, photo?.mediaKey, photo?.refKey, ...(Array.isArray(photo?.legacyKeys) ? photo.legacyKeys : [])]
+        .map(k => String(k || '').trim()).filter(Boolean);
+      return keys.includes(imgParam);
+    };
+    const index = sharedPhotos.findIndex(matchKey);
+    if (index < 0) return undefined;
+    galleryDeepLinkHandledRef.current = imgParam;
+    setActiveLightbox({
+      urls: sharedPhotos.map(p => p.full),
+      index,
+      meta: sharedPhotos.map(p => ({
+        timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
+        tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+        meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
+        sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey,
+        refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey
+      }))
+    });
+    return undefined;
+  }, [sharedPhotos, setActiveLightbox]);
+
+
   React.useEffect(() => {
     if (activeTab !== 'analysis' || mediaAnalysis.calendarId !== calendar?.id || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
     const calendarId = String(calendar?.id || '').trim();
@@ -1529,6 +1565,7 @@ export function ChatGalleryModal({
   const handleConfirmPastePreview = async () => {
     if (!pastePreview) return;
     const files = pastePreview.files;
+    files.forEach(file => { try { file.intakeSource = 'paste'; } catch (_) {} });
     setPastePreview(null);
     const ok = await uploadFiles(files);
     if (ok) setActiveTab('photos');
@@ -1812,6 +1849,7 @@ export function ChatGalleryModal({
     const api = (typeof window !== 'undefined' && window.GATHER_CHAT_FILE_ATTACHMENTS) || {};
     const classify = api.classifyChatComposerFiles;
     if (typeof classify !== 'function') {
+      files.forEach(file => { try { file.intakeSource = 'clip'; } catch (_) {} });
       const ok = await uploadFiles(files);
       if (ok) setActiveTab('photos');
       return;
@@ -1830,7 +1868,10 @@ export function ChatGalleryModal({
     setIsMenuOpen(false);
     let imageOk = false;
     let fileOk = false;
-    if (images.length) imageOk = await uploadFiles(images);
+    if (images.length) {
+      images.forEach(file => { try { file.intakeSource = 'clip'; } catch (_) {} });
+      imageOk = await uploadFiles(images);
+    }
     if (documents.length && typeof api.uploadChatFileAttachments === 'function' && calendar && calendar.id && typeof onAddFiles === 'function') {
       try {
         const ready = await api.uploadChatFileAttachments(calendar.id, documents);

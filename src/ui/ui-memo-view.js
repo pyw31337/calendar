@@ -6,6 +6,9 @@ import { enqueueWriteOperation } from '../core/app-write-queue.js';
 import { useParticipantSync } from '../core/current-participant.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
+import { markFileIntakeSource, storedPhotoPayload } from '../core/upload-intake.js';
+import { buildMemoEditPatch } from '../core/memo-edit-patch.js';
+import { persistMemoCommentsChange, latestMemoCommentAt } from '../core/memo-comments.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -546,7 +549,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   // (processImageFilesSequentially -> compressImageToDataUrls), so memo photos get
   // identical quality handling, HEIC support, and a { original, thumbnail, originalBlob,
   // thumbnailBlob } shape that resolveMemoImageBatch and the thumbnail <img> below expect.
-  const attachComposerFiles = async (files) => {
+  const attachComposerFiles = async (files, intakeSource = 'clip') => {
+    markFileIntakeSource(files, intakeSource);
     if (!files || files.length === 0) return;
     try {
       const remainingSlots = MAX_MEMO_IMAGE_ATTACHMENTS - newImages.length;
@@ -586,10 +590,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   };
   const handleComposerPasteClick = async () => {
     const files = await readClipboardImageFiles(showToast);
-    if (files && files.length > 0) await attachComposerFiles(files);
+    if (files && files.length > 0) await attachComposerFiles(files, 'paste');
   };
 
-  const attachEditFiles = async (files) => {
+  const attachEditFiles = async (files, intakeSource = 'clip') => {
+    markFileIntakeSource(files, intakeSource);
     if (!files || files.length === 0) return;
     try {
       const remainingSlots = MAX_MEMO_IMAGE_ATTACHMENTS - editImages.length;
@@ -629,7 +634,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   };
   const handleEditPasteClick = async () => {
     const files = await readClipboardImageFiles(showToast);
-    if (files && files.length > 0) await attachEditFiles(files);
+    if (files && files.length > 0) await attachEditFiles(files, 'paste');
   };
 
   const handleSaveMemo = async () => {
@@ -677,7 +682,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           payload: {
             memoId,
             memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: sourceMemo?.imageUrls || [], thumbUrls: sourceMemo?.thumbUrls || [], color: sourceMemo?.color || newColor, isPinned: sourceMemo?.isPinned ?? newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp, ...((() => { const p = buildMemoLinkPreviews(text, sourceMemo); return { linkPreview: p.linkPreview, linkPreviews: p.linkPreviews }; })()) }),
-            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
+            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' }))
           }
         });
         if (queued) {
@@ -692,12 +697,19 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       let uploadedUrls = Array.isArray(sourceMemo?.imageUrls) ? sourceMemo.imageUrls.slice() : [];
       let uploadedThumbs = Array.isArray(sourceMemo?.thumbUrls) ? sourceMemo.thumbUrls.slice() : [];
       let uploadedFingerprints = Array.isArray(sourceMemo?.imageFingerprints) ? sourceMemo.imageFingerprints.slice() : [];
+      let newMemoIntake = null;
       if (newImages.length > 0) {
         setNewUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, newImages, setNewUploadProgress);
+        if (resolved.length && !storedPhotoPayload({ text: text || title || 'photo' }, resolved)) {
+          const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+          err.code = 'PHOTO_NOT_STORED';
+          throw err;
+        }
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
         uploadedFingerprints = resolved.map(r => r.fingerprint || '');
+        newMemoIntake = storedPhotoPayload({ text: 'photo' }, resolved)?.imageIntake || null;
       }
 
       // Link previews are hydrated in the background; a third-party scraper must not delay save.
@@ -712,6 +724,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
         imageFingerprints: uploadedFingerprints,
+        ...(newMemoIntake ? { imageIntake: newMemoIntake } : {}),
         color: sourceMemo?.color || newColor,
         isPinned: sourceMemo?.isPinned ?? newIsPinned,
         tags: tagsArray,
@@ -754,7 +767,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     } catch (err) {
       console.error('Failed to save memo:', err);
       if (memoId && typeof onDeleteMemo === 'function') onDeleteMemo(memoId);
-      showToast('메모 저장 실패', 'error');
+      showToast(err?.code === 'PHOTO_NOT_STORED' ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '메모 저장 실패', 'error');
     } finally {
       setNewUploadProgress(null);
     }
@@ -774,14 +787,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         const tagsArray = editTags.map(t => t.startsWith('#') ? t : '#' + t);
         const participantId = editParticipantId || 'anonymous';
         const previewPack = buildMemoLinkPreviews(editText.trim(), editingMemo);
+        const queuedPatch = buildMemoEditPatch({
+          participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [],
+          color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp,
+          linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews,
+          createdAt: editingMemo.createdAt || editingMemo.updatedAt || stamp
+        });
         const queued = await enqueueMemoMediaSave({
           id: `memo_media_${calendarId}_${editingMemo.id}_${stamp}`,
           type: 'media-memo-save',
           calendarId,
           payload: {
             memoId: editingMemo.id,
-            memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews }),
-            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
+            writeMethod: 'update',
+            memoData: sanitizeMemoForFirestore(queuedPatch),
+            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' }))
           }
         });
         if (queued) {
@@ -796,12 +816,20 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       let uploadedUrls = [];
       let uploadedThumbs = [];
       let uploadedFingerprints = [];
+      let editMemoIntake = null;
       if (editImages.length > 0) {
         setEditUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, editImages, setEditUploadProgress);
+        const fresh = resolved.filter(item => item && !item.isExisting);
+        if (fresh.length && !storedPhotoPayload({ text: editText.trim() || editTitle.trim() || 'photo' }, fresh)) {
+          const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+          err.code = 'PHOTO_NOT_STORED';
+          throw err;
+        }
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
         uploadedFingerprints = resolved.map(r => r.fingerprint || '');
+        editMemoIntake = storedPhotoPayload({ text: 'photo' }, resolved)?.imageIntake;
       }
 
       // Save tags formatted back to database (prepend '#' prefix if needed)
@@ -812,29 +840,33 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       const previewPack = buildMemoLinkPreviews(editText.trim(), editingMemo);
 
       const createdAt = editingMemo.createdAt || editingMemo.updatedAt || stamp;
-      const memoData = {
-        ...editingMemo,
+      // Field patch only — never spread editingMemo / rewrite comments (concurrent comment writers).
+      const memoData = buildMemoEditPatch({
         participantId,
         title: editTitle.trim(),
         text: editText.trim(),
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
         imageFingerprints: uploadedFingerprints,
+        ...(editMemoIntake ? { imageIntake: editMemoIntake } : {}),
         color: editColor,
         isPinned: editIsPinned,
         tags: tagsArray,
         createdAt,
         updatedAt: stamp,
         linkPreview: previewPack.linkPreview,
-        linkPreviews: previewPack.linkPreviews
-      };
+        linkPreviews: previewPack.linkPreviews,
+        imageUrl: uploadedUrls[0] || null,
+        thumbUrl: uploadedThumbs[0] || null
+      });
+      const localMemo = { ...editingMemo, ...memoData, id: editingMemo.id };
 
-      if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
+      if (typeof onUpsertMemo === 'function') onUpsertMemo(localMemo);
       else if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, memoData);
 
-      const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'set', '메모 수정');
+      const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'update', '메모 수정');
       if (!saved?.success) throw new Error('Memo update failed');
-      hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), memoData);
+      hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), localMemo);
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -859,7 +891,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       console.error('Failed to update memo:', err);
       if (typeof onUpsertMemo === 'function') onUpsertMemo(editingMemo);
       else if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, editingMemo);
-      showToast('메모 수정 실패', 'error');
+      showToast(err?.code === 'PHOTO_NOT_STORED' ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '메모 수정 실패', 'error');
     } finally {
       setEditUploadProgress(null);
     }
@@ -966,15 +998,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
     // lastCommentAt is a denormalized copy of the newest comment's createdAt (0 once every
-    // comment is deleted). It exists purely so app-main.js's memo subscription can load an old
-    // memo that just received a comment even when it's well outside the paginated recent-by-
-    // createdAt window -- see the lastCommentAt-ordered query there. Comparing memo.comments
-    // itself (the array) isn't queryable in Firestore the way a plain field is.
-    const nextLastCommentAt = getLatestMemoCommentTimestamp({ comments: nextComments });
+    // comment is deleted). Appends use arrayUnion; edits/deletes run a server transaction by id
+    // so a concurrent comment from another device is not wiped by a stale full-array write.
+    const nextLastCommentAt = latestMemoCommentAt(nextComments);
     if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: nextComments, lastCommentAt: nextLastCommentAt });
     try {
-      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments, lastCommentAt: nextLastCommentAt }, 'update', '메모 댓글 저장');
-      if (!updated?.success) throw new Error('Memo comment update failed');
+      const db = __fb();
+      const result = await persistMemoCommentsChange({
+        db,
+        calendarId: calendar.id,
+        memoId: memo.id,
+        previousComments: memo.comments,
+        nextComments,
+        writeUpdate: (data) => writeMemoDocument('memos', calendar.id, memo.id, data, 'update', '메모 댓글 저장')
+      });
+      if (!result?.success) throw new Error(result?.reason || 'Memo comment update failed');
       return true;
     } catch (err) {
       console.error('Failed to update memo comments:', err);

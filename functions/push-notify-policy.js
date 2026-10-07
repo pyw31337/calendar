@@ -3,10 +3,10 @@
 // fan out to every push_subscriptions doc. Maintenance writes (link preview,
 // image tags, GPS, asset graph, updatedAt) re-sent the same memo text, and iOS
 // does not reliably collapse Web Push tags, so one unchanged memo became a
-// lock-screen storm. Decisions here notify only on a new registration
-// (a new memo, a newly added photo, or a new comment) and collapse duplicate
-// device subscriptions before anything is sent. Editing an existing memo's
-// title or body, or editing/deleting a comment, does not notify.
+// lock-screen storm. Decisions here notify only on a new memo or a new
+// comment, and collapse duplicate device subscriptions before anything is sent.
+// Editing an existing memo's title or body, adding or removing its photos, or
+// editing/deleting a comment, does not notify.
 
 const crypto = require('crypto');
 
@@ -70,20 +70,14 @@ function decideMemoNotification(before, after, context = {}) {
   const nextSignature = visibleMemoSignature(after);
   if (before && visibleMemoSignature(before) === nextSignature) return null;
 
-  const textChanged = !before || textOf(before) !== textOf(after);
-  // Only an added photo is news. Removing or reordering photos (e.g. a 보관함 bulk action that
-  // saved the memo once per removed photo) paged everyone once per write with the same text.
-  const beforeImages = new Set(imageSignature(before).split('\u0001').filter(Boolean));
-  const imagesChanged = !before || imageSignature(after).split('\u0001').some(url => url && !beforeImages.has(url));
   const freshComment = before ? addedComment(before, after) : null;
-  // A write to an existing memo notifies only for a new registration: a comment id that
-  // was not there before, or a photo URL that was not there before. Title/body edits,
-  // comment text edits, and comment deletes are the same memo and must not push.
-  // A body edit that also adds a photo is still that edit, not a separate registration.
+  // An existing memo notifies only when a comment id is new. Title/body edits,
+  // photo adds, removals, and reorders (the old "메모 사진" push), comment
+  // edits, and comment deletes must not push. A new comment still notifies
+  // if the same save also adds a photo.
   let kind = 'create';
   if (before) {
     if (freshComment) kind = 'comment';
-    else if (imagesChanged && !textChanged) kind = 'images';
     else return null;
   }
 

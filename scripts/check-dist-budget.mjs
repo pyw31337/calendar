@@ -57,7 +57,10 @@ const LAZY_CHUNK_PATTERNS = [
   /^ui-share-modal-.*\.js$/,
   /^ui-chat-sheets-.*\.js$/,
   /^ui-chat-files-.*\.js$/,
-  /^ui-date-modal-.*\.js$/
+  /^ui-date-modal-.*\.js$/,
+  // Shared by ui-lightbox + ui-places only (both lazy). Vite emits it as its own chunk; without
+  // this exclusion it was counted as eager even though nothing on the critical path imports it.
+  /^app-vv-measure-.*\.js$/
 ];
 
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
@@ -76,7 +79,16 @@ const LAZY_CHUNK_PATTERNS = [
 // One copy per photo (a re-upload links the stored original; shared-file delete/album guards)
 // added ~4 KB to the eager upload/photo-action code (1671684 > 1668000); 1.676 MB keeps the same
 // few KB of headroom.
-const TOTAL_JS_MAX_BYTES = 1_676_000;
+// Refusing an unstored chat photo (no inline data URL, no empty bubble) added ~1 KB eager
+// (1677033 > 1676000); 1.679 MB keeps the same few KB of headroom.
+// Recording how a photo was sent, and keeping the original when the thumb fails,
+// added ~2.5 KB eager (1681486 > 1679000); 1.685 MB keeps the same few KB of headroom.
+// Memo field-patch updates, concurrent comment persistence, settings field-diff, and chat-file
+// storageGc queueing added ~5.5 KB eager (1690477 > 1685000); 1.695 MB keeps the same few KB
+// of headroom.
+// Shared Asia/Seoul today/date-key helper + memory deep-link history markers added ~2 KB eager
+// (1692k+); 1.700 MB keeps the same few KB of headroom.
+const TOTAL_JS_MAX_BYTES = 1_700_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

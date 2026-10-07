@@ -32,6 +32,8 @@ import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 import { isExcludedFromPeople, personNameVariants, tagMatchesPerson, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
 import { CommonPagination } from './ui-shared.js';
 import { contentPosterStatusBadge } from '../core/culture-poster-badge.js';
+const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
+const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
@@ -1582,12 +1584,14 @@ export function HistoryView({
   };
   const [historyTab, setHistoryTab] = React.useState(readHistoryTabFromUrl);
   const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(() => new URLSearchParams(window.location.search).get('memory') || null);
+  const memoryHistoryRef = React.useRef(false);
   const pushHistoryState = (tab, memoryId = null) => {
     const params = new URLSearchParams(window.location.search);
     params.set('historyTab', tab);
     if (memoryId) params.set('memory', memoryId); else params.delete('memory');
     const qs = params.toString();
-    window.history.pushState({ historyTab: tab, memory: memoryId || null }, '', `${window.location.pathname}?${qs}`);
+    window.history.pushState({ historyTab: tab, memory: memoryId || null, __moyeoraMemory: Boolean(memoryId) }, '', `${window.location.pathname}?${qs}`);
+    if (memoryId) memoryHistoryRef.current = true;
   };
   const openMemoryGroup = id => {
     setSelectedMemoryGroupId(id);
@@ -1595,14 +1599,18 @@ export function HistoryView({
   };
   const clearMemoryGroup = (useBrowserBack = false) => {
     const params = new URLSearchParams(window.location.search);
-    if (useBrowserBack && params.get('memory')) {
+    const memoryId = params.get('memory');
+    if (useBrowserBack && memoryId && memoryHistoryRef.current
+        && window.history.state?.__moyeoraMemory) {
+      memoryHistoryRef.current = false;
       window.history.back();
       return;
     }
+    memoryHistoryRef.current = false;
     setSelectedMemoryGroupId(null);
     params.delete('memory');
     const qs = params.toString();
-    window.history.replaceState({ historyTab }, '', `${window.location.pathname}?${qs}`);
+    window.history.replaceState({ historyTab, __moyeoraMemory: false }, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
   };
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
@@ -1639,7 +1647,9 @@ export function HistoryView({
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('historyTab');
       setHistoryTab(VALID_HISTORY_TABS.includes(tab) ? tab : 'memories');
-      setSelectedMemoryGroupId(params.get('memory') || null);
+      const nextMemory = params.get('memory') || null;
+      if (!nextMemory) memoryHistoryRef.current = false;
+      setSelectedMemoryGroupId(nextMemory);
     };
     window.addEventListener('popstate', handleHistoryPopState);
     return () => window.removeEventListener('popstate', handleHistoryPopState);
@@ -4928,9 +4938,8 @@ function getCultureItemKind(item) {
   return byCategory[item.category] || byCategory[item.anniversaryCategory] || (item.genre === 'movie' ? 'movie' : '');
 }
 
-function todayIsoLocal() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+function todayIsoLocal(now = new Date()) {
+  return localTodaySeoul(now);
 }
 
 // Keep in step with MOVIE_THEATRICAL_DAYS in scripts/lib/culture-normalize.mjs. Snapshots
@@ -4938,10 +4947,7 @@ function todayIsoLocal() {
 // those fields — a release older than this window is not still 상영중.
 const MOVIE_THEATRICAL_DAYS = 28;
 function addDaysIsoLocal(iso, days) {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return localAddDays(iso, days) || iso;
 }
 function movieScreeningEnd(item) {
   const release = cultureItemDay(item);
@@ -6700,7 +6706,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
             /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              className: "culture-card-meta",
+              title: isMovieCard
+                ? `개봉일 ${formatDateWithDayName(item.releaseDate || item.startDate) || CULTURE_MISSING_LABEL}`
+                : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, isMovieCard
               ? `개봉일 ${formatDateWithDayName(item.releaseDate || item.startDate) || CULTURE_MISSING_LABEL}`
               : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL)),
@@ -6709,10 +6719,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             }, highlightKeyword(item.title, searchQuery)),
             isMovieCard ? /*#__PURE__*/React.createElement(React.Fragment, null,
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                className: "culture-card-meta",
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
               }, highlightKeyword(item.ageRating || '등급 정보 없음', searchQuery)),
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                className: "culture-card-meta",
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
               }, highlightKeyword(`[${item.director || '감독 정보 없음'}] ${Array.isArray(item.cast) && item.cast.length ? item.cast.join(', ') : '출연 정보 없음'}`, searchQuery))
             ) : /*#__PURE__*/React.createElement(React.Fragment, null,
             // 지역축제는 '장소'와 '주소'가 사실상 같은 정보를 가리키는 경우가 대부분이라
@@ -6720,10 +6732,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // 생략하고 주소만 보여준다. 문화공연(anniversaryCategory 'event')은 공연장 이름이
             // 주소만으로는 알 수 없는 별도 정보라 계속 둘 다 보여준다.
             anniversaryCategory !== 'festival' && anniversaryCategory !== 'movie' && /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              className: "culture-card-meta",
+              title: item.venue || CULTURE_MISSING_LABEL,
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, highlightKeyword(item.venue || CULTURE_MISSING_LABEL, searchQuery)),
             /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              className: "culture-card-meta",
+              title: item.address || CULTURE_MISSING_LABEL,
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, highlightKeyword(item.address || CULTURE_MISSING_LABEL, searchQuery)))
           )
         );

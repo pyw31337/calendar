@@ -6,6 +6,8 @@ import { MemeAdminPanel } from './ui-meme-admin.js';
 import { MacBackupPanel } from './ui-mac-backup-admin.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
+import { diffCalendarSettingsFields } from '../core/calendar-settings-diff.js';
+import { todaySeoulDateKey, seoulMonthKey } from '../core/seoul-date.js';
 
 /**
  * Icon unification pass (2026-09-17): a handful of admin icons that used to come from the
@@ -644,6 +646,7 @@ export function AdminDashboard({ initialCalendars }) {
   const [googlePlacesStats, setGooglePlacesStats] = React.useState(null);
 
   const lastSyncedRef = React.useRef(null);
+  const settingsBaselineRef = React.useRef(null);
 
   React.useEffect(() => {
     return () => {
@@ -1232,6 +1235,15 @@ export function AdminDashboard({ initialCalendars }) {
 	        setNewPlaceCategoryName('');
 	        setNewPartName('');
         lastSyncedRef.current = key;
+        settingsBaselineRef.current = {
+          title: cal.title,
+          description: cal.description || '',
+          accentColor: normalizeColorValue(cal.accentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
+          participants: getActiveParticipants(cal),
+          settlementBaseBudget: Number(cal.settlementBaseBudget || 0),
+          expenseCategories: getExpenseCategories(cal),
+          placeCategories: getPlaceCategories(cal)
+        };
       }
     }
   }, [selectedCalId, serverCalendars]);
@@ -1390,17 +1402,33 @@ export function AdminDashboard({ initialCalendars }) {
 	      accentColor: normalizeColorValue(calAccentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
 	      participants: calParticipants,
 	      settlementBaseBudget: Number((calSettlementBaseBudget || '').replace(/[^0-9]/g, '')) || 0,
-	      expenseCategories: normalizeExpenseCategories(calExpenseCategories),
-	      placeCategories: normalizePlaceCategories(calPlaceCategories),
+	      expenseCategories: normalizeExpenseCategories(calExpenseCategories, { allowEmpty: true }),
+	      placeCategories: normalizePlaceCategories(calPlaceCategories, { allowEmpty: true }),
 	      updatedAt: now,
       revision: (cal.revision || 0) + 1
     };
 
-    const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings', [], {
-      settingsFields: ['title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget']
-    });
+    const baseline = settingsBaselineRef.current || cal;
+    const settingsFields = diffCalendarSettingsFields(baseline, stampedCal, [
+      'title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget'
+    ]);
+    if (!settingsFields.length) {
+      showAdminToast('변경된 설정이 없습니다.', 'info');
+      return;
+    }
+
+    const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings', [], { settingsFields });
     if (saved) {
       setServerCalendars(prev => prev.map(c => c.id === selectedCalId ? stampedCal : c));
+      settingsBaselineRef.current = {
+        title: stampedCal.title,
+        description: stampedCal.description || '',
+        accentColor: stampedCal.accentColor,
+        participants: stampedCal.participants,
+        settlementBaseBudget: stampedCal.settlementBaseBudget,
+        expenseCategories: stampedCal.expenseCategories,
+        placeCategories: stampedCal.placeCategories
+      };
       showAdminToast('설정 저장완료', 'success');
     } else {
       showAdminToast('설정 저장 실패', 'error');
@@ -1987,7 +2015,7 @@ export function AdminDashboard({ initialCalendars }) {
   // Must match the +9h KST offset incrementKakaoLocalSearchStat uses server-side (functions/
   // index.js), or this card would show "0건" for several hours around KST midnight even right
   // after a real search -- toISOString() alone is UTC regardless of the browser's local timezone.
-  const kakaoTodayBucket = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const kakaoTodayBucket = todaySeoulDateKey();
   const kakaoDailyUsage = (kakaoSearchStats && kakaoSearchStats.dailyUsageBucket === kakaoTodayBucket)
     ? (kakaoSearchStats.dailyUsageCount || 0) : 0;
 
@@ -1995,7 +2023,7 @@ export function AdminDashboard({ initialCalendars }) {
   // Kakao this is a genuinely paid API past its free SKU threshold, so this card exists mainly as
   // an early-warning signal rather than a hard limit display (the real number lives in Google
   // Cloud 콘솔's billing view, which can change independently of this code).
-  const googlePlacesThisMonthBucket = new Date().toISOString().slice(0, 7);
+  const googlePlacesThisMonthBucket = seoulMonthKey();
   const googlePlacesMonthlyUsage = (googlePlacesStats && googlePlacesStats.monthlyUsageBucket === googlePlacesThisMonthBucket)
     ? (googlePlacesStats.monthlyUsageCount || 0) : 0;
 

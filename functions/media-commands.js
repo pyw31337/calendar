@@ -18,6 +18,17 @@
 // emulator (functions/test/media-commands.emulator.test.js).
 
 const GC_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+// Uploaded originals use names like `...${base}_original_${size}b.ext` (see app-image-pipeline).
+// Invariant: never delete originals — only orphan derived thumbnails may be swept.
+function isOriginalStoragePath(path) {
+  const p = String(path || '');
+  // Production: `...${base}_original_${size}b.ext`; legacy/tests: `...${name}_original.ext`.
+  return /_original(?:_|\.)/i.test(p) || /\/originals?\//i.test(p);
+}
+function isDerivedThumbPath(path) {
+  const p = String(path || '');
+  return /_thumb(?:_|\.)/i.test(p) || /_small(?:_|\.)/i.test(p);
+}
 // One mediaCommand transaction also reads every affected source document and the meeting album
 // collection. Keeping a conservative cap prevents a 200-photo UI selection from exceeding
 // Firestore's 500-document transaction limit; the browser chunks larger selections.
@@ -226,7 +237,9 @@ async function deleteAsset({ db, calendarDocId, asset, now = Date.now() }) {
       albumCopiesRemoved += before.filter(photo => sameFile(photo, asset)).length;
       writes.push(() => tx.update(doc.ref, { photos, updatedAt: now }));
     });
-    const paths = Array.from(new Set([storagePathFromUrl(asset.imageUrl), storagePathFromUrl(asset.thumbUrl)].filter(Boolean)));
+    // Queue only derived thumbnails — originals must never be deleted (I2 / product rule).
+    const paths = Array.from(new Set([storagePathFromUrl(asset.imageUrl), storagePathFromUrl(asset.thumbUrl)].filter(Boolean)))
+      .filter(path => !isOriginalStoragePath(path) && isDerivedThumbPath(path));
     paths.forEach(path => {
       writes.push(() => tx.set(db.collection('storageGc').doc(Buffer.from(path).toString('base64url')), {
         path, calendarDocId, assetKey, queuedAt: now, deleteAfter: now + GC_GRACE_MS,
@@ -584,6 +597,28 @@ function collectStoragePaths(value, into, depth = 0) {
   if (typeof value === 'object') Object.values(value).forEach(item => collectStoragePaths(item, into, depth + 1));
 }
 
+/**
+ * Queue Storage paths for delayed GC. Skips originals. Used by gallery chat-file deletes so
+ * the client never hard-deletes a path that may still be referenced elsewhere.
+ */
+async function queueStorageGcPaths({ db, calendarDocId, paths = [], now = Date.now() }) {
+  const list = [...new Set((Array.isArray(paths) ? paths : []).map(p => String(p || '').trim()).filter(Boolean))];
+  let queued = 0;
+  let skippedOriginal = 0;
+  for (const path of list) {
+    if (isOriginalStoragePath(path)) { skippedOriginal += 1; continue; }
+    await db.collection('storageGc').doc(Buffer.from(path).toString('base64url')).set({
+      path,
+      calendarDocId: String(calendarDocId || ''),
+      queuedAt: now,
+      deleteAfter: now + GC_GRACE_MS,
+      reason: 'client-queue',
+    }, { merge: true });
+    queued += 1;
+  }
+  return { ok: true, queued, skippedOriginal };
+}
+
 // Delete queued Storage objects whose grace period elapsed and that nothing in ANY calendar
 // still references: no photoIndex row (messages, memos, albums), no anniversary photo and no
 // culture item poster. Photos copied across calendars keep the source file's URL, and a
@@ -591,23 +626,45 @@ function collectStoragePaths(value, into, depth = 0) {
 // the queuing calendar's index deleted files other records still showed.
 async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
   const due = await db.collection('storageGc').where('deleteAfter', '<=', now).limit(limit).get();
-  const result = { examined: due.size, deleted: 0, kept: 0 };
+  const result = { examined: due.size, deleted: 0, kept: 0, skippedOriginal: 0 };
   if (!due.size) return result;
   const referenced = new Set();
   const calendars = await db.collection('calendars').listDocuments();
   for (const calendar of calendars) {
-    const [index, anniversaries, cultureItems, calendarDoc] = await Promise.all([
+    // In-use set must cover every document type that can hold a Storage URL / path — not only
+    // photoIndex. Messages, memos, places, chat fileAttachments, anniversaries and posters all
+    // keep shared files alive.
+    const [index, anniversaries, cultureItems, calendarDoc, messages, memos, places] = await Promise.all([
       calendar.collection('photoIndex').get(),
       calendar.collection('anniversaries').get(),
       calendar.collection('customCultureItems').get(),
       calendar.get(),
+      calendar.collection('messages').select('imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'fileAttachments', 'smallThumbUrl', 'smallThumbUrls').get(),
+      calendar.collection('memos').select('imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'fileAttachments').get(),
+      calendar.collection('places').get(),
     ]);
     index.docs.forEach(row => { const data = row.data() || {}; [data.full, data.thumb].forEach(url => { const p = storagePathFromUrl(url); if (p) referenced.add(p); }); });
-    [...anniversaries.docs, ...cultureItems.docs].forEach(doc => collectStoragePaths(doc.data(), referenced));
+    [...anniversaries.docs, ...cultureItems.docs, ...messages.docs, ...memos.docs, ...places.docs].forEach(doc => {
+      const data = doc.data() || {};
+      collectStoragePaths(data, referenced);
+      // fileAttachments store an explicit storagePath (not only a download URL).
+      (Array.isArray(data.fileAttachments) ? data.fileAttachments : []).forEach(att => {
+        const p = String(att?.storagePath || '').trim();
+        if (p) referenced.add(p);
+      });
+    });
     collectStoragePaths(calendarDoc.data()?.calendar?.anniversaries, referenced);
+    collectStoragePaths(calendarDoc.data()?.calendar?.places, referenced);
   }
   for (const doc of due.docs) {
     const { path } = doc.data() || {};
+    if (!path) { await doc.ref.delete(); continue; }
+    // Never delete originals even if somehow queued.
+    if (isOriginalStoragePath(path)) {
+      result.skippedOriginal += 1;
+      await doc.ref.delete();
+      continue;
+    }
     if (referenced.has(path)) {
       result.kept += 1;
       await doc.ref.delete();
@@ -638,5 +695,8 @@ module.exports = {
   MAX_BULK_TAG_ITEMS,
   MAX_MERGE_EXTRAS,
   sweepStorageGc,
+  queueStorageGcPaths,
+  isOriginalStoragePath,
+  isDerivedThumbPath,
   collectStoragePaths,
 };

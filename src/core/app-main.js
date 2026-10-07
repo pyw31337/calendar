@@ -1,5 +1,6 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
+import { installClientErrorMonitor } from './client-error-monitor.js';
 import {
   classifyChatComposerFiles,
   createPendingChatFileAttachment,
@@ -25,6 +26,8 @@ import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
 import { setPhotoTagPlaces } from './photo-metadata-tags.js';
 import { buildImageGeoMap } from './photo-geo.js';
 import { sharesAsset, syncAssetTagsInMeetings } from './media-reference-integrity.js';
+import { persistMemoCommentsChange, latestMemoCommentAt } from './memo-comments.js';
+import { diffCalendarSettingsFields } from './calendar-settings-diff.js';
 import { buildSettlementDraftFromMeeting } from './settlement-draft.js';
 import { getReservedSettlementItemKeys } from './settlement-card-selection.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
@@ -44,8 +47,10 @@ import {
   uploadInlineChatImageToStorage, readClipboardImageFiles,
   migrateBase64ChatImagesForCalendar, backfillMeetingUploadSourcesForCalendar,
   resolveChatImageBatch, resolveMemoImageBatch, deleteAllChatImagesFromStorage,
-  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION, limitImageUploadSelection
+  resolveAnniversaryImageBatch, MAX_IMAGE_UPLOADS_PER_ACTION, limitImageUploadSelection,
+  revokeCompressedObjectUrls
 } from './app-image-pipeline.js';
+import { storedPhotoPayload } from './upload-intake.js';
 import {
   computeKoreanHolidaysForYear,
   getHolidayNamesForDate,
@@ -1254,45 +1259,10 @@ function CalendarApp() {
   React.useEffect(() => { setPhotoTagPlaces(activeCalPlaces); }, [activeCalPlaces]);
   React.useEffect(() => { activeCalRef.current = activeCal; }, [activeCal]);
 
-  // Lightweight client-side error monitoring: without this, a bug that fails silently in
-  // someone's browser is invisible to us unless they think to report it. Reuses the existing
-  // serverAuditLogs pipeline (queueServerAuditEvent -> auditEvent Cloud Function, already
-  // rate-limited server-side) instead of adding a new third-party service/account -- these
-  // show up in the admin 감사 로그 tab as action "client_error", same place as every other
-  // audit event. Registered once for the page's lifetime, not per calendar.
-  React.useEffect(() => {
-    // One report per distinct message, max 5 per page load (a failed Firestore client repeats).
-    const reportedClientErrors = new Set();
-    const reportClientError = (message, extra) => {
-      const calId = activeCalRef.current?.id || 'unknown';
-      const note = sanitizeText(`${message || '알 수 없는 오류'} ${extra || ''}`.trim(), 200);
-      if (reportedClientErrors.has(note) || reportedClientErrors.size >= 5) return;
-      reportedClientErrors.add(note);
-      queueServerAuditEvent(calId, 'client_error', note, getClientAuditContext());
-    };
-    const onError = (event) => {
-      reportClientError(event?.message, event?.filename ? `@${event.filename}:${event.lineno || ''}` : '');
-    };
-    const onRejection = (event) => {
-      const reason = event?.reason;
-      reportClientError(reason?.message || String(reason || '').slice(0, 160));
-    };
-    // SDK internal assertion = realtime stops for this page (firestore-listener-guard.js): offer reload.
-    const onFirestoreBroken = (event) => {
-      reportClientError(event?.detail?.message || 'FIRESTORE INTERNAL ASSERTION FAILED');
-      showToast('실시간 연결에 문제가 생겼습니다. 새로고침하면 복구됩니다.', 'error', 60000,
-        () => { window.location.reload(); }, null, '새로고침');
-    };
-    window.addEventListener('error', onError);
-    window.addEventListener('unhandledrejection', onRejection);
-    window.addEventListener('gather:firestore-broken', onFirestoreBroken);
-    if (window.__gatherFirestoreBroken) onFirestoreBroken({ detail: { message: window.__gatherFirestoreBroken } });
-    return () => {
-      window.removeEventListener('error', onError);
-      window.removeEventListener('unhandledrejection', onRejection);
-      window.removeEventListener('gather:firestore-broken', onFirestoreBroken);
-    };
-  }, []);
+  React.useEffect(() => installClientErrorMonitor({
+    target: window, getCalendarId: () => activeCalRef.current?.id,
+    sanitizeText, queueServerAuditEvent, getClientAuditContext, showToast
+  }), []);
 
   React.useEffect(() => {
     if (activeCal) {
@@ -1328,17 +1298,14 @@ function CalendarApp() {
     }
   }, [activeCal, activeCalLoaded]);
 
-  // Local schedule reminder: D-day anytime, or D-1 after 18:00 local, for confirmed meetings
-  // and type:repeat anniversary occurrences. Best-effort while the tab is open -- server push
-  // at 18:00 KST (sendEveScheduleReminders) covers devices that aren't open.
+  // Local D-day / D-1 (after 18:00 KST) reminder; server sendEveScheduleReminders covers closed tabs.
   React.useEffect(() => {
     if (!activeCalLoaded || !activeCal) return;
     const meetings = getTrulyConfirmedMeetings(activeCal);
-    const now = new Date();
-    const toDateStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const todayStr = toDateStr(now);
-    const tomorrowStr = toDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
-    const hour = now.getHours();
+    const utils = window.GATHER_APP_UTILS || {};
+    const todayStr = utils.getTodayString?.() || '';
+    const tomorrowStr = utils.addDaysToDateKey?.(todayStr, 1) || todayStr;
+    const hour = utils.seoulHour?.() ?? new Date().getHours();
     const candidates = [];
     const todayMeeting = meetings.find(m => m.date === todayStr);
     if (todayMeeting) candidates.push({ kind: 'meeting', meeting: todayMeeting, whenLabel: '오늘', key: todayMeeting.date });
@@ -2546,12 +2513,18 @@ function CalendarApp() {
     setMemos(prev => (Array.isArray(prev) ? prev.filter(m => m.id !== memoId) : []));
   };
   const handleMemoCommentsChangeFromMemoPreview = async (memo, nextComments) => {
-    let latest = 0;
-    for (const c of (nextComments || [])) { const t = Number(c?.createdAt) || 0; if (t > latest) latest = t; }
+    const latest = latestMemoCommentAt(nextComments);
     patchLocalMemo(memo.id, { comments: nextComments, lastCommentAt: latest });
     try {
-      const updated = await writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, { comments: nextComments, lastCommentAt: latest }, 'update', '메모 댓글 저장');
-      if (!updated?.success) throw new Error('Memo comment update failed');
+      const result = await persistMemoCommentsChange({
+        db: firebaseDb,
+        calendarId: activeCal.id,
+        memoId: memo.id,
+        previousComments: memo.comments,
+        nextComments,
+        writeUpdate: (data) => writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, data, 'update', '메모 댓글 저장')
+      });
+      if (!result?.success) throw new Error(result?.reason || 'Memo comment update failed');
       return true;
     } catch (err) {
       console.error('Failed to update memo comments:', err);
@@ -2790,11 +2763,12 @@ function CalendarApp() {
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' })),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
         if (!queued) throw new Error('사진 오프라인 저장 공간이 부족합니다.');
+        chatImages.forEach(img => revokeCompressedObjectUrls(img));
         setChatInput('');
         setChatImages([]);
         setChatFileAttachments([]);
@@ -2834,7 +2808,7 @@ function CalendarApp() {
         // message in the normal case. Images that fall back to inline base64 (Storage
         // unavailable) keep their full quality -- instead the batch is split across multiple
         // chat messages if needed so no single message can exceed Firestore's 1MiB/doc limit.
-        const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
+        const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress, { requireStorage: true });
         notifyDedupedImages(resolvedImages);
         if (resolvedImages.length === 0) {
           throw new Error('이미 업로드된 사진입니다. 새 사진을 선택해 주세요.');
@@ -2854,7 +2828,7 @@ function CalendarApp() {
           // iOS suspended the PWA just after an otherwise successful image upload.
           const imageGeoMap = buildImageGeoMap(chunkImages);
           const messageOperationId = `chat_${activeCalId}_${baseTimestamp}_${i}_${Math.random().toString(36).slice(2, 8)}`;
-          const messageData = {
+          const draftedMessage = {
             participantId: effectiveParticipantId,
             text: i === 0 ? chatInput.trim() : '',
             imageUrl: chunkImages[0].imageUrl,
@@ -2868,6 +2842,12 @@ function CalendarApp() {
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
+          const messageData = storedPhotoPayload(draftedMessage, chunkImages);
+          if (!messageData) {
+            const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+            err.code = 'PHOTO_NOT_STORED';
+            throw err;
+          }
           messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
           if (i === 0 && uploadedFileAttachments.length) messageData.fileAttachments = uploadedFileAttachments;
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
@@ -2892,6 +2872,7 @@ function CalendarApp() {
             }, 'update', '채팅 링크 미리보기 후처리');
           }).catch(error => console.warn('Background chat link preview failed:', error));
         }
+        chatImages.forEach(img => revokeCompressedObjectUrls(img));
         setChatInput('');
         setChatImages([]);
         setChatFileAttachments([]);
@@ -2909,11 +2890,12 @@ function CalendarApp() {
           showToast('네트워크가 불안정하여 전송을 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
         }
       } else {
-        showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
+        showRetryableUploadToast(imageCount > 0 ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '등록 실패', () => handleSendChatMessage(), 5000);
       }
     } catch (err) {
       console.error('handleSendChatMessage failed:', err);
-      showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
+      const duplicatePhoto = /이미 업로드된 사진/.test(String(err?.message || ''));
+      showRetryableUploadToast(duplicatePhoto ? err.message : (imageCount > 0 ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '등록 실패'), () => handleSendChatMessage(), 5000);
     } finally {
       setIsChatSubmitting(false);
       setChatUploadProgress(null);
@@ -3010,7 +2992,7 @@ function CalendarApp() {
             participantId: fallbackParticipantId,
             text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
             variantProfile: 'grid',
-            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '' }))
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, smallThumbBlob: image.smallThumbBlob || null, metadata: image.metadata || null, fingerprint: image.fingerprint || '', fingerprintStrength: image.fingerprintStrength || '', intakeSource: image.intakeSource || '', intakeClient: image.intakeClient || '', intakeName: image.intakeName || '', intakeMime: image.intakeMime || '' }))
           }
         });
         if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');
@@ -3045,7 +3027,7 @@ function CalendarApp() {
           current: Math.min(resolvedImages.length, savedCount),
           total: resolvedImages.length
         });
-        const messageData = {
+        const draftedMessage = {
           participantId: fallbackParticipantId,
           text: i === 0 ? '갤러리 사진' : '',
           imageUrl: chunkImages[0].imageUrl,
@@ -3059,6 +3041,12 @@ function CalendarApp() {
           // Distinguishes gallery uploads so the Lightbox can show their source accurately.
           uploadSource: 'gallery'
         };
+        const messageData = storedPhotoPayload(draftedMessage, chunkImages);
+        if (!messageData) {
+          const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+          err.code = 'PHOTO_NOT_STORED';
+          throw err;
+        }
         messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
@@ -3077,11 +3065,12 @@ function CalendarApp() {
       } else {
         showToast('갤러리에 사진이 추가되었습니다.', 'success');
       }
+      compressed.forEach(img => revokeCompressedObjectUrls(img));
       forgetPreprocessedImages(files);
       return true;
     } catch (err) {
       console.error('handleUploadGalleryImages failed:', err);
-      showRetryableUploadToast('갤러리 업로드 실패', () => handleUploadGalleryImages(files), 5000);
+      showRetryableUploadToast(err?.code === 'PHOTO_NOT_STORED' ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '갤러리 업로드 실패', () => handleUploadGalleryImages(files), 5000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -3185,6 +3174,7 @@ function CalendarApp() {
   const handleDeleteGalleryFiles = items => deleteGalleryFileAttachments(items, {
     activeCal,
     activeCalId,
+    projectId: firebaseConfig?.projectId || '',
     guardLoadedCalendar,
     findChatMessageById,
     getMessageImageEntries,
@@ -3463,6 +3453,16 @@ function CalendarApp() {
         uploadedFileAttachments = uploadedFileAttachments.concat((uploaded || []).map(item => item ? { ...item, tags: withUploadDateTag(item.tags) } : item));
       }
 
+      const freshResolved = resolvedImages.filter(resolved => {
+        const src = (newImages || [])[resolved?.sourceIndex];
+        return src && !src.isExisting;
+      });
+      if (freshResolved.length && !storedPhotoPayload({ text: newText || 'photo' }, freshResolved)) {
+        const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+        err.code = 'PHOTO_NOT_STORED';
+        throw err;
+      }
+      const editIntake = storedPhotoPayload({ text: newText || 'photo' }, firstChunk)?.imageIntake;
       const data = {
         text: newText,
         imageUrl: firstChunk[0]?.imageUrl || '',
@@ -3472,7 +3472,8 @@ function CalendarApp() {
         imageTags: firstChunk.map(resolved => tagByResolvedImage.get(resolved) || ''),
         imageFingerprints: firstChunk.map(resolved => fingerprintByResolvedImage.get(resolved) || ''),
         linkPreview: linkPreview || null,
-        fileAttachments: uploadedFileAttachments
+        fileAttachments: uploadedFileAttachments,
+        ...(editIntake ? { imageIntake: editIntake } : {})
       };
       data.imageTagMap = reconcileMessageImageTagMap({ ...editingMessage, ...data }, editingMessage.imageTagMap);
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
@@ -3511,7 +3512,8 @@ function CalendarApp() {
         const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
         for (let i = 0; i < extraChunks.length; i++) {
           const chunkImages = extraChunks[i];
-          const sent = await writeCollectionDocumentWithFallback('messages', calId, '', {
+          const extraIntake = storedPhotoPayload({ text: 'photo' }, chunkImages)?.imageIntake;
+          const extraDraft = {
             participantId: resolvedParticipantId,
             text: '',
             imageUrl: chunkImages[0].imageUrl,
@@ -3525,8 +3527,10 @@ function CalendarApp() {
               thumbUrls: chunkImages.map(r => r.thumbUrl),
               imageTags: chunkImages.map(resolved => tagByResolvedImage.get(resolved) || '')
             }),
-            timestamp: baseTimestamp + i
-          }, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
+            timestamp: baseTimestamp + i,
+            ...(extraIntake ? { imageIntake: extraIntake } : {})
+          };
+          const sent = await writeCollectionDocumentWithFallback('messages', calId, '', extraDraft, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
           if (!sent) {
             ok = false;
             break;
@@ -4519,7 +4523,7 @@ function CalendarApp() {
           current: Math.min(successfulImages.length, savedCount),
           total: successfulImages.length
         });
-        const messageData = {
+        const draftedMessage = {
           participantId: fallbackParticipantId,
           text: i === 0 ? '일정 사진' : '',
           imageUrl: chunkImages[0].imageUrl,
@@ -4532,6 +4536,12 @@ function CalendarApp() {
           timestamp: now + i,
           uploadSource: 'meeting'
         };
+        const messageData = storedPhotoPayload(draftedMessage, chunkImages);
+        if (!messageData) {
+          const err = new Error('사진이 안 올라갔어요. 다시 보내 주세요.');
+          err.code = 'PHOTO_NOT_STORED';
+          throw err;
+        }
         messageData.imageTagMap = reconcileMessageImageTagMap(messageData);
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장', { documentId: messageOperationId });
         if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
@@ -5088,9 +5098,16 @@ function CalendarApp() {
         return false;
       }
       const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
-      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings', [], {
-        settingsFields: ['title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget']
-      });
+      // Only patch fields the modal actually changed — always sending categories from a stale
+      // local snapshot was resetting expense/place categories edited elsewhere.
+      const settingsFields = diffCalendarSettingsFields(activeCal, stampedCal, [
+        'title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget'
+      ]);
+      if (!settingsFields.length) {
+        showToast('변경된 설정이 없습니다.', 'info');
+        return true;
+      }
+      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings', [], { settingsFields });
     }
   };
   const handleUpdateWeatherLocation = async (location) => {

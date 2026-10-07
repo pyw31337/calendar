@@ -35,9 +35,10 @@ const {
   buildPushTargetUrl,
   decidePollNotifications,
   decideScheduleNotification,
-  selectDeliverableSubscriptions
+  selectDeliverableSubscriptions,
+  claimDocId
 } = require('./push-notify-policy');
-const { planSettlementReminders } = require('./settlement-reminders');
+const { planSettlementReminders, planNewSettlementNotifications } = require('./settlement-reminders');
 const { parsePublicHttpUrl, setPublicCacheHeaders } = require('./public-proxy-contract');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
@@ -601,7 +602,7 @@ exports.onPhotoCommentItemWrite = seoulTriggerFunctions().runWith({ secrets: ['V
     await broadcastCalendarPush(calendarDocId, {
       title: `${author}의 사진 댓글`,
       body: String(after.text || '').slice(0, 120),
-      url: buildPushTargetUrl(calendarDocId, { view: 'gallery' }),
+      url: buildPushTargetUrl(calendarDocId, { view: 'gallery', img: after.assetKey || '' }),
       tag: `photo-comment-${calendarDocId}-${context.params.commentId}`,
       renotify: false
     }, { skipParticipantId: after.participantId || null, channel: 'comment' });
@@ -803,9 +804,12 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
           lastPushChannel: channel,
           lastPushError: String(err && err.message || 'unknown').slice(0, 500)
         }, { merge: true }).catch(() => {});
-        if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
+        // 404/410 = endpoint gone. 400/403 are often payload/VAPID misconfig — deleting
+        // every subscription on those would wipe devices after a bad deploy/key rotation.
+        if (err.statusCode === 410 || err.statusCode === 404) {
           return record.then(() => doc.ref.delete());
         }
+        console.warn('Push fail kept subscription', doc.id, err && err.statusCode);
         return record;
       });
     promises.push(p);
@@ -922,20 +926,21 @@ function isAnniversaryToday(ann, y, m, d) {
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
 
-// Memo created, a new comment, or a newly added photo → push. The trigger is onWrite
-// because comments and photos are saved as updates, but a title/body edit of an existing
-// memo must not push (decideMemoNotification returns null; kind "edit" is refused here too).
+// Memo created or a new comment → push. The trigger is onWrite because comments
+// are saved as updates. A title/body edit, or a photo added to an existing memo,
+// must not push (decideMemoNotification returns null; kind "edit" and "images"
+// are refused here too).
 exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const memo = change.after.data() || {};
-    // New memo, new comment, or a newly added photo only. Tag, GPS, link preview,
+    // New memo or a new comment only. A photo added to an existing memo, tag, GPS, link preview,
     // asset-graph, updatedAt, and title/body edits must not page anyone. The same
     // revision is claimed once so a retried trigger cannot send it again.
     const decision = decideMemoNotification(before, memo, { memoId: context.params.memoId });
-    if (!decision || decision.kind === 'edit') return;
+    if (!decision || decision.kind === 'edit' || decision.kind === 'images') return;
     const calendarDocId = context.params.calendarDocId;
     const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
     if (!claimed) {
@@ -950,11 +955,7 @@ exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE
     const author = decision.authorName || (named && named.name) || '참여자';
     const title = decision.kind === 'comment'
       ? `${author}의 메모 댓글`
-      : decision.kind === 'images'
-        ? `${author}의 메모 사진`
-        : decision.kind === 'edit'
-          ? `${author}의 메모 수정`
-          : `${author}의 새 메모`;
+      : `${author}의 새 메모`;
     await broadcastCalendarPush(calendarDocId, {
       title,
       body: decision.body,
@@ -1023,7 +1024,8 @@ exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_
     const beforePolls = Array.isArray(beforeCal.polls) ? beforeCal.polls : [];
     const afterPolls = Array.isArray(afterCal.polls) ? afterCal.polls : [];
     const decisions = decidePollNotifications(beforePolls, afterPolls);
-    if (decisions.length === 0) return;
+    const settlementDecisions = planNewSettlementNotifications(beforeCal.settlementCards, afterCal.settlementCards);
+    if (decisions.length === 0 && settlementDecisions.length === 0) return;
     const calendarDocId = context.params.calendarDocId;
     for (const decision of decisions) {
       const poll = decision.poll;
@@ -1040,6 +1042,20 @@ exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_
         renotify: false
       }, { skipParticipantId: decision.skipParticipantId, channel: 'poll' });
     }
+    for (const decision of settlementDecisions) {
+      const claimed = await claimPushDelivery(calendarDocId, claimDocId(decision.claimKey));
+      if (!claimed) {
+        console.log('Skipping duplicate settlement push', decision.claimKey);
+        continue;
+      }
+      await broadcastCalendarPush(calendarDocId, {
+        title: '정산 알림',
+        body: decision.body,
+        url: `./?id=${calendarDocId.replace('cal_', '')}&tab=settlement`,
+        tag: `settlement-${calendarDocId}-${decision.id}`,
+        renotify: false
+      }, { skipParticipantId: decision.skipParticipantId || null, channel: 'schedule' });
+    }
   });
 
 exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
@@ -1050,6 +1066,7 @@ exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secr
   const y = Number(kstParts.find(p => p.type === 'year').value);
   const m = Number(kstParts.find(p => p.type === 'month').value);
   const d = Number(kstParts.find(p => p.type === 'day').value);
+  const todayKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
   const db = admin.firestore();
   const annSnap = await db.collectionGroup('anniversaries').get();
@@ -1069,45 +1086,33 @@ exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secr
     return null;
   }
 
+  // Route through broadcastCalendarPush so per-device channel prefs apply (schedule), and
+  // claim once per anniversary/day so a schedule retry cannot double-send.
   const promises = [];
   for (const [calendarDocId, entry] of byCalendar) {
     const calendarSnap = await entry.ref.get();
     if (!calendarSnap.exists) continue;
-
-    const subSnap = await entry.ref.collection('push_subscriptions').get();
-    if (subSnap.empty) continue;
-
-    entry.anniversaries.forEach(ann => {
-      const payload = JSON.stringify({
+    for (const ann of entry.anniversaries) {
+      const claimKey = claimDocId(`anniversary_${ann.id}_${todayKey}`);
+      const claimed = await claimPushDelivery(calendarDocId, claimKey);
+      if (!claimed) {
+        console.log('Skipping duplicate anniversary reminder', claimKey);
+        continue;
+      }
+      promises.push(broadcastCalendarPush(calendarDocId, {
         title: '오늘의 기념일',
         body: `🎉 ${ann.title || '기념일'}`,
         url: `./?id=${calendarDocId.replace('cal_', '')}`,
-        tag: `anniversary-${calendarDocId}-${ann.id}`
-      });
-      subSnap.forEach(subDoc => {
-        const data = subDoc.data();
-        const pushSubscription = {
-          endpoint: data.endpoint,
-          keys: { auth: data.keys?.auth, p256dh: data.keys?.p256dh }
-        };
-        // Same urgency: 'high' reasoning as onMessageCreate above -- a same-day anniversary
-        // reminder is only useful if it actually arrives that day.
-        const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
-          .then(() => {
-            console.log(`Anniversary push sent to subscription: ${subDoc.id}`);
-          })
-          .catch(err => {
-            console.error(`Failed to send anniversary push to sub ${subDoc.id}:`, err);
-            if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
-              console.log(`Removing expired subscription: ${subDoc.id}`);
-              return subDoc.ref.delete();
-            }
-          });
-        promises.push(p);
-      });
-    });
+        tag: `anniversary-${calendarDocId}-${ann.id}`,
+        renotify: false
+      }, { channel: 'schedule' }));
+    }
   }
 
+  if (!promises.length) {
+    console.log('No anniversary pushes after claims for', todayKey);
+    return null;
+  }
   await Promise.all(promises);
   return null;
 });
@@ -1189,26 +1194,35 @@ exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secr
   return null;
 });
 
-// Monday evening: settlement cards still 진행중 a few days after they were opened
-// (settlement-reminders.js). Uses the schedule channel, like the meeting reminders above.
-exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('10 19 * * 1').timeZone('Asia/Seoul').onRun(async () => {
+// Unpaid settlement cards: one push on the Seoul date 3 days after the card was
+// created, and one on the date 5 days after, while it is still not 마감.
+// 06:30 KST, same morning slot as the anniversary job. Each card/day is claimed
+// once, so a retry or a second run the same morning cannot send it again.
+exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const db = admin.firestore();
   const snap = await db.collection('calendars').get();
   const promises = [];
-  snap.forEach(doc => {
+  for (const doc of snap.docs) {
     const calendar = (doc.data() || {}).calendar || {};
-    planSettlementReminders(calendar).forEach(reminder => {
+    for (const reminder of planSettlementReminders(calendar)) {
+      const claimKey = claimDocId(reminder.claimKey);
+      const claimed = await claimPushDelivery(doc.id, claimKey);
+      if (!claimed) {
+        console.log('Skipping duplicate settlement reminder', claimKey);
+        continue;
+      }
       promises.push(broadcastCalendarPush(doc.id, {
         title: '정산 알림',
         body: reminder.body,
         url: `./?id=${doc.id.replace('cal_', '')}&tab=settlement`,
-        tag: `settlement-open-${doc.id}-${reminder.id}`
+        tag: `settlement-unpaid-${doc.id}-${reminder.id}-day${reminder.days}`,
+        renotify: false
       }, { channel: 'schedule' }));
-    });
-  });
+    }
+  }
   if (!promises.length) {
-    console.log('No open settlement cards to remind');
+    console.log('No unpaid settlement reminders for today');
     return null;
   }
   await Promise.all(promises);
@@ -2725,7 +2739,7 @@ exports.pruneStaleRateLimitDocs = functions.region(SEOUL_REGION).pubsub.schedule
 // P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
 // one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
 // checks); rate limited per IP and scoped to one calendar id per request.
-const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets', 'mergeAssets']);
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset', 'bulkTagAssets', 'mergeAssets', 'queueStorageGc']);
 exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -2749,7 +2763,13 @@ exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 
   // Keep the established mutation surface for the original one-photo commands. Only the
   // new batch command supports externally hosted direct-media URLs, and it still resolves the
   // owner from its canonical photoIndex row before writing (media-commands.js).
-  if (op !== 'bulkTagAssets' && ![imageUrl, thumbUrl].some(isStorageUrl)) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  if (op !== 'bulkTagAssets' && op !== 'queueStorageGc' && ![imageUrl, thumbUrl].some(isStorageUrl)) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  if (op === 'queueStorageGc') {
+    const paths = Array.isArray(req.body?.paths) ? req.body.paths : [];
+    if (!paths.length || paths.length > 50 || paths.some(p => typeof p !== 'string' || !p.trim() || p.length > 500)) {
+      res.status(400).json({ ok: false, reason: 'invalid-paths' }); return;
+    }
+  }
   if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
   const db = admin.firestore();
   const calendarDocId = `cal_${calendarId}`;
@@ -2767,6 +2787,19 @@ exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 
     memoId: typeof item?.memoId === 'string' ? item.memoId.slice(0, 200) : '',
   });
   try {
+    if (op === 'queueStorageGc') {
+      const paths = (Array.isArray(req.body?.paths) ? req.body.paths : [])
+        .map(p => String(p || '').trim())
+        // Only accept paths under this calendar's chatFiles / chatImages / memoImages prefixes.
+        .filter(p => (
+          p.startsWith(`chatFiles/${calendarId}/`)
+          || p.startsWith(`chatImages/${calendarId}/`)
+          || p.startsWith(`memoImages/${calendarId}/`)
+        ));
+      const queued = await mediaCommands.queueStorageGcPaths({ db, calendarDocId, paths });
+      res.status(200).json(queued);
+      return;
+    }
     if (op === 'mergeAssets') {
       const merged = await mediaCommands.mergeAssets({
         db,
@@ -3334,6 +3367,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
 exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 540, memory: '1GB' })
   .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
     const calendars = await admin.firestore().collection('calendars').select().get();
+    const rebuildFailures = [];
     for (const doc of calendars.docs) {
       const calendarId = doc.id.startsWith('cal_') ? doc.id.slice(4) : doc.id;
       if (!CALENDAR_ID_RE.test(calendarId)) continue;
@@ -3342,7 +3376,14 @@ exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeo
         console.log('nightly photoIndex rebuild', JSON.stringify({ calendarId, indexedPhotos: report.indexedPhotos, staleRows: report.staleRows }));
       } catch (err) {
         console.error(`nightly photoIndex rebuild failed for ${calendarId}:`, err);
+        rebuildFailures.push(calendarId);
       }
+    }
+    // Abort GC when any rebuild failed — sweeping against a partial/stale in-use set can
+    // queue live originals for deletion.
+    if (rebuildFailures.length) {
+      console.error('nightly storage GC aborted; photoIndex rebuild failed for', JSON.stringify(rebuildFailures));
+      return null;
     }
     const gc = await mediaCommands.sweepStorageGc({ db: admin.firestore(), bucket: admin.storage().bucket() });
     console.log('nightly storage GC', JSON.stringify(gc));

@@ -367,37 +367,37 @@ export function ResizableModalContainer({ className, style, children, ...props }
     };
   }, []);
 
-  // Fit modal to currently visible viewport (address bar / toolbars on or off).
+  // Fit modal using --app-vv-height; re-run on the same return signals as #870 (no settle fan-out).
   React.useEffect(() => {
     if (dimensions) return undefined;
     const root = document.documentElement;
     const apply = () => {
-      const vv = window.visualViewport;
-      const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
-      const vvTop = vv && typeof vv.offsetTop === 'number' ? Math.max(0, vv.offsetTop) : 0;
-      const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
-      const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
-      const maxPx = Math.max(180, Math.floor(isMemoEdit
-          ? Math.min(780, vvH - vvTop - reserved)
-        : Math.min(860, vvH - vvTop - reserved)));
+      const vvH = getVisibleHeight();
+      const topRaw = Number.parseFloat(root.style.getPropertyValue('--app-vv-offset-top'));
+      const vvTop = Number.isFinite(topRaw) && topRaw > 0 ? topRaw : 0;
+      const isMemoEdit = containerRef.current?.classList.contains('memo-edit-modal-container');
+      const reserved = window.matchMedia?.('(max-width: 640px)').matches ? 20 : 32;
+      const maxPx = Math.max(180, Math.floor(Math.min(isMemoEdit ? 780 : 860, vvH - vvTop - reserved)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
-      if (containerRef.current) {
-        containerRef.current.style.maxHeight = `${maxPx}px`;
-      }
+      if (containerRef.current) containerRef.current.style.maxHeight = `${maxPx}px`;
     };
-    apply();
+    const onVis = () => { if (document.visibilityState !== 'hidden') apply(); };
+    const onSw = (e) => { if (e?.data?.type === 'notification-open') apply(); };
     const vv = window.visualViewport;
-    if (vv) {
-      vv.addEventListener('resize', apply);
-      vv.addEventListener('scroll', apply);
-    }
+    vv?.addEventListener('resize', apply);
     window.addEventListener('resize', apply);
+    window.addEventListener('pageshow', apply);
+    window.addEventListener('focus', apply);
+    document.addEventListener('visibilitychange', onVis);
+    try { navigator.serviceWorker?.addEventListener('message', onSw); } catch (_) {}
+    apply();
     return () => {
-      if (vv) {
-        vv.removeEventListener('resize', apply);
-        vv.removeEventListener('scroll', apply);
-      }
+      vv?.removeEventListener('resize', apply);
       window.removeEventListener('resize', apply);
+      window.removeEventListener('pageshow', apply);
+      window.removeEventListener('focus', apply);
+      document.removeEventListener('visibilitychange', onVis);
+      try { navigator.serviceWorker?.removeEventListener('message', onSw); } catch (_) {}
     };
   }, [dimensions]);
 
@@ -1060,6 +1060,8 @@ export function GamifiedConfirmButtonContent({ label }) {
 }
 
 export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null, wrapTitle = false }) {
+  // Stretch cards (memo/chat full-width) always get intentional 2-line titles so long
+  // Korean names are not hard-clipped to ~70px; callers can still pass wrapTitle.
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1169,7 +1171,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         padding: imageSrc ? '8px 10px 8px 0' : '8px 10px',
         minWidth: 0,
         maxWidth: stretch ? 'none' : (imageSrc ? '198px' : '270px'),
-        flex: stretch ? '1 1 0' : '0 1 auto',
+        flex: stretch ? '1 1 0%' : '0 1 auto',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -1180,16 +1182,20 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
+        className: (stretch || wrapTitle) ? 'link-preview-card-title is-wrap' : 'link-preview-card-title',
         style: {
           fontSize: 'var(--font-size-md)',
           fontWeight: 700,
-          lineHeight: 1.3,
+          lineHeight: 1.25,
           color: 'var(--text-main)',
-          overflow: wrapTitle ? 'visible' : 'hidden',
-          textOverflow: wrapTitle ? 'clip' : 'ellipsis',
-          whiteSpace: wrapTitle ? 'normal' : 'nowrap',
-          wordBreak: wrapTitle ? 'break-word' : undefined,
-          overflowWrap: wrapTitle ? 'anywhere' : undefined
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: (stretch || wrapTitle) ? 'normal' : 'nowrap',
+          wordBreak: (stretch || wrapTitle) ? 'keep-all' : undefined,
+          overflowWrap: (stretch || wrapTitle) ? 'anywhere' : undefined,
+          display: (stretch || wrapTitle) ? '-webkit-box' : undefined,
+          WebkitLineClamp: (stretch || wrapTitle) ? 2 : undefined,
+          WebkitBoxOrient: (stretch || wrapTitle) ? 'vertical' : undefined
         }
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
@@ -2240,6 +2246,76 @@ export function ResizableListSection({
   );
 }
 
+
+/**
+ * Browser Back closes the top overlay first (same pattern as the gallery lightbox).
+ * Pushes a same-URL history marker when the overlay mounts; popstate calls onClose.
+ * Closing via UI calls history.back() when our marker is still on top so PWA Back
+ * never exits the app unexpectedly. Ephemeral dialogs should pass enabled:false.
+ * Deep links (?memory=, notification ?tab=) keep their own URL entries unchanged.
+ */
+export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } = {}) {
+  const React = window.React;
+  const markerRef = React.useRef(false);
+  const closingViaBackRef = React.useRef(false);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  const stateKey = `__moyeoraOverlay_${key}`;
+
+  React.useEffect(() => {
+    if (!enabled || typeof window === 'undefined' || !window.history) return undefined;
+    try {
+      window.history.pushState({ ...(window.history.state || {}), [stateKey]: true }, '', window.location.href);
+      markerRef.current = true;
+    } catch (_) {
+      markerRef.current = false;
+    }
+    const handlePopState = () => {
+      if (!markerRef.current) return;
+      markerRef.current = false;
+      closingViaBackRef.current = true;
+      try {
+        if (typeof onCloseRef.current === 'function') onCloseRef.current();
+      } finally {
+        closingViaBackRef.current = false;
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      // If the overlay unmounts without going through history.back (parent navigated),
+      // drop the marker quietly so a later Back does not reopen a ghost close.
+      if (markerRef.current && window.history.state && window.history.state[stateKey]) {
+        markerRef.current = false;
+        try {
+          const next = { ...(window.history.state || {}) };
+          delete next[stateKey];
+          window.history.replaceState(next, '', window.location.href);
+        } catch (_) { /* best-effort */ }
+      } else {
+        markerRef.current = false;
+      }
+    };
+  }, [enabled, stateKey]);
+
+  const requestClose = React.useCallback(() => {
+    if (closingViaBackRef.current) {
+      if (typeof onCloseRef.current === 'function') onCloseRef.current();
+      return;
+    }
+    if (markerRef.current && window.history.state && window.history.state[stateKey]) {
+      markerRef.current = false;
+      try {
+        window.history.back();
+        return;
+      } catch (_) { /* fall through */ }
+    }
+    if (typeof onCloseRef.current === 'function') onCloseRef.current();
+  }, [stateKey]);
+
+  return requestClose;
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ResizableModalContainer: ResizableModalContainer,
@@ -2262,6 +2338,7 @@ export function ResizableListSection({
     SyncStatusChip: SyncStatusChip,
     SyncStatusBanner: SyncStatusBanner,
     LinkPreviewCard: LinkPreviewCard,
+    useOverlayHistory: useOverlayHistory,
     LinkPreviewProgressOverlay: LinkPreviewProgressOverlay,
     AdminLoginGate: AdminLoginGate,
     DonutChart: DonutChart,
