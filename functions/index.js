@@ -14,7 +14,9 @@ const seoulFunctions = () => functions.region(SEOUL_REGION);
 const seoulTriggerFunctions = seoulFunctions;
 const workerFunctions = () => functions.region(SEOUL_REGION, 'us-central1');
 const { defineString, defineSecret } = require('firebase-functions/params');
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const photoCommentItems = require('./photo-comment-items');
 const crypto = require('crypto');
 const webpush = require('web-push');
@@ -52,7 +54,7 @@ const NAVER_SMTP_APP_PASSWORD = defineSecret('NAVER_SMTP_APP_PASSWORD');
 const MEDIA_BRIEF_RECIPIENT = 'pyw213@naver.com';
 const NAVER_SMTP_ACCOUNT = 'pyw213@naver.com';
 
-admin.initializeApp();
+initializeApp();
 
 function parseMeetingDateTags(value) {
   const text = typeof value === 'string' ? value : '';
@@ -319,11 +321,11 @@ function selectPhotoIndexOwner(owners) {
 // a 200-photo upload produces four source-record bumps, not hundreds of contested writes.
 async function bumpPhotoIndexRevision(calendarDocId) {
   if (!calendarDocId) return;
-  const summaryRef = admin.firestore()
+  const summaryRef = getFirestore()
     .collection('calendars').doc(calendarDocId)
     .collection('photoIndexMeta').doc('summary');
   await summaryRef.set({
-    revision: admin.firestore.FieldValue.increment(1),
+    revision: FieldValue.increment(1),
     updatedAt: Date.now()
   }, { merge: true });
 }
@@ -335,7 +337,7 @@ async function bumpPhotoIndexRevision(calendarDocId) {
 async function syncAssetGraphProjection(calendarDocId, assetKeys) {
   const keys = Array.from(new Set(Array.from(assetKeys || []).filter(Boolean))).slice(0, 80);
   if (!calendarDocId || !keys.length) return;
-  const db = admin.firestore();
+  const db = getFirestore();
   const root = db.collection('calendars').doc(calendarDocId);
   const rows = await db.getAll(...keys.map(key => root.collection('photoIndex').doc(key)));
   const calendarId = calendarDocId.startsWith('cal_') ? calendarDocId.slice(4) : calendarDocId;
@@ -357,7 +359,7 @@ async function syncAssetGraphProjection(calendarDocId, assetKeys) {
 }
 
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
   const collectionNames = ['messages', 'memos', 'confirmedMeetings', 'anniversaries', 'photoCommentItems', 'photoIndex'];
   const snapshots = await Promise.all(collectionNames.map(collection => root.collection(collection).get()));
@@ -476,7 +478,7 @@ async function withRowRetry(run) {
 }
 
 async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const indexRef = db.collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
   const sourceId = context.params[idParam];
   const before = change.before.exists ? getPhotoIndexEntries(sourceType, sourceId, change.before.data() || {}) : [];
@@ -589,13 +591,13 @@ exports.onPhotoCommentItemWrite = seoulTriggerFunctions().runWith({ secrets: ['V
     const after = change.after.exists ? change.after.data() : null;
     const keys = photoCommentItems.assetKeysToRecount(before, after);
     for (const key of keys) {
-      await photoCommentItems.recountAsset(admin.firestore(), admin, context.params.calendarDocId, key);
+      await photoCommentItems.recountAsset(getFirestore(), FieldValue, context.params.calendarDocId, key);
     }
     if (before || !after || after.migratedFrom || after.deletedAt != null) return null;
     const calendarDocId = context.params.calendarDocId;
     const claimKey = `photo-comment:${context.params.commentId}`;
     if (!(await claimPushDelivery(calendarDocId, claimKey))) return null;
-    const calendarSnap = await admin.firestore().collection('calendars').doc(calendarDocId).get();
+    const calendarSnap = await getFirestore().collection('calendars').doc(calendarDocId).get();
     const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
     const named = participants.find(person => person && person.id === after.participantId);
     const author = (named && named.name) || '참여자';
@@ -617,7 +619,7 @@ exports.onPhotoCommentIndexWrite = seoulTriggerFunctions().firestore
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;
     const comments = change.after.data()?.comments;
-    await photoCommentItems.mirrorLegacyThread(admin.firestore(), context.params.calendarDocId, context.params.photoKey, comments);
+    await photoCommentItems.mirrorLegacyThread(getFirestore(), context.params.calendarDocId, context.params.photoKey, comments);
     return null;
   });
 
@@ -647,7 +649,7 @@ exports.onLinkPreviewWrite = seoulTriggerFunctions().firestore
   .onWrite(makeCalendarCountSyncTrigger());
 
 async function syncMeetingPhotoIndex(change, context) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const calendarRef = db.collection('calendars').doc(context.params.calendarDocId);
   const indexRef = calendarRef.collection('meetingPhotoIndex');
   const sourceMessageId = context.params.messageId;
@@ -704,11 +706,11 @@ function ensureVapidConfigured() {
 // again. Fail closed: a claim outage skips the push instead of repeating a storm.
 async function claimPushDelivery(calendarDocId, claimKey) {
   if (!calendarDocId || !claimKey) return false;
-  const ref = admin.firestore()
+  const ref = getFirestore()
     .collection('calendars').doc(calendarDocId)
     .collection('push_delivery_claims').doc(String(claimKey));
   try {
-    return await admin.firestore().runTransaction(async tx => {
+    return await getFirestore().runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (snap.exists) return false;
       tx.set(ref, { createdAt: Date.now(), claimKey: String(claimKey) });
@@ -723,7 +725,7 @@ async function claimPushDelivery(calendarDocId, claimKey) {
 /** Shared push broadcast for a calendar's push_subscriptions */
 async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   ensureVapidConfigured();
-  const db = admin.firestore();
+  const db = getFirestore();
   const skipParticipantId = options.skipParticipantId || null;
   const channel = options.channel || 'chat'; // chat | comment | memo | poll | schedule
   // Cap fan-out so a compromised/abnormally large subscription set cannot create an
@@ -841,7 +843,7 @@ exports.onMessageCreate = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRI
       return;
     }
 
-    const db = admin.firestore();
+    const db = getFirestore();
 
     // 1. Get calendar details to retrieve title and participants
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
@@ -947,7 +949,7 @@ exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE
       console.log('Skipping duplicate memo push', decision.claimKey);
       return;
     }
-    const db = admin.firestore();
+    const db = getFirestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
     const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
@@ -1003,7 +1005,7 @@ exports.onConfirmedMeetingWrite = seoulTriggerFunctions().runWith({ secrets: ['V
       console.log('Skipping duplicate schedule push', decision.claimKey);
       return;
     }
-    const db = admin.firestore();
+    const db = getFirestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
     await broadcastCalendarPush(calendarDocId, {
@@ -1068,7 +1070,7 @@ exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secr
   const d = Number(kstParts.find(p => p.type === 'day').value);
   const todayKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-  const db = admin.firestore();
+  const db = getFirestore();
   const annSnap = await db.collectionGroup('anniversaries').get();
 
   const byCalendar = new Map();
@@ -1129,7 +1131,7 @@ exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secr
   const d = tomorrow.getDate();
   const tomorrowKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
-  const db = admin.firestore();
+  const db = getFirestore();
   const promises = [];
 
   // Confirmed meetings scheduled for tomorrow.
@@ -1200,7 +1202,7 @@ exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secr
 // once, so a retry or a second run the same morning cannot send it again.
 exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
-  const db = admin.firestore();
+  const db = getFirestore();
   const snap = await db.collection('calendars').get();
   const promises = [];
   for (const doc of snap.docs) {
@@ -1331,7 +1333,7 @@ async function saveLinkPreviewToFirestore(url, preview) {
       siteName: String(preview.siteName || preview.domain || '').slice(0, 200),
       fetchedAt: Date.now()
     };
-    await admin.firestore().collection('linkPreviews').doc(urlHash).set(data, { merge: true });
+    await getFirestore().collection('linkPreviews').doc(urlHash).set(data, { merge: true });
   } catch (err) {
     console.error('saveLinkPreviewToFirestore failed:', err);
   }
@@ -1356,10 +1358,10 @@ const PLACE_SEARCH_PROXY_RUNTIME = PUBLIC_PROXY_RUNTIME;
 async function checkProxyRateLimit(bucketKey, ip, windowMs, maxRequests) {
   try {
     const docId = `${bucketKey}_${String(ip || 'unknown').replace(/[^a-zA-Z0-9.:_-]/g, '_').slice(0, 200) || 'unknown'}`;
-    const ref = admin.firestore().collection('proxyRateLimits').doc(docId);
+    const ref = getFirestore().collection('proxyRateLimits').doc(docId);
     const now = Date.now();
     let allowed = true;
-    await admin.firestore().runTransaction(async tx => {
+    await getFirestore().runTransaction(async tx => {
       const snap = await tx.get(ref);
       const data = snap.exists ? snap.data() : null;
       const withinWindow = data && data.windowStart && (now - data.windowStart) < windowMs;
@@ -1502,7 +1504,7 @@ exports.peekalinkProxy = seoulFunctions().runWith({ ...PUBLIC_PROXY_RUNTIME, sec
   // 0. Check Firestore shared cache first (avoids any network or rate limit)
   try {
     const urlHash = hashUrlForCache(normalizedLink);
-    const cachedDoc = await admin.firestore().collection('linkPreviews').doc(urlHash).get();
+    const cachedDoc = await getFirestore().collection('linkPreviews').doc(urlHash).get();
     if (cachedDoc.exists && cachedDoc.data()?.title && !looksLikeBlockedPreviewTitle(cachedDoc.data()?.title)) {
       const d = cachedDoc.data();
       res.status(200).json({
@@ -1601,8 +1603,8 @@ async function incrementKakaoLocalSearchStat() {
     // sync with the same day Kakao's own console would show, rather than rolling over 9 hours
     // early/late relative to it.
     const todayBucket = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const ref = admin.firestore().collection('appConfig').doc('kakaoLocalSearchStats');
-    await admin.firestore().runTransaction(async tx => {
+    const ref = getFirestore().collection('appConfig').doc('kakaoLocalSearchStats');
+    await getFirestore().runTransaction(async tx => {
       const snap = await tx.get(ref);
       const data = snap.exists ? snap.data() : null;
       const sameBucket = data && data.dailyUsageBucket === todayBucket;
@@ -1621,7 +1623,7 @@ async function incrementKakaoLocalSearchStat() {
 // provider queries (including API keys) never appear in Firestore document paths.
 function externalCacheRef(provider, key) {
   const digest = crypto.createHash('sha256').update(`${provider}:${key}`).digest('hex');
-  return admin.firestore().collection('externalApiCache').doc(`${provider}_${digest}`);
+  return getFirestore().collection('externalApiCache').doc(`${provider}_${digest}`);
 }
 async function readExternalCache(provider, key) {
   try {
@@ -1759,7 +1761,7 @@ exports.completePhotoLocationTags = seoulTriggerFunctions()
     });
     if (!locationTagsByAsset.size) return null;
 
-    await admin.firestore().runTransaction(async transaction => {
+    await getFirestore().runTransaction(async transaction => {
       const snapshot = await transaction.get(change.after.ref);
       if (!snapshot.exists) return;
       const latest = snapshot.data() || {};
@@ -1806,8 +1808,8 @@ const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 async function incrementGooglePlacesSearchStat() {
   try {
     const monthBucket = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC)
-    const ref = admin.firestore().collection('appConfig').doc('googlePlacesSearchStats');
-    await admin.firestore().runTransaction(async tx => {
+    const ref = getFirestore().collection('appConfig').doc('googlePlacesSearchStats');
+    await getFirestore().runTransaction(async tx => {
       const snap = await tx.get(ref);
       const data = snap.exists ? snap.data() : null;
       const sameBucket = data && data.monthlyUsageBucket === monthBucket;
@@ -1981,7 +1983,7 @@ exports.listPublicCalendarSummaries = seoulFunctions().https.onRequest(async (re
     return;
   }
   try {
-    const snap = await admin.firestore().collection('calendars').get();
+    const snap = await getFirestore().collection('calendars').get();
     const calendars = [];
     snap.forEach(doc => {
       const cal = doc.data()?.calendar;
@@ -2019,7 +2021,7 @@ function sha256Hex(text) {
 }
 
 async function getStoredAdminPasswordHash() {
-  const snap = await admin.firestore().collection('appConfig').doc('adminAuth').get();
+  const snap = await getFirestore().collection('appConfig').doc('adminAuth').get();
   const hash = snap.exists ? snap.data()?.passwordHash : null;
   return typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash) ? hash : DEFAULT_ADMIN_PASSWORD_HASH;
 }
@@ -2032,7 +2034,7 @@ const ADMIN_AUTH_RATE_LIMIT_MAX_FAILURES = 10;
 
 async function checkAdminAuthRateLimit(ip) {
   const docId = String(ip || 'unknown').replace(/[^a-zA-Z0-9.:_-]/g, '_').slice(0, 200) || 'unknown';
-  const ref = admin.firestore().collection('adminAuthAttempts').doc(docId);
+  const ref = getFirestore().collection('adminAuthAttempts').doc(docId);
   const snap = await ref.get();
   const now = Date.now();
   const data = snap.exists ? snap.data() : null;
@@ -2059,7 +2061,7 @@ async function recordAdminAuthResult(rateState, success) {
     return;
   }
   const now = Date.now();
-  await admin.firestore().runTransaction(async tx => {
+  await getFirestore().runTransaction(async tx => {
     const snap = await tx.get(rateState.ref);
     const data = snap.exists ? snap.data() : null;
     const withinWindow = data && data.windowStart && (now - data.windowStart) < ADMIN_AUTH_RATE_LIMIT_WINDOW_MS;
@@ -2113,7 +2115,7 @@ exports.auditEvent = seoulFunctions().https.onRequest(async (req, res) => {
     after: String(rawResource.after || '').slice(0, 500)
   } : null;
   try {
-    await admin.firestore().collection('serverAuditLogs').add({
+    await getFirestore().collection('serverAuditLogs').add({
       calendarId, action, actorId: actorId.slice(0, 80), sessionId: sessionId.slice(0, 100),
       client, target, ...(resource ? { resource } : {}), ipHash, userAgent, receivedAt: Date.now()
     });
@@ -2186,7 +2188,7 @@ exports.listAllCalendars = seoulFunctions().https.onRequest(async (req, res) => 
   if (!matches) { res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' }); return; }
 
   try {
-    const snap = await admin.firestore().collection('calendars').get();
+    const snap = await getFirestore().collection('calendars').get();
     const calendars = [];
     let lastModified = 0;
     snap.forEach(doc => {
@@ -2227,7 +2229,7 @@ exports.listServerAuditLogs = seoulFunctions().https.onRequest(async (req, res) 
       // showed "조회 실패". An equality-only where() never needs a composite index, so fetch
       // this calendar's rows unordered up to a generous cap and sort/trim in JS instead --
       // audit log volume per calendar stays small enough that this is cheap.
-      const snap = await admin.firestore().collection('serverAuditLogs')
+      const snap = await getFirestore().collection('serverAuditLogs')
         .where('calendarId', '==', String(calendarId))
         .limit(5000)
         .get();
@@ -2235,7 +2237,7 @@ exports.listServerAuditLogs = seoulFunctions().https.onRequest(async (req, res) 
         .sort((a, b) => (Number(b.receivedAt) || 0) - (Number(a.receivedAt) || 0))
         .slice(0, max);
     } else {
-      const snap = await admin.firestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max).get();
+      const snap = await getFirestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max).get();
       logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
     res.status(200).json({ ok: true, logs });
@@ -2266,7 +2268,7 @@ exports.memePoolUpsert = seoulFunctions().https.onRequest(async (req, res) => {
   await recordAdminAuthResult(rateState, matches);
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
-    const ref = admin.firestore().collection('memePool').doc(id);
+    const ref = getFirestore().collection('memePool').doc(id);
     const existingSnap = await ref.get();
     const existing = existingSnap.exists ? existingSnap.data() : null;
     // hashtags is the only field a second call (the lightbox tagging step, after the bulk
@@ -2292,7 +2294,7 @@ exports.memePoolUpsert = seoulFunctions().https.onRequest(async (req, res) => {
     if (!doc.thumbUrl && !doc.fullUrl) { res.status(400).json({ ok: false, message: 'thumbUrl or fullUrl required' }); return; }
     await ref.set(doc);
     try {
-      await admin.firestore().collection('memePool').doc('_metadata').set({
+      await getFirestore().collection('memePool').doc('_metadata').set({
         updatedAt: now,
         version: 1
       }, { merge: true });
@@ -2317,9 +2319,9 @@ exports.memePoolDelete = seoulFunctions().https.onRequest(async (req, res) => {
   await recordAdminAuthResult(rateState, matches);
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
-    await admin.firestore().collection('memePool').doc(id).delete();
+    await getFirestore().collection('memePool').doc(id).delete();
     try {
-      await admin.firestore().collection('memePool').doc('_metadata').set({
+      await getFirestore().collection('memePool').doc('_metadata').set({
         updatedAt: Date.now(),
         version: 1
       }, { merge: true });
@@ -2353,7 +2355,7 @@ exports.listUntaggedPhotoIndexEntries = seoulFunctions().https.onRequest(async (
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
     const pageSize = Math.min(200, Math.max(1, Number(limit) || 60));
-    let query = admin.firestore().collectionGroup('photoIndex')
+    let query = getFirestore().collectionGroup('photoIndex')
       .where('tags', '==', '')
       .orderBy('updatedAt', 'desc')
       .limit(pageSize);
@@ -2400,7 +2402,7 @@ exports.listPhotoIndexEntriesForDedup = seoulFunctions().https.onRequest(async (
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
     const pageSize = Math.min(200, Math.max(1, Number(limit) || 200));
-    let query = admin.firestore().collectionGroup('photoIndex')
+    let query = getFirestore().collectionGroup('photoIndex')
       .orderBy('updatedAt', 'desc')
       .limit(pageSize);
     if (typeof cursor === 'number' && Number.isFinite(cursor)) query = query.startAfter(cursor);
@@ -2451,7 +2453,7 @@ exports.listSharedDataPool = seoulFunctions().https.onRequest(async (req, res) =
   try {
     const pageSize = Math.min(200, Math.max(1, Number(limit) || 100));
     const collectionName = kind === 'file' ? 'sharedFiles' : 'linkPreviews';
-    let query = admin.firestore().collection(collectionName)
+    let query = getFirestore().collection(collectionName)
       .where('calendarCount', '>=', 2)
       .orderBy('calendarCount', 'desc')
       .limit(pageSize);
@@ -2477,7 +2479,7 @@ exports.listSharedDataPool = seoulFunctions().https.onRequest(async (req, res) =
 // confirmedMeeting's photos[index].tags) -- mirrors handleSaveImageTags's routing in app-main.js,
 // just server-side so it can act on any calendar regardless of who's logged into it.
 async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const calendarDocId = `cal_${calendarId}`;
   const indexRef = db.collection('calendars').doc(calendarDocId).collection('photoIndex').doc(assetKey);
   const indexSnap = await indexRef.get();
@@ -2609,7 +2611,7 @@ exports.mergeDedupPhotos = seoulFunctions().https.onRequest(async (req, res) => 
   await recordAdminAuthResult(rateState, matches);
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
-    const db = admin.firestore();
+    const db = getFirestore();
     const calendarDocId = `cal_${calendarId}`;
     const indexColl = db.collection('calendars').doc(calendarDocId).collection('photoIndex');
     const [winnerSnap, loserSnap] = await Promise.all([indexColl.doc(winnerAssetKey).get(), indexColl.doc(loserAssetKey).get()]);
@@ -2661,7 +2663,7 @@ exports.listPushSubscriptionHealth = seoulFunctions().https.onRequest(async (req
   await recordAdminAuthResult(rateState, matches);
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
-    const snap = await admin.firestore().collection('calendars').doc(`cal_${calendarId}`).collection('push_subscriptions').limit(1000).get();
+    const snap = await getFirestore().collection('calendars').doc(`cal_${calendarId}`).collection('push_subscriptions').limit(1000).get();
     const now = Date.now();
     const summary = { total: snap.size, active: 0, stale30d: 0, sent: 0, failed: 0, channels: { chat: 0, comment: 0, memo: 0, poll: 0, schedule: 0 } };
     snap.forEach(doc => {
@@ -2702,7 +2704,7 @@ exports.adminChangePassword = seoulFunctions().https.onRequest(async (req, res) 
   if (!matches) { res.status(401).json({ ok: false, message: '현재 비밀번호가 올바르지 않습니다.' }); return; }
 
   try {
-    await admin.firestore().collection('appConfig').doc('adminAuth').set({
+    await getFirestore().collection('appConfig').doc('adminAuth').set({
       passwordHash: newPasswordHash,
       updatedAt: Date.now()
     });
@@ -2721,7 +2723,7 @@ exports.adminChangePassword = seoulFunctions().https.onRequest(async (req, res) 
 // existing sendAnniversaryReminders schedule.
 exports.pruneStaleRateLimitDocs = functions.region(SEOUL_REGION).pubsub.schedule('30 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const db = admin.firestore();
+  const db = getFirestore();
   for (const collectionName of ['adminAuthAttempts', 'proxyRateLimits']) {
     const snap = await db.collection(collectionName).where('windowStart', '<', cutoff).get();
     if (snap.empty) continue;
@@ -2771,7 +2773,7 @@ exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 
     }
   }
   if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
-  const db = admin.firestore();
+  const db = getFirestore();
   const calendarDocId = `cal_${calendarId}`;
   const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
   if (!calendarSnap.exists) { res.status(404).json({ ok: false, reason: 'calendar' }); return; }
@@ -2803,7 +2805,7 @@ exports.mediaCommand = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 
     if (op === 'mergeAssets') {
       const merged = await mediaCommands.mergeAssets({
         db,
-        bucket: admin.storage().bucket(),
+        bucket: getStorage().bucket(),
         calendarDocId,
         keep: cleanAsset,
         extras: extras.map(cleanRef),
@@ -2849,7 +2851,7 @@ function hasValidMediaWorkerToken(req) {
 // 맥 백업 (어드민 '맥 백업' 탭): the admin asks for a backup; the Mac picks the request up on
 // its next 15-minute check (macWorkerSync, worker token) and reports the result back. Only a
 // timestamp and the backup summary are stored -- never a key, passphrase or file content.
-const MAC_BACKUP_DOC = () => admin.firestore().collection('adminOps').doc('macBackup');
+const MAC_BACKUP_DOC = () => getFirestore().collection('adminOps').doc('macBackup');
 
 function sanitizeMacBackupResult(raw = {}) {
   const text = (value, max) => String(value == null ? '' : value).slice(0, max);
@@ -2914,7 +2916,7 @@ exports.macWorkerSync = seoulFunctions().runWith({ secrets: [MEDIA_WORKER_TOKEN]
 async function ingestFaceSuggestions(req, res, calendarId, rawItems, now) {
   const keys = Array.from(new Set(rawItems.map(item => String(item?.assetKey || '')).filter(key => PHOTO_ASSET_KEY_RE.test(key))));
   if (rawItems.length > 0 && !keys.length) { res.status(400).json({ ok: false, message: 'No valid face items' }); return; }
-  const db = admin.firestore();
+  const db = getFirestore();
   const calendarRef = db.collection('calendars').doc(`cal_${calendarId}`);
   try {
     if (!(await calendarRef.get()).exists) { res.status(404).json({ ok: false, message: 'Calendar not found' }); return; }
@@ -2975,7 +2977,7 @@ exports.ingestMediaAnalysis = workerFunctions().runWith({
   }
   const items = rawItems.map(item => sanitizeAnalysisItem(item, now)).filter(Boolean);
   if (rawItems.length > 0 && !items.length) { res.status(400).json({ ok: false, message: 'No valid analysis items' }); return; }
-  const db = admin.firestore();
+  const db = getFirestore();
   const calendarRef = db.collection('calendars').doc(`cal_${calendarId}`);
   try {
     if (!(await calendarRef.get()).exists) { res.status(404).json({ ok: false, message: 'Calendar not found' }); return; }
@@ -2990,7 +2992,7 @@ exports.ingestMediaAnalysis = workerFunctions().runWith({
     const runId = String(req.body?.runId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96) || crypto.randomUUID();
     const workerId = String(req.body?.workerId || 'macos-local').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'macos-local';
     const status = String(req.body?.status || (items.length ? 'completed' : 'idle')).replace(/[^a-z-]/g, '').slice(0, 24) || 'idle';
-    const batch = admin.firestore().batch();
+    const batch = getFirestore().batch();
     for (const item of acceptedItems) {
       const target = calendarRef.collection('mediaAnalysis').doc(item.id);
       batch.set(target, {
@@ -3048,7 +3050,7 @@ exports.completeMediaAnalysisLocationTags = seoulTriggerFunctions()
     const before = change.before.data() || {};
     if (after.analysisVersion < 5 || after.status !== 'suggested' || !after.assetKey) return null;
     if (before.analyzedAt === after.analyzedAt && before.sourceUpdatedAt === after.sourceUpdatedAt) return null;
-    return completeAnalysisLocationTags({ db: admin.firestore(), calendarDocId: context.params.calendarDocId,
+    return completeAnalysisLocationTags({ db: getFirestore(), calendarDocId: context.params.calendarDocId,
       assetKey: after.assetKey, lookupTags: fetchKakaoCoordinateTags, legacy: change.before.exists && !before.automatic });
   });
 function sanitizeMediaAnalysisFeedbackTags(value) {
@@ -3084,11 +3086,11 @@ exports.recordMediaAnalysisFeedback = seoulFunctions().runWith({
   const finalTags = decision === 'rejected' ? [] : sanitizeMediaAnalysisFeedbackTags(req.body?.finalTags);
   const now = Date.now();
   const analysisId = stableAnalysisId(assetKey);
-  const calendarRef = admin.firestore().collection('calendars').doc(`cal_${calendarId}`);
+  const calendarRef = getFirestore().collection('calendars').doc(`cal_${calendarId}`);
   const photoRef = calendarRef.collection('photoIndex').doc(assetKey);
   const analysisRef = calendarRef.collection('mediaAnalysis').doc(analysisId);
   try {
-    const [photoSnap, analysisSnap] = await admin.firestore().getAll(photoRef, analysisRef);
+    const [photoSnap, analysisSnap] = await getFirestore().getAll(photoRef, analysisRef);
     if (!photoSnap.exists) { res.status(404).json({ ok: false, message: 'Source photo no longer exists' }); return; }
     if (!analysisSnap.exists) { res.status(404).json({ ok: false, message: 'Analysis result no longer exists' }); return; }
     const previousReview = analysisSnap.data()?.review || {};
@@ -3100,7 +3102,7 @@ exports.recordMediaAnalysisFeedback = seoulFunctions().runWith({
       reviewedAt: now,
       reviewCount: Math.max(0, Number(previousReview.reviewCount) || 0) + 1
     };
-    const batch = admin.firestore().batch();
+    const batch = getFirestore().batch();
     batch.set(analysisRef, { review }, { merge: true });
     batch.set(calendarRef.collection('mediaAnalysisFeedback').doc(analysisId), {
       assetKey,
@@ -3114,7 +3116,7 @@ exports.recordMediaAnalysisFeedback = seoulFunctions().runWith({
         : [],
       analysisVersion: Math.max(1, Number(analysisSnap.data()?.analysisVersion) || 1),
       lastReviewedAt: now,
-      reviewCount: admin.firestore.FieldValue.increment(1)
+      reviewCount: FieldValue.increment(1)
     }, { merge: true });
     await batch.commit();
     res.status(200).json({ ok: true, review });
@@ -3147,7 +3149,7 @@ exports.recordFaceFeedback = seoulFunctions().runWith({
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
-  const db = admin.firestore();
+  const db = getFirestore();
   const calendarRef = db.collection('calendars').doc(`cal_${calendarId}`);
   try {
     const refs = assetKeys.map(key => calendarRef.collection('mediaAnalysis').doc(stableAnalysisId(key)));
@@ -3159,7 +3161,7 @@ exports.recordFaceFeedback = seoulFunctions().runWith({
       if (!snap.exists) return;
       const facePeople = (snap.data()?.facePeople || []).filter(entry => faceName(entry?.name) !== name);
       batch.set(refs[index], {
-        faceRejected: admin.firestore.FieldValue.arrayUnion(name),
+        faceRejected: FieldValue.arrayUnion(name),
         facePeople,
         faceSuggested: facePeople.length > 0,
         faceRejectedAt: now
@@ -3192,7 +3194,7 @@ exports.getMediaAnalysisCalibration = workerFunctions().runWith({
     return;
   }
   try {
-    const snapshot = await admin.firestore().collection('calendars').doc(`cal_${calendarId}`)
+    const snapshot = await getFirestore().collection('calendars').doc(`cal_${calendarId}`)
       .collection('mediaAnalysisFeedback').orderBy('lastReviewedAt', 'desc').limit(300).get();
     const signals = snapshot.docs.map(doc => {
       const data = doc.data() || {};
@@ -3272,7 +3274,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
 }).pubsub.schedule('0,15,30,45 8 * * 1-5').timeZone('Asia/Seoul').onRun(async () => {
   const now = Date.now();
   const dateKey = getKstDateKey(new Date(now));
-  const db = admin.firestore();
+  const db = getFirestore();
   const reportRef = db.collection('operationsMediaBriefs').doc(`media-analysis-${dateKey}`);
   const existing = await reportRef.get();
   if (existing.data()?.deliveryStatus === 'sent') return null;
@@ -3346,7 +3348,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
       sentAt: Date.now(),
       provider: delivery.provider,
       providerMessageId,
-      lastError: admin.firestore.FieldValue.delete()
+      lastError: FieldValue.delete()
     }, { merge: true });
   } catch (error) {
     const message = String(error?.message || error).slice(0, 500);
@@ -3366,7 +3368,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
 // linger (they were ~2% of owners and every stale 404 row), then sweep the Storage GC queue.
 exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 540, memory: '1GB' })
   .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
-    const calendars = await admin.firestore().collection('calendars').select().get();
+    const calendars = await getFirestore().collection('calendars').select().get();
     const rebuildFailures = [];
     for (const doc of calendars.docs) {
       const calendarId = doc.id.startsWith('cal_') ? doc.id.slice(4) : doc.id;
@@ -3385,7 +3387,7 @@ exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeo
       console.error('nightly storage GC aborted; photoIndex rebuild failed for', JSON.stringify(rebuildFailures));
       return null;
     }
-    const gc = await mediaCommands.sweepStorageGc({ db: admin.firestore(), bucket: admin.storage().bucket() });
+    const gc = await mediaCommands.sweepStorageGc({ db: getFirestore(), bucket: getStorage().bucket() });
     console.log('nightly storage GC', JSON.stringify(gc));
     return null;
   });
@@ -3437,7 +3439,7 @@ function sourceAssetIds(data = {}) {
 }
 
 async function prepareMediaIntegrityReview({ calendarId, apply = false, materializeGraph = false, migrateLegacyComments = false } = {}) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
   const names = ['photoIndex', 'messages', 'memos', 'confirmedMeetings', 'photoComments'];
   const snapshots = await Promise.all(names.map(name => root.collection(name).get()));
@@ -3446,7 +3448,7 @@ async function prepareMediaIntegrityReview({ calendarId, apply = false, material
   const missingAssetKeys = new Set();
   // Metadata checks are deliberately bounded. No image bytes are downloaded, and a transient
   // Storage failure is treated as unknown/alive rather than as a missing photo.
-  const bucket = admin.storage().bucket();
+  const bucket = getStorage().bucket();
   const queue = rows.slice();
   await Promise.all(Array.from({ length: 12 }, async () => {
     while (queue.length) {
@@ -3532,7 +3534,7 @@ async function prepareMediaIntegrityReview({ calendarId, apply = false, material
           if (!unique.has(id)) unique.set(id, comment);
         });
         const comments = Array.from(unique.values()).sort((a, b) => Number(a?.timestamp || 0) - Number(b?.timestamp || 0)).slice(0, 200);
-        tx.set(targetRef, { comments, migratedFrom: admin.firestore.FieldValue.arrayUnion(legacyKey), updatedAt: now }, { merge: true });
+        tx.set(targetRef, { comments, migratedFrom: FieldValue.arrayUnion(legacyKey), updatedAt: now }, { merge: true });
         // Preserve the old thread for undo/audit; it is only marked as copied, never deleted.
         tx.set(legacyRef, { migration: { status: 'copied', assetKey: item.assetKey, runId, copiedAt: now } }, { merge: true });
       });

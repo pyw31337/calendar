@@ -16,12 +16,13 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const APPLY = process.env.APPLY === '1';
 const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST || 'scripts/reattach-photo-comments.json', 'utf8'));
-admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'metro-live-2918e' });
-const root = admin.firestore().collection('calendars').doc(`cal_${manifest.calendar}`);
+initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'metro-live-2918e' });
+const root = getFirestore().collection('calendars').doc(`cal_${manifest.calendar}`);
 
 const report = [];
 for (const move of manifest.moves) {

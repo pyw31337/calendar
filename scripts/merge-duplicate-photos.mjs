@@ -20,16 +20,18 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const media = require('./media-commands.js');
 const policy = require('./push-notify-policy.js');
 
 const APPLY = process.env.APPLY === '1';
 const ONLY = String(process.env.CALENDARS || '').split(',').map(s => s.trim()).filter(Boolean);
 const PROJECT = process.env.GCLOUD_PROJECT || 'metro-live-2918e';
-admin.initializeApp({ projectId: PROJECT, storageBucket: process.env.STORAGE_BUCKET || `${PROJECT}.firebasestorage.app` });
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
+initializeApp({ projectId: PROJECT, storageBucket: process.env.STORAGE_BUCKET || `${PROJECT}.firebasestorage.app` });
+const db = getFirestore();
+const bucket = getStorage().bucket();
 
 const pathOf = media.storagePathFromUrl;
 const tokens = text => String(text || '').split(/\s+/).map(t => t.trim()).filter(Boolean);

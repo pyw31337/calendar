@@ -104,7 +104,7 @@ async function mirrorLegacyThread(db, calendarDocId, docId, comments, { dryRun =
  * Recount one photo's live comments and publish the number to the summary doc (what every
  * thumbnail badge reads) and to the photo's photoIndex row(s).
  */
-async function recountAsset(db, admin, calendarDocId, assetKey) {
+async function recountAsset(db, FieldValue, calendarDocId, assetKey) {
   if (!assetKey) return 0;
   const root = db.collection('calendars').doc(calendarDocId);
   const agg = await root.collection(ITEMS)
@@ -114,7 +114,6 @@ async function recountAsset(db, admin, calendarDocId, assetKey) {
     .get();
   const count = Number(agg.data().count) || 0;
   const now = Date.now();
-  const FieldValue = admin.firestore.FieldValue;
   await root.collection(SUMMARY).doc(SUMMARY_DOC).set({
     counts: { [assetKey]: count > 0 ? count : FieldValue.delete() },
     updatedAt: now

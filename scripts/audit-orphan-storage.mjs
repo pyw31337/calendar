@@ -13,13 +13,15 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const media = require('./media-commands.js');
 
 const PROJECT = process.env.GCLOUD_PROJECT || 'metro-live-2918e';
-admin.initializeApp({ projectId: PROJECT, storageBucket: process.env.STORAGE_BUCKET || `${PROJECT}.firebasestorage.app` });
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
+initializeApp({ projectId: PROJECT, storageBucket: process.env.STORAGE_BUCKET || `${PROJECT}.firebasestorage.app` });
+const db = getFirestore();
+const bucket = getStorage().bucket();
 
 const stemOf = path => path.replace(/_(original|thumb)_[^/]*$|_small\.[a-z0-9]+$/i, '_');
 

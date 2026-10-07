@@ -4,14 +4,15 @@
 //   npm run test:functions:emulator   (from the repo root)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const items = require('../photo-comment-items');
 
 const host = process.env.FIRESTORE_EMULATOR_HOST;
 if (!host) throw new Error('Run under `firebase emulators:exec` (FIRESTORE_EMULATOR_HOST unset).');
 const project = process.env.GCLOUD_PROJECT || 'demo-moyeora';
-const app = admin.initializeApp({ projectId: project }, 'photo-comment-items-test');
-const db = app.firestore();
+const app = initializeApp({ projectId: project }, 'photo-comment-items-test');
+const db = getFirestore(app);
 
 const str = v => ({ stringValue: v });
 const num = v => ({ integerValue: String(v) });
@@ -70,7 +71,7 @@ test('legacy threads migrate create-only to their one owning photo, and counts f
   assert.equal(kept.text, '새 앱에서 수정');
   assert.equal(kept.deletedAt, 9);
 
-  assert.equal(await items.recountAsset(db, admin, cal, 'asset:v1:p1'), 2, 'soft-deleted comment is not counted');
+  assert.equal(await items.recountAsset(db, FieldValue, cal, 'asset:v1:p1'), 2, 'soft-deleted comment is not counted');
   assert.equal((await root.collection('photoIndex').doc('asset:v1:p1').get()).data().commentCount, 2);
   assert.equal((await root.collection(items.SUMMARY).doc(items.SUMMARY_DOC).get()).data().counts['asset:v1:p1'], 2);
 
@@ -82,7 +83,7 @@ test('legacy threads migrate create-only to their one owning photo, and counts f
   await root.collection(items.ITEMS).doc('cmt_b').update({ deletedAt: 10 });
   const noId = (await root.collection(items.ITEMS).where('assetKey', '==', 'asset:v1:p1').where('deletedAt', '==', null).get()).docs;
   await Promise.all(noId.map(doc => doc.ref.update({ deletedAt: 11 })));
-  assert.equal(await items.recountAsset(db, admin, cal, 'asset:v1:p1'), 0);
+  assert.equal(await items.recountAsset(db, FieldValue, cal, 'asset:v1:p1'), 0);
   const summary = (await root.collection(items.SUMMARY).doc(items.SUMMARY_DOC).get()).data();
   assert.equal('asset:v1:p1' in (summary.counts || {}), false);
 });

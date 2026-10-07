@@ -16,15 +16,16 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const items = require('./photo-comment-items.js');
 
 const APPLY = process.env.APPLY === '1';
 const ONLY = String(process.env.CALENDARS || '').split(',').map(s => s.trim()).filter(Boolean);
 const PROJECT = process.env.GCLOUD_PROJECT || 'metro-live-2918e';
 
-admin.initializeApp({ projectId: PROJECT });
-const db = admin.firestore();
+initializeApp({ projectId: PROJECT });
+const db = getFirestore();
 
 async function calendarDocIds() {
   if (ONLY.length) return ONLY.map(id => `cal_${id}`);
@@ -48,7 +49,7 @@ async function migrateCalendar(calendarDocId) {
   }
   if (APPLY) {
     // The item trigger recounts too; doing it here as well makes the result final when this ends.
-    for (const key of touched) await items.recountAsset(db, admin, calendarDocId, key);
+    for (const key of touched) await items.recountAsset(db, FieldValue, calendarDocId, key);
     const live = await root.collection(items.ITEMS).where('deletedAt', '==', null).count().get();
     report.liveItemsAfter = Number(live.data().count) || 0;
   }

@@ -19,7 +19,9 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const policy = require('./push-notify-policy.js');
 
 const APPLY = process.env.APPLY === '1';
@@ -28,9 +30,9 @@ const BUCKET = process.env.STORAGE_BUCKET || `${PROJECT}.firebasestorage.app`;
 const backup = JSON.parse(fs.readFileSync(process.env.BACKUP, 'utf8'));
 const manifest = JSON.parse(fs.readFileSync(process.env.MANIFEST, 'utf8'));
 
-admin.initializeApp({ projectId: PROJECT, storageBucket: BUCKET });
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
+initializeApp({ projectId: PROJECT, storageBucket: BUCKET });
+const db = getFirestore();
+const bucket = getStorage().bucket();
 
 const SLOT_FIELDS = ['imageUrls', 'thumbUrls', 'imageTags', 'imageFingerprints'];
 const pathOf = url => {

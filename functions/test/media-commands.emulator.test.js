@@ -3,13 +3,15 @@
 //   npm run test:functions:emulator   (from the repo root)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const { deleteAsset, tagAsset, bulkTagAssets, mergeAssets, sweepStorageGc, GC_GRACE_MS, getPhotoAssetKey, isOriginalStoragePath } = require('../media-commands');
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Run under `firebase emulators:exec` (FIRESTORE_EMULATOR_HOST unset).');
-const app = admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'demo-moyeora', storageBucket: 'demo-moyeora.appspot.com' }, 'media-commands-test');
-const db = app.firestore();
-const bucket = app.storage().bucket();
+const app = initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'demo-moyeora', storageBucket: 'demo-moyeora.appspot.com' }, 'media-commands-test');
+const db = getFirestore(app);
+const bucket = getStorage(app).bucket();
 const CAL = 'cal_testcal';
 const root = db.collection('calendars').doc(CAL);
 const url = (name, token = 't') => `https://firebasestorage.googleapis.com/v0/b/demo-moyeora.appspot.com/o/chatImages%2Ftestcal%2F${name}?alt=media&token=${token}`;

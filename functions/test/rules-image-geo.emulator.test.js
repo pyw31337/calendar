@@ -55,6 +55,19 @@ test('imageGeoMap must be a map', async () => {
   assert.equal(res.status, 403);
 });
 
+test('image intake diagnostics are accepted on creation and update', async () => {
+  const item = { mapValue: { fields: { method: str('paste'), client: str('mobile') } } };
+  const res = await createMessage('intake1', { imageIntake: arr([item]) });
+  assert.equal(res.status, 200, await res.text());
+  const updated = await patchMessage('intake1', { imageIntake: arr([]) });
+  assert.equal(updated.status, 200, await updated.text());
+});
+
+test('image intake diagnostics reject non-lists and oversized lists', async () => {
+  assert.equal((await createMessage('intake-invalid', { imageIntake: str('invalid') })).status, 403);
+  assert.equal((await createMessage('intake-large', { imageIntake: arr(Array.from({ length: 51 }, () => str('x'))) })).status, 403);
+});
+
 test('other unknown message fields are still rejected', async () => {
   const res = await createMessage('geo4', { somethingElse: str('x') });
   assert.equal(res.status, 403);

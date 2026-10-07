@@ -33,15 +33,16 @@ async function readClientErrorLogs() {
   const json = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
   if (!json) return null;
   const require = createRequire(new URL('../functions/package.json', import.meta.url));
-  const admin = require('firebase-admin');
-  const app = admin.initializeApp({ credential: admin.credential.cert(JSON.parse(json)) }, 'ops-daily-report');
+  const { initializeApp, cert, deleteApp } = require('firebase-admin/app');
+  const { getFirestore } = require('firebase-admin/firestore');
+  const app = initializeApp({ credential: cert(JSON.parse(json)) }, 'ops-daily-report');
   try {
     const since = Date.now() - 24 * 60 * 60 * 1000;
-    const snap = await app.firestore().collection('serverAuditLogs')
+    const snap = await getFirestore(app).collection('serverAuditLogs')
       .where('receivedAt', '>=', since).orderBy('receivedAt', 'desc').limit(2000).get();
     return snap.docs.map(doc => doc.data());
   } finally {
-    await app.delete();
+    await deleteApp(app);
   }
 }
 

@@ -15,13 +15,14 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(new URL('../functions/package.json', import.meta.url));
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 const media = require('./media-commands.js');
 
 const APPLY = process.env.APPLY === '1';
 const ONLY = String(process.env.CALENDARS || '').split(',').map(s => s.trim()).filter(Boolean);
-admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'metro-live-2918e' });
-const db = admin.firestore();
+initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'metro-live-2918e' });
+const db = getFirestore();
 
 async function calendarIds() {
   if (ONLY.length) return ONLY;
