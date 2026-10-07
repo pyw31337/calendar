@@ -1,3 +1,5 @@
+import qrcode from 'qrcode-generator';
+
 /**
  * ShareModal (P4-2). Site rule: URL + copy + QR.
  * Deps via window.GATHER_UI_DEPS at render time.
@@ -82,7 +84,6 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       : ('현재 캘린더 (' + calendar.id + ') 전용 공유 URL');
 
     const qrDataUrl = React.useMemo(function () {
-      if (typeof qrcode === 'undefined') return null;
       try {
         const qr = qrcode(0, 'M');
         qr.addData(shareUrl);

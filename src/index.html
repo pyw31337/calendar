@@ -154,14 +154,9 @@
         }
       })();
     </script>
-    <!-- Pretendard: the V2 font stack (design.css --font-sans) names it first, but it was never
-         loaded -- Mac/iOS then took line metrics from SF while drawing Hangul in Noto Sans KR, so
-         Korean text sat visibly high in every fixed-height badge/pill/field. Dynamic subset: the
-         browser downloads only the unicode-range chunks a page actually uses. -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+    <!-- Fonts are bundled from npm by main.jsx. The variable faces use unicode ranges and
+         font-display: swap, so the system stack renders immediately offline without waiting for
+         a third-party font CDN. -->
     <!-- Same-origin Firebase SDK preload. main.jsx skips these when they are already ready, so
          mobile browsers do not depend on a third-party CDN or duplicate the SDK scripts. -->
     <script vite-ignore src="vendor/firebase-app-compat.js?v=20260903-sdk-10-14-1" defer></script>
@@ -171,19 +166,9 @@
          `window.firebase undefined` even after every retry/timeout adjustment tried, tracing back
          to something on that network path blocking www.gstatic.com specifically while the site's
          own origin loaded fine. See main.jsx for the loader. -->
-    <!-- async, not a plain blocking <script src> (and not defer -- defer scripts still execute in
-         document order among the "list of scripts to execute in order" that module scripts belong
-         to as well, so a defer script placed here would still make <script type="module"
-         src="/main.jsx"> at the bottom of <body> wait for it to finish downloading before running,
-         same blocking problem one step removed; measured directly with this app's own boot-ready
-         flag). async scripts run independently the moment they're ready, entirely outside that
-         ordering, so they can never delay main.jsx. These three are also non-critical (confetti
-         effect, lunar-calendar date conversion, QR code generation; every call site already
-         guards for the library not being loaded yet), so nothing here needs them before first
-         paint or before the app boots -- if jsdelivr.net is ever slow or unreachable for a
-         visitor, that no longer holds up Firebase SDK loading or anything else. -->
-    <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
-    <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+    <!-- Confetti, lunar-calendar conversion, and QR generation are imported from npm by the
+         application modules. Keeping them inside the build removes an additional CDN failure
+         path from PWA boot and makes the service worker's offline strategy deterministic. -->
     <style id="app-splash-style">
       /* PC / Desktop: Suppress splash screen to avoid intrusive flicker */
       html.is-pc-device .app-splash {

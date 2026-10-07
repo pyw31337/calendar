@@ -16,6 +16,18 @@ const run = photos => buildTagSuggestions({
   personLabels: ['박서준', '유리', '영우'],
 });
 
+test('aliases, compound person tags and explicit exclusion do not create repeat person requests', () => {
+  const people = [{ label: '박서준', aliases: ['서준', '첫째'] }];
+  const photos = [
+    { assetKey: 'a', tags: '261006 첫째' }, { assetKey: 'b', tags: '261006 서준사진' },
+    { assetKey: 'c', tags: '261006 인물아님' }
+  ];
+  const result = buildTagSuggestions({ photos, personLabels: people, getPhotoDates: p => dateTokens(p.tags) });
+  assert.deepEqual(result.personDays, []);
+  assert.deepEqual(buildFaceSuggestions({ photos, personLabels: people,
+    faceItems: photos.map(p => ({ assetKey: p.assetKey, facePeople: [{ name: '박서준', score: .99 }] })) }), []);
+});
+
 test('a photo filed under a place by GPS gets that place tag suggested', () => {
   const photos = [{ assetKey: 'a', tags: '260919 아이폰15', latitude: 36.6201, longitude: 126.8301, messageId: 'm1' }];
   const { groups } = run(photos);

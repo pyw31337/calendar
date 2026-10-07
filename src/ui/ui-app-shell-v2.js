@@ -8,7 +8,7 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
 import './v2/color-themes.css';
-import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader, prefetchDestinationStyles } from './v2/screens.js';
+import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
@@ -38,7 +38,7 @@ function galleryCommentMotion(photo, index) {
 import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
-import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
+import { bindUiComponentAliases } from './component-aliases.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
@@ -52,6 +52,7 @@ import {
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
+import { AiOperationsSummary } from './ai-operations-panel.js';
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
@@ -59,7 +60,8 @@ import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
-import { getWeatherIcon, fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
+import { fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
+import { getWeatherIcon } from './weather-icon.js';
 
 // Home gallery: 12 photos per page -- 4x3 on PC, 6x2 at mid widths, 3x4 on phones (dest-chrome-late.css).
 const HOME_GALLERY_PAGE_SIZE = 12;
@@ -1753,7 +1755,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, onOpenGalleryAnalysis, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1823,13 +1825,15 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
         },
         setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox || calendarContext?.setActiveLightbox,
         onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange || calendarContext?.onMemoCommentsChange,
+        calendar: mergedCalendar,
         // HomeActivitySummary always passes the complete memo record.  Keep
         // the legacy callback compatible by converting it back to an id only
         // when the V2 shell has not supplied its focused-navigation handler.
         onOpenMemo: onOpenMemo || (memo => recordsContext?.memoProps?.onOpenMemo?.(memo?.id || memo)),
       },
       onOpenDate,
-      onChangeView
+      onChangeView,
+      onOpenGalleryAnalysis
     }),
     React.createElement('footer', { className: bentoClass('renewal-home-footer footer') },
       React.createElement('span', null, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
@@ -2067,7 +2071,8 @@ function HomeLoadingRows({ label, count = 3, variant = 'row' }) {
   )));
 }
 
-function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
+
+function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpenGalleryAnalysis }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2176,6 +2181,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     React.createElement('div', { className: bentoClass('renewal-home-summary-section bento-card wide enter'), style: { animationDelay: '0.04s' } },
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
     ),
+    React.createElement(AiOperationsSummary, { calendar: calendarContext?.calendar, onOpenDate, onChangeView, onOpenGalleryAnalysis }),
     React.createElement(HomeSummarySection, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
       messages.length ? React.createElement(HomeSummaryPager, {
         items: messages,
@@ -2709,18 +2715,6 @@ function useLazyUi(key, isReadyFn, loadFn, onError) {
   return ready || !!lazyUiReady[key];
 }
 
-function prefetchDestinationUi() {
-  const run = () => {
-    try { window.__gatherLoadViewUi?.('memo'); } catch (e) {}
-    try { window.__gatherLoadViewUi?.('places'); } catch (e) {}
-    try { window.__gatherLoadChatUi?.(); } catch (e) {}
-    try { window.__gatherLoadEventUi?.(); } catch (e) {}
-    try { prefetchDestinationStyles(); } catch (e) {}
-  };
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 1800 });
-  else setTimeout(run, 200);
-}
-
 /** 기록 > 전체 is not a destination. Bare ?tab=records / sub=all is rewritten to the calendar. */
 
 /**
@@ -2917,7 +2911,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
  * chunk as `ChatRoomView` (`window.__gatherLoadChatUi`), so this waits for that chunk before
  * rendering -- identical "wait-then-open" step `ChatPane` already uses.
  */
-function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
+function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions, initialGalleryTab = 'photos', onInitialGalleryTabConsumed = null }) {
   const React = window.React;
   const [gallerySearchQuery, setGallerySearchQuery] = React.useState('');
   const [galleryTab, setGalleryTab] = React.useState('photos');
@@ -2933,6 +2927,11 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     () => window.__gatherLoadChatUi?.(),
     () => recordsContext.showToast?.('갤러리 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
+  // The home operation card may request the AI review tab before this lazy module mounts.
+  // Reset this one-shot request only after its first real gallery render receives the prop.
+  React.useEffect(() => {
+    if (loaded && initialGalleryTab !== 'photos') onInitialGalleryTabConsumed?.();
+  }, [loaded, initialGalleryTab, onInitialGalleryTabConsumed]);
   if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'gallery' });
   const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
   if (typeof ChatGalleryModal !== 'function') {
@@ -2948,6 +2947,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     onV2SearchQuery: setGallerySearchQuery,
     onRegisterMenuActions: registerGalleryActions,
     onActiveTabChange: handleGalleryTabChange,
+    initialTab: initialGalleryTab,
     onChangeView,
   });
   return React.createElement(React.Fragment, null,
@@ -3196,7 +3196,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideN
   );
 }
 
-function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
+function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions, initialGalleryTab, onInitialGalleryTabConsumed }) {
   const React = window.React;
   // Memo/Places are first-class destinations — never show renewal-shell-subtab chrome for them.
   React.useEffect(() => {
@@ -3208,7 +3208,7 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
   return React.createElement('div', { className: 'v2-records-frame v2-records-no-subtab' },
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
-      ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
+      ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions, initialGalleryTab, onInitialGalleryTabConsumed })
       : subTab === 'content'
       ? React.createElement(ContentPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
       : subTab === 'archive'
@@ -3609,6 +3609,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // bypassed here.  It preserves the exact home memo selected during the tab
   // handoff, even before the outer app has a chance to rebuild its contexts.
   const [homeFocusedMemo, setHomeFocusedMemo] = React.useState(null);
+  // One-shot route intent: the gallery itself is lazy-loaded, so a plain tab toggle here could
+  // fire before it exists. It is consumed by MediaPane after the first mounted gallery render.
+  const [initialGalleryTab, setInitialGalleryTab] = React.useState('photos');
   // Keep the side-navigation D-day fresh for an installed app that stays open
   // across midnight; otherwise it would only update after another interaction.
   const [sideNavDayStamp, setSideNavDayStamp] = React.useState(() => Date.now());
@@ -4099,7 +4102,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     } catch (_) {
       writeLocationState(activeTab, recordsSubTab, { push: false });
     }
-    prefetchDestinationUi();
     const onPopState = () => {
       const nextTab = readTabFromLocation();
       const nextSub = readRecordsSubTabFromLocation();
@@ -4401,7 +4403,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d, tab) => { setDateModalTab(['meeting', 'participant', 'settlement'].includes(tab) ? tab : null); setDateModalDate(d); }, onChangeView, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, onOpenGalleryAnalysis: () => { setInitialGalleryTab('analysis'); onChangeView('gallery'); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
@@ -4413,7 +4415,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : activeTab === 'settlement'
           ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('settlement') })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab) })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab), initialGalleryTab, onInitialGalleryTabConsumed: () => setInitialGalleryTab('photos') })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem, onOpenSideNav: () => setIsSideNavOpen(true) })
           : null,

@@ -7,6 +7,16 @@ const MAX_TAGS = 20;
 const MAX_TEXT = 640;
 const MAX_OCR_LINES = 12;
 const MAX_LABELS = 16;
+const EVIDENCE_SOURCES = new Set(['existing-tag', 'capture-date', 'meeting-date', 'gps-place', 'ocr-person', 'vision-label', 'learned-feedback']);
+
+function tagEvidenceList(value) {
+  return (Array.isArray(value) ? value : []).slice(0, 40).map(entry => ({
+    tag: text(entry?.tag, 80).replace(/^#+/, '').trim(),
+    source: text(entry?.source, 24),
+    confidence: typeof entry?.confidence === 'number' && Number.isFinite(entry.confidence)
+      ? Math.max(0, Math.min(1, entry.confidence)) : 0
+  })).filter(entry => entry.tag && EVIDENCE_SOURCES.has(entry.source));
+}
 
 function text(value, max = MAX_TEXT) {
   return Array.from(String(value == null ? '' : value), character => character.charCodeAt(0) < 32 ? ' ' : character)
@@ -63,6 +73,7 @@ function sanitizeAnalysisItem(item = {}, now = Date.now()) {
     analyzedAt: Math.max(0, integer(item.analyzedAt, now)),
     analysisVersion: Math.max(1, integer(item.analysisVersion, 1)),
     suggestedTags: tags,
+    tagEvidence: tagEvidenceList(item.tagEvidence),
     people,
     places,
     meetings,

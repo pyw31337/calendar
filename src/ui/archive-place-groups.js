@@ -19,53 +19,14 @@
  */
 
 import { nearestPlaceForCoords } from '../core/photo-metadata-tags.js';
-
-const MIN_PARTIAL_MATCH_LENGTH = 2;
-// Both the older lightbox and the current bulk editor capped a single tag at this length.
-// Keep it as a named compatibility boundary: existing photo tags must remain useful after
-// the place name is later expanded with an English spelling or a category suffix.
+import { compactTagIdentity as compactPlaceToken, placeNameTokens, photoMatchesPlaceTag } from '../core/photo-tag-identity.js';
+export { compactPlaceToken, placeNameTokens, photoMatchesPlaceTag };
 const LEGACY_PLACE_TAG_MAX_LENGTH = 30;
-const AUTO_PLACE_TAG_MAX_LENGTH = 24;
+
 // A photo the reader removed from 분류 필요. It stays in the gallery; it just
 // is not a place photo, so date/GPS rules must not file it again.
 export const NOT_A_PLACE_TAG = '장소아님';
 
-// Same shape photo-metadata-tags.js compactHashtagToken gives a place-name tag: no spaces or
-// punctuation, lower-case for latin letters.
-export function compactPlaceToken(value) {
-  return String(value || '')
-    .replace(/[\s_\-./(),[\]{}'"`~!@#$%^&*+=|\\:;<>?·•]+/g, '')
-    .toLowerCase();
-}
-
-export function placeNameTokens(place) {
-  const names = [place?.name, place?.alias].map(compactPlaceToken).filter(Boolean);
-  return Array.from(new Set(names));
-}
-
-// `placeTagToken()` historically removed only spaces before truncating at 30 characters,
-// whereas the EXIF uploader compacted punctuation first and then capped its automatic tag at
-// 24.  As a result, a valid generated tag such as
-// `다낭빌라드네일&풋마사지(DaNangVillaDeNail` was not a substring of the later-expanded
-// registered name `다낭 빌라드네일&풋마사지(DaNang Villa De Nail&Foot spa)`.
-//
-// Do not broadly accept `registeredName.includes(tag)`: that would turn an ordinary `#서울`
-// into a match for `서울랜드`.  Instead accept *only* the exact legacy representations the app
-// itself has produced for this place.  This makes the migration deterministic and keeps short,
-// hand-written tags conservative.
-function legacyPlaceTagTokens(place) {
-  return Array.from(new Set([place?.name, place?.alias].flatMap(value => {
-    const raw = String(value || '').trim();
-    if (!raw) return [];
-    const legacyEditorToken = raw.replace(/[\s#,]+/g, '').slice(0, LEGACY_PLACE_TAG_MAX_LENGTH);
-    const compact = compactPlaceToken(raw);
-    return [
-      compactPlaceToken(legacyEditorToken),
-      compact.slice(0, AUTO_PLACE_TAG_MAX_LENGTH),
-      compact.slice(0, LEGACY_PLACE_TAG_MAX_LENGTH)
-    ].filter(Boolean);
-  })));
-}
 
 function photoTagTokens(photo) {
   return String(photo?.tags || '')
@@ -95,17 +56,6 @@ export function withNotAPlaceTag(tagsText) {
   return { status: 'add', tags: next.join(' '), before };
 }
 
-export function photoMatchesPlaceTag(photo, place) {
-  const names = placeNameTokens(place);
-  if (!names.length) return false;
-  const tokens = photoTagTokens(photo);
-  const legacyTokens = legacyPlaceTagTokens(place);
-  // "#서울랜드" and "#서울랜드불꽃놀이" both count; a 1-letter name only counts as an exact tag.
-  return tokens.some(tag => (
-    legacyTokens.includes(tag)
-    || names.some(name => tag === name || (name.length >= MIN_PARTIAL_MATCH_LENGTH && tag.includes(name)))
-  ));
-}
 
 // Camera photos carry a device hashtag (photo-metadata-tags.js formatDeviceHashtag, from EXIF);
 // screenshots of maps, reservations and chats never do. Date-assigned groups pick up both, so a

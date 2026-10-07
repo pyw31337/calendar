@@ -40,6 +40,23 @@ const LAZY_CHUNK_PATTERNS = [
   /^ui-memo-view-.*\.js$/,
   /^ui-event-modals-.*\.js$/,
   /^ui-lightbox-.*\.js$/,
+  // Component aliases load these modules on their first render. They were previously imported
+  // in main.jsx's all-at-once boot Promise.all, so treating them as eager hid both the actual
+  // loading cost and regressions in route-level splitting.
+  /^ui-calendar-core-.*\.js$/,
+  /^ui-summary-gallery-.*\.js$/,
+  /^ui-shared-.*\.js$/,
+  /^ui-confirm-dialog-.*\.js$/,
+  /^ui-overlays-.*\.js$/,
+  /^ui-widgets-.*\.js$/,
+  /^ui-weather-.*\.js$/,
+  /^ui-side-menu-.*\.js$/,
+  /^ui-misc-.*\.js$/,
+  /^ui-place-register-.*\.js$/,
+  /^ui-remaining-.*\.js$/,
+  /^ui-share-modal-.*\.js$/,
+  /^ui-chat-sheets-.*\.js$/,
+  /^ui-chat-files-.*\.js$/,
   /^ui-date-modal-.*\.js$/
 ];
 

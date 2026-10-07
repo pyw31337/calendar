@@ -91,9 +91,11 @@ jobs:
           tour_key="$TOUR_API_SERVICE_KEY_SECRET"
           if [ -z "$tour_key" ]; then
             gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" --quiet >/dev/null 2>&1
-            # If the live function cannot be read, stop rather than deploy an empty key over it.
-            live=$(gcloud functions describe tourApiSearchProxy --project metro-live-2918e --region us-central1 --format=json 2>"$RUNNER_TEMP/describe.err") \
-              || { echo "Could not read the live tourApiSearchProxy config:"; cat "$RUNNER_TEMP/describe.err"; exit 1; }
+            # Seoul is the active region; keep US as a fallback for deployments before migration.
+            # If neither live function can be read, stop rather than overwrite its key.
+            live=$(gcloud functions describe tourApiSearchProxy --project metro-live-2918e --region asia-northeast3 --format=json 2>"$RUNNER_TEMP/describe.err") \
+              || live=$(gcloud functions describe tourApiSearchProxy --project metro-live-2918e --region us-central1 --format=json 2>"$RUNNER_TEMP/describe.err") \
+              || { echo "Could not read the live tourApiSearchProxy config in either region."; exit 1; }
             tour_key=$(printf '%s' "$live" | jq -r '.environmentVariables.TOUR_API_SERVICE_KEY // .serviceConfig.environmentVariables.TOUR_API_SERVICE_KEY // ""')
           fi
           if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi

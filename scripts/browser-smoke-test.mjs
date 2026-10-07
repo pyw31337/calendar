@@ -22,6 +22,7 @@
 //   CALENDAR_SMOKE_BASE_URL=https://pyw31337.github.io/calendar/ npm run smoke:browser
 //                                           # skip local preview, test a already-deployed URL
 //   CALENDAR_SMOKE_BROWSER=firefox npm run smoke:browser
+//   CALENDAR_SMOKE_BLOCK_PRODUCTION_DATA=0 npm run smoke:browser:live
 
 import { chromium, firefox, webkit } from 'playwright';
 import { spawn } from 'node:child_process';
@@ -35,7 +36,9 @@ const EXPLICIT_BASE_URL = process.env.CALENDAR_SMOKE_BASE_URL || null;
 const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
 const BROWSER_TYPES = { chromium, firefox, webkit };
 const DEPLOY_SCOPE = process.env.CALENDAR_SMOKE_SCOPE === 'deploy';
-const BLOCK_PRODUCTION_DATA = process.env.CALENDAR_SMOKE_BLOCK_PRODUCTION_DATA === '1';
+// UI smoke is deterministic and read-free by default. The separate live smoke workflow owns
+// production availability; set this to 0 only when deliberately diagnosing production data.
+const BLOCK_PRODUCTION_DATA = process.env.CALENDAR_SMOKE_BLOCK_PRODUCTION_DATA !== '0';
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
 const LOCAL_BASE_PATH = `/${String(process.env.CALENDAR_SMOKE_BASE_PATH || '').replace(/^\/+|\/+$/g, '')}`;
 const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}${LOCAL_BASE_PATH === '/' ? '/' : `${LOCAL_BASE_PATH}/`}`;
@@ -71,6 +74,11 @@ const VIEWPORTS = [
 let failCount = 0;
 let passCount = 0;
 let knownExternalWarningCount = 0;
+const intentionallyBlockedUrls = new Set();
+function reportsIntentionalBlock(text, url = '') {
+  return BLOCK_PRODUCTION_DATA && (intentionallyBlockedUrls.has(url)
+    || [...intentionallyBlockedUrls].some(blocked => text.includes(blocked)));
+}
 function pass(label) {
   passCount += 1;
   console.log(`  ✓ ${label}`);
@@ -80,12 +88,14 @@ function fail(label, detail) {
   console.error(`  ✗ ${label} -- ${detail}`);
 }
 function isIgnorableConsoleError(text, url = '') {
-  if (text.includes('net::ERR_FAILED')
-    && (url.includes('firestore.googleapis.com') || text.includes('firestore.googleapis.com'))) {
+  // Firefox reports route.abort as a CORS failure. Only exclude URLs that this test actually
+  // blocked; real live-mode CORS failures and unrelated application exceptions must still fail.
+  if (reportsIntentionalBlock(text, url)
+    && /(net::ERR_FAILED|access control checks|blocked by CORS|CORS policy|Cross-Origin Request Blocked|CORS request did not succeed|Failed to load resource)/i.test(text)) {
     knownExternalWarningCount += 1;
     return true;
   }
-  if (text.includes('Could not reach Cloud Firestore backend')) {
+  if (BLOCK_PRODUCTION_DATA && intentionallyBlockedUrls.size && text.includes('Could not reach Cloud Firestore backend')) {
     knownExternalWarningCount += 1;
     return true;
   }
@@ -119,8 +129,8 @@ function isActionableConsoleWarning(text) {
 }
 function isKnownBrowserPageError(message) {
   if (/ResizeObserver loop (?:completed with undelivered notifications|limit exceeded)/i.test(message)) return true;
+  if (reportsIntentionalBlock(message) && /due to access control checks/i.test(message)) return true;
   if (BROWSER_NAME !== 'webkit') return false;
-  if (/firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(message)) return true;
   // WebKit reports a SecurityError when TikTok's HTTPS embed script probes its parent while the
   // production build is exercised through Vite's local HTTP preview. The deployed site is HTTPS,
   // and this third-party iframe exception does not escape or affect the app frame.
@@ -293,6 +303,9 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
 
       await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
       await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+      // Visibility confirms the first render, not the URL-normalizing React effect. WebKit
+      // can paint that render before the effect runs. Require the actual destination change.
+      await page.waitForFunction(() => new URL(location.href).searchParams.get('tab') !== 'records', null, { timeout: 10000 });
       const hub = new URL(page.url()).searchParams;
       if (hub.get('tab') === 'records') {
         throw new Error(`기록 허브가 남아 있음 sub=${hub.get('sub') || '(없음)'}`);
@@ -318,6 +331,10 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         // Legacy bookmark URL — shell promotes to first-class tab and clears sub.
         await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${dest}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+        await page.waitForFunction(expected => {
+          const params = new URL(location.href).searchParams;
+          return params.get('tab') === expected && !params.get('sub');
+        }, dest, { timeout: 10000 });
         const promoted = new URL(page.url()).searchParams;
         if (promoted.get('tab') !== dest) {
           throw new Error(`기록 full-chrome ${label} URL 진입 후 tab=${promoted.get('tab') || '(없음)'}`);
@@ -585,13 +602,16 @@ async function main() {
 
   const browser = await browserType.launch();
   // Browser smoke is a UI/layout gate, not a production-data load test. Blocking Firestore
-  // transport here prevents every deploy/matrix run from billing reads against live calendars;
-  // the explicit live-smoke script remains the place for read-only production API checks.
+  // transport prevents every matrix run from billing reads against live calendars; the explicit
+  // live-smoke script remains the place for read-only production API checks.
   const createContext = browser.newContext.bind(browser);
   browser.newContext = async (...args) => {
     const context = await createContext(...args);
-    await context.route('**://firestore.googleapis.com/**', route => route.abort());
-    await context.route('**://*.firebaseio.com/**', route => route.abort());
+    if (BLOCK_PRODUCTION_DATA) {
+      const blockTransport = route => { intentionallyBlockedUrls.add(route.request().url()); return route.abort(); };
+      await context.route('**://firestore.googleapis.com/**', blockTransport);
+      await context.route('**://*.firebaseio.com/**', blockTransport);
+    }
     return context;
   };
   if (BLOCK_PRODUCTION_DATA) console.log('[browser-smoke-test] production Firestore transport blocked (UI-only smoke)');

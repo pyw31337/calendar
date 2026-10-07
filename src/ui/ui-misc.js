@@ -1,3 +1,5 @@
+import qrcode from 'qrcode-generator';
+
 /**
  * Misc chat/share UI (P4-9)
  */
@@ -307,7 +309,6 @@ export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
     return getMemoItemShareUrl(calendarId, memo.id);
   }, [calendarId, memo.id]);
   const qrDataUrl = React.useMemo(() => {
-    if (typeof qrcode === 'undefined') return null;
     try {
       const qr = qrcode(0, 'M');
       qr.addData(shareUrl);

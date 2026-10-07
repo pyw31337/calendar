@@ -4,6 +4,10 @@ import path from 'node:path';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
+const calendarIds = fs.readdirSync(root)
+  .map(file => file.match(/^manifest-([A-Za-z0-9_-]+)\.json$/))
+  .filter(Boolean)
+  .map(match => match[1]);
 
 function copyDir(src, dest) {
   if (!fs.existsSync(src)) return;
@@ -16,7 +20,25 @@ function copyDir(src, dest) {
   }
 }
 
-copyDir(path.join(root, 'share'), path.join(dist, 'share'));
+// Only public calendar share entry points belong in the Pages artifact. Test/stress calendars
+// are useful local fixtures, but publishing their static fallbacks makes them discoverable and
+// needlessly increases every deploy. Dynamic memo/detail links still resolve through 404.html.
+const shareSource = path.join(root, 'share');
+const shareDest = path.join(dist, 'share');
+for (const file of ['index.html', '.nojekyll']) {
+  const source = path.join(shareSource, file);
+  if (fs.existsSync(source)) {
+    fs.mkdirSync(shareDest, { recursive: true });
+    fs.copyFileSync(source, path.join(shareDest, file));
+  }
+}
+for (const calendarId of calendarIds) copyDir(path.join(shareSource, calendarId), path.join(shareDest, calendarId));
+const skippedShareDirectories = fs.existsSync(shareSource)
+  ? fs.readdirSync(shareSource, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !calendarIds.includes(entry.name))
+    .map(entry => entry.name)
+  : [];
+console.log(`[copy-static-to-dist] published share calendars: ${calendarIds.join(', ')}${skippedShareDirectories.length ? `; excluded local fixtures: ${skippedShareDirectories.length}` : ''}`);
 copyDir(path.join(root, 'icons'), path.join(dist, 'icons'));
 for (const f of ['404.html', 'og-thumb.jpg', 'og-thumb-v2.jpg', 'sw.js', 'favicon.ico', 'manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   const s = path.join(root, f);
@@ -50,13 +72,12 @@ if (fs.existsSync(distIndex)) {
     fs.writeFileSync(distIndex, html);
   }
   const appHtml = html.replace(/<head>/i, '<head>\n    <base href="../../" />');
-  const ids = fs.readdirSync(root).map(f => f.match(/^manifest-([A-Za-z0-9_-]+)\.json$/)).filter(Boolean).map(m => m[1]);
-  for (const id of ids) {
+  for (const id of calendarIds) {
     const dir = path.join(dist, 'app', id);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'index.html'), appHtml);
   }
-  console.log(`[copy-static-to-dist] app/<id>/ pages: ${ids.join(', ')}`);
+  console.log(`[copy-static-to-dist] app/<id>/ pages: ${calendarIds.join(', ')}`);
 }
 
 // MapLibre's ESM worker falls back to `new URL('./maplibre-gl-worker.mjs', import.meta.url)`.

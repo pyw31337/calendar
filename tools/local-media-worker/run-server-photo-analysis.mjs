@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { isRetryableAssetFailure } from './analysis-retry-policy.mjs';
+import { classifyPhoto } from './analysis-evidence.mjs';
 import { lookHashOfFile, similarGroups } from './look-hash.mjs';
 
 const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
@@ -112,7 +113,28 @@ async function fetchRevision(args) {
 
 async function fetchCalendar(args) {
   const doc = await firestoreGet(`https://firestore.googleapis.com/v1/projects/${args.project}/databases/(default)/documents/calendars/cal_${args.calendar}`);
-  return decodeDocument(doc)?.calendar || {};
+  const calendar = decodeDocument(doc)?.calendar || {};
+  // Places moved to a canonical subcollection. The root's legacy copy alone misses new names
+  // and aliases. Read only small identity/GPS fields, never the places' photo arrays.
+  const result = await timedRequest(firestoreRunQueryUrl(args.project, args.calendar), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: 'places' }],
+      select: { fields: ['name', 'title', 'alias', 'aliases', 'lat', 'lng', 'latitude', 'longitude', 'updatedAt', 'deletedAt', 'removedAt', 'isDeleted'].map(fieldPath => ({ fieldPath })) },
+      limit: 501
+    } })
+  }, 'Place identity query', async response => {
+    if (!response.ok) throw new Error(`Place identity query failed: ${response.status}`);
+    return response.json();
+  });
+  const documents = (Array.isArray(result) ? result : []).filter(row => row.document).map(row => row.document);
+  if (documents.length > 500) throw new Error('Place identity context exceeds bounded analysis limit');
+  const places = new Map((Array.isArray(calendar.places) ? calendar.places : Object.values(calendar.places || {}))
+    .filter(Boolean).map((place, index) => [place.id || `legacy_${index}`, place]));
+  documents.forEach(document => {
+    const place = { ...decodeDocument(document), id: document.name.split('/').pop() };
+    places.set(place.id, place);
+  });
+  return { ...calendar, places: [...places.values()].filter(place => !place.deletedAt && !place.removedAt && !place.isDeleted) };
 }
 
 function workerFunctionUrl(args, functionName) {
@@ -217,108 +239,8 @@ async function readWorkerToken(service, account) {
   return (await shell('/usr/bin/security', ['find-generic-password', '-a', account, '-s', service, '-w'])).trim();
 }
 
-function nearestPlace(photo, places) {
-  const lat = Number(photo.latitude);
-  const lng = Number(photo.longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
-  let nearest = null;
-  for (const place of Array.isArray(places) ? places : []) {
-    const pLat = Number(place?.lat ?? place?.latitude);
-    const pLng = Number(place?.lng ?? place?.longitude);
-    if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) continue;
-    const distance = Math.hypot((pLat - lat) * 111000, (pLng - lng) * 88000);
-    if (!nearest || distance < nearest.distance) nearest = { name: String(place?.name || place?.title || ''), distance };
-  }
-  return nearest?.distance <= 250 ? nearest.name : '';
-}
-
-function toKstDateString(ts) {
-  if (!ts) return '';
-  const date = new Date(typeof ts === 'number' || /^\d+$/.test(ts) ? Number(ts) : String(ts));
-  if (Number.isNaN(date.getTime())) return '';
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(date);
-  const part = type => parts.find(value => value.type === type)?.value || '00';
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
-
-function extractSmartKeywords(text) {
-  if (!text) return [];
-  const clean = String(text).replace(/[\r\n\t]/g, ' ').trim();
-  const words = clean.split(/[\s,#·•/]+/).map(w => w.trim()).filter(w => w.length >= 2);
-  const combined = clean.replace(/[\s_\-./(),[\]{}'"`~!@#$%^&*+=|\\:;<>?·•]+/g, '').trim();
-  const res = [];
-  if (combined && combined.length >= 2 && combined.length <= 15) res.push(combined);
-  for (const word of words) {
-    if (word.length >= 2 && word.length <= 15 && !res.includes(word)) res.push(word);
-  }
-  return res;
-}
-
 function classify(photo, insight, calendar, calibration = new Map()) {
-  const rawTags = String(photo.tags || '').split(/[\s,#]+/).map(value => value.trim()).filter(Boolean);
-  const lowerTags = rawTags.map(value => value.toLocaleLowerCase('ko'));
-  const includes = value => lowerTags.includes(String(value || '').toLocaleLowerCase('ko'));
-  const people = (Array.isArray(calendar.participants) ? calendar.participants : [])
-    .map(person => String(person?.name || '').trim()).filter(Boolean).filter(includes);
-  const places = (Array.isArray(calendar.places) ? calendar.places : [])
-    .map(place => String(place?.name || place?.title || '').trim()).filter(Boolean).filter(includes);
-  const nearby = nearestPlace(photo, calendar.places);
-  if (nearby && !places.includes(nearby)) places.push(nearby);
-
-  // Date resolution from photo.meetingDate or timestamp / capturedAt
-  const dateStr = String(photo.meetingDate || '').trim() || toKstDateString(photo.timestamp || photo.capturedAt);
-  const dateMatch = dateStr.match(/^20(\d{2})-(\d{2})-(\d{2})$/);
-  const suggestedDateTag = dateMatch ? `${dateMatch[1]}${dateMatch[2]}${dateMatch[3]}` : '';
-  const hasDateTag = rawTags.some(t => /^\d{6}$/.test(t) || /^\d{8}$/.test(t));
-  const dateCandidates = (suggestedDateTag && !hasDateTag) ? [suggestedDateTag] : [];
-
-  // Match participants from OCR text if not already tagged
-  const ocrText = Array.isArray(insight.ocrText) ? insight.ocrText.join(' ') : '';
-  const allParticipants = (Array.isArray(calendar.participants) ? calendar.participants : [])
-    .map(person => String(person?.name || '').trim()).filter(Boolean);
-  for (const person of allParticipants) {
-    if (ocrText.includes(person) && !people.includes(person)) {
-      people.push(person);
-    }
-  }
-
-  const matchedMeetings = [];
-  if (dateStr) {
-    const rawMeetings = Array.isArray(calendar.confirmedMeeting) ? calendar.confirmedMeeting : (calendar.confirmedMeeting ? [calendar.confirmedMeeting] : []);
-    for (const meeting of rawMeetings) {
-      if (!meeting || meeting.confirmed === false) continue;
-      const mDate = String(meeting.date || meeting.id || meeting.targetDate || '').trim();
-      if (mDate === dateStr) matchedMeetings.push(meeting);
-    }
-    const rawAnniversaries = Array.isArray(calendar.anniversaries) ? calendar.anniversaries : [];
-    for (const anniv of rawAnniversaries) {
-      if (!anniv || anniv.deletedAt) continue;
-      const aStart = String(anniv.startDate || anniv.date || '').trim();
-      const aEnd = String(anniv.endDate || aStart).trim();
-      if ((aStart && aStart === dateStr) || (aStart && aEnd && dateStr >= aStart && dateStr <= aEnd)) {
-        matchedMeetings.push(anniv);
-      }
-    }
-  }
-
-  const scheduleSmartTags = [];
-  for (const m of matchedMeetings) {
-    const title = String(m.title || m.name || '').trim();
-    const note = String(m.note || m.memo || '').trim();
-    if (title) scheduleSmartTags.push(...extractSmartKeywords(title));
-    if (note) scheduleSmartTags.push(...extractSmartKeywords(note));
-  }
-
-  const meetings = matchedMeetings.map(m => String(m.title || m.name || m.date || '')).filter(Boolean);
-  const learned = calibratedTags(insight, calibration).filter(tag => !includes(tag));
-  return {
-    suggestedTags: Array.from(new Set([...dateCandidates, ...(insight.suggestedTags || []), ...people, ...places, ...scheduleSmartTags, ...meetings, ...learned])).slice(0, 20),
-    people, places, meetings,
-    scenes: Array.from(new Set((insight.labels || []).filter(label => Number(label?.confidence) >= 0.65).map(label => label.name))).slice(0, 12),
-    confidence: Math.max(0, ...((insight.labels || []).map(label => Number(label?.confidence) || 0)))
-  };
+  return classifyPhoto(photo, insight, calendar, calibratedTags(insight, calibration));
 }
 
 async function inspectPhoto(photo, tempRoot, visionBinary) {
@@ -361,7 +283,7 @@ async function upload(args, token, runId, items, window, { status = 'completed',
       calendarId: args.calendar,
       runId,
       workerId: 'macos-vision-m2',
-      workerVersion: '4',
+      workerVersion: '5',
       window,
       status,
       error,

@@ -1,3 +1,5 @@
+import KoreanLunarCalendar from 'korean-lunar-calendar';
+
 // ---- Anniversary date matching, category badges, lunar conversion ----
 // Split out of app-main.js (2026-09-10, docs/split-plan.md 15단계 방식): this block is
 // pure date/badge math with no React or component-state dependency. getAnniversaryDisplayColor

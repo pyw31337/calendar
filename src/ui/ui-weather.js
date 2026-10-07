@@ -3,12 +3,12 @@
  */
 
 import {
-  getWeatherIcon as getCoreWeatherIcon,
   getWeatherDescription,
   fetchDetailedWeatherForecast,
   resolveDailyForecast
 } from '../core/app-weather.js';
 import { DateTitle } from './date-title.js';
+import { getWeatherIcon } from './weather-icon.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -22,10 +22,6 @@ function __fb() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
 
-function getWeatherIcon(...args) {
-  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon || getCoreWeatherIcon;
-  return typeof f === 'function' ? f(...args) : getCoreWeatherIcon(...args);
-}
 function translateKoreanToEnglish(...args) {
   const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
   return typeof f === 'function' ? f(...args) : undefined;

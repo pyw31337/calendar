@@ -18,7 +18,7 @@ import {
   filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields,
   getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
 } from './gallery-data.js';
-import { bindUiComponentAliases } from './app-ui-wrappers.js';
+import { bindUiComponentAliases } from '../ui/component-aliases.js';
 import { createBulkImageTagSaveHandler, createImageTagSaveHandler, createImageTagSaveState, MAX_MEDIA_TAGS, MAX_MEDIA_TAG_TEXT_LENGTH } from './app-image-tag-save.js';
 import { saveBulkPhotoTagsRemote } from './bulk-photo-tags.js';
 import { createCalendarPhotoActions } from './app-calendar-photo-actions.js';
@@ -33,7 +33,7 @@ import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, co
 import { fetchLinkPreview, useLinkPreview, shouldFetchLinkPreviewForChatUrl } from './app-link-preview.js';
 import { isExternalServiceUrl } from './memo-share-link.js';
 import { isChatImageUpload } from './image-variants.js';
-import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from './app-chat-render.js';
+import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from '../ui/chat-render.js';
 import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCategoryMarkerContent, buildPlaceMarkerHtml, panMapToFitMarkerPopup, centerMapOnMarkerAndPopup } from './app-place-map.js';
 import {
   buildMetadataTags,
@@ -204,7 +204,7 @@ import {
   setChatLastReadTimestamp
 } from './app-calendar-screen-state.js';
 import { twemojiImageUrl, getRecentEmojis, addRecentEmoji } from './app-chat-data.js';
-import { getWeatherIcon, translateKoreanToEnglish } from './app-weather.js';
+import { translateKoreanToEnglish } from './app-weather.js';
 import { KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY, fetchWithTimeout } from './app-place-search.js';
 import {
   getInitialDataLoadingState,
@@ -217,7 +217,7 @@ import {
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 // U1b (docs/app-main-split-units.md): plain GATHER_UI_COMPONENTS pass-through aliases,
-// bound once below via bindUiComponentAliases (src/core/app-ui-wrappers.js). Kept as
+// bound once below via bindUiComponentAliases (src/ui/component-aliases.js). Kept as
 // same-name const bindings because check-required-symbols.mjs (AdminLoginGate) and every
 // JSX call site in this file still reference these names directly.
 const uiWrapperAliases = bindUiComponentAliases(React);
@@ -3870,6 +3870,7 @@ function CalendarApp() {
   });
   const handleBulkSaveImageTags = createBulkImageTagSaveHandler({
     activeCalId,
+    isCurrentCalendar: () => imageTagSaveStateRef.current?.calId === activeCalId,
     saveState: imageTagSaveStateRef.current,
     projectId: firebaseConfig.projectId,
     galleryPhotoIndex,
@@ -5231,7 +5232,7 @@ const { ImageUploadOverlay, ImageProcessingOverlay, EmojiPickerSheet } = uiWrapp
 
 
 // U1a (docs/app-main-split-units.md): the icon components below are aliases bound from
-// GATHER_UI_COMPONENTS by bindUiComponentAliases (src/core/app-ui-wrappers.js), reusing the
+// GATHER_UI_COMPONENTS by bindUiComponentAliases (src/ui/component-aliases.js), reusing the
 // single `uiWrapperAliases` object computed near the top of this file (U1b) -- kept as
 // same-name const bindings here because check-required-symbols.mjs and every JSX call site
 // in this file still reference these names directly.
@@ -5871,7 +5872,6 @@ function bindGatherUiDeps() {
     getKnownPlaceParticipantNames: typeof getKnownPlaceParticipantNames === 'function' ? getKnownPlaceParticipantNames : null,
     getPlaceCategoryMarkerContent: typeof getPlaceCategoryMarkerContent === 'function' ? getPlaceCategoryMarkerContent : null,
     getSolarFromLunar: typeof getSolarFromLunar === 'function' ? getSolarFromLunar : null,
-    getWeatherIcon: typeof getWeatherIcon === 'function' ? getWeatherIcon : null,
     isAdminRestoreRoute: typeof isAdminRestoreRoute === 'function' ? isAdminRestoreRoute : null,
     listAllCalendarsRemote: typeof listAllCalendarsRemote === 'function' ? listAllCalendarsRemote : null,
     listServerAuditLogsRemote: typeof listServerAuditLogsRemote === 'function' ? listServerAuditLogsRemote : null,
@@ -5954,3 +5954,6 @@ try {
 }
 
 window.__gatherStartApp = __gatherStartApp;
+// Keep an explicit module entry point. The production splitter must not synthesize an empty
+// namespace for this dynamic import while its side effects live in another shared chunk.
+export { __gatherStartApp };

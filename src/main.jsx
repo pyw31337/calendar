@@ -1,4 +1,9 @@
 import './react-globals.js';
+// These are bundled into the deployed site instead of being fetched from Google Fonts/CDNs.
+// Each Korean unicode-range is requested only when the page uses it, while the system stack
+// remains available immediately when a device is offline or a font request is slow.
+import '@fontsource-variable/plus-jakarta-sans/wght.css';
+import '@fontsource-variable/noto-sans-kr/wght.css';
 import './app.css';
 import './ui/celebrate-confetti.js';
 import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
@@ -335,43 +340,17 @@ async function boot() {
       import('./core/app-notifications.js'),
       import('./core/firebase-services.js')
     ]);
-    // DateModal (tap a date) and Lightbox (open a photo) are ~300KB of source that the first
-    // screen never renders. Register placeholders that load the real chunk on first use, and
-    // prefetch both once the calendar is on screen (src/core/lazy-ui-proxy.js).
+    // DateModal (tap a date) and Lightbox (open a photo) are not needed to paint the first
+    // screen. Register placeholders that load their chunks on first use; do not idle-prefetch
+    // them, because a calendar visit must not compete with archive/gallery media work.
     const { registerLazyUiComponents } = await import('./core/lazy-ui-proxy.js');
-    const prefetchLazyUi = registerLazyUiComponents(window.React, {
+    registerLazyUiComponents(window.React, {
       dateModal: { load: () => import('./ui/ui-date-modal.js'), components: ['DateModal'] },
       lightbox: { load: () => import('./ui/ui-lightbox.js'), components: ['Lightbox', 'LightboxInfoPanel', 'LightboxTagPanel'] }
     });
-    await Promise.all([
-      import('./ui/ui-icons.js'),
-      import('./ui/ui-confirm-dialog.js'),
-      import('./ui/ui-share-modal.js'),
-      import('./ui/ui-overlays.js'),
-      import('./ui/ui-widgets.js'),
-      import('./ui/ui-weather.js'),
-      import('./ui/ui-side-menu.js'),
-      import('./ui/ui-misc.js'),
-      import('./ui/ui-place-register.js'),
-      import('./ui/ui-remaining.js'),
-      import('./ui/ui-summary-gallery.js'),
-      import('./ui/ui-shared.js'),
-      import('./ui/ui-calendar-core.js'),
-      // ChatParticipantSheet (the actual participant-selection bottom sheet, vs. the button
-      // that opens it) lives in this file, but it isn't chat-specific -- the memo composer/edit
-      // modal, the comment composer, and the chat message reassignment modal in
-      // ui-calendar-core.js all open it too. It used to load only via loadChatUi() (view=chat or
-      // gallery), so opening the picker from memo/comments/edit before ever visiting chat in the
-      // same session found window.GATHER_UI_COMPONENTS.ChatParticipantSheet unset and silently
-      // rendered nothing. Loading it here unconditionally, alongside every other always-on
-      // shared UI module, makes it available regardless of which view boots first.
-      import('./ui/ui-chat-sheets.js'),
-      // renderChatFileAttachments / FileAttachmentCard used to load only via loadChatUi().
-      // The main-screen chat preview (CommentsSection) calls renderChatMessageBody which needs
-      // those components for file-only bubbles (PDFs etc.); without this eager import the
-      // preview showed name+timestamp and an empty bubble until the user opened full chat.
-      import('./ui/ui-chat-files.js')
-    ]);
+    // component-aliases.js fetches each owning module when React first renders the component.
+    // This replaces the old all-at-once UI Promise.all, so archive/gallery/admin modules cannot
+    // block calendar startup or consume memory before the user navigates to them.
     // Admin dashboard/modals are normally loaded only for a direct admin route. The main
     // screen can also request AdminModal from its side menu; that path uses loadAdminUi above.
     const params = new URLSearchParams(window.location.search);
@@ -392,8 +371,8 @@ async function boot() {
     // firebase SDK is already fully loaded (awaited above, before any imports started), so
     // app-firebase-data.js's top-level firebase.initializeApp() call (evaluated as part of this
     // import) can safely assume window.firebase exists.
-    await import('./core/app-main.js');
-    if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
+    const { __gatherStartApp: startApp } = await import('./core/app-main.js');
+    startApp();
     // Closing sheets/modals fade and slide out instead of vanishing in one frame (V2 only).
     installOverlayExitMotion(document, { isEnabled: () => !!document.querySelector('.renewal-shell.v2-design') });
     // Text fields: capsule when one line, rounded box sized to a wrapped placeholder (V2).
@@ -401,8 +380,6 @@ async function boot() {
     // Sign in after the first render so the auth SDK never delays the calendar. Failure is
     // harmless in P2-A: the rules still accept unauthenticated requests.
     setTimeout(() => { appAuth.startAnonymousAuth({ loadScript: src => loadScriptWithRetry(src, 15000) }); }, 0);
-    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => { prefetchLazyUi(); }, { timeout: 2500 });
-    else setTimeout(() => { prefetchLazyUi(); }, 1200);
     // The ready contract means app-main has bound all shared helpers and started the React tree,
     // not merely that its prerequisite chunks finished. Vite 8/Rolldown made the final dynamic
     // import boundary visible enough for tests and fast clients to observe the old premature flag.

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { isAnalysisWindow, parseHolidayIcs } from '../tools/local-media-worker/run-scheduled-media-analysis.mjs';
 import { isRetryableAssetFailure } from '../tools/local-media-worker/analysis-retry-policy.mjs';
-import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, recordMediaAnalysisFeedback } from '../src/core/media-analysis-feed.js';
+import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, fetchMediaAnalysisWorkerStates, recordMediaAnalysisFeedback } from '../src/core/media-analysis-feed.js';
 
 const require = createRequire(import.meta.url);
 const { sanitizeAnalysisItem, stableAnalysisId, summarize } = require('../functions/media-analysis.js');
@@ -90,6 +90,23 @@ test('fetchMediaAnalysisFeed applies customizable bounded limit', async () => {
   }
 });
 
+test('home operations reads only bounded worker health fields after first paint', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.match(String(url), /mediaAnalysisWorkerState\?pageSize=10&mask.fieldPaths=workerId/);
+    return new Response(JSON.stringify({ documents: [{
+      name: 'projects/x/databases/(default)/documents/calendars/cal_cw/mediaAnalysisWorkerState/macos-vision-m2',
+      fields: { status: { stringValue: 'idle' }, lastHeartbeatAt: { integerValue: '1234' } }
+    }] }), { status: 200 });
+  };
+  try {
+    const workers = await fetchMediaAnalysisWorkerStates({ calendarId: 'cw', projectId: 'metro-live-2918e', force: true });
+    assert.deepEqual(workers, [{ id: 'macos-vision-m2', workerId: 'macos-vision-m2', status: 'idle', lastError: '', lastHeartbeatAt: 1234, latestSummary: null }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('AI review actions resolve a canonical photo only on demand and send bounded feedback to the server', async () => {
   const originalFetch = globalThis.fetch;
   const requests = [];
@@ -119,7 +136,7 @@ test('AI review actions resolve a canonical photo only on demand and send bounde
   }
 });
 
-test('daily briefing produces a readable HTML digest and flags stale or failed work', () => {
+test('daily briefing produces an actionable HTML digest and flags stale or failed work', () => {
   const brief = buildBrief({
     dateLabel: '2026년 9월 28일 월요일',
     calendars: [{
@@ -127,11 +144,12 @@ test('daily briefing produces a readable HTML digest and flags stale or failed w
       summary: { received: 12, suggested: 9, failed: 1, withPeople: 3, withPlaces: 4, withMeetings: 2 }
     }]
   });
-  assert.match(brief.subject, /^모여라 캘린더 AI 분석 브리핑/);
+  assert.match(brief.subject, /^모여라 캘린더 AI 운영 브리핑/);
   assert.match(brief.html, /모아엘가/);
-  assert.match(brief.html, /라이브 웹에서 분석 검토하기/);
+  assert.match(brief.html, /운영 인박스에서 확인하기/);
   assert.match(brief.text, /오류 1건/);
   assert.equal(brief.staleCount, 1);
+  assert.equal(brief.operationCount, 2);
   assert.equal(brief.total.suggested, 9);
 });
 

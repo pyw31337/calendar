@@ -1,7 +1,7 @@
 /* v2-shell-structure: first-class memo/places destinations; Bento side-nav is source of IA. */
 /* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
 .renewal-shell.v2-design {
-  --font-sans: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+  --font-sans: 'Noto Sans KR Variable', 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
   --renewal-page-max: 1600px;
   --v2-side-nav-width: 280px;
   /* Brand = vivid schedule purple (same family as --cal-schedule) */
@@ -1698,6 +1698,120 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide {
   grid-column: 1 / -1;
 }
+.v2-design .bp-ai-operations-card {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--brand, #7c2fe5) 18%, var(--border-subtle, #e8e5f0));
+  border-radius: 20px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--brand, #7c2fe5) 7%, var(--bg-card, var(--bg-primary))) , var(--bg-card, var(--bg-primary)) 58%);
+  box-shadow: 0 8px 24px rgba(64, 42, 120, 0.06);
+}
+.v2-design .bp-ai-operations-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.v2-design .bp-ai-operations-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--brand, #7c2fe5);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.v2-design .bp-ai-operations-heading h2 {
+  margin: 0;
+  color: var(--text-main, #1e1b2e);
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.v2-design .bp-ai-operations-heading p {
+  margin: 5px 0 0;
+  color: var(--text-muted, #777385);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.v2-design .bp-ai-operations-count {
+  flex: 0 0 auto;
+  min-width: 42px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--brand, #7c2fe5);
+  color: var(--on-brand);
+  font-size: .75rem;
+  font-weight: 800;
+  text-align: center;
+}
+.v2-design .bp-ai-operations-count.bp-is-clear {
+  background: color-mix(in srgb, var(--status-green, #16a34a) 12%, var(--bg-card, var(--bg-primary)));
+  color: var(--status-green, #16a34a);
+}
+.v2-design .bp-ai-operations-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.v2-design .bp-ai-operations-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle, #ebe8f3);
+  border-radius: 14px;
+  background: var(--bg-card, var(--bg-primary));
+}
+.v2-design .bp-ai-operations-priority {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 31px;
+  min-height: 23px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand, #7c2fe5) 12%, var(--bg-card, var(--bg-primary)));
+  color: var(--brand, #7c2fe5);
+  font-size: .67rem;
+  font-weight: 800;
+}
+.v2-design .bp-ai-operations-row.bp-is-high .bp-ai-operations-priority { background: color-mix(in srgb, var(--status-danger, #d14343) 12%, var(--bg-card, var(--bg-primary))); color: var(--status-danger, #d14343); }
+.v2-design .bp-ai-operations-row.bp-is-medium .bp-ai-operations-priority { background: color-mix(in srgb, var(--status-info, #2865b6) 12%, var(--bg-card, var(--bg-primary))); color: var(--status-info, #2865b6); }
+.v2-design .bp-ai-operations-copy { min-width: 0; display: grid; gap: 3px; }
+.v2-design .bp-ai-operations-copy strong,
+.v2-design .bp-ai-operations-copy span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.v2-design .bp-ai-operations-copy small { color: var(--text-muted); font-size: .68rem; overflow-wrap: anywhere; }
+.v2-design .bp-ai-operations-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--text-muted); font-size: .75rem; }
+.v2-design .bp-ai-operations-status button,
+.v2-design .bp-ai-operations-expand { border: 1px solid var(--border-subtle); background: var(--bg-card); color: var(--brand); border-radius: var(--radius-md); min-height: 40px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.v2-design .bp-ai-operations-status button:disabled { opacity: .55; cursor: wait; }
+.v2-design .bp-ai-operations-copy strong { color: var(--text-main, #1e1b2e); font-size: .83rem; }
+.v2-design .bp-ai-operations-copy span { color: var(--text-muted, #777385); font-size: .71rem; }
+.v2-design .bp-ai-operations-row button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--brand, #7c2fe5);
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.v2-design .bp-ai-operations-row button:hover { background: color-mix(in srgb, var(--brand, #7c2fe5) 10%, var(--bg-card, var(--bg-primary))); }
+.v2-design .bp-ai-operations-empty { display: grid; gap: 4px; padding: 2px 0; }
+.v2-design .bp-ai-operations-empty strong { color: var(--text-main, #1e1b2e); font-size: .86rem; }
+.v2-design .bp-ai-operations-empty span { color: var(--text-muted, #777385); font-size: .76rem; }
 @media (min-width: 768px) and (max-width: 1199px) {
   .v2-design .bp-bento-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide { grid-column: 1 / -1; }
@@ -1705,6 +1819,9 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 @media (max-width: 767px) {
   .v2-design .bp-bento-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide { grid-column: 1; }
+  .v2-design .bp-ai-operations-card { grid-column: 1; padding: 16px; }
+  .v2-design .bp-ai-operations-list { grid-template-columns: 1fr; }
+  .v2-design .bp-ai-operations-heading p { max-width: 250px; }
 }
 
 /* Tablet (no fixed side rail yet, hamburger-only): the hero card goes edge-to-edge like

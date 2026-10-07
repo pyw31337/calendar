@@ -15,6 +15,12 @@ dist/
 # Local files
 .env
 .env.*
+# Firebase Admin/service-account credentials must never enter version control.
+*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
+*service-account*.json
+*service_account*.json
+serviceAccountKey.json
 booking_checker.log
 screenshots/
 screenshots_test/

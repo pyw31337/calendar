@@ -3,7 +3,10 @@ import fs from 'node:fs';
 // Keep the coordinator from absorbing extracted feature code again. Photo-comment persistence
 // now lives in photo-comment-items.js and UI compatibility wrappers are local to their actual chunk.
 const targets = [
-  { file: 'src/core/app-main.js', maxLines: 12250, label: 'app-main.js' },
+  { file: 'src/core/app-main.js', maxLines: 6000, label: 'app-main.js' },
+  { file: 'src/ui/ui-summary-gallery.js', maxLines: 7350, label: 'ui-summary-gallery.js' },
+  { file: 'src/app.css', maxLines: 8750, label: 'app.css' },
+  { file: 'functions/index.js', maxLines: 3650, label: 'functions/index.js' },
   { file: 'src/core/app-anniversary-dates.js', maxLines: 360, label: 'app-anniversary-dates.js' },
   { file: 'src/core/app-firebase-data.js', maxLines: 4500, label: 'app-firebase-data.js' },
   { file: 'src/core/notification-pwa-state.js', maxLines: 240, label: 'notification-pwa-state.js' },

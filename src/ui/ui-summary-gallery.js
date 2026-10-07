@@ -3,6 +3,8 @@
  */
 
 import { LikeButton } from './like-button.js';
+import { KOREA_REGIONS } from '../core/korean-regions.js';
+import { identityLabels, photoTagTokens } from '../core/photo-tag-identity.js';
 import { getPhotoCommentIdentityFromList } from '../core/app-domain-helpers.js';
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
@@ -29,7 +31,7 @@ import { buildPlacePhotoGroups, orderCoverPhotos, withPlaceTag, placeTagToken, w
 import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 import { isExcludedFromPeople, personNameVariants, tagMatchesPerson, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
 import { CommonPagination } from './ui-shared.js';
-import { getCulturePosterBadge, CULTURE_POSTER_BADGE_COLORS } from './culture-poster-badge.js';
+import { contentPosterStatusBadge } from '../core/culture-poster-badge.js';
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
@@ -1795,8 +1797,10 @@ export function HistoryView({
 
   const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
   const personTagChips = React.useMemo(() => [
-    ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, color: p.color || '#7C3AED' })),
-    ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, participantId: null, label: t, color: '#64748B' }))
+    ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, aliases: identityLabels(p), color: p.color || '#7C3AED' })),
+    ...customPersonTags.map(t => ({ label: identityLabels(t)[0], aliases: identityLabels(t) }))
+      .filter(t => t.label && !activeParticipants.some(p => p.name === t.label))
+      .map(t => ({ ...t, id: `custom_${t.label}`, participantId: null, color: '#64748B' }))
   ], [activeParticipants, customPersonTags]);
 
   // 보관함의 첫 화면은 서버 photoIndex의 한 페이지만 사용한다. 이전에는 `complete`가 true일
@@ -2097,19 +2101,16 @@ export function HistoryView({
       setIsAddingBackPhotos(false);
     }
   };
-  const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
-  // 때문 -- 2~3음절 한글 이름이면 첫 글자(성으로 추정)를 뗀 나머지도 매칭 후보에 넣는다.
+  // 때문 -- 3음절 한글 이름만 성을 뗀 이름도 후보에 넣고, 명시적 별칭을 함께 확인한다.
   // tag는 {label, participantId} -- 한때 participantId가 있으면(실제 캘린더 참여자) "그 사람이
   // 보낸 사진 전부"를 자동으로 그 사람 사진으로 매칭했었다. 하지만 "보낸 사진"과 "그 사람이
   // 등장하는 사진"은 다른 개념이라, 음식/풍경/서류 스캔처럼 본인이 안 나온 사진까지 전부
   // 잡혀버려 인물 탭이 실제와 동떨어지게 부풀려지는 문제가 있었다. 인물 태그는 해시태그(#이름)로
   // 명시적으로 붙인 사진만 인정한다 -- participantId는 더 이상 매칭에 쓰지 않는다.
-  // "#해맑은도연"처럼 이름 앞뒤에 다른 글자가 붙은 해시태그도 같은 사람으로 인식해야 하므로
-  // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
-  // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
-  // 완전일치만 인정한다.
+  // 무제한 부분일치 대신 공유 판별식의 제한된 접미어(사진/생일 등)를 쓴다.
+  // "영우동"을 "영우"로, "도연"의 한 글자를 무관한 사람으로 오인하지 않는다.
   // 인물 분류는 인물 탭을 실제로 열었을 때만 수행한다. 보관함 첫 진입(기본: 추억)에서
   // 보이지 않는 인물/장소 분류까지 동시에 실행하면 사진 수에 비례해 메인 스레드를 막는다.
   // 탭을 다시 열어도 그 탭의 데이터가 바뀌지 않는 한 useMemo 캐시가 유지된다.
@@ -2120,10 +2121,10 @@ export function HistoryView({
     if (historyTab !== 'people' && !q) return { personPhotosByLabel: buckets, unclassifiedPeoplePhotos: unclassified };
     const matchers = personTagChips.map(tag => ({
       label: tag.label,
-      variants: personNameVariants(tag.label)
+      variants: identityLabels(tag).flatMap(personNameVariants)
     }));
     historyPhotoEntries.forEach(entry => {
-      const tokens = entryTagTokens(entry).map(token => token.toLowerCase());
+      const tokens = photoTagTokens([entry?.tags, entry?.personTags]);
       // 인물아님: taken out of 분류 필요 by 제외 (archive-person-exclusion.js); still matched to a
       // person if it carries one's tag.
       const excluded = isExcludedFromPeople(entry?.tags);
@@ -2262,7 +2263,7 @@ export function HistoryView({
       const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
       if (!assetKey || seen.has(assetKey)) return;
       seen.add(assetKey);
-      const next = fromUnclassified ? withNotAPersonTag(photo?.tags || '') : withoutPersonTag(photo?.tags || '', selectedPersonTag);
+      const next = fromUnclassified ? withNotAPersonTag(photo?.tags || '') : withoutPersonTag(photo?.tags || '', personTagChips.find(chip => chip.label === selectedPersonTag) || selectedPersonTag);
       if (next.status === 'already') return;
       changes.push({ photo, assetKey, beforeTags: next.before, tags: next.tags });
     });
@@ -2342,7 +2343,7 @@ export function HistoryView({
       places: getCalendarPlaces(calendar),
       placeGroups: placePhotoGroups,
       getPhotoDates: photo => parseHistoryDateTokens(photo?.tags || ''),
-      personLabels: personTagChips.map(chip => chip.label),
+      personLabels: personTagChips,
       attendeesByDate: suggestionAttendees
     });
   }, [historyTab, historyPhotoEntries, calendar, placePhotoGroups, personTagChips, suggestionAttendees]);
@@ -2359,7 +2360,7 @@ export function HistoryView({
   }, [historyTab, calendar?.id]);
   const faceSuggestionKey = photo => String(photo?.assetKey || photo?.mediaKey || photo?.refKey || canonicalPhotoAssetKey(photo || {}));
   const faceSuggestions = React.useMemo(() => (historyTab === 'suggest' && faceItems.length
-    ? buildFaceSuggestions({ photos: historyPhotoEntries, faceItems, personLabels: personTagChips.map(chip => chip.label), keyOf: faceSuggestionKey })
+    ? buildFaceSuggestions({ photos: historyPhotoEntries, faceItems, personLabels: personTagChips, keyOf: faceSuggestionKey })
     : []), [historyTab, historyPhotoEntries, faceItems, personTagChips]);
   const rejectFaces = async (photos, name) => {
     const assetKeys = photos.map(faceSuggestionKey).filter(Boolean);
@@ -2778,7 +2779,7 @@ export function HistoryView({
   const visiblePersonChips = React.useMemo(() => {
     if (!q) return personTagChips;
     return personTagChips.filter(tag => {
-      const variants = personNameVariants(tag.label);
+      const variants = identityLabels(tag).flatMap(personNameVariants);
       if (variants.some(value => value.includes(q) || (value.length > 1 && q.includes(value)))) return true;
       const photos = personPhotosByLabel.get(tag.label) || [];
       return photos.some(photo => archivePhotoMatchesSearch(photo, q));
@@ -4656,25 +4657,6 @@ const cultureGenreLabel = genre => CULTURE_GENRE_LABELS[genre] || genre || '기�
 // 그대로 맞춘 것 -- 이 코드로 데이터를 직접 필터링한다. `gugun`은 데이터에 별도 필드가 없어
 // item.address의 두 번째 토큰(예: "경기도 부천시 ...")으로 대조하므로, 실제 데이터 유무와 무관하게
 // 대한민국 표준 행정구역 전체를 보여준다 (Culture Flow 자체 지역설정 백드롭과 동일한 방식).
-const KOREA_REGIONS = [
-  { code: 'seoul', label: '서울', gugun: ['종로구', '중구', '용산구', '성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구', '은평구', '서대문구', '마포구', '양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구', '서초구', '강남구', '송파구', '강동구'] },
-  { code: 'busan', label: '부산', gugun: ['중구', '서구', '동구', '영도구', '부산진구', '동래구', '남구', '북구', '해운대구', '사하구', '금정구', '강서구', '연제구', '수영구', '사상구', '기장군'] },
-  { code: 'daegu', label: '대구', gugun: ['중구', '동구', '서구', '남구', '북구', '수성구', '달서구', '달성군', '군위군'] },
-  { code: 'incheon', label: '인천', gugun: ['중구', '동구', '미추홀구', '연수구', '남동구', '부평구', '계양구', '서구', '강화군', '옹진군'] },
-  { code: 'gwangju', label: '광주', gugun: ['동구', '서구', '남구', '북구', '광산구'] },
-  { code: 'daejeon', label: '대전', gugun: ['동구', '중구', '서구', '유성구', '대덕구'] },
-  { code: 'ulsan', label: '울산', gugun: ['중구', '남구', '동구', '북구', '울주군'] },
-  { code: 'sejong', label: '세종', gugun: ['세종시'] },
-  { code: 'gyeonggi', label: '경기', gugun: ['수원시', '성남시', '의정부시', '안양시', '부천시', '광명시', '평택시', '동두천시', '안산시', '고양시', '과천시', '구리시', '남양주시', '오산시', '시흥시', '군포시', '의왕시', '하남시', '용인시', '파주시', '이천시', '안성시', '김포시', '화성시', '광주시', '양주시', '포천시', '여주시', '연천군', '가평군', '양평군'] },
-  { code: 'gangwon', label: '강원', gugun: ['춘천시', '원주시', '강릉시', '동해시', '태백시', '속초시', '삼척시', '홍천군', '횡성군', '영월군', '평창군', '정선군', '철원군', '화천군', '양구군', '인제군', '고성군', '양양군'] },
-  { code: 'chungbuk', label: '충북', gugun: ['청주시', '충주시', '제천시', '보은군', '옥천군', '영동군', '증평군', '진천군', '괴산군', '음성군', '단양군'] },
-  { code: 'chungnam', label: '충남', gugun: ['천안시', '공주시', '보령시', '아산시', '서산시', '논산시', '계룡시', '당진시', '금산군', '부여군', '서천군', '청양군', '홍성군', '예산군', '태안군'] },
-  { code: 'jeonbuk', label: '전북', gugun: ['전주시', '군산시', '익산시', '정읍시', '남원시', '김제시', '완주군', '진안군', '무주군', '장수군', '임실군', '순창군', '고창군', '부안군'] },
-  { code: 'jeonnam', label: '전남', gugun: ['목포시', '여수시', '순천시', '나주시', '광양시', '담양군', '곡성군', '구례군', '고흥군', '보성군', '화순군', '장흥군', '강진군', '해남군', '영암군', '무안군', '함평군', '영광군', '장성군', '완도군', '진도군', '신안군'] },
-  { code: 'gyeongbuk', label: '경북', gugun: ['포항시', '경주시', '김천시', '안동시', '구미시', '영주시', '영천시', '상주시', '문경시', '경산시', '의성군', '청송군', '영양군', '영덕군', '청도군', '고령군', '성주군', '칠곡군', '예천군', '봉화군', '울진군', '울릉군'] },
-  { code: 'gyeongnam', label: '경남', gugun: ['창원시', '진주시', '통영시', '사천시', '김해시', '밀양시', '거제시', '양산시', '의령군', '함안군', '창녕군', '고성군', '남해군', '하동군', '산청군', '함양군', '거창군', '합천군'] },
-  { code: 'jeju', label: '제주', gugun: ['제주시', '서귀포시'] }
-];
 // Flat (region, gugun) lookup used by the search field below to resolve a typed district name
 // (e.g. "부천") straight to its parent 시/도 -- built once at module load since KOREA_REGIONS
 // never changes at runtime.
@@ -6562,7 +6544,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
         const todayIso = todayIsoLocal();
         const itemKind = getCultureItemKind(item) || (anniversaryCategory === 'festival' ? 'festival' : (anniversaryCategory === 'event' ? 'performance' : ''));
-        const posterBadge = getCulturePosterBadge(item, {
+        const posterBadge = contentPosterStatusBadge(item, {
           today: todayIso,
           isMovie: isMovieCard,
           isOngoingKind: !isMovieCard && (itemKind === 'festival' || itemKind === 'performance'),
@@ -6619,11 +6601,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: {
                 position: 'absolute', top: '8px', left: '8px', zIndex: 3,
                 display: 'inline-flex', alignItems: 'center', padding: '4px 9px',
-                borderRadius: 'var(--radius-full)', backgroundColor: CULTURE_POSTER_BADGE_COLORS[posterBadge.tone], color: '#FFFFFF',
+                borderRadius: 'var(--radius-full)', backgroundColor: posterBadge.backgroundColor, color: '#FFFFFF',
                 fontSize: 'var(--font-size-2xs)', fontWeight: 800, lineHeight: 1,
                 boxShadow: '0 1px 4px rgba(0,0,0,0.28)'
               }
-            }, posterBadge.label),
+            }, posterBadge.text),
             // 스포츠 경기 카드: 포스터(팀 관계없는 종목 기본 이미지) 위에 날짜/양팀 로고/경기장을
             // 오버레이로 얹는다. 로고를 크게 꽉 채우고, 날짜/경기장은 로고 쪽으로 촘촘하게 붙인다
             // (컬처플로우 스포츠 카드 레이아웃 참고).

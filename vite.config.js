@@ -75,7 +75,9 @@ const chunkGroups = [
   // where they overlap, so this only catches files nothing else already claims.
   {
     name: 'app-main',
-    test: /[\\/]core[\\/]app-(main|ui-wrappers|ui-hooks|search|link-preview|chat-render|place-map|image-pipeline|ui-deps)\.js$/,
+    // The UI aliases/chat renderer moved out of core, but are still called during app-main's
+    // initialization. Keep them in this group so its WeakMap/registry cannot be read mid-cycle.
+    test: /[\\/](?:core[\\/]app-(main|ui-wrappers|ui-hooks|search|link-preview|chat-render|place-map|image-pipeline|ui-deps)|ui[\\/](?:component-aliases|chat-render))\.js$/,
     priority: 20
   },
   { name: 'vendor', test: /node_modules/, priority: 10 }

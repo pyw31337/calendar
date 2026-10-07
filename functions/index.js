@@ -24,8 +24,10 @@ const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract'
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
 const { buildKakaoLocationTags, appendLocationTags } = require('./photo-location-tags');
+const { completeAnalysisLocationTags } = require('./media-auto-tags');
 const { MAX_BATCH_ITEMS, MAX_TAGS, faceName, sanitizeAnalysisItem, sanitizeFaceItem, sanitizeSimilarGroups, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
+const { collectMediaBriefCalendars } = require('./media-analysis-brief-data');
 const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
 const {
   decideMemoNotification,
@@ -36,6 +38,7 @@ const {
   selectDeliverableSubscriptions
 } = require('./push-notify-policy');
 const { planSettlementReminders } = require('./settlement-reminders');
+const { parsePublicHttpUrl, setPublicCacheHeaders } = require('./public-proxy-contract');
 
 // A long-lived local worker needs a credential that is independent from the short admin PIN.
 // It is bound only to the ingestion endpoint; neither the app nor unrelated functions receive it.
@@ -919,19 +922,20 @@ function isAnniversaryToday(ann, y, m, d) {
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
 
-// Memo created or edited → push (channel: memo). A write trigger is required because
-// memo edits are saved as updates; the old create-only trigger silently missed them.
+// Memo created, a new comment, or a newly added photo → push. The trigger is onWrite
+// because comments and photos are saved as updates, but a title/body edit of an existing
+// memo must not push (decideMemoNotification returns null; kind "edit" is refused here too).
 exports.onMemoWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return;
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const memo = change.after.data() || {};
-    // Notify only when title/text/photos/comments actually change. Tag, GPS, link
-    // preview, asset-graph and updatedAt maintenance must not page anyone, and the
-    // same revision is claimed once so a retried trigger cannot send it again.
+    // New memo, new comment, or a newly added photo only. Tag, GPS, link preview,
+    // asset-graph, updatedAt, and title/body edits must not page anyone. The same
+    // revision is claimed once so a retried trigger cannot send it again.
     const decision = decideMemoNotification(before, memo, { memoId: context.params.memoId });
-    if (!decision) return;
+    if (!decision || decision.kind === 'edit') return;
     const calendarDocId = context.params.calendarDocId;
     const claimed = await claimPushDelivery(calendarDocId, decision.claimKey);
     if (!claimed) {
@@ -1319,28 +1323,6 @@ async function saveLinkPreviewToFirestore(url, preview) {
   }
 }
 
-// Public proxy endpoints must never become an open SSRF relay. Accept only ordinary web URLs,
-// reject embedded credentials, and block loopback/private/cloud-metadata host spellings.
-function parsePublicHttpUrl(value) {
-  if (typeof value !== 'string' || value.trim().length === 0 || value.trim().length > 2000) return null;
-  try {
-    const url = new URL(value.trim());
-    const host = url.hostname.toLowerCase();
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
-    if (host === 'localhost' || host === 'localhost.localdomain' || host === 'metadata.google.internal'
-      || host === 'metadata.google.com' || host.endsWith('.internal')
-      || /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)
-      || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
-      || host === '::1' || host.startsWith('fc') || host.startsWith('fd')) return null;
-    return url;
-  } catch (_) { return null; }
-}
-
-function setPublicCacheHeaders(res, maxAge = 300) {
-  res.set('Cache-Control', `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`);
-  res.set('X-Content-Type-Options', 'nosniff');
-}
-
 const PUBLIC_PROXY_RUNTIME = { timeoutSeconds: 15, memory: '256MB', maxInstances: 20 };
 // kakaoLocalSearchProxy/googlePlacesSearchProxy briefly ran with minInstances: 1 (a warm instance,
 // ~$2.31/month minimum bill) to remove cold-start latency. Reverted: the actual bottleneck the
@@ -1706,7 +1688,7 @@ async function fetchKakaoCoordinateTags(latitude, longitude) {
     return [];
   }
   const kakaoUrl = `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${encodeURIComponent(String(lng))}&y=${encodeURIComponent(String(lat))}`;
-  const response = await fetch(kakaoUrl, { headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` } });
+  const response = await fetch(kakaoUrl, { headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }, signal: AbortSignal.timeout(8000) });
   await incrementKakaoLocalSearchStat();
   if (!response.ok) throw new Error(`Kakao photo reverse geocode failed: ${response.status}`);
   const payload = await response.json();
@@ -1776,6 +1758,7 @@ exports.completePhotoLocationTags = seoulTriggerFunctions()
         const assetKey = getPhotoAssetKey(entry.imageUrl || entry.thumbUrl);
         const locationTags = locationTagsByAsset.get(assetKey);
         if (!locationTags?.length) return;
+        if (photoGeoSignature(readImageGeo(latest, assetKey)) !== photoGeoSignature(newGeoEntries.find(candidate => candidate.assetKey === assetKey)?.geo)) return;
         const current = String(Object.prototype.hasOwnProperty.call(imageTagMap, assetKey) ? imageTagMap[assetKey] : (imageTags[entry.index] || ''));
         const next = appendLocationTags(current, locationTags);
         if (next === current) return;
@@ -3021,6 +3004,20 @@ exports.ingestMediaAnalysis = workerFunctions().runWith({
 });
 
 const MEDIA_ANALYSIS_REVIEW_DECISIONS = new Set(['applied', 'edited', 'rejected']);
+// Independent of HTTP ingestion: bounded retries/audit cannot make a successful worker upload
+// appear failed. Own audit writes do not retrigger processing.
+exports.completeMediaAnalysisLocationTags = seoulTriggerFunctions()
+  .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'], failurePolicy: true })
+  .firestore.document('calendars/{calendarDocId}/mediaAnalysis/{analysisId}')
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const after = change.after.data() || {};
+    const before = change.before.data() || {};
+    if (after.analysisVersion < 5 || after.status !== 'suggested' || !after.assetKey) return null;
+    if (before.analyzedAt === after.analyzedAt && before.sourceUpdatedAt === after.sourceUpdatedAt) return null;
+    return completeAnalysisLocationTags({ db: admin.firestore(), calendarDocId: context.params.calendarDocId,
+      assetKey: after.assetKey, lookupTags: fetchKakaoCoordinateTags, legacy: change.before.exists && !before.automatic });
+  });
 function sanitizeMediaAnalysisFeedbackTags(value) {
   const source = Array.isArray(value) ? value : [];
   return Array.from(new Set(source
@@ -3187,41 +3184,6 @@ function formatBriefDate(date = new Date()) {
   }).format(date);
 }
 
-function mediaWorkerIsStale(workerState, now = Date.now()) {
-  const heartbeat = Number(workerState?.lastHeartbeatAt || 0);
-  // An idle Mac (no new photos) reports in only every 12 hours -- it no longer calls the server
-  // every 15 minutes just to say it is alive. 26 hours still flags a Mac that stopped for a day.
-  return !heartbeat || now - heartbeat > 26 * 60 * 60 * 1000;
-}
-
-async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
-  const calendarSnap = await db.collection('calendars').select('calendar').get();
-  const reports = await Promise.all(calendarSnap.docs.map(async calendarDoc => {
-    const calendarId = calendarDoc.id.startsWith('cal_') ? calendarDoc.id.slice(4) : calendarDoc.id;
-    if (!CALENDAR_ID_RE.test(calendarId)) return null;
-    const [workerSnap, runSnap] = await Promise.all([
-      calendarDoc.ref.collection('mediaAnalysisWorkerState').doc('macos-vision-m2').get(),
-      calendarDoc.ref.collection('mediaAnalysisRuns').doc(`macos_${calendarId}_${dateKey.replace(/-/g, '')}`).get()
-    ]);
-    // The service digest includes every calendar where the opted-in worker wrote a heartbeat or
-    // run. Other shared/test calendars never leak into the recipient's morning email.
-    if (!workerSnap.exists && !runSnap.exists) return null;
-    const worker = workerSnap.data() || {};
-    const run = runSnap.data() || {};
-    const calendar = calendarDoc.data()?.calendar || {};
-    const stale = mediaWorkerIsStale(worker, now);
-    const healthLabel = stale ? '생존 신호 확인' : worker.status === 'idle' ? '대기' : '정상';
-    return {
-      id: calendarId,
-      name: String(calendar.title || calendar.name || calendarId),
-      summary: run.summary || worker.latestSummary || {},
-      stale,
-      healthLabel
-    };
-  }));
-  return reports.filter(Boolean);
-}
-
 async function sendResendMail({ apiKey, from, subject, html, text, idempotencyKey }) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -3305,7 +3267,9 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
       generatedAt: now,
       calendarCount: calendars.length,
       summary: brief.total,
-      staleCount: brief.staleCount
+      staleCount: brief.staleCount,
+      operationCount: brief.operationCount,
+      operations: calendars.map(calendar => ({ id: calendar.id, name: calendar.name, items: calendar.operations || [] }))
     }, { merge: true });
     return null;
   }
@@ -3322,6 +3286,8 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
     calendarCount: calendars.length,
     summary: brief.total,
     staleCount: brief.staleCount,
+    operationCount: brief.operationCount,
+    operations: calendars.map(calendar => ({ id: calendar.id, name: calendar.name, items: calendar.operations || [] })),
     provider: delivery.provider
   }, { merge: true });
   try {

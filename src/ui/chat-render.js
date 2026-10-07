@@ -1,7 +1,7 @@
-import { highlightTextWithYellowMarker } from './app-search.js';
-import { extractFirstUrl, getMediaIdentityKeys, getMessageImageEntries, formatBytes, getDataUrlInfo } from './app-domain-helpers.js';
-import { resolvePhotoAsset } from './gallery-thumb.js';
-import { bindUiComponentAliases } from './app-ui-wrappers.js';
+import { highlightTextWithYellowMarker } from '../core/app-search.js';
+import { extractFirstUrl, getMediaIdentityKeys, getMessageImageEntries, formatBytes, getDataUrlInfo } from '../core/app-domain-helpers.js';
+import { resolvePhotoAsset } from '../core/gallery-thumb.js';
+import { bindUiComponentAliases } from './component-aliases.js';
 
 const React = window.React;
 const { DirectChatMediaText, UrlCapsuleBadge, DateCapsuleBadge } = bindUiComponentAliases(React);

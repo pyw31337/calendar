@@ -75,11 +75,12 @@ for (const importPath of REQUIRED_MAIN_ORDER) {
   lastIndex = index;
 }
 
-if (!mainEntry.includes('window.__gatherStartApp()')) {
-  fail('src/main.jsx must call window.__gatherStartApp() after dependencies load.');
+if (!/const\s*\{\s*__gatherStartApp:\s*startApp\s*\}\s*=\s*await import\('\.\/core\/app-main\.js'\);\s*startApp\(\);/.test(mainEntry)) {
+  fail('src/main.jsx must await and invoke the explicit app-main module entry after dependencies load.');
 }
 
 const appMain = readFileSync(join(ROOT, 'src/core/app-main.js'), 'utf8');
+if (!/export\s*\{\s*__gatherStartApp\s*\}/.test(appMain)) fail('app-main must export its explicit start function.');
 const firebaseServices = readFileSync(join(ROOT, 'src/core/firebase-services.js'), 'utf8');
 const firebaseData = readFileSync(join(ROOT, 'src/core/app-firebase-data.js'), 'utf8');
 // app-main.js was split into these two in a later refactor (each has its own manualChunks entry

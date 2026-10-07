@@ -1,10 +1,9 @@
 name: Browser Matrix Smoke
 
-# Loads real production calendar data (kkot/cw/jhair) through a real JS engine in each of 3
-# browsers. Weekly (was daily) -- this app has only a couple of active users and near-zero write
-# volume, so a full 3-browser pass every single day was pure Firestore-read overhead with no
-# corresponding increase in bugs caught. workflow_dispatch still allows an on-demand run any time
-# (e.g. right after a risky UI change) without waiting for the weekly schedule.
+# Runs a deterministic local production bundle through each of 3 browsers. Firestore is blocked
+# so CORS/availability of the external backend cannot mask a browser regression; the separate
+# live-smoke job is the explicit production-data availability check. Weekly (was daily) keeps
+# broad rendering coverage without billing reads for every fixture calendar.
 on:
   workflow_dispatch:
   schedule:
@@ -34,4 +33,5 @@ jobs:
       - name: Run browser smoke
         env:
           CALENDAR_SMOKE_BROWSER: ${{ matrix.browser }}
+          CALENDAR_SMOKE_BLOCK_PRODUCTION_DATA: '1'
         run: npm run smoke:browser

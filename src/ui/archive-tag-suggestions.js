@@ -23,6 +23,8 @@
  */
 
 import { isLikelyCameraPhoto, isDismissedFromPlaces, photoMatchesPlaceTag, placeTagToken } from './archive-place-groups.js';
+import { identityLabels, personNameVariants, tagMatchesPerson, photoTagTokens, isAdministrativePlaceTag } from '../core/photo-tag-identity.js';
+import { isExcludedFromPeople } from './archive-person-exclusion.js';
 
 const SAME_DAY_PLACE_SHARE = 0.7;
 const SAME_DAY_PLACE_MIN_ANCHORS = 2;
@@ -64,18 +66,18 @@ export function dateTagToken(isoDate) {
  */
 export function personLabelMatchers(labels) {
   return (Array.isArray(labels) ? labels : [])
-    .map(label => String(label || '').trim())
-    .filter(Boolean)
-    .map(label => ({ label, variants: /^[가-힣]{3}$/.test(label) ? [label, label.slice(1)] : [label] }));
+    .map(record => ({ label: typeof record === 'string' ? record : record?.label || record?.name,
+      variants: [...new Set(identityLabels(record).flatMap(personNameVariants))] }))
+    .filter(row => row.label && row.variants.length);
 }
 
 // The spelling the photo actually uses (서준, not 박서준), so a suggestion adds the same tag the
 // family already types and the 인물 tab groups it with the rest.
 function peopleIn(photo, matchers) {
-  const tokens = tokensOf(photo);
+  const tokens = photoTagTokens([photo?.tags, photo?.personTags]);
   const found = [];
   matchers.forEach(matcher => {
-    const variant = matcher.variants.find(value => tokens.includes(value));
+    const variant = tokens.find(value => tagMatchesPerson(value, matcher.variants));
     if (variant && !found.includes(variant)) found.push(variant);
   });
   return found;
@@ -97,7 +99,8 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
   const livePlaces = (Array.isArray(places) ? places : []).filter(place => place && !place.deletedAt && placeTagToken(place));
   const datesOf = photo => Array.from(new Set(((typeof getPhotoDates === 'function' ? getPhotoDates(photo) : []) || [])
     .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')))));
-  const hasPlaceTag = photo => livePlaces.some(place => photoMatchesPlaceTag(photo, place));
+  const hasPlaceTag = photo => livePlaces.some(place => photoMatchesPlaceTag(photo, place))
+    || photoTagTokens(photo?.tags).some(isAdministrativePlaceTag) || photoTagTokens([photo?.placeTags, photo?.locationTags]).length > 0;
   const groups = [];
   const claimedForPlace = new Set();
 
@@ -143,8 +146,9 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
   const matchers = personLabelMatchers(personLabels);
   const personVariants = new Set(matchers.flatMap(matcher => matcher.variants));
   const placeTags = new Set(livePlaces.map(placeTagToken));
-  const isBatchTag = token => !DATE_TAG.test(token) && !DEVICE_TAG.test(token) && !MODEL_PART_TAG.test(token) && !personVariants.has(token)
-    && !placeTags.has(token) && token !== '장소아님';
+  const isBatchTag = token => !DATE_TAG.test(token) && !DEVICE_TAG.test(token) && !MODEL_PART_TAG.test(token)
+    && !matchers.some(matcher => tagMatchesPerson(token, matcher.variants))
+    && !placeTags.has(token) && token !== '장소아님' && token !== '인물아님';
   const batches = new Map();
   list.forEach(photo => {
     const batch = String(photo?.messageId || '');
@@ -206,6 +210,7 @@ export function buildTagSuggestions({ photos = [], places = [], placeGroups = nu
       const tally = new Map();
       const missing = [];
       dayPhotos.forEach(photo => {
+        if (isExcludedFromPeople(photo?.tags)) return;
         const people = peopleIn(photo, matchers);
         if (!people.length) { missing.push(photo); return; }
         people.forEach(label => tally.set(label, (tally.get(label) || 0) + 1));
@@ -359,13 +364,13 @@ export function buildFaceSuggestions({ photos = [], faceItems = [], personLabels
   const cards = new Map();
   (Array.isArray(faceItems) ? faceItems : []).forEach(item => {
     const photo = byKey.get(String(item?.assetKey || ''));
-    if (!photo) return;
+    if (!photo || isExcludedFromPeople(photo?.tags)) return;
     const rejected = new Set(Array.isArray(item.faceRejected) ? item.faceRejected : []);
-    const tokens = tokensOf(photo);
+    const tokens = photoTagTokens([photo?.tags, photo?.personTags]);
     (Array.isArray(item.facePeople) ? item.facePeople : []).forEach(entry => {
       const name = String(entry?.name || '').trim();
       if (!name || rejected.has(name)) return;
-      if (variantsOf(name).some(variant => tokens.includes(variant))) return;
+      if (tokens.some(token => tagMatchesPerson(token, variantsOf(name)))) return;
       if (!cards.has(name)) cards.set(name, { id: `face:${name}`, kind: 'person', rule: 'face', tag: name, title: name, entries: [] });
       cards.get(name).entries.push({ photo, score: Number(entry?.score) || 0 });
     });

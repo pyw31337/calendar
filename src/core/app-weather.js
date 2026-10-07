@@ -1,17 +1,3 @@
-import { SunIcon, CloudIcon, MistIcon, CloudRainIcon, SnowflakeIcon, CloudLightningIcon } from '../ui/ui-icons.js';
-
-export function getWeatherIcon(code, size = 16) {
-  const React = window.React;
-  const c = Number(code);
-  if (c === 0) return /*#__PURE__*/React.createElement(SunIcon, { size });
-  if ([1, 2, 3].includes(c)) return /*#__PURE__*/React.createElement(CloudIcon, { size });
-  if ([45, 48].includes(c)) return /*#__PURE__*/React.createElement(MistIcon, { size });
-  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(c)) return /*#__PURE__*/React.createElement(CloudRainIcon, { size });
-  if ([71, 73, 75, 77, 85, 86].includes(c)) return /*#__PURE__*/React.createElement(SnowflakeIcon, { size });
-  if ([95, 96, 99].includes(c)) return /*#__PURE__*/React.createElement(CloudLightningIcon, { size });
-  return /*#__PURE__*/React.createElement(SunIcon, { size });
-}
-
 export function translateKoreanToEnglish(query) {
   const clean = query.trim().toLowerCase();
   const mapping = {

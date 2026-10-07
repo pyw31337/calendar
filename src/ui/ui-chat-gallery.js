@@ -5,6 +5,9 @@
 import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry, paginateGalleryItems } from '../core/gallery-data.js';
 import { classifyGalleryItem, dedupeGalleryFiles, galleryFileViewModel } from '../core/gallery-item-kind.js';
 import { getPhotoTagCompleteness } from '../core/photo-tag-completeness.js';
+import { hasEquivalentPhotoTag } from '../core/photo-tag-identity.js';
+import { getAnalysisSuggestedTags, getMediaAnalysisReview, getSafeMediaAutoApplyCandidates, normalizeAnalysisTagList, prepareAnalysisTags } from '../core/ai-media-review.js';
+import { persistMediaAnalysisReview } from '../core/media-analysis-review-save.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { buildBulkPhotoTagChanges, normalizePhotoTagTokens } from '../core/bulk-photo-tags.js';
@@ -23,26 +26,9 @@ import { LikeButton } from './like-button.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
-const AI_REVIEW_MAX_TAGS = 20;
 const GALLERY_PAGE_SIZE = 100;
 const GALLERY_CARD_PAGE_SIZE = 20;
 const ANALYSIS_BATCH_FETCH_CONCURRENCY = 6;
-function normalizeAnalysisTagList(values) {
-  const input = (Array.isArray(values) ? values : [values])
-    .flatMap(value => String(value || '').split(/[\s,#]+/));
-  return Array.from(new Set(input
-    .map(value => String(value || '').replace(/^#+/, '').trim())
-    .filter(Boolean))).slice(0, AI_REVIEW_MAX_TAGS);
-}
-function getAnalysisSuggestedTags(item) {
-  return normalizeAnalysisTagList([
-    ...(Array.isArray(item?.suggestedTags) ? item.suggestedTags : []),
-    ...(Array.isArray(item?.people) ? item.people : []),
-    ...(Array.isArray(item?.places) ? item.places : []),
-    ...(Array.isArray(item?.meetings) ? item.meetings : [])
-  ]);
-}
-
 function createAnalysisTagChange(item, photo, finalTags) {
   const assetKey = String(item?.assetKey || photo?.assetKey || '').trim();
   const imageUrl = String(photo?.full || photo?.imageUrl || photo?.url || photo?.directMediaUrl || photo?.thumb || '').trim();
@@ -65,14 +51,9 @@ function createAnalysisTagChange(item, photo, finalTags) {
 }
 
 function getSuggestedDateTag(photo, item) {
-  const ts = photo?.timestamp || photo?.capturedAt || item?.lastReceivedAt || item?.analyzedAt;
-  if (!ts) return '';
-  const date = new Date(Number(ts));
-  if (Number.isNaN(date.getTime()) || date.getTime() <= 0) return '';
-  const yy = String(date.getFullYear()).slice(2);
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${yy}${mm}${dd}`;
+  // Receipt/upload time is not the camera's capture date.
+  return (item?.tagEvidence || []).find(entry => entry.source === 'capture-date'
+    && entry.confidence === 1 && /^\d{6}$/.test(entry.tag))?.tag || '';
 }
 
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -502,7 +483,8 @@ export function ChatGalleryModal({
   onSaveImageTags = null,
   onBulkSaveImageTags = null,
   onRegisterMenuActions = null,
-  onActiveTabChange = null
+  onActiveTabChange = null,
+  initialTab = 'photos'
 }) {
   const React = window.React;
   // The full-page gallery owns scrolling through .gallery-page-scroll.  Lock the document
@@ -605,7 +587,7 @@ export function ChatGalleryModal({
     const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
-  const [activeTab, setActiveTab] = React.useState('photos');
+  const [activeTab, setActiveTab] = React.useState(() => initialTab === 'analysis' ? 'analysis' : 'photos');
   // 좋아요 tab: everything the calendar liked across screens (core/likes-store.js).
   const galleryLikes = useLikes(React, calendar?.id);
   // 내 좋아요 = the participant chosen on this device; 모두 = everyone's, one card per liked thing.
@@ -618,8 +600,24 @@ export function ChatGalleryModal({
     setSelectedBulkShareKeys(new Set());
   }; // 'photos' | 'links' | 'files' | 'analysis'
   const [analysisViewMode, setAnalysisViewMode] = React.useState('unreviewed'); // 'unreviewed' | 'reviewed'
-  const [mediaAnalysis, setMediaAnalysis] = React.useState({ loading: false, error: '', items: [] });
+  const [mediaAnalysis, setMediaAnalysis] = React.useState({ calendarId: '', loading: false, error: '', items: [] });
   const [analysisPhotoCache, setAnalysisPhotoCache] = React.useState({});
+  const [analysisPhotoErrors, setAnalysisPhotoErrors] = React.useState({});
+  const analysisCalendarRef = React.useRef(calendar?.id);
+  const analysisRequestRef = React.useRef(0);
+  const analysisEpochRef = React.useRef(0);
+  if (analysisCalendarRef.current !== calendar?.id) analysisEpochRef.current += 1;
+  analysisCalendarRef.current = calendar?.id;
+  React.useEffect(() => {
+    setMediaAnalysis({ calendarId: calendar?.id || '', loading: false, error: '', items: [] });
+    setAnalysisPhotoCache({});
+    setAnalysisPhotoErrors({});
+    setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+    setAnalysisSavingAssetKey('');
+    setIsBatchApplying(false);
+    setBatchProgress({ current: 0, total: 0 });
+    return () => { analysisRequestRef.current += 1; analysisEpochRef.current += 1; };
+  }, [calendar?.id]);
   const photoByAssetKeyRef = React.useRef(new Map());
   const [isBatchApplying, setIsBatchApplying] = React.useState(false);
   const [batchProgress, setBatchProgress] = React.useState({ current: 0, total: 0 });
@@ -629,10 +627,13 @@ export function ChatGalleryModal({
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!calendarId || !projectId) return Promise.resolve();
-    setMediaAnalysis(previous => ({ ...previous, loading: true, error: '' }));
+    const requestId = ++analysisRequestRef.current;
+    if (force) { setAnalysisPhotoCache({}); setAnalysisPhotoErrors({}); }
+    const isCurrent = () => requestId === analysisRequestRef.current && calendarId === analysisCalendarRef.current;
+    setMediaAnalysis(previous => ({ ...previous, calendarId, items: previous.calendarId === calendarId ? previous.items : [], loading: true, error: '' }));
     return fetchMediaAnalysisFeed({ calendarId, projectId, force, limit: 100 })
-      .then(items => setMediaAnalysis({ loading: false, error: '', items }))
-      .catch(error => setMediaAnalysis(previous => ({ ...previous, loading: false, error: String(error?.message || error) })));
+      .then(items => { if (isCurrent()) setMediaAnalysis({ calendarId, loading: false, error: '', items }); })
+      .catch(error => { if (isCurrent()) setMediaAnalysis(previous => ({ ...previous, loading: false, error: String(error?.message || error) })); });
   }, [calendar?.id]);
   React.useEffect(() => {
     if (activeTab === 'analysis') void loadMediaAnalysis();
@@ -648,9 +649,10 @@ export function ChatGalleryModal({
   }, []);
   const saveAnalysisReview = React.useCallback(async (item, decision, finalTags = [], acceptedTags = []) => {
     const calendarId = String(calendar?.id || '').trim();
+    const epoch = analysisEpochRef.current;
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
-    const optimisticReview = {
+    const review = {
       decision,
       proposedTags: getAnalysisSuggestedTags(item),
       acceptedTags,
@@ -658,11 +660,7 @@ export function ChatGalleryModal({
       reviewedAt: Date.now(),
       reviewCount: (Number(item?.review?.reviewCount) || 0) + 1
     };
-    updateAnalysisReview(item.assetKey, optimisticReview);
-    if (decision === 'rejected') {
-      showToast('추천에서 제외했습니다.', 'info');
-    }
-    void recordMediaAnalysisFeedback({
+    await recordMediaAnalysisFeedback({
       calendarId,
       projectId,
       assetKey: item.assetKey,
@@ -670,120 +668,67 @@ export function ChatGalleryModal({
       proposedTags: getAnalysisSuggestedTags(item),
       acceptedTags,
       finalTags
-    }).catch(err => console.warn('Background feedback save warning:', err));
-    return optimisticReview;
+    });
+    if (analysisCalendarRef.current === calendarId && epoch === analysisEpochRef.current) {
+      updateAnalysisReview(item.assetKey, review);
+      if (decision === 'rejected') showToast('추천에서 제외했습니다.', 'info');
+    }
+    return review;
   }, [calendar?.id, updateAnalysisReview, showToast]);
-  const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied', { silent = false } = {}) => {
+  const applyAnalysisTags = React.useCallback(async (item, requestedTags = getAnalysisSuggestedTags(item), decision = 'applied', { silent = false, originalTags } = {}) => {
     const calendarId = String(calendar?.id || '').trim();
+    const epoch = analysisEpochRef.current;
+    const isCurrent = () => calendarId === analysisCalendarRef.current && epoch === analysisEpochRef.current;
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     const saveBulk = onBulkSaveImageTags || window.__gatherBulkSaveImageTags;
-    if (!onSaveImageTags && typeof saveBulk !== 'function') throw new Error('이 화면에서 태그 저장 기능을 준비하지 못했습니다.');
+    // AI review always uses the canonical, calendar-scoped transaction. The legacy per-owner
+    // fallback reads mutable screen state and cannot safely finish across calendar navigation.
+    if (typeof saveBulk !== 'function') throw new Error('사진 태그 저장 기능을 준비하지 못했습니다. 새로고침 후 다시 시도해 주세요.');
     if (!calendarId || !projectId || !item?.assetKey) throw new Error('분석 대상을 찾을 수 없습니다.');
 
-    // 1. Resolve photo from memory cache immediately if available (avoids 1~2s REST delay)
-    const cachedPhoto = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey] || null;
-    let photo = cachedPhoto;
-    if (!photo) {
-      setAnalysisSavingAssetKey(item.assetKey);
-      try {
-        photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
-      } catch (err) {
-        setAnalysisSavingAssetKey('');
-        throw err;
-      }
-    }
-
-    const finalTags = normalizeAnalysisTagList([photo?.tags || '', ...requestedTags]);
-    const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo?.tags || '').join(' ');
-
-    // 2. Optimistic UI update: Immediately mark review in state so user experiences instant response (0.05s)
-    const optimisticReview = {
-      decision,
-      proposedTags: getAnalysisSuggestedTags(item),
-      acceptedTags: requestedTags,
-      finalTags,
-      reviewedAt: Date.now(),
-      reviewCount: (Number(item?.review?.reviewCount) || 0) + 1
-    };
-    updateAnalysisReview(item.assetKey, optimisticReview);
-    setAnalysisAction({ assetKey: '', mode: '', draft: '' });
-    setAnalysisSavingAssetKey('');
-
-    if (!silent) {
-      showToast(changed ? '태그를 적용했습니다.' : '이미 같은 태그가 적용되어 있어 검토 완료로 표시했습니다.', 'success');
-    }
-
-    // 3. Save to server in background without blocking user UI
+    setAnalysisSavingAssetKey(item.assetKey);
     try {
-      const tagSavePromise = (async () => {
-        if (!changed) return true;
-        if (typeof saveBulk === 'function') {
-          const result = await saveBulk([createAnalysisTagChange(item, photo, finalTags)]);
-          return result?.ok;
-        } else if (typeof onSaveImageTags === 'function') {
-          const sourceOwner = String(photo.tagSourceOwner || photo.sourceOwner || photo.owners?.[0]?.sourceOwner || '');
-          const ownerMatch = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
-          if (!ownerMatch) return false;
-          const [, sourceType, sourceId, sourceIndex] = ownerMatch;
-          const imageIndex = Number(sourceIndex);
-          const source = sourceType === 'message' ? 'chat' : sourceType;
-          return onSaveImageTags(sourceId, imageIndex, finalTags.join(' '), {
-            source,
-            sourceOwner,
-            imageIndex,
-            sourceImageIndex: imageIndex,
-            meetingDate: sourceType === 'meeting' ? sourceId : '',
-            photoId: String(photo.photoId || ''),
-            imageUrl: photo.full || photo.thumb || '',
-            thumb: photo.thumb || photo.full || '',
-            assetKey: item.assetKey,
-            mediaKey: item.assetKey,
-            refKey: item.assetKey,
-            directMediaUrl: String(photo.directMediaUrl || ''),
-            readFresh: true,
-            silent: true
-          });
-        }
-        return true;
-      })();
-
-      const feedbackPromise = recordMediaAnalysisFeedback({
-        calendarId,
-        projectId,
-        assetKey: item.assetKey,
-        decision,
-        proposedTags: getAnalysisSuggestedTags(item),
-        acceptedTags: requestedTags,
-        finalTags
-      }).catch(err => console.warn('Background feedback save error:', err));
-
-      const [tagSaveOk] = await Promise.all([tagSavePromise, feedbackPromise]);
-      if (changed && !tagSaveOk) {
-        showToast('태그 서버 저장에 실패했습니다. 다시 시도해 주세요.', 'error');
-      }
-    } catch (err) {
-      console.error('Server save error in applyAnalysisTags:', err);
-      showToast('태그 서버 동기화 중 오류가 발생했습니다.', 'error');
+      // Never overwrite a newer device's tags with the thumbnail cache's stale version.
+      const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: item.assetKey });
+      if (!isCurrent()) return;
+      const finalTags = prepareAnalysisTags(photo, requestedTags, { decision, originalTags, calendar });
+      const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo?.tags || '').join(' ');
+      await persistMediaAnalysisReview({ changed, saveTags: async () => {
+        return saveBulk([createAnalysisTagChange(item, photo, finalTags)]);
+      }, saveReview: () => saveAnalysisReview(item, decision, finalTags, requestedTags.filter(tag => finalTags.includes(tag))) });
+      if (!isCurrent()) return;
+      setAnalysisPhotoCache(previous => ({ ...previous, [item.assetKey]: { ...photo, tags: finalTags.join(' ') } }));
+      setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+      if (!silent) showToast(changed ? '태그와 검토 기록을 저장했습니다.' : '이미 적용된 태그를 확인하고 검토 기록을 저장했습니다.', 'success');
+    } catch (error) {
+      if (isCurrent()) throw error;
+    } finally {
+      if (isCurrent()) setAnalysisSavingAssetKey('');
     }
-  }, [calendar?.id, onBulkSaveImageTags, onSaveImageTags, analysisPhotoCache, showToast, updateAnalysisReview]);
+  }, [calendar, onBulkSaveImageTags, showToast, saveAnalysisReview]);
   const handleBatchApplyAnalysis = React.useCallback(async () => {
-    const unreviewed = (mediaAnalysis.items || []).filter(item => {
+    // Never bulk-apply the whole unreviewed queue. The local worker intentionally keeps
+    // inferred/generic labels for a person to inspect. Only direct per-tag evidence is eligible.
+    const verified = getSafeMediaAutoApplyCandidates(mediaAnalysis.calendarId === calendar?.id ? mediaAnalysis.items : []);
+    const unreviewed = verified.filter(item => {
       if (!item?.assetKey || item.review) return false;
       const photo = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
       if (photo && classifyGalleryItem(photo) !== 'photo') return false;
-      const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
+      const currentTagsText = photo?.tags ?? photo?.caption ?? '';
       const completeness = getPhotoTagCompleteness(currentTagsText, calendar, {
         caption: photo?.caption,
         tags: photo?.tags,
-        personTags: photo?.personTags
+        personTags: photo?.personTags, placeTags: photo?.placeTags, locationTags: photo?.locationTags, sourceAvailable: !!photo
       });
       return !completeness.isComplete;
     });
     if (!unreviewed.length) {
-      showToast('처리할 미검토 항목이 없습니다.', 'info');
+      showToast('일괄 적용 기준을 만족하는 추천이 없습니다. 나머지 항목은 사진별로 검토해 주세요.', 'info');
       return;
     }
     const calendarId = String(calendar?.id || '').trim();
+    const epoch = analysisEpochRef.current;
+    const isCurrent = () => calendarId === analysisCalendarRef.current && epoch === analysisEpochRef.current;
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!calendarId || !projectId) {
       showToast('분석 대상 캘린더를 찾을 수 없습니다.', 'error');
@@ -801,32 +746,31 @@ export function ChatGalleryModal({
     let cursor = 0;
     try {
       const workers = Array.from({ length: Math.min(ANALYSIS_BATCH_FETCH_CONCURRENCY, unreviewed.length) }, async () => {
-        while (cursor < unreviewed.length) {
+        while (cursor < unreviewed.length && isCurrent()) {
           const index = cursor++;
           const item = unreviewed[index];
           try {
-            const cachedPhoto = photoByAssetKeyRef.current.get(item.assetKey) || analysisPhotoCache[item.assetKey];
-            const photo = (cachedPhoto && (cachedPhoto.tags != null || cachedPhoto.sourceOwner))
-              ? cachedPhoto
-              : await fetchMediaAnalysisPhoto({
+            const photo = await fetchMediaAnalysisPhoto({
                   calendarId,
                   projectId,
                   assetKey: item.assetKey,
                 });
+            if (!getMediaAnalysisReview(item, { photo }).canBulkApply) throw new Error('사진 정보가 변경됐거나 직접 근거가 부족합니다. 다시 검토해 주세요.');
             resolved.push({
               item,
-              finalTags: normalizeAnalysisTagList([photo.tags || '', ...getAnalysisSuggestedTags(item)]),
+              finalTags: prepareAnalysisTags(photo, getAnalysisSuggestedTags(item), { calendar }),
               photo,
             });
           } catch (error) {
             failures.push({ item, error });
             console.warn('AI batch photo lookup failed for', item.assetKey, error);
           } finally {
-            setBatchProgress({ current: index + 1, total: unreviewed.length });
+            if (isCurrent()) setBatchProgress(previous => ({ current: previous.current + 1, total: unreviewed.length }));
           }
         }
       });
       await Promise.all(workers);
+      if (!isCurrent()) return;
 
       const changed = resolved
         .map(({ item, photo, finalTags }) => ({ item, finalTags, photo, change: createAnalysisTagChange(item, photo, finalTags) }))
@@ -835,6 +779,8 @@ export function ChatGalleryModal({
         const result = await saveBulk(changed.map(record => record.change));
         if (!result?.ok) throw new Error('AI 추천 태그 일괄 저장에 실패했습니다.');
       }
+      if (isCurrent()) setAnalysisPhotoCache(previous => ({ ...previous,
+        ...Object.fromEntries(resolved.map(record => [record.item.assetKey, { ...record.photo, tags: record.finalTags.join(' ') }])) }));
       // Reviews are audit records, so keep them after the canonical tag write and use bounded
       // parallelism. A failed review never rolls back an already successful photo mutation.
       let reviewCursor = 0;
@@ -850,27 +796,33 @@ export function ChatGalleryModal({
         }
       });
       await Promise.all(reviewWorkers);
+      if (!isCurrent()) return;
       const failedAssetCount = new Set(failures.map(({ item }) => item?.assetKey).filter(Boolean)).size;
       const message = failedAssetCount
         ? `사진 태그 ${resolved.length}장을 반영했습니다. 분석 기록 ${failedAssetCount}건은 다시 시도해 주세요.`
-        : `미검토 사진 ${resolved.length}장에 AI 추천 태그를 일괄 적용했습니다.`;
+        : `검증된 사진 추천 ${resolved.length}장에만 태그를 적용했습니다.`;
       showToast(message, failures.length ? 'error' : 'success');
     } catch (error) {
       console.error('AI batch tag apply failed:', error);
-      showToast(String(error?.message || 'AI 추천 태그 일괄 저장에 실패했습니다.'), 'error');
+      if (isCurrent()) showToast(String(error?.message || 'AI 추천 태그 일괄 저장에 실패했습니다.'), 'error');
     } finally {
-      setIsBatchApplying(false);
-      setBatchProgress({ current: 0, total: 0 });
+      if (isCurrent()) {
+        setIsBatchApplying(false);
+        setBatchProgress({ current: 0, total: 0 });
+      }
     }
-  }, [calendar, mediaAnalysis.items, onBulkSaveImageTags, saveAnalysisReview, showToast, analysisPhotoCache]);
+  }, [calendar, mediaAnalysis.items, mediaAnalysis.calendarId, onBulkSaveImageTags, saveAnalysisReview, showToast, analysisPhotoCache]);
   const rejectAnalysisTags = React.useCallback(async item => {
     if (!item?.assetKey) return;
+    const epoch = analysisEpochRef.current;
     setAnalysisSavingAssetKey(item.assetKey);
     try {
       await saveAnalysisReview(item, 'rejected', []);
-      setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+      if (epoch === analysisEpochRef.current) setAnalysisAction({ assetKey: '', mode: '', draft: '' });
+    } catch (error) {
+      if (epoch === analysisEpochRef.current) throw error;
     } finally {
-      setAnalysisSavingAssetKey('');
+      if (epoch === analysisEpochRef.current) setAnalysisSavingAssetKey('');
     }
   }, [saveAnalysisReview]);
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
@@ -1141,37 +1093,40 @@ export function ChatGalleryModal({
   photoByAssetKeyRef.current = photoByAssetKey;
 
   React.useEffect(() => {
-    if (activeTab !== 'analysis' || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
+    if (activeTab !== 'analysis' || mediaAnalysis.calendarId !== calendar?.id || !Array.isArray(mediaAnalysis.items) || mediaAnalysis.items.length === 0) return;
     const calendarId = String(calendar?.id || '').trim();
     const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     if (!calendarId || !projectId) return;
 
     const missingKeys = mediaAnalysis.items
       .map(item => item.assetKey)
-      .filter(key => key && !photoByAssetKey.has(key) && !analysisPhotoCache[key]);
+      .filter(key => key && !photoByAssetKey.has(key) && !analysisPhotoCache[key] && !analysisPhotoErrors[key]);
 
     if (missingKeys.length === 0) return;
 
     let canceled = false;
     const fetchMissingPhotos = async () => {
       const updates = {};
-      await Promise.all(
-        missingKeys.slice(0, 30).map(async key => {
+      const errors = {};
+      const queue = [...new Set(missingKeys)].slice(0, 30);
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
+        while (!canceled && next < queue.length) {
+          const key = queue[next++];
           try {
             const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: key });
-            if (photo && (photo.thumb || photo.full || photo.imageUrl)) {
-              updates[key] = photo;
-            }
-          } catch (_) {}
-        })
-      );
-      if (!canceled && Object.keys(updates).length > 0) {
-        setAnalysisPhotoCache(previous => ({ ...previous, ...updates }));
+            if (photo) updates[key] = photo;
+          } catch (error) { errors[key] = String(error?.message || '사진 정보를 확인하지 못했습니다.'); }
+        }
+      }));
+      if (!canceled) {
+        if (Object.keys(updates).length) setAnalysisPhotoCache(previous => ({ ...previous, ...updates }));
+        if (Object.keys(errors).length) setAnalysisPhotoErrors(previous => ({ ...previous, ...errors }));
       }
     };
     void fetchMissingPhotos();
     return () => { canceled = true; };
-  }, [activeTab, mediaAnalysis.items, photoByAssetKey, analysisPhotoCache, calendar?.id]);
+  }, [activeTab, mediaAnalysis.items, mediaAnalysis.calendarId, photoByAssetKey, analysisPhotoCache, analysisPhotoErrors, calendar?.id]);
 
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
@@ -2974,18 +2929,18 @@ export function ChatGalleryModal({
   const renderGalleryContent = () => {
     if (activeTab === 'likes') return renderLikesTab();
     if (activeTab === 'analysis') {
-      const allItems = mediaAnalysis.items || [];
+      const allItems = mediaAnalysis.calendarId === calendar?.id ? mediaAnalysis.items || [] : [];
       const unreviewed = [];
       const reviewed = [];
       for (const item of allItems) {
         const photo = photoByAssetKey.get(item.assetKey) || analysisPhotoCache[item.assetKey];
         if (photo && classifyGalleryItem(photo) !== 'photo') continue;
         const isReviewed = Boolean(item.review);
-        const currentTagsText = item.review?.finalTags?.join(' ') || photo?.tags || '';
+        const currentTagsText = photo?.tags ?? photo?.caption ?? '';
         const completeness = getPhotoTagCompleteness(currentTagsText, calendar, {
         caption: photo?.caption,
         tags: photo?.tags,
-        personTags: photo?.personTags
+        personTags: photo?.personTags, placeTags: photo?.placeTags, locationTags: photo?.locationTags, sourceAvailable: !!photo
       });
         const isHandled = isReviewed || completeness.isComplete;
         const meta = { item, photo, completeness, isReviewed, isHandled };
@@ -2996,8 +2951,10 @@ export function ChatGalleryModal({
         }
       }
       const displayList = analysisViewMode === 'unreviewed' ? unreviewed : reviewed;
-      const canSaveAnalysisTags = typeof onSaveImageTags === 'function'
-        || typeof onBulkSaveImageTags === 'function'
+      const safeAutoApplyCount = unreviewed.filter(({ item }) => (
+        getSafeMediaAutoApplyCandidates([item]).length === 1
+      )).length;
+      const canSaveAnalysisTags = typeof onBulkSaveImageTags === 'function'
         || typeof window.__gatherBulkSaveImageTags === 'function';
 
       const renderChips = (values, colorType = 'accent') => {
@@ -3152,12 +3109,12 @@ export function ChatGalleryModal({
             /*#__PURE__*/React.createElement('p', {
               style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', lineHeight: 1.4 }
             }, analysisViewMode === 'unreviewed'
-              ? '날짜(YYMMDD)·장소·인물 태그 중 누락되었거나 추천된 항목입니다. 수정/적용 시 검토 완료로 이동합니다.'
+              ? '기존 태그 분류를 확인 중이거나 새 추천이 있는 사진입니다. 확인되지 않은 항목만 검토해 주세요.'
               : '검토를 마쳤거나 필수 태그(날짜·장소·인물)가 모두 입력된 사진 목록입니다.')
           ),
           /* Right action buttons */
           /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-            analysisViewMode === 'unreviewed' && unreviewed.length > 0 && /*#__PURE__*/React.createElement('button', {
+            analysisViewMode === 'unreviewed' && safeAutoApplyCount > 0 && /*#__PURE__*/React.createElement('button', {
               type: 'button',
               className: 'btn btn-action',
               disabled: isBatchApplying || mediaAnalysis.loading,
@@ -3184,7 +3141,7 @@ export function ChatGalleryModal({
               ),
               isBatchApplying
                 ? `적용 중 (${batchProgress.current}/${batchProgress.total})…`
-                : `미처리 전체 태그 적용 (${unreviewed.length})`
+                : `검증된 추천 적용 (${safeAutoApplyCount})`
             ),
             /*#__PURE__*/React.createElement('button', {
               type: 'button',
@@ -3261,7 +3218,7 @@ export function ChatGalleryModal({
                     /*#__PURE__*/React.createElement('polyline', { points: '20 6 9 17 4 12' })
                   )
                 ),
-                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 15px)', fontWeight: 800, color: 'var(--text-main)' } }, '모든 사진의 검토 및 태그 작성이 완료되었습니다!'),
+                /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-base, 15px)', fontWeight: 800, color: 'var(--text-main)' } }, '현재 불러온 분석 범위에서 검토할 사진이 없습니다.'),
                 /*#__PURE__*/React.createElement('span', { style: { fontSize: 'var(--font-size-xs, 12px)', maxWidth: '380px', lineHeight: 1.5 } }, '미처리 항목이 없습니다. 날짜(YYMMDD)·장소·인물 필수 정보가 모두 등록되었거나 추천 태그가 적용되었습니다.'),
                 reviewed.length > 0 && /*#__PURE__*/React.createElement('button', {
                   type: 'button',
@@ -3306,7 +3263,7 @@ export function ChatGalleryModal({
           const fullUrl = photo?.full || photo?.imageUrl || photo?.thumb || '';
           const isSaving = analysisSavingAssetKey === item.assetKey;
           const isEditing = analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit';
-          const suggestedTags = getAnalysisSuggestedTags(item);
+          const suggestedTags = getAnalysisSuggestedTags(item).filter(tag => !photo || !hasEquivalentPhotoTag(tag, photo, calendar));
           const suggestedDate = getSuggestedDateTag(photo, item);
 
           return /*#__PURE__*/React.createElement('article', {
@@ -3480,9 +3437,10 @@ export function ChatGalleryModal({
                       }, `기존: ${photo.tags.slice(0, 32)}${photo.tags.length > 32 ? '…' : ''}`)
                     : /*#__PURE__*/React.createElement('span', {
                         style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' }
-                      }, '기존 태그 없음'),
+                      }, photo ? (completeness.hasPerson || completeness.hasPlace ? '기존 분류 정보 확인됨' : '기존 태그 없음')
+                        : analysisPhotoErrors[item.assetKey] ? `${analysisPhotoErrors[item.assetKey]} 새로고침으로 재시도해 주세요.` : '기존 태그 확인 중'),
                   /* Completeness indicators */
-                  !completeness.hasDate && /*#__PURE__*/React.createElement('span', {
+                  completeness.missing.includes('날짜') && /*#__PURE__*/React.createElement('span', {
                     style: {
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -3494,8 +3452,8 @@ export function ChatGalleryModal({
                       fontSize: '12px',
                       fontWeight: 800
                     }
-                  }, '날짜 누락'),
-                  !completeness.hasPlace && /*#__PURE__*/React.createElement('span', {
+                  }, '날짜 태그 미확인'),
+                  completeness.missing.includes('장소') && /*#__PURE__*/React.createElement('span', {
                     style: {
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -3507,8 +3465,8 @@ export function ChatGalleryModal({
                       fontSize: '12px',
                       fontWeight: 800
                     }
-                  }, '장소 누락'),
-                  !completeness.hasPerson && /*#__PURE__*/React.createElement('span', {
+                  }, '장소 태그 미확인'),
+                  completeness.missing.includes('인물') && /*#__PURE__*/React.createElement('span', {
                     style: {
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -3520,7 +3478,7 @@ export function ChatGalleryModal({
                       fontSize: '12px',
                       fontWeight: 800
                     }
-                  }, '인물 누락'),
+                  }, '인물 태그 미확인'),
                   completeness.isComplete && /*#__PURE__*/React.createElement('span', {
                     style: {
                       display: 'inline-flex',
@@ -3533,7 +3491,7 @@ export function ChatGalleryModal({
                       fontSize: '12px',
                       fontWeight: 800
                     }
-                  }, '✓ 날짜·장소·인물 완비')
+                  }, '✓ 기존 태그 분류 완료')
                 ),
                 /* Right time */
                 /*#__PURE__*/React.createElement('time', {
@@ -3541,13 +3499,20 @@ export function ChatGalleryModal({
                 }, formatMediaAnalysisTime(item.lastReceivedAt || item.analyzedAt))
               ),
               /* Suggested tag chips */
+              (completeness.evidence.people.length > 0 || completeness.evidence.places.length > 0) && /*#__PURE__*/React.createElement('p', {
+                style: { margin: '4px 0', fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted)' }
+              }, [completeness.evidence.people.length ? `인물 인식: ${completeness.evidence.people.join(', ')}` : '',
+                completeness.evidence.places.length ? `장소 인식: ${completeness.evidence.places.join(', ')}` : ''].filter(Boolean).join(' · ')),
+              /*#__PURE__*/React.createElement('p', { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', margin: '4px 0' } },
+                item.automatic?.status === 'applied' ? `GPS 근거로 자동 보완: ${(item.automatic.addedTags || []).join(', ')}. 나머지 추정은 확인해 주세요.`
+                  : getMediaAnalysisReview(item, { photo }).reasons.join(' ') || '원본 메타데이터에 근거한 추천입니다.'),
               /*#__PURE__*/React.createElement('div', {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }
               },
-                renderChips(item.suggestedTags, 'accent'),
-                renderChips(item.people, 'people'),
-                renderChips(item.places, 'places'),
-                renderChips(item.meetings, 'meetings'),
+                renderChips((item.suggestedTags || []).filter(tag => suggestedTags.includes(tag)), 'accent'),
+                renderChips((item.people || []).filter(tag => suggestedTags.includes(tag)), 'people'),
+                renderChips((item.places || []).filter(tag => suggestedTags.includes(tag)), 'places'),
+                renderChips((item.meetings || []).filter(tag => suggestedTags.includes(tag)), 'meetings'),
                 suggestedTags.length === 0 && /*#__PURE__*/React.createElement('span', {
                   style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)' }
                 }, '추천 태그 없음')
@@ -3569,7 +3534,7 @@ export function ChatGalleryModal({
                 item.ocrText.join(' · ')
               ),
               /* Action row or Review state */
-              item.review
+              item.review && !isEditing
                 ? /*#__PURE__*/React.createElement('div', {
                     style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '4px' }
                   },
@@ -3616,11 +3581,11 @@ export function ChatGalleryModal({
                       type: 'button',
                       onClick: () => {
                         const existingList = normalizeAnalysisTagList(photo?.tags || '');
-                        const finalTags = item.review.finalTags?.length ? item.review.finalTags : suggestedTags;
-                        const combined = normalizeAnalysisTagList([...existingList, ...finalTags]).map(t => `#${t}`).join(' ');
+                        const combined = existingList.map(t => `#${t}`).join(' ');
                         setAnalysisAction({
                           assetKey: item.assetKey,
                           mode: 'edit',
+                          originalTags: photo ? String(photo.tags || '') : null,
                           draft: combined
                         });
                       },
@@ -3665,7 +3630,7 @@ export function ChatGalleryModal({
                             onKeyDown: e => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error'));
+                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft, { limit: Infinity }), 'edited', { originalTags: analysisAction.originalTags }).catch(error => showToast(String(error?.message || error), 'error'));
                               } else if (e.key === 'Escape') {
                                 setAnalysisAction({ assetKey: '', mode: '', draft: '' });
                               }
@@ -3703,7 +3668,7 @@ export function ChatGalleryModal({
                             /* Place suggestions from calendar */
                             (Array.isArray(calendar?.places) ? calendar.places : []).map(p => {
                               const name = String(p?.name || p?.title || '').trim();
-                              if (!name) return null;
+                              if (!name || hasEquivalentPhotoTag(name, { tags: analysisAction.draft || photo?.tags }, calendar)) return null;
                               return /*#__PURE__*/React.createElement('button', {
                                 key: `place-${name}`,
                                 type: 'button',
@@ -3723,7 +3688,7 @@ export function ChatGalleryModal({
                             /* Participant suggestions from calendar */
                             (Array.isArray(calendar?.participants) ? calendar.participants : []).map(part => {
                               const name = String(part?.name || '').trim();
-                              if (!name) return null;
+                              if (!name || hasEquivalentPhotoTag(name, { tags: analysisAction.draft || photo?.tags }, calendar)) return null;
                               return /*#__PURE__*/React.createElement('button', {
                                 key: `person-${name}`,
                                 type: 'button',
@@ -3764,7 +3729,7 @@ export function ChatGalleryModal({
                               className: 'btn btn-action',
                               disabled: isSaving,
                               onClick: () => {
-                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft), 'edited').catch(error => showToast(String(error?.message || error), 'error'));
+                                void applyAnalysisTags(item, normalizeAnalysisTagList(analysisAction.draft, { limit: Infinity }), 'edited', { originalTags: analysisAction.originalTags }).catch(error => showToast(String(error?.message || error), 'error'));
                               },
                               style: {
                                 minHeight: '34px',
@@ -3846,11 +3811,12 @@ export function ChatGalleryModal({
                             disabled: isSaving || isBatchApplying || !canSaveAnalysisTags,
                             onClick: () => {
                               const existingList = normalizeAnalysisTagList(photo?.tags || '');
-                              const aiTags = getAnalysisSuggestedTags(item);
+                              const aiTags = getAnalysisSuggestedTags(item).filter(tag => !hasEquivalentPhotoTag(tag, photo, calendar));
                               const combined = normalizeAnalysisTagList([...existingList, ...aiTags]).map(t => `#${t}`).join(' ');
                               setAnalysisAction({
                                 assetKey: item.assetKey,
                                 mode: 'edit',
+                                originalTags: photo ? String(photo.tags || '') : null,
                                 draft: combined
                               });
                             },

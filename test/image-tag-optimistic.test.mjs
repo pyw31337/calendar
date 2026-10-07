@@ -123,6 +123,42 @@ test('bulk tag saves patch the gallery index before the remote command and roll 
   }
 });
 
+test('late bulk-save rollback cannot patch a newly selected calendar', async () => {
+  let currentCalendar = 'cal-a';
+  let items = [{ assetKey: 'shared-asset', tags: 'a-old', full: 'https://cdn.example/a.jpg' }];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const patchCalendars = [];
+  const remembered = [];
+  const handler = createBulkImageTagSaveHandler({
+    activeCalId: 'cal-a', projectId: 'proj',
+    isCurrentCalendar: () => currentCalendar === 'cal-a',
+    galleryPhotoIndex: { patchItems: updater => { patchCalendars.push(currentCalendar); items = updater(items); } },
+    invalidatePhotoIndexCache: () => {},
+    rememberPhotoIndexTags: (id, probes) => remembered.push({ id, tags: probes[0]?.tags }),
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(JSON.parse(options.body).calendarId, 'cal-a');
+    await gate;
+    throw new Error('offline');
+  };
+  try {
+    const pending = handler([{ photo: items[0], assetKey: 'shared-asset', beforeTags: 'a-old', tags: 'a-new' }]);
+    assert.equal(items[0].tags, 'a-new');
+    currentCalendar = 'cal-b';
+    items = [{ ...items[0], tags: 'b-untouched' }];
+    release();
+    assert.equal((await pending).ok, false);
+    assert.equal(items[0].tags, 'b-untouched');
+    assert.deepEqual(patchCalendars, ['cal-a']);
+    assert.ok(remembered.every(record => record.id === 'cal-a'));
+  } finally {
+    release();
+    globalThis.fetch = originalFetch;
+  }
+});
+
 // CalendarApp rebuilds the handler on every render (the first edit's local patch causes one).
 // Sharing the save state keeps the second edit queued behind the first instead of racing it.
 test('a handler rebuilt by a render keeps queueing behind the in-flight save', async () => {

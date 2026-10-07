@@ -356,6 +356,7 @@ export function createImageTagSaveHandler(context) {
 export function createBulkImageTagSaveHandler(context) {
   const {
     activeCalId,
+    isCurrentCalendar = () => true,
     projectId,
     galleryPhotoIndex,
     invalidatePhotoIndexCache,
@@ -392,7 +393,7 @@ export function createBulkImageTagSaveHandler(context) {
         probes.push({ ...hit, tags: String(nextTags) });
         return { ...photo, tags: String(nextTags), tagAuthoritative: true };
       };
-      if (typeof galleryPhotoIndex?.patchItems === 'function') {
+      if (isCurrentCalendar() && typeof galleryPhotoIndex?.patchItems === 'function') {
         galleryPhotoIndex.patchItems(items => (items || []).map(applyPhoto));
       } else {
         list.forEach(change => {

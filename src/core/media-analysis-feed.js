@@ -7,6 +7,7 @@ function decodeFirestoreValue(value) {
   if ('integerValue' in value) return Number(value.integerValue) || 0;
   if ('doubleValue' in value) return Number(value.doubleValue) || 0;
   if ('booleanValue' in value) return Boolean(value.booleanValue);
+  if ('timestampValue' in value) return Date.parse(value.timestampValue) || 0;
   if ('arrayValue' in value) return (value.arrayValue?.values || []).map(decodeFirestoreValue);
   if ('mapValue' in value) return Object.fromEntries(Object.entries(value.mapValue?.fields || {}).map(([key, child]) => [key, decodeFirestoreValue(child)]));
   if ('nullValue' in value) return null;
@@ -21,17 +22,19 @@ function firestoreDocumentUrl(projectId, calendarId, collectionId, documentId) {
   return `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/${collectionId}/${encodeURIComponent(documentId)}`;
 }
 
-export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = false, limit = 80 } = {}) {
+export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = false, limit = 80, summaryOnly = false } = {}) {
   if (!calendarId || !projectId) return [];
   const queryLimit = Math.max(10, Math.min(200, Number(limit) || 80));
-  const key = `${projectId}:${calendarId}:${queryLimit}`;
+  const key = `${projectId}:${calendarId}:${queryLimit}:${summaryOnly ? 'summary' : 'full'}`;
   const cached = cache.get(key);
   if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/calendars/cal_${calendarId}:runQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({ structuredQuery: {
       from: [{ collectionId: 'mediaAnalysis' }],
+      ...(summaryOnly ? { select: { fields: ['assetKey', 'analysisVersion', 'status', 'error', 'review', 'automatic', 'suggestedTags', 'people', 'places', 'meetings'].map(fieldPath => ({ fieldPath })) } } : {}),
       orderBy: [{ field: { fieldPath: 'lastReceivedAt' }, direction: 'DESCENDING' }],
       limit: queryLimit
     } })
@@ -50,7 +53,7 @@ export async function fetchMediaAnalysisFeed({ calendarId, projectId, force = fa
 // chooses an action, so opening the review tab remains one bounded query rather than 40 reads.
 export async function fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey } = {}) {
   if (!calendarId || !projectId || !assetKey) throw new Error('사진 분석 대상을 찾을 수 없습니다.');
-  const response = await fetch(firestoreDocumentUrl(projectId, calendarId, 'photoIndex', assetKey));
+  const response = await fetch(firestoreDocumentUrl(projectId, calendarId, 'photoIndex', assetKey), { signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(response.status === 404 ? '원본 사진이 삭제되었어요.' : `사진 정보 요청 실패 (${response.status})`);
   const document = await response.json();
   return { ...decodeDocument(document), assetKey: document.name.split('/').pop() };
@@ -119,7 +122,7 @@ export async function fetchSimilarPhotoGroups({ calendarId, projectId, force = f
   const key = `similar:${projectId}:${calendarId}`;
   const cached = cache.get(key);
   if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/mediaAnalysisWorkerState?pageSize=10`);
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/mediaAnalysisWorkerState?pageSize=10`, { signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`비슷한 사진 요청 실패 (${response.status})`);
   const payload = await response.json();
   const items = (payload?.documents || [])
@@ -128,6 +131,35 @@ export async function fetchSimilarPhotoGroups({ calendarId, projectId, force = f
     .filter(group => group.length >= 2);
   cache.set(key, { savedAt: Date.now(), items });
   return items;
+}
+
+/**
+ * Returns only operational worker fields. This is intentionally a tiny, cached read used by
+ * the home operations inbox after first paint; it never fetches photos, OCR text or embeddings.
+ */
+export async function fetchMediaAnalysisWorkerStates({ calendarId, projectId, force = false } = {}) {
+  if (!calendarId || !projectId) return [];
+  const key = `workers:${projectId}:${calendarId}`;
+  const cached = cache.get(key);
+  if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
+  const fields = ['workerId', 'status', 'lastHeartbeatAt', 'lastError', 'latestSummary', 'lastSuccessAt'];
+  const mask = fields.map(field => `mask.fieldPaths=${field}`).join('&');
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/mediaAnalysisWorkerState?pageSize=10&${mask}`, { signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error(`AI 분석 상태 요청 실패 (${response.status})`);
+  const items = (await response.json()).documents || [];
+  const normalized = items.map(document => {
+    const data = decodeDocument(document);
+    return {
+      id: document.name.split('/').pop(),
+      workerId: String(data.workerId || document.name.split('/').pop() || ''),
+      status: String(data.status || ''),
+      lastError: String(data.lastError || ''),
+      lastHeartbeatAt: Number(data.lastHeartbeatAt) || 0,
+      latestSummary: data.latestSummary && typeof data.latestSummary === 'object' ? data.latestSummary : null,
+    };
+  });
+  cache.set(key, { savedAt: Date.now(), items: normalized });
+  return normalized;
 }
 
 /** "아니에요": this person is not in these photos; never suggest them for these photos again. */

@@ -57,9 +57,8 @@ test('the same memo revision notifies only once', () => {
   const again = planMemoPush(null, memo({ updatedAt: 2, linkPreview: { url: 'https://example.com' } }), claims, { memoId: 'memo_place' });
   assert.equal(again, null);
   const edited = planMemoPush(memo(), memo({ text: memoText + '\n추가 안내' }), claims, { memoId: 'memo_place' });
-  assert.ok(edited);
-  assert.equal(edited.kind, 'edit');
-  assert.notEqual(edited.claimKey, created.claimKey);
+  assert.equal(edited, null);
+  assert.equal(claims.size, 1);
 });
 
 test('duplicate device subscriptions collapse to one delivery', () => {
@@ -124,6 +123,13 @@ test('memo photos: an added photo notifies, a removed or reordered one does not'
   assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'c'] }, { memoId: 'm1' }), null);
   assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['c', 'b', 'a'] }, { memoId: 'm1' }), null);
   assert.equal(decideMemoNotification(base, { ...base, imageUrls: ['a', 'b', 'c', 'd'] }, { memoId: 'm1' })?.kind, 'images');
-  // A removal together with a text edit is still an edit.
-  assert.equal(decideMemoNotification(base, { ...base, text: '새 내용', imageUrls: ['a'] }, { memoId: 'm1' })?.kind, 'edit');
+  // A body edit is not a registration, with or without a photo removal in the same save.
+  assert.equal(decideMemoNotification(base, { ...base, text: '새 내용', imageUrls: ['a'] }, { memoId: 'm1' }), null);
+  assert.equal(decideMemoNotification(base, { ...base, text: '새 내용' }, { memoId: 'm1' }), null);
+});
+
+test('editing or deleting an existing memo comment does not notify', () => {
+  const before = memo({ comments: [{ id: 'cmt_old', text: '이전', participantId: 'person_author' }] });
+  assert.equal(decideMemoNotification(before, memo({ comments: [{ id: 'cmt_old', text: '고침', participantId: 'person_author' }] }), { memoId: 'memo_place' }), null);
+  assert.equal(decideMemoNotification(before, memo({ comments: [] }), { memoId: 'memo_place' }), null);
 });

@@ -24,21 +24,9 @@ export function isExcludedFromPeople(tagsText) {
   return splitTags(tagsText).includes(NOT_A_PERSON_TAG);
 }
 
-// Same name variants the 인물 tab matches with: a 2-3 letter Korean name also matches without
-// its family name ("박영우" -> "영우").
-export function personNameVariants(name) {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return [];
-  const variants = new Set([trimmed]);
-  if (/^[가-힣]{2,3}$/.test(trimmed)) variants.add(trimmed.slice(1));
-  return Array.from(variants).map(value => value.toLowerCase());
-}
-
-// The 인물 tab's rule: a 1-letter variant only as an exact tag, longer ones inside a tag too.
-export function tagMatchesPerson(token, variants) {
-  const value = String(token || '').toLowerCase();
-  return variants.some(variant => (variant.length <= 1 ? value === variant : value.includes(variant)));
-}
+// Shared with AI analysis so archive labels and missing-tag checks cannot disagree.
+import { identityLabels, personNameVariants, tagMatchesPerson } from '../core/photo-tag-identity.js';
+export { personNameVariants, tagMatchesPerson };
 
 // Puts 인물아님 in front so a photo at the 20-tag cap still leaves 분류 필요.
 export function withNotAPersonTag(tagsText) {
@@ -51,7 +39,7 @@ export function withNotAPersonTag(tagsText) {
 export function withoutPersonTag(tagsText, personLabel) {
   const tokens = splitTags(tagsText);
   const before = tokens.join(' ');
-  const variants = personNameVariants(personLabel);
+  const variants = identityLabels(personLabel).flatMap(personNameVariants);
   if (!variants.length) return { status: 'already', tags: before, before };
   const kept = tokens.filter(token => !tagMatchesPerson(token, variants));
   if (kept.length === tokens.length) return { status: 'already', tags: before, before };
