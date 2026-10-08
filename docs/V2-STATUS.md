@@ -24,7 +24,7 @@
 | NotificationPermissionHelpModal on V2 | **#734 완료** |
 | 다크모드 | **P0 완료** (Phase1–4 전부 머지 + 포괄 가드 테스트) |
 | Safari 채팅 키보드 / visualViewport | **완료** — 2026-10-01 사용자 실기기 검수 |
-| 기본 shell 플래그 전환 | **완료** — `isRenewalShellEnabled()` = `shell !== 'v1'` |
+| 기본 shell 플래그 전환 | **완료** — 게이트 자체 제거(2026-10-08): `app-feature-flags.js` 삭제, `renderRenewalShellIfEnabled()`는 항상 V2 셸을 반환 |
 
 ## 최근 머지 (발췌)
 

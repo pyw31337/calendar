@@ -2,6 +2,8 @@
 
 **이 문서의 독자:** Grok / Codex / Claude / Gemini / 사람 — 세션 없이 이 저장소만 보고 V2를 기본 셸로 올리는 작업을 이어갈 수 있어야 한다.  
 **최종 갱신:** 2026-09-23 (Claude, **컷오버 실행 완료** — 사용자의 명시적 지시로 Safari 실기기 서명 게이트를 건너뛰고 진행)  
+**2026-10-08:** 남아 있던 죽은 게이트(`src/core/app-feature-flags.js`의 항상-`true` `isRenewalShellEnabled()`)도 삭제. 라이브 `?id=cw|kkot|jhair`가 `?shell` 없이 V2로 열리는 것을 Playwright로 확인.
+
 **상태 한 줄 (2026-10-01 갱신):** **V2가 유일한 셸이다 — V1 트리와 `?shell=v1`은 사용자 실기기 검수 후 제거됨.** 아래는 컷오버 당시 기록. **V2가 기본 셸이다.** `isRenewalShellEnabled()` = `shell !== 'v1'` (부재 시 V2), `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백. §5에 사전 조사해둔 7개 파일 diff를 그대로 적용해 완료: `app-feature-flags.js`/`app-routing-state.js`(2곳)/`ui-app-shell-v2.js`(2곳)/`app-main.js`/`index.html`(host auto-force가 `?shell=v1`을 무시하던 버그 포함 수정)/`test/v2-routing.test.mjs`(신규 케이스 2개)/`scripts/browser-smoke-test.mjs`(기본 URL 검증 추가). `scripts/firebase-safety-tests.mjs`의 낡은 기대값 1건도 같이 수정. **Safari 채팅 VV 실기기 서명은 사용자가 추후 직접 진행** — 정적 코드 리뷰·자동 테스트 24개는 이미 통과했고, 문제 발견 시 `?shell=v1`로 즉시 되돌릴 수 있다는 전제로 이 순서를 바꿨다. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
 
 관련 문서:
@@ -294,10 +296,9 @@ cd /Users/pyw31337/Developer/calendar   # 사용자 Mac 기준
 git fetch origin && git checkout main && git pull --ff-only
 # 기본(V2):
 open 'https://pyw31337.github.io/calendar/?id=cw'
-# V1 폴백:
-open 'https://pyw31337.github.io/calendar/?id=cw&shell=v1'
+# (V1 폴백은 제거됨 — ?shell=v1 도 V2로 열린다)
 # 게이트 확인:
-rg -n "isRenewalShellEnabled|shell !== 'v1'" src/core src/ui/ui-app-shell-v2.js src/index.html
+rg -n "isRenewalShellEnabled|shell !== 'v1'" src   # 결과 없음이 정상 (게이트 제거됨)
 node --test test/v2-routing.test.mjs
 # 다크 가드 + 잔여 라이트 표면:
 node --test test/v2-dark-tokens-phase1.test.mjs test/v2-dark-tokens-phase2.test.mjs test/v2-dark-tokens-phase3.test.mjs test/v2-dark-tokens-phase4.test.mjs test/v2-dark-tokens-guard.test.mjs

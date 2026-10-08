@@ -1,7 +1,7 @@
 /**
- * Claude HTML design adapters, enabled exclusively by ?shell=v2.
- * The reference CSS is namespaced; existing feature components supply their real
- * state and actions through optional renderers. Default routes retain their UI.
+ * V2 app shell (the only shell since the 2026-10 V1 removal) built from the Claude HTML design
+ * adapters. The reference CSS is namespaced; existing feature components supply their real
+ * state and actions through optional renderers.
  */
 
 import './v2/reference-home.css';
@@ -37,7 +37,6 @@ function galleryCommentMotion(photo, index) {
 
 import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
-import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from './component-aliases.js';
 import { useOverlayHistory } from './ui-shared.js';
 import { closeAllOverlays, getOpenOverlays } from '../core/overlay-stack.js';
@@ -3615,13 +3614,12 @@ function MorePane({ calendarName, onSelectItem, selectedItem, onOpenSideNav }) {
 
 /**
  * One-call adapter for CalendarApp's return statement (kept to a single call there deliberately
- * -- CalendarApp is frozen at a hard line-count ceiling, docs/app-main-split-units.md). Returns
- * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
- * existing return unchanged.
+ * -- CalendarApp is frozen at a hard line-count ceiling, docs/app-main-split-units.md). Always
+ * returns the V2 shell element: V2 is the only shell, so the old `?shell=v2` gate is gone. The
+ * name is kept so app-main.js needs no change.
  */
 export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, settlementContextDeps, recordsContextDeps, globalOverlays) {
   const React = window.React;
-  if (!isRenewalShellEnabled()) return null;
   return React.createElement(RenewalAppShell, {
     activeCalId, calendar,
     moreContext: buildRenewalMoreContext(calendar, moreContextDeps),
