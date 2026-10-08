@@ -4108,7 +4108,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         setHomeFocusedMemo(memo);
         if (typeof recordsContext?.memoProps?.onFocusMemo === 'function') recordsContext.memoProps.onFocusMemo(memo);
       } else if (id && typeof recordsContext?.memoProps?.onOpenMemo === 'function') {
+        // app-main's handleJumpToMemo fetches the memo, switches to 메모 and pushes its own history
+        // entry. Pushing ours too left two 메모 entries, so Back from the memo needed two presses
+        // to get back to 통합검색 -- only sync the shell tab here.
         recordsContext.memoProps.onOpenMemo(id);
+        setActiveTabState('memo');
+        return;
       }
       onChangeView('memo');
     },
