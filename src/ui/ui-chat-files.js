@@ -110,7 +110,7 @@ function FileTypeBadge(props) {
       width: "48px", height: "48px", borderRadius: "10px",
       backgroundColor: "color-mix(in srgb, var(--primary) 12%, var(--bg-secondary))",
       color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: "0.75rem", fontWeight: 900, letterSpacing: "0.02em", flexShrink: 0,
+      fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.02em", flexShrink: 0,
       overflow: "hidden"
     },
     "aria-hidden": true
@@ -673,7 +673,7 @@ export function DocumentLightbox(props) {
           },
             React.createElement("div", {
               style: {
-                fontWeight: 900, fontSize: "var(--font-size-base)", color: "var(--text-main)",
+                fontWeight: 800, fontSize: "var(--font-size-base)", color: "var(--text-main)",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
               }
             }, current.name || "파일"),
@@ -724,7 +724,7 @@ export function DocumentLightbox(props) {
             style: {
               width: "32px", height: "32px", minWidth: "32px", borderRadius: "8px",
               border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
-              color: "var(--text-main)", cursor: "pointer", fontWeight: 900,
+              color: "var(--text-main)", cursor: "pointer", fontWeight: 800,
               flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center",
               lineHeight: 1, padding: 0, marginLeft: "auto"
             }
@@ -771,7 +771,7 @@ export function DocumentLightbox(props) {
                       href: current.url, target: "_blank", rel: "noopener noreferrer",
                       style: {
                         height: "40px", padding: "0 16px", borderRadius: "12px", background: "#57606F",
-                        color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 900,
+                        color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 800,
                         textDecoration: "none"
                       }
                     }, "새 탭에서 열기")
@@ -845,7 +845,7 @@ export function DocumentLightbox(props) {
                           href: current.url, target: "_blank", rel: "noopener noreferrer",
                           style: {
                             height: "40px", padding: "0 16px", borderRadius: "12px", background: "#57606F",
-                            color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 900,
+                            color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 800,
                             textDecoration: "none"
                           }
                         }, "열기")
@@ -873,7 +873,7 @@ export function DocumentLightbox(props) {
                 href: current.url, target: "_blank", rel: "noopener noreferrer",
                 style: {
                   height: "40px", padding: "0 16px", borderRadius: "12px", background: "#57606F",
-                  color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 900,
+                  color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 800,
                   textDecoration: "none"
                 }
               }, "새 탭에서 열기")

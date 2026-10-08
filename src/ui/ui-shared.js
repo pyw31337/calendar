@@ -874,7 +874,7 @@ export function getListEditTextBtnStyle(isMobile, isEdit) {
     padding: isMobile ? '0 8px' : '0 14px',
     borderRadius: 'var(--radius-md)',
     fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)',
-    fontWeight: 900,
+    fontWeight: 800,
     cursor: 'pointer',
     flex: isEdit && isMobile ? 1 : '0 0 auto',
     flexShrink: 0,
@@ -1431,7 +1431,7 @@ export function ColorSwatchPicker({ value, onChange, disabled, title = "색상 �
               width: '44px', height: '44px', borderRadius: '50%', backgroundColor: color,
               border: isSelected ? '3px solid var(--text-main)' : '1px solid var(--border-subtle)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#FFFFFF', fontWeight: 900, fontSize: '1rem'
+              color: '#FFFFFF', fontWeight: 800, fontSize: '1rem'
             }
           }, isSelected && "✓");
         })
@@ -1690,7 +1690,7 @@ export function ParticipantSelectSheet({
       style: disabled ? { cursor: 'not-allowed', opacity: 0.58 } : undefined
     }, /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }),
     status && /*#__PURE__*/React.createElement("span", {
-      style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 900 }
+      style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 800 }
     }, status));
   })))), document.body);
 }
@@ -1733,7 +1733,7 @@ export function OperationProgressOverlay({ title, detail, pct }) {
   }, /*#__PURE__*/React.createElement('div', {
     style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }
   },
-    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '4px' } }, title || '작업 처리 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '4px' } }, title || '작업 처리 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 } }, detail || '서버에 반영하고 있습니다.'),
     /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'var(--cta-fill, linear-gradient(90deg, #4F46E5, #EC4899))', transition: 'width 0.35s ease', borderRadius: 'var(--radius-full)' } })

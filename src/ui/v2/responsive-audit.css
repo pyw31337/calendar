@@ -107,7 +107,7 @@
 
 .v2-design .v2-settlement .settlement-person-actual-paid b {
   color: var(--settlement-hero-surface-text);
-  font-weight: 850;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
@@ -129,7 +129,7 @@
 
 .v2-design .v2-settlement .settlement-transfer-guide b {
   color: #fff;
-  font-weight: 900;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 

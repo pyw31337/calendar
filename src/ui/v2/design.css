@@ -1,7 +1,7 @@
 /* v2-shell-structure: first-class memo/places destinations; Bento side-nav is source of IA. */
 /* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
 .renewal-shell.v2-design {
-  --font-sans: 'Noto Sans KR Variable', 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --renewal-page-max: 1600px;
   --v2-side-nav-width: 280px;
   /* Brand = vivid schedule purple (same family as --cal-schedule) */
@@ -187,7 +187,7 @@
   justify-content: center;
   padding: 4px 10px;
   font-size:0.75rem;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.04em;
   border-radius: var(--radius-full, 9999px);
   background: rgba(255, 255, 255, 0.96);
@@ -291,7 +291,7 @@
   letter-spacing: -0.01em;
 }
 .v2-design .bp-hero-weather-col.is-today .bp-hero-weather-day {
-  font-weight: 900;
+  font-weight: 800;
   color: #fff;
 }
 .v2-design .bp-hero-weather-dday-badge {
@@ -301,7 +301,7 @@
   background: rgba(255, 255, 255, 0.96) !important;
   color: var(--v2-accent, var(--a-brand-2, #5B4BEB)) !important;
   font-size:0.75rem !important;
-  font-weight: 900 !important;
+  font-weight: 800 !important;
   line-height: 1 !important;
   padding: 2px 5px !important;
   border-radius: 9999px !important;
@@ -1277,7 +1277,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-day-event-title { font-size:0.75rem !important; font-weight: 800 !important; }
 .v2-design .bp-day-anniversary-label { font-size:0.75rem !important; font-weight: 600 !important; }
 
-.v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; font-weight: 900; }
+.v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; font-weight: 800; }
 .v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md) !important; font-weight: 700 !important; }
 .v2-design .bp-dday-expanded-title { font-size: var(--v2-fs-lg) !important; font-weight: 800; }
 .v2-design .bp-dday-expanded-tag,

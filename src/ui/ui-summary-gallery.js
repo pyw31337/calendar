@@ -2899,7 +2899,7 @@ export function HistoryView({
     ? getListEditTextBtnStyle(isMobile, true)
     : {
         height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px', borderRadius: 'var(--radius-md)',
-        fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer',
+        fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer',
         flex: isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
       };
   const renderMemoryAllDateToggle = () => /*#__PURE__*/React.createElement("div", {
@@ -2913,7 +2913,7 @@ export function HistoryView({
     [{ key: 'all', label: '전체' }, { key: 'date', label: '일자' }].map(tab => /*#__PURE__*/React.createElement("button", {
       key: tab.key, type: "button", onClick: () => setMemoryViewMode(tab.key),
       style: {
-        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: memoryViewMode === tab.key ? 'var(--accent-primary)' : 'transparent',
         color: memoryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -3075,7 +3075,7 @@ export function HistoryView({
           },
             /*#__PURE__*/React.createElement("span", {
               style: {
-                fontSize: 'var(--font-size-md)', fontWeight: 900, color: 'var(--on-status, #FFFFFF)',
+                fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--on-status, #FFFFFF)',
                 backgroundColor: 'var(--status-green)', padding: '4px 10px', borderRadius: 'var(--radius-full)'
               }
             }, section.items.length),

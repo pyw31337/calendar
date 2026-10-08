@@ -1242,7 +1242,7 @@ export function PlacesView({
       type: "button",
       onClick: () => setVisitFilter(tab.key),
       style: {
-        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: visitFilter === tab.key ? 'var(--accent-primary)' : 'transparent',
         color: visitFilter === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -1259,7 +1259,7 @@ export function PlacesView({
       ? getListEditTextBtnStyle(isMobile, isBulkShareMode)
       : {
           height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px',
-          borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
+          borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 800,
           cursor: 'pointer', flex: isBulkShareMode && isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
         };
     if (!isBulkShareMode) {
@@ -1896,7 +1896,7 @@ export function PlacesView({
               /*#__PURE__*/React.createElement("span", {
                 style: {
                   display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: 'var(--radius-full)',
-                  backgroundColor: `${category.color}18`, color: category.color, fontSize: 'var(--font-size-xs)', fontWeight: 900
+                  backgroundColor: `${category.color}18`, color: category.color, fontSize: 'var(--font-size-xs)', fontWeight: 800
                 }
               },
                 /*#__PURE__*/React.createElement("span", {

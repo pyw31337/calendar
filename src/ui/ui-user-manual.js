@@ -72,7 +72,7 @@ export function UserManualOverlay({ calendar, onClose }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           color: day === 15 ? '#EF4444' : 'var(--text-main)',
-          fontWeight: 900,
+          fontWeight: 800,
           fontSize: 'var(--font-size-base)'
         }
       }, day, day === 15 && /*#__PURE__*/React.createElement("span", { style: { color: 'var(--v2-accent, #7C3AED)', fontSize: 'var(--font-size-2xs)' } }, "확정")), day === 22 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
@@ -91,12 +91,12 @@ export function UserManualOverlay({ calendar, onClose }) {
       preview: /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-card)' }
       }, /*#__PURE__*/React.createElement("div", {
-        style: { padding: '13px 16px', background: '#F5EAFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900 }
+        style: { padding: '13px 16px', background: '#F5EAFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 800 }
       }, "26.08.22(토)", /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } }, "×")), /*#__PURE__*/React.createElement("div", {
         style: { padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }
-      }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 900, color: 'var(--text-muted)' } }, "참여자 선택"), /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-muted)' } }, "참여자 선택"), /*#__PURE__*/React.createElement("div", {
         style: { height: '42px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', padding: '0 14px', gap: '8px', fontWeight: 800 }
-      }, /*#__PURE__*/React.createElement("span", { style: { width: 9, height: 9, borderRadius: '50%', backgroundColor: sampleParticipant.color } }), sampleParticipant.name), /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 900, color: 'var(--text-muted)' } }, "메모 입력"), /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement("span", { style: { width: 9, height: 9, borderRadius: '50%', backgroundColor: sampleParticipant.color } }), sampleParticipant.name), /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-muted)' } }, "메모 입력"), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '11px 12px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
       }, "예: 1시 이후 가능, 차량 운전 가능"), /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -112,12 +112,12 @@ export function UserManualOverlay({ calendar, onClose }) {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       }, /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid var(--status-green)', background: '#ECFDF5', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: 'var(--status-green)', fontWeight: 900, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'var(--status-green)', color: 'var(--on-status, #FFFFFF)', fontSize: 'var(--font-size-sm)', fontWeight: 900, whiteSpace: 'nowrap' }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: 'var(--status-green)', fontWeight: 800, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
+        style: { padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'var(--status-green)', color: 'var(--on-status, #FFFFFF)', fontSize: 'var(--font-size-sm)', fontWeight: 800, whiteSpace: 'nowrap' }
       }, "전원")), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
       }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: 'var(--cta-fill, linear-gradient(135deg, #6366F1, #EC4899))', color: 'var(--on-cta, #FFFFFF)', fontWeight: 900, fontSize: 'var(--font-size-sm)' }
+        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: 'var(--cta-fill, linear-gradient(135deg, #6366F1, #EC4899))', color: 'var(--on-cta, #FFFFFF)', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
       }, "D-11")))
     }
   ];
@@ -157,9 +157,9 @@ export function UserManualOverlay({ calendar, onClose }) {
   }, /*#__PURE__*/React.createElement("header", {
     style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', fontSize: 'var(--font-size-md)', fontWeight: 900, marginBottom: '10px' }
+    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', fontSize: 'var(--font-size-md)', fontWeight: 800, marginBottom: '10px' }
   }, "빠른 안내"), /*#__PURE__*/React.createElement("h2", {
-    style: { margin: 0, fontSize: 'clamp(1.45rem, 4vw, 2.2rem)', lineHeight: 1.12, letterSpacing: '-0.04em', fontWeight: 950 }
+    style: { margin: 0, fontSize: 'clamp(1.45rem, 4vw, 2.2rem)', lineHeight: 1.12, letterSpacing: '-0.04em', fontWeight: 800 }
   }, "사용 방법"), /*#__PURE__*/React.createElement("p", {
     style: { margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 'clamp(0.9rem, 2.5vw, 1rem)', lineHeight: 1.55 }
   }, calendar?.title ? `${calendar.title} · 날짜 선택 → 일정 등록 → 모임 확정` : "날짜 선택 → 일정 등록 → 모임 확정")), /*#__PURE__*/React.createElement("button", {
@@ -177,7 +177,7 @@ export function UserManualOverlay({ calendar, onClose }) {
   }, /*#__PURE__*/React.createElement(StepIcon, null, step.icon), /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0 }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { margin: 0, fontSize: '1rem', fontWeight: 950, letterSpacing: '-0.02em' }
+    style: { margin: 0, fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.02em' }
   }, step.title), /*#__PURE__*/React.createElement("p", {
     style: { margin: '7px 0 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', lineHeight: 1.55 }
   }, step.desc))), /*#__PURE__*/React.createElement("div", {

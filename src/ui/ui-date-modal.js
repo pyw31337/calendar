@@ -2993,7 +2993,7 @@ export function DateModal({
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
               /*#__PURE__*/React.createElement("span", {
                 style: {
-                  fontSize: 'var(--font-size-2xs)', fontWeight: 900, padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                  fontSize: 'var(--font-size-2xs)', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)',
                   backgroundColor: `${catColor}18`, color: catColor
                 }
               }, catName)
@@ -3343,7 +3343,7 @@ export function DateModal({
                     backgroundColor: `${categoryColor}18`,
                     color: categoryColor,
                     fontSize: 'var(--font-size-xs)',
-                    fontWeight: 900
+                    fontWeight: 800
                   }
                 }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', categoryName),
                 expenseTime && /*#__PURE__*/React.createElement("span", {
@@ -3369,7 +3369,7 @@ export function DateModal({
                     backgroundColor: `${(activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B'}18`,
                     color: (activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B',
                     fontSize: 'var(--font-size-xs)',
-                    fontWeight: 900
+                    fontWeight: 800
                   }
                 }, expense.isSelfPay ? expense.payerId : `${expense.payerId} 선결제`),
                 expense.isSelfPay && /*#__PURE__*/React.createElement("span", {
@@ -3382,7 +3382,7 @@ export function DateModal({
                     backgroundColor: 'rgba(100, 116, 139, 0.14)',
                     color: '#475569',
                     fontSize: 'var(--font-size-xs)',
-                    fontWeight: 900
+                    fontWeight: 800
                   }
                 }, "자비부담")
               ),
@@ -3392,7 +3392,7 @@ export function DateModal({
                   /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: expenseUrl })
                 ) : expenseLabel
               ),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 900, color: Number(expense.amount) < 0 ? 'var(--status-green)' : '#DC2626' } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 800, color: Number(expense.amount) < 0 ? 'var(--status-green)' : '#DC2626' } },
                 `${Number(expense.amount) < 0 ? '+' : '-'}${Math.abs(Number(expense.amount)).toLocaleString()}원`
               )
             )
@@ -3522,7 +3522,7 @@ export function DateModal({
               padding: '0 16px',
               borderRadius: 'var(--radius-md)',
               fontSize: 'var(--font-size-md)',
-              fontWeight: 900,
+              fontWeight: 800,
               cursor: isSavingMeetingPhotos ? 'wait' : 'pointer',
               boxSizing: 'border-box'
             }
@@ -3666,7 +3666,7 @@ export function DateModal({
           },
           style: disabled ? { cursor: 'not-allowed', opacity: 0.58 } : undefined
         }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name),
-        status && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 900 } }, status));
+        status && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', flexShrink: 0, color: 'var(--accent-primary)', fontSize: 'var(--font-size-sm)', fontWeight: 800 } }, status));
       })
     )
   )) : null;

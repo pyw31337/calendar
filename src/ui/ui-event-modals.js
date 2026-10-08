@@ -1550,7 +1550,7 @@ export function AnniversaryModal({
         }
       }, /*#__PURE__*/React.createElement("span", {
         style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)', fontWeight: 700 }
-      }, "참여자 없음"), isBulkNoParticipant && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 900 } }, "✓")),
+      }, "참여자 없음"), isBulkNoParticipant && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 800 } }, "✓")),
       participants.map(p => /*#__PURE__*/React.createElement("button", {
         key: p.id,
         type: "button",
@@ -1560,7 +1560,7 @@ export function AnniversaryModal({
           setIsBulkParticipantSheetOpen(false);
         }
       }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name),
-        bulkParticipantId === p.id && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 900 } }, "✓")))
+        bulkParticipantId === p.id && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 800 } }, "✓")))
     )
   ));
 
@@ -1589,7 +1589,7 @@ export function AnniversaryModal({
           onClick: () => toggleBulkWeek(opt.value)
         },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: 'var(--text-main)' } }, opt.label),
-          selected && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 900 } }, "✓")
+          selected && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 800 } }, "✓")
         );
       })
     ),
@@ -1629,7 +1629,7 @@ export function AnniversaryModal({
           style: opt.value === 0 ? { color: '#EF4444' } : undefined
         },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: opt.value === 0 ? '#EF4444' : 'var(--text-main)' } }, opt.label),
-          selected && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 900 } }, "✓")
+          selected && /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 800 } }, "✓")
         );
       })
     ),
@@ -2769,7 +2769,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--status-green)', color: 'var(--on-status, #FFFFFF)',
-                fontSize: 'var(--font-size-sm)', fontWeight: 900, pointerEvents: 'none'
+                fontSize: 'var(--font-size-sm)', fontWeight: 800, pointerEvents: 'none'
               }
             }, '✓')
           ),
@@ -3052,7 +3052,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     style: { width: '92%', maxWidth: '430px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }
   },
     React.createElement('div', { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
-      React.createElement('h3', { style: { margin: 0, fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)' } }, '정산카드'),
+      React.createElement('h3', { style: { margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' } }, '정산카드'),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
         React.createElement('button', {
           type: 'button', title: '이미지로 다운로드', 'aria-label': '이미지로 다운로드', onClick: handleDownloadSettlementCardImage,
@@ -3064,7 +3064,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     React.createElement('div', { className: 'modal-body settlement-card-preview-body', style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'linear-gradient(145deg, #EEF2FF, #FDF2F8)' } },
       React.createElement('div', { className: 'settlement-card-preview-hero', style: { padding: '16px', borderRadius: '14px', background: 'linear-gradient(135deg, #4F46E5, #DB2777)', color: '#FFFFFF', boxShadow: '0 8px 20px rgba(79,70,229,0.18)' } },
         React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', opacity: 0.82, marginBottom: '4px' } }, cardToEdit?.status === 'closed' ? '마감된 정산' : '진행중인 정산'),
-        React.createElement('div', { style: { fontSize: '1.08rem', fontWeight: 900, marginBottom: '12px' } }, title || '1/N 간편 송금'),
+        React.createElement('div', { style: { fontSize: '1.08rem', fontWeight: 800, marginBottom: '12px' } }, title || '1/N 간편 송금'),
         React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: '8px' } },
           React.createElement('span', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700 } }, '총 지출'),
           React.createElement('strong', { className: 'settlement-card-preview-total', style: { fontSize: '1.25rem', color: '#F0ABFC' } }, `${totalExpense.toLocaleString()}원`)
@@ -3543,7 +3543,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       backgroundColor: `${category.color}18`,
       color: category.color,
       fontSize: 'var(--font-size-xs)',
-      fontWeight: 900,
+      fontWeight: 800,
       whiteSpace: 'nowrap'
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -3559,7 +3559,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       backgroundColor: 'rgba(100, 116, 139, 0.14)',
       color: '#475569',
       fontSize: 'var(--font-size-xs)',
-      fontWeight: 900,
+      fontWeight: 800,
       whiteSpace: 'nowrap'
     }
   }, "자비부담");
@@ -3611,7 +3611,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, /*#__PURE__*/React.createElement("section", {
     style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', background: 'var(--bg-primary)' }
   }, /*#__PURE__*/React.createElement("h4", {
-    style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }
+    style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }
   }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-light)', fontSize: 'var(--font-size-md)' }
   }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement("div", {
@@ -3668,7 +3668,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       // plain +/- colored amounts on the expense rows below it.
       className: `settlement-day-net${row.net < 0 ? ' is-negative' : ' is-positive'}`,
       style: {
-        fontSize: 'var(--font-size-md)', fontWeight: 900, color: '#FFFFFF',
+        fontSize: 'var(--font-size-md)', fontWeight: 800, color: '#FFFFFF',
         backgroundColor: row.net < 0 ? '#DC2626' : 'var(--status-green)',
         padding: '4px 10px', borderRadius: 'var(--radius-full)'
       }
@@ -3856,7 +3856,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   color: isClosed ? '#FFFFFF' : '#5B4BEB'
                 }
               }, isClosed ? "마감됨" : "진행중"),
-              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 900, lineHeight: 1.25, textAlign: 'left' } }, highlightSettlement(card.title || "1/N 간편 송금")),
+              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 800, lineHeight: 1.25, textAlign: 'left' } }, highlightSettlement(card.title || "1/N 간편 송금")),
 
               /* Account info remains one copyable left-aligned row; only the account number is a capsule. */
               bankInfoText && React.createElement("span", {
@@ -4326,7 +4326,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       className: "modal-header",
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     },
-      React.createElement("h3", { style: { margin: 0, fontSize: '1.02rem', fontWeight: 900, color: 'var(--text-main)' } }, "정산 목록"),
+      React.createElement("h3", { style: { margin: 0, fontSize: '1.02rem', fontWeight: 800, color: 'var(--text-main)' } }, "정산 목록"),
       React.createElement("button", { type: "button", onClick: () => setIsSettlementListOpen(false), style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' } }, "✕")
     ),
     React.createElement("div", {

@@ -585,7 +585,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         onClick: () => onSearchTag && onSearchTag(tag),
         style: {
           display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-          padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
+          padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, lineHeight: 1,
           border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
           cursor: onSearchTag ? 'pointer' : 'default'
         }
@@ -1779,7 +1779,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           justifyContent: 'center',
           cursor: zoomLevel === ZOOM_DEFAULT ? 'default' : 'pointer',
           fontSize: 'var(--font-size-2xs)',
-          fontWeight: 900,
+          fontWeight: 800,
           opacity: zoomLevel === ZOOM_DEFAULT ? 0.7 : 1
         }
       }, `${zoomLevel}%`),

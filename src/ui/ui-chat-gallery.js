@@ -1454,7 +1454,7 @@ export function ChatGalleryModal({
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '10px', flexShrink: 0 }
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', userSelect: 'none' },
+      style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', userSelect: 'none' },
       onClick: openGalleryPicker,
       title: "클릭하여 년월 이동"
     },
@@ -1716,7 +1716,7 @@ export function ChatGalleryModal({
       ? getListEditTextBtnStyle(isMobile, isBulkShareMode)
       : {
           height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px',
-          borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
+          borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 800,
           cursor: 'pointer', flex: isBulkShareMode && isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
         };
     if (!isBulkShareMode) {
@@ -2719,7 +2719,7 @@ export function ChatGalleryModal({
       "aria-pressed": value === tab.key ? 'true' : 'false',
       onClick: () => onChange(tab.key),
       style: {
-        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: value === tab.key ? 'var(--accent-primary)' : 'transparent',
         color: value === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -2865,7 +2865,7 @@ export function ChatGalleryModal({
         className: "btn btn-action btn-action-dark",
         disabled: isSavingLink,
         onClick: handleSubmitLinkInput,
-        style: { height: '40px', padding: '0 14px', borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 900, flexShrink: 0, cursor: isSavingLink ? 'wait' : 'pointer' }
+        style: { height: '40px', padding: '0 14px', borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 800, flexShrink: 0, cursor: isSavingLink ? 'wait' : 'pointer' }
       }, "등록")
     )
   );
@@ -3071,7 +3071,7 @@ export function ChatGalleryModal({
           /* Left summary info & view toggle */
           /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
             /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
-              /*#__PURE__*/React.createElement('span', { style: { fontWeight: 900, color: 'var(--text-main)', fontSize: 'var(--font-size-md, 15px)' } }, 'AI 사진 분석 추천'),
+              /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, color: 'var(--text-main)', fontSize: 'var(--font-size-md, 15px)' } }, 'AI 사진 분석 추천'),
               /* Segmented view switcher */
               /*#__PURE__*/React.createElement('div', {
                 style: {
@@ -3988,7 +3988,7 @@ export function ChatGalleryModal({
               },
                 /*#__PURE__*/React.createElement("span", {
                   style: {
-                    fontSize: 'var(--font-size-md)', fontWeight: 900, color: 'var(--on-status, #FFFFFF)',
+                    fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--on-status, #FFFFFF)',
                     backgroundColor: 'var(--status-green)', padding: '4px 10px', borderRadius: 'var(--radius-full)'
                   }
                 }, section.items.length),
@@ -4116,7 +4116,7 @@ export function ChatGalleryModal({
         )
       : /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("h3", {
-            style: { fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', flex: 1 }
+            style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', flex: 1 }
           }, "갤러리"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 } },
             /*#__PURE__*/React.createElement("button", {
@@ -4221,7 +4221,7 @@ export function ChatGalleryModal({
           style: {
             padding: '4px 10px',
             fontSize: 'var(--font-size-sm)',
-            fontWeight: 900,
+            fontWeight: 800,
             borderRadius: 'var(--radius-md)',
             cursor: hasClipboardImage ? 'pointer' : 'default',
             flexShrink: 0,

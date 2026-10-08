@@ -1,5 +1,6 @@
 :root {
-  --font-sans: 'Noto Sans KR Variable', 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+  /* The one UI font token: Pretendard + system fallback. Use weights for hierarchy. */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 
   /* White / Light Theme Colors */
   --bg-primary: #F8FAFC;
@@ -756,7 +757,7 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
   color: #FFFFFF;
   cursor: pointer;
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
 }
 .btn,
@@ -2701,7 +2702,7 @@ select.form-select {
   border-radius: var(--radius-full);
   padding: 3px 4px 3px 8px;
   font-size:0.75rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1;
   box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.14);
 }
@@ -2781,7 +2782,7 @@ select.form-select {
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-subtle);
-  font-weight: 900;
+  font-weight: 800;
   color: var(--text-main);
 }
 .poll-voter-option {
@@ -2797,7 +2798,7 @@ select.form-select {
   color: var(--text-main);
   font-family: inherit;
   font-size: 0.95rem;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
 }
 .poll-voter-option:hover, .poll-voter-option:focus-visible { background: #EEF2FF; border-color: var(--accent-primary); }
@@ -3240,7 +3241,7 @@ select.form-select {
 .sync-status-banner__label,
 .sync-status-banner__time {
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.15;
 }
 .sync-status-banner__time {
@@ -3404,13 +3405,13 @@ select.form-select {
 .admin-quota-label {
   color: var(--text-muted);
   font-size: 0.78rem;
-  font-weight: 850;
+  font-weight: 800;
   margin-bottom: 5px;
 }
 .admin-quota-value {
   color: var(--text-main);
   font-size: 1.1rem;
-  font-weight: 950;
+  font-weight: 800;
   line-height: 1.35;
 }
 .admin-quota-note {
@@ -3556,7 +3557,7 @@ select.form-select {
 }
 .admin-side-menu-title {
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 800;
   color: #0F172A;
   line-height: 1.2;
 }
@@ -3607,7 +3608,7 @@ select.form-select {
   gap: 10px;
   font-family: inherit;
   font-size: 0.9rem;
-  font-weight: 850;
+  font-weight: 800;
   text-align: left;
   cursor: pointer;
   box-shadow: none;
@@ -3950,7 +3951,7 @@ select.form-select {
   align-self: flex-end;
   color: #E247A1;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
 }
 .settlement-person-amount.is-refund {
@@ -4269,7 +4270,7 @@ select.form-select {
 }
 .settlement-metric-card-value {
   font-size: 1.05rem;
-  font-weight: 950;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6205,7 +6206,7 @@ textarea.form-input {
   gap: 0 !important;
 }
 .admin-side-menu .admin-side-menu-item-title {
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
 }
 .admin-side-menu .admin-side-menu-setting-row {
@@ -6691,7 +6692,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   padding-bottom: 64px;
   background: var(--bg-primary);
   color: var(--text-main);
-  font-family: 'Noto Sans KR Variable', 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+  font-family: var(--font-sans);
 }
 .renewal-shell-side-nav { display: none; }
 .renewal-shell-main { padding: 0; background: var(--bg-primary); color: var(--text-main); }
@@ -6733,7 +6734,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-home-hero .dday-compact:active { transform: scale(0.98); }
 .renewal-home-hero .dday-compact-badge {
-  background: rgba(255,255,255,0.95); color: var(--brand); font-weight: 900; font-size: 1.05rem; line-height: 1;
+  background: rgba(255,255,255,0.95); color: var(--brand); font-weight: 800; font-size: 1.05rem; line-height: 1;
   padding: 6px 12px; border-radius: var(--radius-full); flex-shrink: 0; letter-spacing: -0.02em;
   animation: confirmed-meeting-heartbeat 0.75s ease-in-out infinite; transform-origin: center center;
 }
@@ -7039,7 +7040,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   --renewal-page-max: 1080px; --renewal-bg: var(--bg-primary); --renewal-card: var(--bg-card);
   --renewal-border: var(--border-subtle); --renewal-text: var(--text-main); --renewal-muted: var(--text-muted);
   background: var(--renewal-bg);
-  font-family: 'Noto Sans KR Variable', 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+  font-family: var(--font-sans);
 }
 .renewal-shell-main { background: var(--renewal-bg); color: var(--renewal-text); }
 .renewal-shell-main:not(.is-calendar) > .renewal-shell-header {
@@ -7097,7 +7098,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-home-hero .dday-compact:active { transform: scale(.98); }
 .renewal-home-hero .dday-compact-badge {
-  background: rgba(255,255,255,.95); color: var(--v2-accent, #7C3AED); font-weight: 900; font-size: 1.1rem; line-height: 1;
+  background: rgba(255,255,255,.95); color: var(--v2-accent, #7C3AED); font-weight: 800; font-size: 1.1rem; line-height: 1;
   padding: 6px 10px; border-radius: 9999px; flex-shrink: 0; letter-spacing: -.02em;
   animation: renewal-dday-heartbeat .75s ease-in-out infinite; transform-origin: center;
 }
