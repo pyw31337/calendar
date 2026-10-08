@@ -40,7 +40,7 @@ import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from './component-aliases.js';
 import { useOverlayHistory } from './ui-shared.js';
-import { closeAllOverlays, getOpenOverlays } from './overlay-stack.js';
+import { closeAllOverlays, getOpenOverlays } from '../core/overlay-stack.js';
 import { withSearchMarker, stateForTabWrite, planSearchClose, needsSearchColdStartSeed } from './search-history.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,

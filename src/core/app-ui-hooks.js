@@ -4,7 +4,7 @@
  * needed moving into their own module. Same `const React = window.React;` per-function pattern
  * as use-scroll-hide-header.js.
  */
-import { registerOverlay } from '../ui/overlay-stack.js';
+import { registerOverlay } from './overlay-stack.js';
 
 // Tracks which message row's edit/delete controls should be revealed: desktop hover is
 // handled purely in CSS (see .msg-row-hover:hover), this only drives the tap case --
@@ -81,7 +81,7 @@ export function useModalDirtyGuard(onClose, onRequestConfirm, message, active = 
   }, [active, resetKey, readSnapshot]);
   const latestRef = React.useRef({ onClose, onRequestConfirm, message });
   latestRef.current = { onClose, onRequestConfirm, message };
-  // Join the overlay stack (ui/overlay-stack.js) while active: one Esc / a new top-level dialog
+  // Join the overlay stack (core/overlay-stack.js) while active: one Esc / a new top-level dialog
   // from navigation closes every stacked dialog, asking this guard's confirm once if dirty.
   React.useEffect(() => {
     if (!active) return undefined;

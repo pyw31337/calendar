@@ -46,7 +46,7 @@ function mountHook(hookFn) {
 }
 
 const { useOverlayHistory } = await import('../src/ui/ui-shared.js');
-const stack = await import('../src/ui/overlay-stack.js');
+const stack = await import('../src/core/overlay-stack.js');
 
 function openDialog(name, log, key = 'layer-popup') {
   let mounted = null;

@@ -2,7 +2,7 @@
  * Shared UI primitives (P4-22)
  */
 import { useTabStripGesture } from './tab-strip-gesture.js';
-import { registerOverlay, isBatchClosing, getBatchId, noteMarkerConsumed, findDirtyCompanion, confirmMessageFor, OVERLAY_CLOSE_CONFIRM_TITLE } from './overlay-stack.js';
+import { registerOverlay, isBatchClosing, getBatchId, noteMarkerConsumed, findDirtyCompanion, confirmMessageFor, OVERLAY_CLOSE_CONFIRM_TITLE } from '../core/overlay-stack.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};

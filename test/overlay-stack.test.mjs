@@ -5,7 +5,7 @@ import {
   registerOverlay, closeAllOverlays, getOpenOverlays, isBatchClosing, noteMarkerConsumed,
   shouldHandleEscape, findDirtyCompanion, confirmMessageFor, __resetOverlayStackForTests,
   OVERLAY_CLOSE_CONFIRM_MESSAGE,
-} from '../src/ui/overlay-stack.js';
+} from '../src/core/overlay-stack.js';
 
 // A useOverlayHistory-like entry: during a batch close it consumes its marker instead of calling
 // history.back() itself.
