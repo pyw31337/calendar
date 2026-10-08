@@ -44,3 +44,17 @@ export function planSearchClose(state) {
 export function needsSearchColdStartSeed(tabId, state) {
   return tabId === 'search' && !hasSearchMarker(state);
 }
+
+/**
+ * Which 통합검색 category to show after the results changed: the category the user had picked
+ * before opening a result (`preferred`, restored on Back) while it has matches, else the current
+ * one while it has matches, else the first category with matches.
+ */
+export function pickSearchCategory(prev, preferred, tabDefs) {
+  const defs = Array.isArray(tabDefs) ? tabDefs : [];
+  const has = key => { const d = key ? defs.find(t => t.key === key) : null; return !!(d && d.count > 0); };
+  if (has(preferred)) return preferred;
+  if (has(prev)) return prev;
+  const firstNonEmpty = defs.find(t => t.count > 0);
+  return firstNonEmpty ? firstNonEmpty.key : prev;
+}

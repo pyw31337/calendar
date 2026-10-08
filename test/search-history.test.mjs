@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
+  pickSearchCategory,
   SEARCH_MARKER_KEY, hasSearchMarker, withSearchMarker, withoutSearchMarker, stateForTabWrite,
   planSearchClose, needsSearchColdStartSeed,
 } from '../src/ui/search-history.js';
@@ -61,4 +62,22 @@ test('a memo result that app-main opens itself does not push a second 메모 ent
   const shell = await readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
   const fn = shell.slice(shell.indexOf('const searchExtra = {'), shell.indexOf('onSelectDate: (d, focus)'));
   assert.match(fn, /recordsContext\.memoProps\.onOpenMemo\(id\);\s*setActiveTabState\('memo'\);\s*return;/);
+});
+
+test('Back from a result keeps the picked category once it has matches', () => {
+  const defs = (memos) => [{ key: 'schedules', count: 3 }, { key: 'chat', count: 0 }, { key: 'memos', count: memos }];
+  assert.equal(pickSearchCategory('memos', 'memos', defs(0)), 'schedules', 'results not loaded yet: show something');
+  assert.equal(pickSearchCategory('schedules', 'memos', defs(2)), 'memos', 'restored once memo matches arrive');
+  assert.equal(pickSearchCategory('schedules', null, defs(2)), 'schedules', 'no preference: keep current');
+  assert.equal(pickSearchCategory('chat', null, defs(2)), 'schedules', 'empty current: first with matches');
+  assert.equal(pickSearchCategory('chat', null, []), 'chat');
+});
+
+test('통합검색 page remembers the category across Back from a result', async () => {
+  const shell = await readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shell, /initialCategory: searchCategoryRef\.current, onCategoryChange: \(key\) => \{ searchCategoryRef\.current = key \|\| null; \}/);
+  assert.match(shell, /searchQueryRef\.current = '';\s*searchCategoryRef\.current = null;/, 'a fresh search starts on the default category');
+  const core = await readFile(new URL('../src/ui/ui-calendar-core.js', import.meta.url), 'utf8');
+  assert.match(core, /React\.useState\(initialCategory \|\| 'schedules'\)/);
+  assert.match(core, /pickSearchCategory\(prev, preferredCategoryRef\.current, tabDefs\)/);
 });
