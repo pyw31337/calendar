@@ -1,4 +1,5 @@
 import { parseMemoShareUrl, findMemoShareUrlInText } from '../core/memo-share-link.js';
+import { TikTokEmbedWidget as WidgetTikTokEmbedWidget } from './ui-widgets.js';
 
 /**
  * Direct media, deadline picker, places section, image URL (P4-21)
@@ -120,7 +121,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
-  const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
+  const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget || WidgetTikTokEmbedWidget;
   const extractFirstUrl = __deps.extractFirstUrl;
 
   const firstUrl = extractFirstUrl(text);

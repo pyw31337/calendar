@@ -8,6 +8,7 @@ import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
 import { diffCalendarSettingsFields } from '../core/calendar-settings-diff.js';
 import { todaySeoulDateKey, seoulMonthKey } from '../core/seoul-date.js';
+import { ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
 
 /**
  * Icon unification pass (2026-09-17): a handful of admin icons that used to come from the
@@ -321,7 +322,7 @@ export function AdminDashboard({ initialCalendars }) {
   const AdminUnifiedSearchResultsView = __comp.AdminUnifiedSearchResultsView || __deps.AdminUnifiedSearchResultsView;
   const AlertTriangleIcon = __comp.AlertTriangleIcon || __deps.AlertTriangleIcon;
   const CalendarCogIcon = AdminCalendarCogIcon;
-  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge || WidgetParticipantBadge;
   const ChartBarIcon = __comp.ChartBarIcon || __deps.ChartBarIcon;
   const ChartPieIcon = __comp.ChartPieIcon || __deps.ChartPieIcon;
   const ChatSectionIcon = AdminChatSectionIcon;

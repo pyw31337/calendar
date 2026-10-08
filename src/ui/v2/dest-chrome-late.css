@@ -6177,7 +6177,8 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] button[role="switch"][aria
   background-color: #48484A !important;
 }
 /* Settlement card status chip ("진행중") sets its purple text inline (ui-event-modals.js). */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style^="color: rgb(91, 75, 235)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*=" color: rgb(91, 75, 235)"] {
   color: var(--on-brand) !important;
 }
 /* Settlement hero: same solid lime slab as the home hero (start = mid = end, no gradient). */
@@ -6253,7 +6254,8 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-transfer-guide b {
   color: var(--brand) !important;
 }
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style^="color: rgb(91, 75, 235)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*=" color: rgb(91, 75, 235)"] {
   background: var(--on-brand) !important;
   color: var(--brand) !important;
 }
@@ -6392,12 +6394,21 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay .modal-cont
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay > .modal-container.v2-responsive-modal {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
 }
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 58, 237)"],
+/* Inline-ink overrides below match the color property only: "^=" for a leading declaration,
+   " color:" (space after the previous "; ") for later ones. A bare substring match on "color: X" also
+   matched background-color/border-color: X, recoloring the text of filled badges (e.g. the
+   content poster "행사중/상영중" badge turned lime-on-green). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: rgb(124, 58, 237)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: rgb(124, 58, 237)"],
 /* Same purple, now written as a color-theme token with its literal fallback (color-themes.css). */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: var(--a-brand, #7C3AED)"],
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: var(--a-brand, #7C2FE5)"],
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 47, 229)"],
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(139, 92, 246)"]:not(svg):not(path) {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: var(--a-brand, #7C3AED)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: var(--a-brand, #7C3AED)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: var(--a-brand, #7C2FE5)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: var(--a-brand, #7C2FE5)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: rgb(124, 47, 229)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: rgb(124, 47, 229)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: rgb(139, 92, 246)"]:not(svg):not(path),
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: rgb(139, 92, 246)"]:not(svg):not(path) {
   color: var(--brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: var(--v2-primary"],
@@ -6410,11 +6421,14 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .url-capsule-badge {
   color: var(--text-main) !important;
 }
 /* Light-theme slate ink set inline (#334155/#475569) reads ~2:1 on Theme 2's black cards. */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(71, 85, 105)"],
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(51, 65, 85)"] {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: rgb(71, 85, 105)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: rgb(71, 85, 105)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: rgb(51, 65, 85)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: rgb(51, 65, 85)"] {
   color: var(--text-muted) !important;
 }
-html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(22, 163, 74)"] {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style^="color: rgb(22, 163, 74)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*=" color: rgb(22, 163, 74)"] {
   color: var(--brand) !important;
 }
 /* Map cluster counts (inline #3B82F6 + white ring in ui-places.js): black chip, lime ring/ink. */
@@ -6427,6 +6441,48 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .place-cluster-icon > div 
 html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: rgb(226, 232, 240)"] {
   background-color: #3A3A3C !important;
   color: var(--text-muted) !important;
+}
+
+/* Dark-only status tones. Components that paint a light-theme status color inline write it as
+   var(--tone-*, <original literal>); only the dark block defines these, so the light theme
+   computes exactly the original literal. Values are tuned for the near-black cards. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] {
+  --tone-success-bg: rgba(34, 197, 94, 0.14);
+  --tone-success-border: rgba(34, 197, 94, 0.38);
+  --tone-danger-bg: rgba(248, 113, 113, 0.14);
+  --tone-danger-border: rgba(248, 113, 113, 0.4);
+  --tone-danger-ink: #F87171;
+  --tone-warn-bg: rgba(251, 191, 36, 0.1);
+  --tone-warn-border: rgba(251, 191, 36, 0.32);
+  --tone-warn-ink: #FCD34D;
+  --tone-blue-ink: #60A5FA;
+  --tone-violet-ink: #A78BFA;
+  --tone-indigo-ink: #A5B4FC;
+  --tone-purple-ink: #D8B4FE;
+  --tone-red-ink: #F87171;
+  --tone-amber-ink: #FBBF24;
+  --tone-orange-ink: #FB923C;
+  --tone-slate-ink: #A1A1AA;
+  --tone-divider: #2C2C2C;
+  /* DateChip (ui-widgets.js): the light theme's indigo deep ink on a 12% tint read 1.9:1. */
+  --tone-datechip-bg: var(--d-brand-soft, #1F2A0E);
+  --tone-datechip-ink: var(--d-brand, #C9FD58);
+}
+/* The MapLibre vector layer is mounted inside .leaflet-tile-pane, so inverting both (above)
+   flipped it twice and the dark map rendered light gray. The pane does the single inversion. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane .leaflet-gl-layer {
+  filter: none;
+}
+/* Place marker popup: Leaflet's default white bubble with the dark hack's muted inks was gray on
+   white. Same card surface as every other dark sheet. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-popup-content-wrapper,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-popup-tip {
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-popup-content-wrapper {
+  border: 1px solid var(--border-subtle) !important;
 }
 
 /* PC home uses the same 40px page gutter as every other destination body (.v2-dest-body,

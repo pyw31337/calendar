@@ -4,6 +4,7 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { LikeButton } from './like-button.js';
 import { useParticipantSync } from '../core/current-participant.js';
+import { SearchResultLogRow as WidgetSearchResultLogRow, ParticipantPickerButton as WidgetParticipantPickerButton, ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -243,7 +244,7 @@ export function CalendarGrid({
   const SoccerBallIcon = __comp.SoccerBallIcon || __deps.SoccerBallIcon;
   const HandballIcon = __comp.HandballIcon || __deps.HandballIcon;
   const ClapperboardIcon = __comp.ClapperboardIcon || __deps.ClapperboardIcon;
-  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge || WidgetParticipantBadge;
   // 흔들도시락 anniversary: cooking-pot icon + jiggle (title match, not category emoji).
   const isHeundeulDosirakAnn = (ann) => {
     const title = String(ann && ann.title != null ? ann.title : '').trim();
@@ -1628,7 +1629,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
   const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
     const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
-  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton || WidgetParticipantPickerButton;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
@@ -2380,7 +2381,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PollSectionIcon = __comp.PollSectionIcon || __deps.PollSectionIcon;
-  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge || WidgetParticipantBadge;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
@@ -2690,7 +2691,7 @@ export function GlobalSearchModal({
   const SearchCategoryTabs = __comp.SearchCategoryTabs || __deps.SearchCategoryTabs;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
-  const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
+  const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow || WidgetSearchResultLogRow;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const formatChatFileSize = __deps.formatChatFileSize
     || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.formatChatFileSize);
@@ -3105,7 +3106,7 @@ export function EditMessageModal({
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
-  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton || WidgetParticipantPickerButton;
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;

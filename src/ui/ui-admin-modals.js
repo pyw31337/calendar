@@ -3,6 +3,7 @@
  */
 
 import { TABLER_ICONS } from './v2/tabler-icons.js';
+import { SearchResultLogRow as WidgetSearchResultLogRow, ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
 
 /**
  * Icon unification pass (2026-09-17): see the matching comment in ui-admin-dashboard.js -- same
@@ -28,6 +29,17 @@ const AdminHourglassIcon = makeAdminTablerIcon('restore', 16);
 const AdminSettingsIcon = makeAdminTablerIcon('settings', 18);
 const AdminSmallXIcon = makeAdminTablerIcon('x', 24);
 const AdminTrashIcon = makeAdminTablerIcon('trash', 24);
+
+/* Dark themes define --tone-*-ink on <html> (dest-chrome-late.css); light themes don't, so the
+ * literal fallback keeps the light theme computing exactly the original color. */
+const TONE_INK_BY_HEX = {
+  '#2563EB': 'blue', '#7C3AED': 'violet', '#8B5CF6': 'violet', '#DC2626': 'red', '#B91C1C': 'red',
+  '#B45309': 'amber', '#C2410C': 'orange', '#4338CA': 'indigo', '#6366F1': 'indigo', '#7E22CE': 'purple',
+};
+function toneInk(color) {
+  const tone = color && TONE_INK_BY_HEX[String(color).toUpperCase()];
+  return tone ? `var(--tone-${tone}-ink, ${color})` : color;
+}
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -181,7 +193,7 @@ export function AdminModal({
   const CalendarCogIcon = AdminCalendarCogIcon;
   const CalendarExportIcon = __comp.CalendarExportIcon || __deps.CalendarExportIcon;
     const ColorSwatchPicker = __comp.ColorSwatchPicker || __deps.ColorSwatchPicker;
-  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge || WidgetParticipantBadge;
     const HourglassIcon = AdminHourglassIcon;
   const LogIcon = __comp.LogIcon || __deps.LogIcon;
     const PollModal = __comp.PollModal || __deps.PollModal;
@@ -760,7 +772,7 @@ export function AdminModal({
       },
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
-          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#92400E', fontSize: 'var(--font-size-md)', lineHeight: '1.5' }
+          style: { backgroundColor: 'var(--tone-warn-bg, #FEF3C7)', border: '1px solid var(--tone-warn-border, #FDE68A)', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: 'var(--tone-warn-ink, #92400E)', fontSize: 'var(--font-size-md)', lineHeight: '1.5' }
         },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "시점 복구 안내 (데이터 롤백): "),
           "선택한 마일스톤 시점으로 캘린더 데이터를 되돌립니다. 지정한 복구 시점 이후에 수행된 변경 사항이 해당 상태로 복원됩니다."
@@ -863,7 +875,7 @@ export function AdminModal({
                     className: "recent-log-action-badge",
                     style: {
                       fontSize: 'var(--font-size-xs)', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
-                      backgroundColor: actionBadgeBg, color: actionBadgeColor, border: `1px solid ${actionBadgeColor}30`,
+                      backgroundColor: actionBadgeBg, color: toneInk(actionBadgeColor), border: `1px solid ${actionBadgeColor}30`,
                       whiteSpace: 'nowrap', flexShrink: 0
                     }
                   }, actionLabel),
@@ -973,7 +985,7 @@ export function AdminModal({
             const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
             const participant = resolveParticipant(log, participantsMap);
             const actionLabel = actionLabels[log.action] || '기록';
-            const actionColor = actionColors[log.action] || 'var(--text-muted)';
+            const actionColor = toneInk(actionColors[log.action]) || 'var(--text-muted)';
             const noteText = sanitizeText(formatNote(log) || '', 160);
             const logDateText = log.date ? formatShortDateWithDayName(log.date) : '';
             const logTitleText = [participant.name, `[${actionLabel}]`, logDateText].filter(Boolean).join(' ');
@@ -1080,7 +1092,7 @@ export function AdminUnifiedSearchResultsView({
   };
   const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker;
   const SearchCategoryTabs = __comp.SearchCategoryTabs || __deps.SearchCategoryTabs;
-  const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
+  const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow || WidgetSearchResultLogRow;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
 
   const q = (query || '').trim().toLowerCase();
@@ -1201,7 +1213,7 @@ export function AdminUnifiedSearchResultsView({
         "aria-label": "검색 기간/캘린더 필터", title: "검색 기간/캘린더 필터",
         style: {
           ...PAGE_HEADER_ICON_BTN_STYLE,
-          color: (calFilter !== 'all' || dateStart || dateEnd) ? '#2563EB' : 'var(--text-muted)'
+          color: (calFilter !== 'all' || dateStart || dateEnd) ? toneInk('#2563EB') : 'var(--text-muted)'
         }
       }, /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 22 }))
     ),
