@@ -1,4 +1,4 @@
-/* !important policy (audited 2026-10): no-effect !important were dropped; the remaining ones win over inline styles or earlier !important layers. Replace them only with a specificity fix. */
+/* !important policy (audited 2026-10): no-effect !important were dropped; the remaining ones win over inline styles or earlier !important layers (memo-card rules work as redundant pairs with chat-bubble-modules.css). Replace them only with a specificity fix. */
 /**
  * V2 destination full-bleed layout module
  * ---------------------------------------
@@ -115,9 +115,9 @@
 .v2-design .v2-dest-page .v2-legacy-body > .settlement-page-body,
 .v2-design .v2-dest-page .gallery-page-scroll,
 .v2-design .v2-dest-page .history-page-scroll {
-  padding-left: var(--v2-dest-content-pad-x);
-  padding-right: var(--v2-dest-content-pad-x);
-  box-sizing: border-box;
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+  box-sizing: border-box !important;
 }
 
 /* Filter/register/edit controls belong to the scrollable body, never sticky header chrome. */
@@ -147,11 +147,11 @@
 .v2-design .v2-wrap-legacy .memo-composer-card,
 .v2-design .v2-wrap-legacy .settlement-page-actions {
   position: relative !important;
-  top: auto;
-  left: auto;
-  right: auto;
-  margin-left: 0;
-  margin-right: 0;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* Places keeps its own toolbar and category strip outside the list body. They are body
