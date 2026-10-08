@@ -908,6 +908,62 @@ export function DateModal({
   const fetchedSourceIdsRef = React.useRef(new Set());
   // Declared early so source-message hydration can include REST-prefer local album photos.
   const [localAlbumPhotos, setLocalAlbumPhotos] = React.useState([]);
+  const [indexedMeetingPhotos, setIndexedMeetingPhotos] = React.useState([]);
+
+  // A DateModal deliberately keeps its own hydrated album cache: an old chat page may not hold
+  // the source message for a meeting photo.  That cache must be updated when Lightbox confirms
+  // a deletion; waiting for a future modal remount made a successfully deleted photo look as if
+  // it had come straight back.  Compare stable album/source identities first and URLs only as a
+  // legacy fallback (signed Storage URLs can gain a query string between reads).
+  const removeDeletedMeetingPhotoFromLocalCaches = React.useCallback(deletedMeta => {
+    if (!deletedMeta || typeof deletedMeta !== 'object') return;
+    const deletedId = String(deletedMeta.photoId || '');
+    const deletedSourceId = String(deletedMeta.sourceMessageId || deletedMeta.messageId || '');
+    const rawDeletedIndex = Number.isInteger(deletedMeta.sourceImageIndex)
+      ? deletedMeta.sourceImageIndex
+      : (Number.isInteger(deletedMeta.imageIndex) ? deletedMeta.imageIndex : null);
+    const deletedUrls = new Set(
+      [deletedMeta.imageUrl, deletedMeta.thumbUrl, deletedMeta.full, deletedMeta.thumb]
+        .filter(Boolean)
+        .map(url => String(url).split('?')[0])
+    );
+    const matchesPhoto = photo => {
+      if (!photo || typeof photo !== 'object') return false;
+      if (deletedId && String(photo.id || '') === deletedId) return true;
+      const sourceMatches = deletedSourceId && String(photo.sourceMessageId || photo.messageId || '') === deletedSourceId;
+      const photoIndex = Number.isInteger(photo.sourceImageIndex)
+        ? photo.sourceImageIndex
+        : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : null);
+      if (sourceMatches && rawDeletedIndex != null && photoIndex === rawDeletedIndex) return true;
+      if (deletedUrls.size === 0) return false;
+      return [photo.imageUrl, photo.thumbUrl, photo.full, photo.thumb, photo.url]
+        .filter(Boolean)
+        .some(url => deletedUrls.has(String(url).split('?')[0]));
+    };
+    const stripFromSourceMessage = message => {
+      if (!deletedSourceId || !message || String(message.id || '') !== deletedSourceId || rawDeletedIndex == null) return message;
+      const urls = Array.isArray(message.imageUrls) ? message.imageUrls.slice() : (message.imageUrl ? [message.imageUrl] : []);
+      const thumbs = Array.isArray(message.thumbUrls) ? message.thumbUrls.slice() : (message.thumbUrl ? [message.thumbUrl] : []);
+      const tags = Array.isArray(message.imageTags) ? message.imageTags.slice() : [];
+      if (rawDeletedIndex < 0 || rawDeletedIndex >= Math.max(urls.length, thumbs.length)) return message;
+      const nextUrls = urls.filter((_, index) => index !== rawDeletedIndex);
+      const nextThumbs = thumbs.filter((_, index) => index !== rawDeletedIndex);
+      return {
+        ...message,
+        imageUrls: nextUrls,
+        thumbUrls: nextThumbs,
+        imageTags: tags.filter((_, index) => index !== rawDeletedIndex),
+        imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || '',
+        thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || ''
+      };
+    };
+    setLocalAlbumPhotos(previous => (previous || []).filter(photo => !matchesPhoto(photo)));
+    setIndexedMeetingPhotos(previous => (previous || []).filter(photo => !matchesPhoto(photo)));
+    setFetchedTaggedMessages(previous => (previous || []).map(stripFromSourceMessage));
+    setFetchedSourceMessages(previous => Object.fromEntries(
+      Object.entries(previous || {}).map(([id, message]) => [id, stripFromSourceMessage(message)])
+    ));
+  }, []);
   React.useEffect(() => {
     if (typeof onFindChatMessageById !== 'function') return;
     const loadedIds = new Set((chatMessages || []).map(m => m && m.id).filter(Boolean));
@@ -956,8 +1012,8 @@ export function DateModal({
   // user opening Gallery or loading older chat pages first.
   const [fetchedTaggedMessages, setFetchedTaggedMessages] = React.useState([]);
   const [fetchedTaggedMemos, setFetchedTaggedMemos] = React.useState([]);
-  const [indexedMeetingPhotos, setIndexedMeetingPhotos] = React.useState([]);
-  // localAlbumPhotos state is declared above (with source-message hydration).
+  // localAlbumPhotos/indexedMeetingPhotos state are declared above so a Lightbox deletion can
+  // remove its stale snapshot before this tab recomputes its visible photo list.
   const fetchedDateTagRef = React.useRef('');
   React.useEffect(() => {
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
@@ -3587,6 +3643,7 @@ export function DateModal({
               setActiveLightbox({
                 urls: visibleMeetingImages.map(p => p.imageUrl || p.thumbUrl),
                 index,
+                onPhotoDeleted: removeDeletedMeetingPhotoFromLocalCaches,
                 meta: visibleMeetingImages.map(p => ({
                   timestamp: p.createdAt,
                   tags: p.tags,

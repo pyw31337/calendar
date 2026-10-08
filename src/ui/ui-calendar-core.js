@@ -1576,6 +1576,7 @@ export function CommentsSection({
     meta: activeLightbox.meta,
     onClose: () => setActiveLightbox(null),
     onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+    onPhotoDeleted: activeLightbox.onPhotoDeleted,
     showToast,
     onPromoteImageUrl,
     onSaveImageTags,

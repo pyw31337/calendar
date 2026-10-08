@@ -4581,6 +4581,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       calendar: calendar || v2RecordsContext.calendar,
       onClose: () => setActiveV2Lightbox(null),
       onNavigate: index => setActiveV2Lightbox(current => current ? { ...current, index } : current),
+      onPhotoDeleted: activeV2Lightbox.onPhotoDeleted,
       showToast: v2RecordsContext.showToast,
       onPromoteImageUrl: v2RecordsContext.historyProps?.onPromoteImageUrl,
       onSaveImageTags: v2RecordsContext.historyProps?.onSaveImageTags,

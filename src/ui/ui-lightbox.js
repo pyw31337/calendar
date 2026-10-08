@@ -698,7 +698,7 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onPhotoDeleted = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -1276,9 +1276,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       setIsDeletingPhoto(true);
       try {
         const ok = await onDeletePhoto({ ...currentMeta, imageUrl: currentUrl });
-        // No good way to remove just this one entry from the static urls/meta snapshot the
-        // parent handed in -- close and let the next open reflect live data instead.
-        if (ok) closeLightbox();
+        // The Lightbox owns a static urls/meta snapshot, but a date sheet can additionally have
+        // a REST-fetched album cache that survives while this overlay is open.  Tell that owner
+        // about a persisted deletion before closing, otherwise the same stale thumbnail appears
+        // immediately on return even though the server mutation succeeded.
+        if (ok) {
+          try {
+            onPhotoDeleted?.({ ...currentMeta, imageUrl: currentUrl, thumbUrl: currentMeta?.thumbUrl || currentMeta?.thumb || currentUrl });
+          } catch (callbackErr) {
+            // A view-cache refresh must never turn a successful data deletion into a failed one.
+            console.warn('Lightbox deleted-photo cache callback failed:', callbackErr);
+          }
+          closeLightbox();
+        }
         else if (typeof showToast === 'function') showToast('사진을 삭제하지 못했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.', 'error', 4500);
       } catch (err) {
         console.error('Lightbox photo delete failed:', err);

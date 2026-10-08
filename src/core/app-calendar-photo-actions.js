@@ -411,20 +411,20 @@ export function createCalendarPhotoActions({
       { imageUrl: target.full, thumbUrl: target.thumb },
       { excludeMessageId: messageId, excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date) }
     );
-    // `writeCollectionDocumentWithFallback` can also return { queued: true } when neither the
-    // SDK nor REST attempt could complete in time (see FIRESTORE_WRITE_DEADLINE_MS/
-    // shouldQueueCollectionWrite) -- the operation is durably saved for a later automatic retry,
-    // but it has NOT actually reached Firestore yet. Callers used to treat that identically to a
-    // real success, showing "사진이 삭제되었습니다." even though the photo was still sitting on
-    // the server -- exactly the confusing "it says deleted but it's still there" symptom this is
-    // fixing. Surface the truth instead so the user knows to wait rather than repeat the action.
-    let wasQueued;
+    // A queued write has NOT reached Firestore yet.  A delete must not close its Lightbox or
+    // remove a date-sheet thumbnail until the server has acknowledged it; otherwise users see a
+    // successful-looking delete followed by the photo reappearing at the next render.
+    const requireServerAcknowledgement = result => {
+      if (!result) throw new Error('Photo delete update failed');
+      if (!result.queued) return true;
+      if (!silent) showToast('삭제 요청이 서버에 아직 반영되지 않았습니다. 연결이 복구되면 자동으로 처리되며, 사진은 반영될 때까지 그대로 표시됩니다.', 'info', 6500);
+      return false;
+    };
     try {
       const isWholeDelete = nextUrls.length === 0 && !remainingText && remainingFiles.length === 0;
       if (isWholeDelete) {
-        const deleted = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, null, 'delete', '메시지 삭제');
-        if (!deleted) throw new Error('Message delete failed');
-        wasQueued = Boolean(deleted?.queued);
+        const deleted = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, null, 'delete', '메시지 삭제', { requirePersisted: true });
+        if (!requireServerAcknowledgement(deleted)) return false;
         removeLocalChatMessage(messageId);
       } else {
         const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
@@ -437,9 +437,8 @@ export function createCalendarPhotoActions({
           imageTagMap: nextImageTagMap,
           ...fingerprintsWithoutSlots(sourceMessage, index => index === imageIndex)
         });
-        const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제', { deletePaths });
-        if (!ok) throw new Error('Photo delete update failed');
-        wasQueued = Boolean(ok?.queued);
+        const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제', { deletePaths, requirePersisted: true });
+        if (!requireServerAcknowledgement(ok)) return false;
         patchLocalChatMessage(messageId, data);
       }
 
@@ -506,9 +505,7 @@ export function createCalendarPhotoActions({
         if (!meetingCleanupOk) return;
         await finalizeStorageDeletion();
       };
-      if (wasQueued) {
-        if (!silent) showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
-      } else if (silent) {
+      if (silent) {
         await expireStorageDeletion();
       } else if (canUndo) {
         showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, expireStorageDeletion, 5000);

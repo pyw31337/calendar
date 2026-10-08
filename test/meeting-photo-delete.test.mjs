@@ -48,4 +48,7 @@ test('date-modal maps a meeting index projection back to an editable meeting sou
   assert.match(source, /source: p\.source === 'chat-tag' \? 'chat-tag' : 'meeting'/);
   assert.match(lightbox, /const isMeetingPhoto = !!currentMeta\?\.meetingDate && !!currentMeta\?\.photoId/);
   assert.match(lightbox, /void confirmAction\(\)/);
+  assert.match(source, /onPhotoDeleted: removeDeletedMeetingPhotoFromLocalCaches/);
+  assert.match(lightbox, /onPhotoDeleted\?\.\(\{ \.\.\.currentMeta, imageUrl: currentUrl/);
+  assert.match(source, /setLocalAlbumPhotos\(previous => \(previous \|\| \[\]\)\.filter\(photo => !matchesPhoto\(photo\)\)\)/);
 });
