@@ -53,7 +53,7 @@ import {
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
-import { AiOperationsSummary } from './ai-operations-panel.js';
+import { useHomeSummaryUi } from './home-summary-ui.js';
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
@@ -2081,11 +2081,13 @@ function HomeLoadingRows({ label, count = 3, variant = 'row' }) {
 }
 
 
-function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpenGalleryAnalysis }) {
+function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const MemoShareModal = __comp.MemoShareModal || __deps.MemoShareModal;
+  // MemoCard and the components it renders live in lazily loaded UI chunks (home-summary-ui.js).
+  const homeSummaryUiReady = useHomeSummaryUi(React);
   const ReactDOM = window.ReactDOM;
   const memoDateProps = calendarContext?.dateModalProps || {};
   const [sharingMemo, setSharingMemo] = React.useState(null);
@@ -2190,7 +2192,6 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
     React.createElement('div', { className: bentoClass('renewal-home-summary-section bento-card wide enter'), style: { animationDelay: '0.04s' } },
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
     ),
-    React.createElement(AiOperationsSummary, { calendar: calendarContext?.calendar, onOpenDate, onChangeView, onOpenGalleryAnalysis }),
     React.createElement(HomeSummarySection, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
       messages.length ? React.createElement(HomeSummaryPager, {
         items: messages,
@@ -2266,7 +2267,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
         : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.'))
     ),
     React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
-      memos.length ? React.createElement(HomeSummaryPager, {
+      memos.length && homeSummaryUiReady ? React.createElement(HomeSummaryPager, {
         items: memos,
         label: '최근 메모',
         renderPage: (memo, i) => {
@@ -2306,7 +2307,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
           })
           : React.createElement('button', { type: 'button', className: 'v2-bubble-title', onClick: openMemo }, memo.title || '메모')));
       }
-      }) : (calendarContext?.isLoading
+      }) : ((calendarContext?.isLoading || memos.length)
         ? React.createElement(HomeLoadingRows, { label: '최근 메모 불러오는 중', variant: 'card', count: 2 })
         : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.'))
     ),

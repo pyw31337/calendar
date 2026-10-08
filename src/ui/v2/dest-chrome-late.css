@@ -7623,8 +7623,8 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.is-liked { color: var(--bran
 html:has(.renewal-shell.v2-design) .gather-like-btn:active { transform: scale(0.86); }
 html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 2px;
+  left: 2px;
   z-index: 3;
   width: 28px;
   height: 28px;
@@ -7633,7 +7633,7 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia {
   color: #FFFFFF;
   filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.55));
 }
-html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia.at-right { left: auto; right: 6px; }
+html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia.at-right { left: auto; right: 2px; }
 html:has(.renewal-shell.v2-design) .gather-like-btn.is-onMedia.is-liked,
 html:has(.renewal-shell.v2-design) .gather-like-btn.is-inlineMedia.is-liked { background: transparent; color: var(--brand, #7C3AED); }
 html:has(.renewal-shell.v2-design) .gather-like-btn.is-inlineMedia {
@@ -8104,27 +8104,8 @@ html:has(.renewal-shell.v2-design) .places-list-toolbar [role="tablist"]:not(.un
   height: 42px !important;
 }
 
-/* 4 — wide screens: cap dest main column (centered in pane right of side-nav) */
-@media (min-width: 1600px) {
-  html:has(.renewal-shell.v2-design) {
-    --v2-dest-content-max: 1280px;
-  }
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-dest-body,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-legacy-body,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .history-page-scroll,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .gallery-page-scroll,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-list-body,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .v2-dest-controls,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-list-toolbar,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .places-category-sticky-tabs,
-  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-dest-page .culture-items-grid {
-    max-width: var(--v2-dest-content-max, 1280px) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-}
+/* 4 — (removed) destination pages fill the full pane right of the side-nav at every width;
+   the old 1280px wide-screen cap left large empty margins beside the map, lists and grids. */
 
 /* 6 — confetti under modals/controls (base canvas rule lives in app.css) */
 html:has(.renewal-shell.v2-design) canvas.bp-confetti-layer {
