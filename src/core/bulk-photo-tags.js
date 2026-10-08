@@ -92,6 +92,34 @@ export async function mergeDuplicatePhotosRemote({ calendarId, projectId, keep, 
   return payload;
 }
 
+// Deleting one photo can touch its source message, an archive/memo copy and one or more
+// confirmed-meeting albums.  Those changes must be committed together: the older browser-only
+// sequence could remove the source first and then fail while removing the album entry, which is
+// exactly how a date-sheet thumbnail appeared to resurrect after a successful-looking delete.
+// `mediaCommand.deleteAsset` owns that transaction on the server.  This helper deliberately
+// returns the server's counts so callers can reject a no-op rather than showing a false success.
+export async function deletePhotoAssetRemote({ calendarId, projectId, asset, fetchImpl = fetch } = {}) {
+  const ref = toCommandItem(asset);
+  const hasStorageAsset = /^https:\/\/firebasestorage\.googleapis\.com\//i.test(ref.imageUrl)
+    || /^https:\/\/firebasestorage\.googleapis\.com\//i.test(ref.thumbUrl);
+  if (!calendarId || !projectId || !hasStorageAsset) return { ok: false, reason: 'invalid' };
+  const response = await postMediaCommand(fetchImpl, projectId, {
+    calendarId,
+    op: 'deleteAsset',
+    asset: {
+      imageUrl: ref.imageUrl,
+      thumbUrl: ref.thumbUrl,
+      messageId: ref.messageId,
+      memoId: ref.memoId,
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.reason || `photo delete failed (${response.status})`);
+  }
+  return payload;
+}
+
 export async function saveBulkPhotoTagsRemote({ calendarId, projectId, changes, fetchImpl = fetch } = {}) {
   const list = (Array.isArray(changes) ? changes : []).map(toCommandItem)
     .filter(item => /^https?:\/\//i.test(item.imageUrl || item.thumbUrl));

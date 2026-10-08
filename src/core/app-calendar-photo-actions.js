@@ -25,6 +25,7 @@ import { filterDeletedPhotoFromIndexItems } from './gallery-bulk-delete.js';
 import { findImageSlotByAsset, removeAssetFromMeetings, replaceAssetInMeetings } from './media-reference-integrity.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { movePhotoComments } from './photo-comment-items.js';
+import { deletePhotoAssetRemote } from './bulk-photo-tags.js';
 
 export function createCalendarPhotoActions({
   activeCalId, showToast, showUndoableDeleteToast, showRetryableUploadToast, setSelectedDate,
@@ -235,7 +236,7 @@ export function createCalendarPhotoActions({
   // possibly stale local copy -- another device may have removed or reordered photos, and acting
   // on the old array positions is what deleted/retagged neighbouring photos
   // (docs/data-architecture-v3.md, root cause 2).
-  const readFreshChatMessage = async messageId => {
+  const readFreshChatMessage = async (messageId, { allowLocalFallback = true } = {}) => {
     try {
       if (getFirebaseDb()) {
         const snap = await withTimeout(getFirebaseDb().collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'photo edit fresh message read');
@@ -246,7 +247,7 @@ export function createCalendarPhotoActions({
     } catch (readErr) {
       console.warn('readFreshChatMessage fell back to local copy:', readErr);
     }
-    return findChatMessageById(messageId);
+    return allowLocalFallback ? findChatMessageById(messageId) : null;
   };
   // imageFingerprints is slot-aligned with imageUrls: drop the same slots, so the duplicate check
   // never maps a fingerprint onto a neighbour's file. A misaligned legacy array is left alone.
@@ -289,6 +290,27 @@ export function createCalendarPhotoActions({
   // server, which can see every calendar.
   // Kept as the single place a photo file deletion would go; it deletes nothing.
   const deleteAssetFilesIfUnreferenced = async () => false;
+
+  // The server-side command performs this mutation in one Firestore transaction.  Prefer it for
+  // every Firebase Storage asset: source-message and confirmed-meeting writes otherwise race
+  // each other and a failed second write leaves the same image visible in the date modal.
+  // Legacy base64 images intentionally remain on the local mutation path because they are not
+  // addressable by the server's immutable Storage-asset key.
+  const deleteStoredPhotoAssetAtomically = async (asset, { messageId = '', memoId = '' } = {}) => {
+    const imageUrl = String(asset?.imageUrl || asset?.full || asset?.url || '');
+    const thumbUrl = String(asset?.thumbUrl || asset?.thumb || imageUrl || '');
+    const isStorageAsset = /^https:\/\/firebasestorage\.googleapis\.com\//i.test(imageUrl)
+      || /^https:\/\/firebasestorage\.googleapis\.com\//i.test(thumbUrl);
+    if (!isStorageAsset || !activeCalId || !firebaseConfig?.projectId) return null;
+    const result = await deletePhotoAssetRemote({
+      calendarId: activeCalId,
+      projectId: firebaseConfig.projectId,
+      asset: { imageUrl, thumbUrl, messageId, memoId },
+    });
+    // A 200 response with no changed source/album is a stale click, not a successful deletion.
+    const changed = Number(result?.slotsRemoved || 0) + Number(result?.albumCopiesRemoved || 0);
+    return changed > 0 ? result : { ok: false, reason: 'not-found' };
+  };
 
   // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
   // the right photo after the chat message they trace back to loses an image -- the entry at
@@ -381,6 +403,12 @@ export function createCalendarPhotoActions({
     }, sourceMessage.imageTagMap);
     const remainingText = String(sourceMessage.text || '').trim();
     const remainingFiles = Array.isArray(sourceMessage.fileAttachments) ? sourceMessage.fileAttachments.filter(Boolean) : [];
+    // Keep this in lockstep with functions/media-commands.js PLACEHOLDER_TEXTS.  Meeting and
+    // gallery uploads create a message containing only this marker, so the server correctly
+    // removes that empty shell after its final image has gone.
+    const serverDeletesSource = nextUrls.length === 0
+      && remainingFiles.length === 0
+      && ['', '갤러리 사진', '일정 사진', '사진'].includes(remainingText);
     const previousMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
     const sourceSnapshot = JSON.parse(JSON.stringify(sourceMessage));
     const deletedPhotoIdentity = {
@@ -390,6 +418,43 @@ export function createCalendarPhotoActions({
       imageUrl: target.full || '',
       thumbUrl: target.thumb || ''
     };
+    // Never fall back to the former two-request browser deletion after an atomic server command
+    // has failed.  Doing so brought back the split-brain state this path was introduced to
+    // prevent.  The Lightbox stays open and the user gets an honest failure instead.
+    if (/^https:\/\/firebasestorage\.googleapis\.com\//i.test(target.full || '')
+      || /^https:\/\/firebasestorage\.googleapis\.com\//i.test(target.thumb || '')) {
+      try {
+        const result = await deleteStoredPhotoAssetAtomically(target, { messageId });
+        if (!result?.ok) {
+          if (!silent) showToast('이미 삭제되었거나 변경된 사진입니다. 화면을 새로고침해 주세요.', 'error', 4000);
+          return false;
+        }
+        // Reconcile all local windows from the post-transaction source.  This avoids stale
+        // chat/gallery state while the Firestore listeners deliver the same change.
+        const refreshedSource = serverDeletesSource
+          ? null
+          : await readFreshChatMessage(messageId, { allowLocalFallback: false });
+        if (refreshedSource) {
+          patchLocalChatMessage(messageId, {
+            imageUrl: refreshedSource.imageUrl || '',
+            thumbUrl: refreshedSource.thumbUrl || '',
+            imageUrls: Array.isArray(refreshedSource.imageUrls) ? refreshedSource.imageUrls : [],
+            thumbUrls: Array.isArray(refreshedSource.thumbUrls) ? refreshedSource.thumbUrls : [],
+            imageTags: Array.isArray(refreshedSource.imageTags) ? refreshedSource.imageTags : [],
+            imageTagMap: refreshedSource.imageTagMap && typeof refreshedSource.imageTagMap === 'object' ? refreshedSource.imageTagMap : {},
+            imageFingerprints: Array.isArray(refreshedSource.imageFingerprints) ? refreshedSource.imageFingerprints : [],
+          });
+        } else {
+          removeLocalChatMessage(messageId);
+        }
+        if (!silent) showToast('사진이 삭제되었습니다.', 'delete', 3500);
+        return true;
+      } catch (err) {
+        console.error('atomic photo deletion failed:', err);
+        if (!silent) showToast('사진 삭제가 서버에 반영되지 않았습니다. 사진은 그대로 유지됩니다.', 'error', 5000);
+        return false;
+      }
+    }
     // Firestore messages rules only allow a fixed key set. Client snapshots often carry `id`
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { saveBulkPhotoTagsRemote } from '../src/core/bulk-photo-tags.js';
+import { deletePhotoAssetRemote, saveBulkPhotoTagsRemote } from '../src/core/bulk-photo-tags.js';
 
 const change = { photo: { full: 'https://firebasestorage.googleapis.com/v0/b/x/o/a.jpg', messageId: 'm1' }, tags: '서준' };
 const ok = () => ({ ok: true, status: 200, json: async () => ({ ok: true }) });
@@ -30,4 +30,28 @@ test('a rejected request (400) is not retried in the other region', async () => 
     fetchImpl: async url => { urls.push(url); return { ok: false, status: 400, json: async () => ({ ok: false, reason: 'invalid' }) }; },
   }));
   assert.equal(urls.length, 1);
+});
+
+test('photo deletion uses the same Seoul transaction endpoint and keeps source ownership', async () => {
+  const urls = [];
+  const result = await deletePhotoAssetRemote({
+    calendarId: 'cw', projectId: 'p',
+    asset: { full: 'https://firebasestorage.googleapis.com/v0/b/x/o/a.jpg', sourceMessageId: 'meeting_1' },
+    fetchImpl: async (url, options) => {
+      urls.push({ url, body: JSON.parse(options.body) });
+      return { ok: true, status: 200, json: async () => ({ ok: true, slotsRemoved: 1, albumCopiesRemoved: 1 }) };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(urls, [{
+    url: 'https://asia-northeast3-p.cloudfunctions.net/mediaCommand',
+    body: {
+      calendarId: 'cw', op: 'deleteAsset',
+      asset: {
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/x/o/a.jpg',
+        thumbUrl: 'https://firebasestorage.googleapis.com/v0/b/x/o/a.jpg',
+        messageId: 'meeting_1', memoId: '',
+      },
+    },
+  }]);
 });
