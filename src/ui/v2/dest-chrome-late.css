@@ -6160,10 +6160,6 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-container {
 }
 /* app.css already inverts the raster tiles for the legacy dark theme; stacked under the pane
    invert above they flipped back to mid gray. In V2 the pane does the single inversion. */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .places-map-raster-fallback .leaflet-tile {
-  filter: grayscale(1) !important;
-  -webkit-filter: grayscale(1) !important;
-}
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution {
   background: rgba(13, 13, 13, 0.72) !important;
   color: var(--text-muted) !important;
@@ -6481,6 +6477,20 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] {
    flipped it twice and the dark map rendered light gray. The pane does the single inversion. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane .leaflet-gl-layer {
   filter: none;
+}
+/* Raster fallback (Safari/WebKit, no MapLibre): WebKit does not paint the pane-level filter over
+   Leaflet's translate3d tile layers, so the dark map stayed light gray there. Filter each tile
+   instead (same recipe), and keep any vector layer in that pane inverted once. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane:has(> .places-map-raster-fallback) {
+  filter: none;
+  -webkit-filter: none;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .places-map-raster-fallback .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.08) grayscale(0.85) !important;
+  -webkit-filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.08) grayscale(0.85) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane:has(> .places-map-raster-fallback) .leaflet-gl-layer {
+  filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(1.08) grayscale(0.85);
 }
 /* Place marker popup: Leaflet's default white bubble with the dark hack's muted inks was gray on
    white. Same card surface as every other dark sheet. */
