@@ -1,5 +1,10 @@
 /* v2-shell-structure: first-class memo/places destinations; Bento side-nav is source of IA. */
 /* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
+/* !important policy (audited 2026-10): every !important here that had no effect in any audited
+   page, width (320-1920) and light/dark theme was dropped. The remaining ones are kept because they
+   win over inline React styles, library CSS or an earlier !important layer (dropping them changes
+   rendering), or they style states the audit could not reach (accent themes, hover/focus, rare
+   sheets). Replace those only together with a specificity fix, never by deleting the keyword. */
 .renewal-shell.v2-design {
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --renewal-page-max: 1600px;
@@ -61,7 +66,7 @@
   --v2-card-border: #eceaf5;
   --v2-card-shadow: 0 1px 3px rgba(30, 27, 46, 0.04), 0 4px 12px rgba(30, 27, 46, 0.03);
   padding: 0 !important;
-  padding-bottom: 0 !important;
+  padding-bottom: 0;
   min-height: 100dvh;
   font-family: var(--font-sans);
   line-height: normal;
@@ -298,18 +303,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: rgba(255, 255, 255, 0.96);
   color: var(--v2-accent, var(--a-brand-2, #5B4BEB)) !important;
-  font-size:0.75rem !important;
+  font-size:0.75rem;
   font-weight: 800 !important;
-  line-height: 1 !important;
-  padding: 2px 5px !important;
-  border-radius: 9999px !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
   animation: bp-hero-dday-heartbeat 0.75s ease-in-out infinite !important;
-  transform-origin: center !important;
+  transform-origin: center;
   letter-spacing: -0.02em;
-  white-space: nowrap !important;
+  white-space: nowrap;
 }
 .v2-design .bp-hero-weather-past-dday {
   color: rgba(255, 255, 255, 0.9) !important;
@@ -357,7 +362,7 @@
   background:
     linear-gradient(180deg, rgb(var(--a-hero-shade-rgb, 10 7 38) / 0.12) 0%, rgb(var(--a-hero-shade-rgb, 9 4 31) / 0.42) 100%),
     linear-gradient(-45deg, var(--a-hero-3, #12CDF0) 0%, var(--a-hero-2, #3604FD) 42%, var(--a-hero-1, #8019E0) 76%, var(--a-hero-2, #3604FD) 100%) !important;
-  background-size: auto, 100% 100% !important;
+  background-size: auto, 100% 100%;
   animation: none !important;
   isolation: isolate;
   /* Home shell sits flush at the very top of .renewal-shell.v2-design (padding:0), so in iOS
@@ -367,52 +372,52 @@
   padding-top: env(safe-area-inset-top, 0px);
 }
 .v2-design .bp-hero-zone::before {
-  content: "" !important;
-  display: block !important;
-  position: absolute !important;
-  inset: -55% !important;
-  z-index: 0 !important;
-  pointer-events: none !important;
+  content: "";
+  display: block;
+  position: absolute;
+  inset: -55%;
+  z-index: 0;
+  pointer-events: none;
   background:
     radial-gradient(ellipse 85% 78% at 20% 30%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.92) 0%, transparent 58%),
     radial-gradient(ellipse 80% 72% at 78% 18%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.9) 0%, transparent 55%),
-    radial-gradient(ellipse 74% 80% at 42% 88%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.92) 0%, transparent 60%) !important;
-  background-repeat: no-repeat !important;
+    radial-gradient(ellipse 74% 80% at 42% 88%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.92) 0%, transparent 60%);
+  background-repeat: no-repeat;
   mix-blend-mode: normal !important;
-  opacity: 0.9 !important;
-  animation: none !important;
-  transform: none !important;
+  opacity: 0.9;
+  animation: none;
+  transform: none;
   will-change: auto;
 }
 .v2-design .bp-hero-zone::after {
-  content: "" !important;
-  display: block !important;
-  position: absolute !important;
-  inset: -58% !important;
-  z-index: 0 !important;
-  pointer-events: none !important;
+  content: "";
+  display: block;
+  position: absolute;
+  inset: -58%;
+  z-index: 0;
+  pointer-events: none;
   background:
     radial-gradient(ellipse 82% 74% at 76% 74%, rgb(var(--a-hero-1-rgb, 128 25 224) / 0.86) 0%, transparent 56%),
     radial-gradient(ellipse 28% 26% at 12% 70%, rgb(var(--a-hero-3-rgb, 18 205 240) / 0.58) 0%, transparent 48%),
-    radial-gradient(ellipse 70% 64% at 90% 28%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.84) 0%, transparent 54%) !important;
-  background-repeat: no-repeat !important;
+    radial-gradient(ellipse 70% 64% at 90% 28%, rgb(var(--a-hero-2-rgb, 54 4 253) / 0.84) 0%, transparent 54%);
+  background-repeat: no-repeat;
   mix-blend-mode: soft-light !important;
-  opacity: 0.85 !important;
-  animation: none !important;
-  transform: none !important;
+  opacity: 0.85;
+  animation: none;
+  transform: none;
   will-change: auto;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
-  position: absolute !important;
-  inset: -22% !important;
-  z-index: 0 !important;
+  position: absolute;
+  inset: -22%;
+  z-index: 0;
   pointer-events: none;
   background:
     radial-gradient(ellipse 88% 70% at 50% 8%, rgb(var(--a-brand-light-rgb, 192 132 252) / 0.45) 0%, transparent 58%),
-    linear-gradient(180deg, transparent 50%, rgba(24, 8, 48, 0.26) 80%, rgba(15, 5, 40, 0.5) 100%) !important;
+    linear-gradient(180deg, transparent 50%, rgba(24, 8, 48, 0.26) 80%, rgba(15, 5, 40, 0.5) 100%);
   opacity: 0.95 !important;
   animation: none !important;
-  transform: none !important;
+  transform: none;
   will-change: auto;
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
@@ -437,30 +442,30 @@
 }
 .v2-design .bp-hero-zone .bp-icon-btn,
 .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
-  background: var(--v2-glass-dark-fill) !important;
-  border: 1px solid var(--v2-glass-dark-border) !important;
+  background: var(--v2-glass-dark-fill);
+  border: 1px solid var(--v2-glass-dark-border);
   backdrop-filter: var(--v2-glass-blur) !important;
   -webkit-backdrop-filter: var(--v2-glass-blur) !important;
-  box-shadow: var(--v2-glass-dark-inset), 0 0 0 1px rgba(255,255,255,0.12), var(--v2-glass-dark-glow) !important;
+  box-shadow: var(--v2-glass-dark-inset), 0 0 0 1px rgba(255,255,255,0.12), var(--v2-glass-dark-glow);
 }
 .v2-design .bp-dday-compact {
-  background: rgba(255, 255, 255, 0.16) !important;
-  border: 1px solid rgba(255, 255, 255, 0.52) !important;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.52);
   backdrop-filter: var(--v2-glass-blur-strong) !important;
   -webkit-backdrop-filter: var(--v2-glass-blur-strong) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgb(var(--a-ink-rgb, 25 8 85) / 0.24) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgb(var(--a-ink-rgb, 25 8 85) / 0.24);
 }
 .v2-design .bp-dday-compact-badge {
   background: linear-gradient(135deg, var(--a-brand, #7C2FE5) 0%, var(--a-brand-2, #4F46E5) 55%, #2563EB 100%);
   color: #fff;
-  border: 1px solid rgba(255,255,255,0.45) !important;
+  border: 1px solid rgba(255,255,255,0.45);
 }
 .v2-design .bp-dday-chip {
   background: rgba(255,255,255,0.18) !important;
-  border: 1px solid rgba(255,255,255,0.5) !important;
+  border: 1px solid rgba(255,255,255,0.5);
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
 }
 .v2-design .bp-dday-compact-text,
 .v2-design .bp-dday-compact-prefix,
@@ -663,8 +668,8 @@
 /* 320px: no horizontal overflow / overlapping hero controls */
 @media (max-width: 359px) {
   .v2-design .bp-hero-zone .bp-bento-title { padding: 10px 8px 2px; gap: 4px; }
-  .v2-design .bp-dday-toggle-wrap { padding: 10px 8px !important; }
-  .v2-design .bp-dday-strip { padding: 0 8px 10px !important; gap: 6px; }
+  .v2-design .bp-dday-toggle-wrap { padding: 10px 8px; }
+  .v2-design .bp-dday-strip { padding: 0 8px 10px; gap: 6px; }
   .v2-design .bp-dday-compact { gap: 6px; padding: 6px 8px 6px 6px; }
   .v2-design .bp-dday-compact-badge { font-size: 0.95rem; padding: 5px 8px; }
   .v2-design .bp-dday-compact-text { font-size:0.75rem; }
@@ -677,7 +682,7 @@
    DateModal portals into .renewal-shell.v2-design so these selectors apply.
    Default shell never sets shellChrome, so modal-overlay stays unchanged there. */
 .v2-design .bp-sheet-backdrop.modal-overlay {
-  background: rgba(20, 15, 35, 0.5) !important;
+  background: rgba(20, 15, 35, 0.5);
   align-items: flex-end !important;
   justify-content: center;
   padding: 0;
@@ -724,15 +729,15 @@
    spans the full visual width. */
 .renewal-shell.v2-design ~ .modal-overlay,
 .renewal-shell.v2-design .modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  margin: 0 !important;
-  transform: none !important;
-  box-sizing: border-box !important;
-  justify-content: center !important;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  margin: 0;
+  transform: none;
+  box-sizing: border-box;
+  justify-content: center;
 }
 @media (min-width: 768px) {
   .renewal-shell.v2-design .modal-overlay,
@@ -752,24 +757,24 @@
   position: fixed;
   left: 50%;
   right: auto;
-  bottom: 0 !important;
-  top: auto !important;
-  width: 100% !important;
-  max-width: 520px !important;
-  max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
+  bottom: 0;
+  top: auto;
+  width: 100%;
+  max-width: 520px;
+  max-height: min(86dvh, var(--gather-vv-modal-max, 860px));
   margin: 0;
-  transform: translate(-50%, 0) !important;
-  border-radius: 20px 20px 0 0 !important;
-  box-shadow: 0 -16px 44px rgb(var(--a-ink-rgb, 76 29 149) / 0.28) !important;
+  transform: translate(-50%, 0);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -16px 44px rgb(var(--a-ink-rgb, 76 29 149) / 0.28);
   background: var(--bg-card, var(--bg-card));
-  overflow: hidden !important;
+  overflow: hidden;
   padding: 0 !important;
   display: flex;
   flex-direction: column;
   animation: none;
 }
 .v2-design .bp-event-sheet .bp-sheet-handle {
-  display: none !important;
+  display: none;
 }
 .v2-design .bp-event-sheet .modal-header {
   background: var(--bg-card, var(--bg-card));
@@ -795,22 +800,22 @@
 
   .v2-design .bp-sheet-backdrop.modal-overlay {
     align-items: center !important;
-    width: 100vw !important;
-    left: 0 !important;
-    right: auto !important;
+    width: 100vw;
+    left: 0;
+    right: auto;
   }
   .v2-design .bp-event-sheet.modal-container {
-    left: 50vw !important;
-    right: auto !important;
-    bottom: auto !important;
-    top: 50vh !important;
-    margin-left: 0 !important;
-    transform: translate(-50%, -50%) !important;
-    width: min(520px, calc(100vw - 48px)) !important;
-    max-width: 520px !important;
-    max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
-    border-radius: 20px !important;
-    box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
+    left: 50vw;
+    right: auto;
+    bottom: auto;
+    top: 50vh;
+    margin-left: 0;
+    transform: translate(-50%, -50%);
+    width: min(520px, calc(100vw - 48px));
+    max-width: 520px;
+    max-height: min(86dvh, var(--gather-vv-modal-max, 860px));
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22);
   }
 }
 
@@ -861,7 +866,7 @@
  * enough breathing room to remain legible at the reference density. */
 .v2-design .bp-cal-month-nav-row { margin-bottom: 18px !important; }
 .v2-design .bp-cal-month-nav-row .bp-cal-month-title,
-.v2-design .bp-cal-month-label { font-size: 1.3rem !important; font-weight: 800 !important; line-height: 1.2; }
+.v2-design .bp-cal-month-label { font-size: 1.3rem !important; font-weight: 800; line-height: 1.2; }
 .v2-design .bp-cal-month-nav-row .bp-cal-today-btn { font-size: 0.92rem !important; font-weight: 800 !important; padding: 8px 14px; }
 .v2-design .bp-cal-month-nav-row .bp-cal-nav-btn { width: 32px; height: 32px; }
 .v2-design .bp-cal-weekdays { margin-bottom: 8px !important; }
@@ -869,7 +874,7 @@
 .v2-design .bp-cal-days-grid { row-gap: 7px !important; }
 .v2-design .bp-day-cell { gap: 6px; }
 .v2-design .bp-day-head-row { gap: 6px 6px; }
-.v2-design .bp-dot-row { gap: 4px !important; align-items: center; justify-content: center; }
+.v2-design .bp-dot-row { gap: 4px; align-items: center; justify-content: center; }
 /* Name-badge text centering: reference-home.css's own rule sets line-height:1.4 on the
  * ::after text and 1px 6px padding, and that fractional multiplier on top of a rem-based
  * font-size produces a non-integer line-box height, which the browser then has to round
@@ -877,7 +882,7 @@
  * spacing, horizontal) centering reported for the name pills. line-height:1 removes that
  * fractional multiplier entirely; flex centering on both the pill and its text handles the rest. */
 .v2-design .bp-p-dot { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; line-height: 1; }
-.v2-design .bp-p-dot::after { display: inline-flex; align-items: center; justify-content: center; line-height: 1 !important; }
+.v2-design .bp-p-dot::after { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 
 /* Floating badge that follows the finger while a touch drag-to-move-availability gesture is
  * active (BentoCalendarCard). Portaled straight to <body> (same reason CalendarGrid's own touch
@@ -904,11 +909,11 @@ body:has(.v2-design) .v2-avail-drag-ghost {
  * dark category text; narrow layouts intentionally collapse to a solid bar. */
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) {
-    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 15%, var(--bg-card)) !important;
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 15%, var(--bg-card));
     color: var(--cal-anniversary, #F76AAD);
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) > .bp-day-anniversary-label {
-    color: var(--cal-anniversary, #F76AAD) !important;
+    color: var(--cal-anniversary, #F76AAD);
   }
 }
 /* mobile .bp-day-bar-stack .bp-day-anniversary background is redeclared
@@ -973,7 +978,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
  * rules used to live here too — redeclared with equal-or-greater importance under
  * the --v2-fs-* block below, so removed as dead weight (see note above). */
 .v2-design .bp-tag-chip,
-.v2-design .bp-cat-chip { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-cat-chip { font-size: var(--font-size-xs); }
 .v2-design .bp-month-label { font-size: var(--font-size-base) !important; }
 .v2-design .bp-settlement-card-title { font-size: var(--font-size-base) !important; }
 .v2-design .bp-settlement-card-badge { font-size: var(--font-size-2xs) !important; }
@@ -990,7 +995,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .v2-chat-legacy .msg-row-hover > span:first-child,
 .v2-design .v2-chat .bp-chat-name-pill,
 .v2-design .v2-chat .bp-chat-meta { font-size: var(--font-size-2xs) !important; }
-.v2-design .v2-empty { font-size: var(--font-size-md) !important; }
+.v2-design .v2-empty { font-size: var(--font-size-md); }
 .v2-design .v2-load-more { font-size: var(--font-size-sm) !important; }
 
 /* Hide duplicate legacy search bars when dedicated chrome search is present */
@@ -1039,10 +1044,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     gap: 8px !important;
   }
   .v2-design .bp-bento-card.bp-gallery-bleed .bp-thumb-grid {
-    gap: 8px !important;
+    gap: 8px;
   }
   .v2-design .bp-thumb {
-    border-radius: 12px !important;
+    border-radius: 12px;
     min-height: 0;
   }
 }
@@ -1066,7 +1071,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   padding: 4px;
   box-sizing: border-box;
   line-height: 1;
-  font-size:0.75rem !important;
+  font-size:0.75rem;
   border-radius: 999px;
   letter-spacing: -0.02em;
 }
@@ -1077,23 +1082,23 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   .v2-design .bp-day-cell.bp-today .bp-day-num {
     width: 32px; height: 32px; min-width: 32px; min-height: 32px;
     padding: 5px;
-    font-size:0.75rem !important;
+    font-size:0.75rem;
   }
 }
 @media (min-width: 1200px) {
   .v2-design .bp-day-cell.bp-today .bp-day-num {
     width: 36px; height: 36px; min-width: 36px; min-height: 36px;
     padding: 6px;
-    font-size: 0.78rem !important;
+    font-size: 0.78rem;
   }
 }
 
 /* Day cells: mock denseness (ref 60/76px) + ~8–10% for bar stack */
 @media (min-width: 768px) {
   .v2-design .bp-day-cell {
-    min-height: 66px !important;
-    padding: 4px 2px 3px !important;
-    gap: 2px !important;
+    min-height: 66px;
+    padding: 4px 2px 3px;
+    gap: 2px;
   }
 }
 /* .bp-day-cell min-height/padding at 1200px is redeclared further down
@@ -1134,17 +1139,17 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
+  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card));
   color: var(--cal-anniversary, #F76AAD) !important;
-  border-radius: 999px !important; /* single-day / solo default */
+  border-radius: 999px; /* single-day / solo default */
   /* Mobile / narrow default: labelled color badge (title shown through tablet). */
-  height: auto !important;
-  min-height: 1.05rem !important;
-  padding: 0.12rem 0.36rem !important;
+  height: auto;
+  min-height: 1.05rem;
+  padding: 0.12rem 0.36rem;
 }
 /* Multi-day (연일) connected segments — square the joining edges */
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo {
-  border-radius: 999px !important;
+  border-radius: 999px;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-start {
   border-radius: 999px 0 0 999px !important;
@@ -1166,15 +1171,15 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-day-anniversary-label,
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
   /* visibility controlled by progressive media queries */
-  font-size:0.75rem !important;
-  font-weight: 600 !important;
-  line-height: 1.15 !important;
-  color: var(--cal-anniversary, #F76AAD) !important;
+  font-size:0.75rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--cal-anniversary, #F76AAD);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  padding: 0 !important;
+  padding: 0;
 }
 /* Purple confirmed-meeting bars (V2: 모임확정 / 일정·여행 = --cal-schedule) */
 .v2-design .bp-day-bar-stack .bp-day-bar {
@@ -1206,24 +1211,24 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* Name pills — dots from tablet up; given-name text only on 560–767 phones. */
 @media (min-width: 768px) {
   .v2-design .bp-p-dot {
-    width: 7px !important;
-    height: 7px !important;
-    min-width: 7px !important;
-    min-height: 7px !important;
-    padding: 0 !important;
-    border-radius: 50% !important;
+    width: 7px;
+    height: 7px;
+    min-width: 7px;
+    min-height: 7px;
+    padding: 0;
+    border-radius: 50%;
   }
   .v2-design .bp-p-dot:not([data-author-name])::after {
     content: none !important;
     display: none !important;
   }
-  .v2-design .bp-dot-row { gap: 4px !important; }
+  .v2-design .bp-dot-row { gap: 4px; }
 }
 
 /* Calendar cell type hierarchy — mock denseness + ~8% */
 .v2-design .bp-day-corner-label {
-  font-size:0.75rem !important;
-  font-weight: 800 !important;
+  font-size:0.75rem;
+  font-weight: 800;
   line-height: 1.15;
 }
 .v2-design .bp-day-event-title {
@@ -1261,31 +1266,31 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   --font-size-base: var(--v2-fs-base);
   font-size: var(--v2-fs-base);
 }
-.v2-design .bp-bento-title { font-size: var(--v2-fs-title) !important; font-weight: 800; }
+.v2-design .bp-bento-title { font-size: var(--v2-fs-title); font-weight: 800; }
 .v2-design .bp-bento-card-title {
-  font-size: var(--v2-fs-sm) !important;
+  font-size: var(--v2-fs-sm);
   font-weight: 800;
   letter-spacing: 0.04em;
   color: var(--text-muted, #6b6580);
 }
 .v2-design .bp-bento-card .bp-more-link,
-.v2-design .bp-more-link { font-size: var(--v2-fs-sm) !important; font-weight: 700 !important; }
-.v2-design .bp-weekday-label { font-size: var(--v2-fs-2xs) !important; font-weight: 700 !important; }
-.v2-design .bp-day-num { font-size:0.75rem !important; font-weight: 800 !important; }
-.v2-design .bp-cal-legend { font-size: var(--v2-fs-xs) !important; }
-.v2-design .bp-day-corner-label { font-size:0.75rem !important; font-weight: 800 !important; }
+.v2-design .bp-more-link { font-size: var(--v2-fs-sm) !important; font-weight: 700; }
+.v2-design .bp-weekday-label { font-size: var(--v2-fs-2xs); font-weight: 700; }
+.v2-design .bp-day-num { font-size:0.75rem !important; font-weight: 800; }
+.v2-design .bp-cal-legend { font-size: var(--v2-fs-xs); }
+.v2-design .bp-day-corner-label { font-size:0.75rem; font-weight: 800; }
 .v2-design .bp-day-event-title { font-size:0.75rem !important; font-weight: 800 !important; }
-.v2-design .bp-day-anniversary-label { font-size:0.75rem !important; font-weight: 600 !important; }
+.v2-design .bp-day-anniversary-label { font-size:0.75rem; font-weight: 600; }
 
-.v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; font-weight: 800; }
-.v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md) !important; font-weight: 700 !important; }
+.v2-design .bp-dday-compact-badge { font-size: 1.05rem; font-weight: 800; }
+.v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md); font-weight: 700; }
 .v2-design .bp-dday-expanded-title { font-size: var(--v2-fs-lg) !important; font-weight: 800; }
 .v2-design .bp-dday-expanded-tag,
-.v2-design .bp-dday-expanded-badge { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-dday-expanded-badge { font-size: var(--v2-fs-xs); }
 .v2-design .bp-dday-view-btn { font-size: var(--v2-fs-sm) !important; font-weight: 800; }
-.v2-design .bp-dday-date { font-size: var(--v2-fs-sm) !important; font-weight: 800; }
+.v2-design .bp-dday-date { font-size: var(--v2-fs-sm); font-weight: 800; }
 .v2-design .bp-dday-dow,
-.v2-design .bp-dday-pill { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-dday-pill { font-size: var(--v2-fs-2xs); }
 
 .v2-design .bp-chat-text,
 .v2-design .bp-renewal-home-chat-text { font-size: var(--v2-fs-md) !important; line-height: 1.45; }
@@ -1308,12 +1313,12 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .bp-memo-comment-author,
 .v2-design .bp-memo-comment-text { font-size: var(--v2-fs-xs) !important; }
 
-.v2-design .bp-place-name { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
-.v2-design .bp-place-addr { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-place-name { font-size: var(--v2-fs-md); font-weight: 800; }
+.v2-design .bp-place-addr { font-size: var(--v2-fs-xs); }
 .v2-design .bp-place-note:not(.bp-renewal-home-place-note),
-.v2-design .bp-place-tag { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-place-tag { font-size: var(--v2-fs-2xs); }
 .v2-design .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
-  font-size: max(12px, 0.8rem) !important;
+  font-size: max(12px, 0.8rem);
 }
 
 /* Side-nav type: see mock-parity block (explicit px under .v2-design) --
@@ -1355,7 +1360,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   justify-content: center;
   border-radius: 999px;
   padding: 2px 8px;
-  color: #fff !important;
+  color: #fff;
   font-size:0.75rem;
   font-weight: 800;
   margin-right: 6px;
@@ -1387,15 +1392,15 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   }
   .v2-design .bp-dday-compact-text {
     font-size:0.75rem !important;
-    font-weight: 700 !important;
+    font-weight: 700;
   }
   .v2-design .bp-dday-compact-badge {
-    font-size: 1.1rem !important;
-    padding: 6px 11px !important;
+    font-size: 1.1rem;
+    padding: 6px 11px;
   }
-  .v2-design .bp-dday-date { font-size:0.75rem !important; }
+  .v2-design .bp-dday-date { font-size:0.75rem; }
   .v2-design .bp-dday-dow,
-  .v2-design .bp-dday-pill { font-size:0.75rem !important; }
+  .v2-design .bp-dday-pill { font-size:0.75rem; }
   .v2-design .bp-dday-chip {
     width: 64px;
     padding: 7px 4px;
@@ -1404,33 +1409,33 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     padding: 6px 2px 0;
   }
   .v2-design .bp-weekday-label {
-    font-size:0.75rem !important;
-    padding: 4px 0 6px !important;
+    font-size:0.75rem;
+    padding: 4px 0 6px;
   }
   .v2-design .bp-day-cell {
-    min-height: 84px !important;
+    min-height: 84px;
     padding: 5px 3px 4px !important;
-    gap: 2px !important;
+    gap: 2px;
     border-radius: 10px;
   }
   .v2-design .bp-day-num {
     font-size: 0.86rem !important;
-    font-weight: 800 !important;
+    font-weight: 800;
   }
   .v2-design .bp-day-corner-label {
-    font-size:0.75rem !important;
+    font-size:0.75rem;
   }
   .v2-design .bp-day-event-title {
     font-size:0.75rem !important;
     -webkit-line-clamp: 2;
   }
   .v2-design .bp-p-dot {
-    width: 7px !important;
-    height: 7px !important;
-    min-width: 7px !important;
-    min-height: 7px !important;
-    padding: 0 !important;
-    border-radius: 50% !important;
+    width: 7px;
+    height: 7px;
+    min-width: 7px;
+    min-height: 7px;
+    padding: 0;
+    border-radius: 50%;
   }
   .v2-design .bp-p-dot:not([data-author-name])::after {
     content: none !important;
@@ -1442,14 +1447,14 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only),
   .v2-design .bp-day-bar-stack .bp-day-bar.bp-has-label {
-    min-height: 1.1rem !important;
+    min-height: 1.1rem;
   }
   .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-label {
-    font-size:0.75rem !important;
+    font-size:0.75rem;
   }
   .v2-design .bp-cal-legend {
-    font-size:0.75rem !important;
+    font-size:0.75rem;
     padding: 10px 2px 6px;
     gap: 8px 12px;
   }
@@ -1462,7 +1467,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     border-radius: 14px !important;
   }
   .v2-design .bp-bento-card-title {
-    font-size:0.75rem !important;
+    font-size:0.75rem;
     letter-spacing: 0.06em;
   }
   .v2-design .bp-more-link { font-size:0.75rem !important; }
@@ -1470,8 +1475,8 @@ body:has(.v2-design) .v2-avail-drag-ghost {
     width: var(--v2-side-nav-width, 280px) !important;
   }
   /* item density / brand type: mock-parity block below */
-  .v2-design .bp-thumb-grid { gap: 10px !important; }
-  .v2-design .bp-thumb { border-radius: 12px !important; }
+  .v2-design .bp-thumb-grid { gap: 10px; }
+  .v2-design .bp-thumb { border-radius: 12px; }
 }
 
 
@@ -1479,7 +1484,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* Progressive disclosure: mid/bar-only segments stay a thin strip; solo badges show the title. */
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label,
 .v2-design .bp-day-anniversary .bp-day-anniversary-label {
-  display: block !important;
+  display: block;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only {
   min-height: 0.34rem !important;
@@ -1492,22 +1497,22 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
-    height: auto !important;
-    min-height: 1.05rem !important;
-    padding: 0.08rem 0.32rem !important;
+    height: auto;
+    min-height: 1.05rem;
+    padding: 0.08rem 0.32rem;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
   .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
-    display: block !important;
-    font-size:0.75rem !important;
-    font-weight: 600 !important;
-    line-height: 1.15 !important;
-    color: var(--cal-anniversary, #F76AAD) !important;
+    display: block;
+    font-size:0.75rem;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--cal-anniversary, #F76AAD);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
-    padding: 0 2px !important;
+    padding: 0 2px;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid {
     height: 0.34rem !important;
@@ -1521,10 +1526,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 @media (min-width: 1200px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
-    min-height: 1.1rem !important;
+    min-height: 1.1rem;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
-    font-size:0.75rem !important;
+    font-size:0.75rem;
   }
 }
 
@@ -1604,10 +1609,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 @media (max-width: 1023px) {
   .v2-design .meeting-pill-text-full {
-    display: none !important;
+    display: none;
   }
   .v2-design .meeting-pill-text-short {
-    display: inline !important;
+    display: inline;
   }
 }
 /* Hide legacy free-text meeting/note body on month grid (participant schedule memos) */
@@ -1637,17 +1642,17 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   cursor: pointer;
 }
 .v2-design .bp-side-nav-brand-icon {
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px !important;
-  height: 18px !important;
+  width: 18px;
+  height: 18px;
   color: var(--brand, #7C2FE5);
   flex-shrink: 0;
 }
 .v2-design .bp-side-nav-brand-icon svg {
-  width: 18px !important;
-  height: 18px !important;
+  width: 18px;
+  height: 18px;
 }
 .v2-design .bp-side-nav-brand-text {
   font-weight: 800;
@@ -1872,7 +1877,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size:0.75rem !important;
+  font-size:0.75rem;
   font-weight: 800;
   line-height: 1.3;
   /* Simple solid capsule — no border/inset highlight, matching the other name-style pills. */
@@ -1917,7 +1922,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
  * and expanded rail share this rule, so the highlight stays consistent when the rail toggles. */
 .v2-design .bp-side-nav-item.bp-is-active {
   background: rgb(var(--a-brand-rgb, 124 47 229) / 0.12);
-  border: none !important;
+  border: none;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -1948,9 +1953,9 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   background: none;
   border: none;
   color: var(--v2-ink-2, #6b6580);
-  font-size:0.75rem !important;
+  font-size:0.75rem;
   font-weight: 700;
-  padding: 2px 2px !important;
+  padding: 2px 2px;
   max-width: none;
 }
 
@@ -1963,7 +1968,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
 }
 .v2-design .v2-page-header .bp-header-row {
-  align-items: center !important;
+  align-items: center;
   gap: 8px !important;
 }
 .v2-design .v2-header-title-block {
@@ -1976,7 +1981,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .v2-page-header .bp-header-title {
   font-size: 0.98rem !important;
-  font-weight: 800 !important;
+  font-weight: 800;
   color: var(--text-main) !important;
   line-height: 1.25;
 }
@@ -1988,19 +1993,19 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .v2-page-header .bp-back-btn {
   background: none !important;
-  border: none !important;
+  border: none;
   color: var(--v2-ink-2, #6b6580) !important;
-  padding: 4px !important;
-  display: inline-flex !important;
+  padding: 4px;
+  display: inline-flex;
   cursor: pointer;
   flex-shrink: 0;
 }
 .v2-design .v2-page-header .bp-back-btn:hover { color: var(--brand, #7C2FE5) !important; }
 .v2-design .v2-page-header .bp-header-actions {
   margin-left: auto !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
 }
 /* Light glass icon buttons on white PageHeader (shared token language) */
@@ -2031,32 +2036,32 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   padding: 24px 14px 12px !important;
 }
 .v2-design .bp-side-nav-brand-text {
-  font-size: 0.9375rem !important;
-  font-weight: 800 !important;
+  font-size: 0.9375rem;
+  font-weight: 800;
   line-height: 1.25;
 }
 .v2-design .bp-side-nav-cal-badge {
-  font-size:0.75rem !important;
-  font-weight: 800 !important;
-  line-height: 1.3 !important;
-  padding: 2px 8px !important;
+  font-size:0.75rem;
+  font-weight: 800;
+  line-height: 1.3;
+  padding: 2px 8px;
   /* Simple solid capsule (matches the other name-style pills, e.g. chat-name-pill) instead of a
    * light tinted fill + border + inset highlight. */
-  color: var(--on-brand, white) !important;
-  background: var(--brand, #7C2FE5) !important;
+  color: var(--on-brand, white);
+  background: var(--brand, #7C2FE5);
 }
 .v2-design .bp-side-nav-group {
   padding: 4px 10px !important;
 }
 .v2-design .bp-side-nav-item {
-  font-size: 0.875rem !important;
+  font-size: 0.875rem;
   /* Lighter than the active item's 800 (above) on purpose, so the active row reads as
    * both heavier text and a highlighted background. */
   font-weight: 500;
   line-height: 1.25;
   padding: 0 12px !important;
   margin: 0 !important;
-  gap: 12px !important;
+  gap: 12px;
   border-radius: 10px;
   min-height: 44px !important;
   box-sizing: border-box !important;
@@ -2069,8 +2074,8 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   justify-content: center;
 }
 .v2-design .bp-side-nav-item-icon svg {
-  width: 18px !important;
-  height: 18px !important;
+  width: 18px;
+  height: 18px;
 }
 .v2-design .bp-side-nav-item-meta,
 .v2-design .bp-side-nav-item-sub {
@@ -2091,14 +2096,14 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   padding: 2px 7px !important;
 }
 .v2-design .bp-side-nav-date-chip {
-  font-size:0.75rem !important;
-  padding: 2px 2px !important;
+  font-size:0.75rem;
+  padding: 2px 2px;
 }
 .v2-design .bp-side-nav-footer {
   padding: 10px 10px 16px;
 }
 .v2-design .bp-side-nav-collapse-btn {
-  font-size: 0.75rem !important;
+  font-size: 0.75rem;
   padding: 8px;
   border-radius: 9999px;
   margin-top: 8px;
@@ -2117,22 +2122,22 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 @media (min-width: 1200px) {
   .v2-design .bp-side-nav-head {
-    padding: 12px 14px !important;
+    padding: 12px 14px;
   }
   .v2-design .bp-side-nav-brand {
     gap: 8px !important;
   }
   .v2-design .bp-side-nav-brand-text {
-    font-size: 0.9375rem !important;
+    font-size: 0.9375rem;
   }
   .v2-design .bp-side-nav-item {
-    font-size: 0.875rem !important;
+    font-size: 0.875rem;
     padding: 0 12px !important;
     margin: 0 !important;
     min-height: 44px !important;
   }
   .v2-design .bp-side-nav-group.bp-is-main {
-    border-top: none !important;
+    border-top: none;
   }
 }
 
@@ -2205,9 +2210,9 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .bp-tag-chip.bp-is-selected,
 .v2-design .bp-cat-chip.bp-is-selected {
-  border-color: var(--brand, #7C2FE5) !important;
-  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
-  color: var(--brand, #7C2FE5) !important;
+  border-color: var(--brand, #7C2FE5);
+  background: var(--brand-soft, var(--a-brand-soft, #F3EEFF));
+  color: var(--brand, #7C2FE5);
   box-shadow: var(--v2-glass-purple-inset);
 }
 .v2-design .bp-settlement-card-badge,
@@ -2288,17 +2293,17 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary,
   .v2-design .festival-bar-desktop .bp-day-anniversary {
-    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
-    color: var(--cal-anniversary, #F76AAD) !important;
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card));
+    color: var(--cal-anniversary, #F76AAD);
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
   .v2-design .festival-bar-desktop .bp-day-anniversary-label {
-    display: block !important;
-    color: var(--cal-anniversary, #F76AAD) !important;
-    font-size:0.75rem !important;
-    font-weight: 600 !important;
-    line-height: 1.15 !important;
-    padding: 0 3px !important;
+    display: block;
+    color: var(--cal-anniversary, #F76AAD);
+    font-size:0.75rem;
+    font-weight: 600;
+    line-height: 1.15;
+    padding: 0 3px;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label { display: none !important; }
@@ -2306,14 +2311,14 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 @media (max-width: 767px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary,
   .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"] {
-    background: var(--cal-anniversary, #F76AAD) !important;
+    background: var(--cal-anniversary, #F76AAD);
     color: transparent !important;
-    height: 0.34rem !important;
-    min-height: 0.34rem !important;
-    padding: 0 !important;
+    height: 0.34rem;
+    min-height: 0.34rem;
+    padding: 0;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
-    display: none !important;
+    display: none;
   }
   /* festival-bar-desktop/mobile display split for this breakpoint already lives at the
      top of this file (byte-identical rule) -- removed as a same-file dead duplicate. */
@@ -2361,7 +2366,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
    * the generic .bp-bento-card-title rules elsewhere in this file set font-size !important,
    * which always wins over a non-important declaration regardless of selector specificity. */
   font-size: 1.3rem !important;
-  font-weight: 800 !important;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
 }
