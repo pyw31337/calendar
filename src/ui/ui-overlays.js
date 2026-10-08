@@ -44,7 +44,7 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
     style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }
   },
     /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
-      /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, label || '사진 전송 중...'),
+      /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, label || '사진 전송 중...'),
       queueText && /*#__PURE__*/React.createElement('span', {
         style: {
           flexShrink: 0,
@@ -57,7 +57,7 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
           color: 'var(--text-muted)',
           border: '1px solid var(--border-subtle)',
           fontSize: 'var(--font-size-sm)',
-          fontWeight: 900,
+          fontWeight: 800,
           lineHeight: 1
         }
       }, queueText)
@@ -85,7 +85,7 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
     style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }
   },
     /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
-      /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, '사진 변환 중...'),
+      /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, '사진 변환 중...'),
       queueText && /*#__PURE__*/React.createElement('span', {
         style: {
           flexShrink: 0,
@@ -98,7 +98,7 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
           color: 'var(--text-muted)',
           border: '1px solid var(--border-subtle)',
           fontSize: 'var(--font-size-sm)',
-          fontWeight: 900,
+          fontWeight: 800,
           lineHeight: 1
         }
       }, queueText)

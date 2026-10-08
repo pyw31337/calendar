@@ -1767,7 +1767,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                   key: tag,
                   style: {
                     display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-                    padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
+                    padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, lineHeight: 1,
                     border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
                   }
                 }, `#${tag}`, /*#__PURE__*/React.createElement("button", {
@@ -2196,7 +2196,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 borderRadius: 'var(--radius-full)',
                 padding: '3px 4px 3px 10px',
                 fontSize: 'var(--font-size-sm)',
-                fontWeight: 900,
+                fontWeight: 800,
                 lineHeight: 1,
                 border: '1px solid var(--border-subtle)',
                 color: 'var(--text-main)',

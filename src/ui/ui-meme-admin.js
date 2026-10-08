@@ -434,7 +434,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     }),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' } },
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 } }, `밈 이미지 풀 (${pool.length}장, 미태그 ${untaggedList.length}장)`),
+        /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 } }, `밈 이미지 풀 (${pool.length}장, 미태그 ${untaggedList.length}장)`),
         /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', margin: '2px 0 0 0' } }, "여러 장을 한 번에 선택해 올린 뒤, 아래 그리드에서 사진을 눌러 해시태그를 입력하세요. 같은 파일명·포맷·용량의 이미지는 자동으로 건너뜁니다.")
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },

@@ -881,7 +881,7 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
           /*#__PURE__*/React.createElement("span", {
             style: {
               display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: 'var(--radius-full)',
-              backgroundColor: `${category.color}18`, color: category.color, fontSize: 'var(--font-size-xs)', fontWeight: 900
+              backgroundColor: `${category.color}18`, color: category.color, fontSize: 'var(--font-size-xs)', fontWeight: 800
             }
           },
             /*#__PURE__*/React.createElement("span", {

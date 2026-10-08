@@ -1989,7 +1989,7 @@ export function WeatherDetailModal({
                     }
                   },
                     /*#__PURE__*/React.createElement("span", {
-                      style: { fontSize: '0.75rem', fontWeight: 750, color: row.textColor || row.color }
+                      style: { fontSize: '0.75rem', fontWeight: 700, color: row.textColor || row.color }
                     }, row.text),
                     /*#__PURE__*/React.createElement("div", {
                       style: { height: '50px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', width: '100%' }

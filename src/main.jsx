@@ -1,9 +1,9 @@
 import './react-globals.js';
-// These are bundled into the deployed site instead of being fetched from Google Fonts/CDNs.
-// Each Korean unicode-range is requested only when the page uses it, while the system stack
-// remains available immediately when a device is offline or a font request is slow.
-import '@fontsource-variable/plus-jakarta-sans/wght.css';
-import '@fontsource-variable/noto-sans-kr/wght.css';
+// Pretendard is the only UI typeface; hierarchy comes from weights (400-800), not families.
+// The variable dynamic-subset face is bundled (no font CDN): each of its unicode-range subsets
+// is fetched only when the page uses those glyphs, with font-display: swap so the system
+// fallback in --font-sans renders immediately when offline or while a subset is loading.
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './app.css';
 import './ui/celebrate-confetti.js';
 import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
@@ -82,7 +82,7 @@ function showBootStatus(msg, { keepSplash = false } = {}) {
   }
   const root = document.getElementById('root');
   if (!root || root.dataset.booted === '1') return;
-  root.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:0.88rem;">${msg}</div>`;
+  root.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;color:#64748B;font-size:0.88rem;">${msg}</div>`;
 }
 
 // index.html used to load these as plain synchronous <head> <script src> tags, which browsers

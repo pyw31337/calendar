@@ -3472,7 +3472,7 @@ export function EditMessageModal({
       type: 'button',
       onClick: () => setFileAttachments(prev => prev.filter((_, idx) => idx !== index)),
       'aria-label': '파일 첨부 제거',
-      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 900, padding: '4px 6px' }
+      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 800, padding: '4px 6px' }
     }, '×')
   ))) : null,
   /*#__PURE__*/React.createElement("input", {

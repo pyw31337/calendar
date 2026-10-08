@@ -1890,7 +1890,7 @@ export function AdminDashboard({ initialCalendars }) {
     dashboard: {
       color: 'var(--text-main)',
       minHeight: '100vh',
-      fontFamily: 'Inter, sans-serif',
+      fontFamily: 'var(--font-sans)',
       width: '100%',
       maxWidth: '100%',
       overflowX: 'hidden'
@@ -1981,7 +1981,7 @@ export function AdminDashboard({ initialCalendars }) {
     },
     metricValue: {
       fontSize: '1.6rem',
-      fontWeight: '900',
+      fontWeight: '800',
       color: 'var(--text-main)',
       marginTop: '0'
     }
@@ -2764,7 +2764,7 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(TrophyIcon, null), "날짜별 가능 인원 Top")
           ),
           dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", { key: `${stat.calendar.id}_popular`, style: { marginBottom: '14px' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 950, marginBottom: '6px', color: 'var(--text-main)', fontSize: 'var(--font-size-base)' } }, stat.calendar.id, " (전원 가능 ", stat.fullDates.length, "일)"),
+            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '6px', color: 'var(--text-main)', fontSize: 'var(--font-size-base)' } }, stat.calendar.id, " (전원 가능 ", stat.fullDates.length, "일)"),
             stat.popularDates.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' } }, "등록된 날짜가 없습니다.") :
             stat.popularDates.slice(0, 3).map(item => /*#__PURE__*/React.createElement("div", {
               key: `${stat.calendar.id}_${item.date}`,
@@ -2798,7 +2798,7 @@ export function AdminDashboard({ initialCalendars }) {
                 style: { marginBottom: '16px', paddingLeft: '10px', borderLeft: `3px solid ${accent}` }
               },
               /*#__PURE__*/React.createElement("span", {
-                style: { display: 'inline-block', fontWeight: 900, marginBottom: '8px', color: accent, fontSize: 'var(--font-size-md)', backgroundColor: `${accent}1A`, padding: '2px 10px', borderRadius: 'var(--radius-full)' }
+                style: { display: 'inline-block', fontWeight: 800, marginBottom: '8px', color: accent, fontSize: 'var(--font-size-md)', backgroundColor: `${accent}1A`, padding: '2px 10px', borderRadius: 'var(--radius-full)' }
               }, stat.calendar.id),
               stat.participantStats.map(participant => {
                 const pct = `${Math.max(4, Math.round(participant.count / Math.max(1, stat.schedules.length) * 100))}%`;
@@ -3060,7 +3060,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("section", { style: styles.card },
           /* Header */
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }, "data-collapse-anchor": "true", "data-collapse-key": "settings-polls", "data-collapse-label": "투표 설정" },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '800', color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
             /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 } },
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-poll-create",
@@ -3359,7 +3359,7 @@ export function AdminDashboard({ initialCalendars }) {
           dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
             key: `${stat.calendar.id}_backup_tab`, className: "admin-backup-card"
           },
-            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 900, color: 'var(--text-main)', fontSize: 'var(--font-size-base)' } }, stat.calendar.id, " 백업 파일"),
+            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', fontSize: 'var(--font-size-base)' } }, stat.calendar.id, " 백업 파일"),
             /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', margin: '4px 0 10px 0' } },
               `${stat.participants.length}명 참여자 · 활성일정 ${stat.schedules.length}건 · 투표 ${stat.pollCount}개`
             ),
@@ -3389,7 +3389,7 @@ export function AdminDashboard({ initialCalendars }) {
           "data-collapse-anchor": "true", "data-collapse-key": "logs-chat", "data-collapse-label": "채팅 로그"
         },
           /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 auto', minWidth: 0 } },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅 로그", (adminMsgTotal[selectedCalId] || 0) > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge" }, adminMsgTotal[selectedCalId])),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '800', color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅 로그", (adminMsgTotal[selectedCalId] || 0) > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge" }, adminMsgTotal[selectedCalId])),
             /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', margin: '2px 0 0 0' } }, "각 캘린더별 채팅 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
           ),
           /*#__PURE__*/React.createElement("div", {
@@ -3546,7 +3546,7 @@ export function AdminDashboard({ initialCalendars }) {
         }
       },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-          /*#__PURE__*/React.createElement("h4", { style: { margin: 0, fontSize: '1.05rem', fontWeight: 900 } }, logDetail.title),
+          /*#__PURE__*/React.createElement("h4", { style: { margin: 0, fontSize: '1.05rem', fontWeight: 800 } }, logDetail.title),
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: closeLogDetail, "aria-label": "닫기",
             style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }

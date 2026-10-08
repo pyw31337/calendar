@@ -4378,7 +4378,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-place-name {
   overflow: hidden;
   color: var(--v2-ink, var(--text-main, #171426));
   font-size: var(--v2-fs-base, 0.94rem);
-  font-weight: 850;
+  font-weight: 800;
   letter-spacing: -0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4391,7 +4391,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-location-copy > span {
   margin-top: -4px !important;
   color: var(--v2-ink-3, var(--text-muted, #756d84));
   font-size: var(--v2-fs-xs, 0.75rem);
-  font-weight: 650;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4457,7 +4457,7 @@ html:has(.renewal-shell.v2-design) .v2-date-title-rel {
 html:has(.renewal-shell.v2-design) .v2-date-title-date {
   flex: 0 0 auto;
   font-size: var(--v2-fs-title, 1.2rem);
-  font-weight: 850;
+  font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--v2-ink, var(--text-main, #171426));
 }
@@ -4641,7 +4641,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-main {
 html:has(.renewal-shell.v2-design) .weather-highlight-temp-big {
   color: #fff;
   font-size: 4.35rem;
-  font-weight: 720;
+  font-weight: 700;
   line-height: 0.86;
   letter-spacing: -0.06em;
 }
@@ -4651,7 +4651,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-degree {
   margin-right: 10px;
   color: rgba(255, 255, 255, 0.92);
   font-size: 1.7rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 html:has(.renewal-shell.v2-design) .weather-highlight-side {
   display: flex;
@@ -4674,7 +4674,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-place {
   gap: 4px;
   max-width: 148px;
   overflow: hidden;
-  font-weight: 650;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4685,7 +4685,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-place {
 html:has(.renewal-shell.v2-design) .weather-highlight-range {
   color: rgba(255, 255, 255, 0.86);
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 /* Bottom row across the whole card: region icon + 설정위치 on one line; the row is the button
    that opens the weather-region picker. */
@@ -4706,7 +4706,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-setting {
   background: rgba(255, 255, 255, 0.16);
   font: inherit;
   font-size: 0.78rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.3;
   text-align: left;
   cursor: pointer;
@@ -4949,7 +4949,7 @@ html:has(.renewal-shell.v2-design) .weather-bolt {
 html:has(.renewal-shell.v2-design) .weather-highlight-feels-like {
   color: var(--v2-ink-3, var(--text-muted, #756d84));
   font-size: var(--v2-fs-xs, 0.75rem);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 html:has(.renewal-shell.v2-design) .weather-highlight-temperatures {
@@ -4973,7 +4973,7 @@ html:has(.renewal-shell.v2-design) .weather-highlight-temperature-label {
 
 html:has(.renewal-shell.v2-design) .weather-highlight-temperature-value {
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: -0.05em;
   line-height: 1;
 }
@@ -5003,7 +5003,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-label {
   gap: 6px;
   color: var(--v2-ink-3, var(--text-muted, #756d84));
   font-size: var(--v2-fs-xs, 0.75rem);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 html:has(.renewal-shell.v2-design) .weather-detail-metric-mark {
@@ -5029,7 +5029,7 @@ html:has(.renewal-shell.v2-design) .weather-detail-metric-value-row {
 html:has(.renewal-shell.v2-design) .weather-detail-metric-value {
   color: var(--v2-ink, var(--text-main, #171426));
   font-size: var(--v2-fs-lg, 0.94rem);
-  font-weight: 850;
+  font-weight: 800;
   letter-spacing: -0.025em;
   white-space: nowrap;
 }
