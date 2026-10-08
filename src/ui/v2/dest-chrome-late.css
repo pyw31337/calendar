@@ -3067,6 +3067,15 @@ html:has(.renewal-shell.v2-design)[data-v2-keyboard] .renewal-shell.v2-design {
 html:has(.renewal-shell.v2-design)[data-v2-keyboard] .bp-mobile-bottom-nav {
   padding-bottom: 0 !important;
 }
+/* Chat room only: while typing, the composer sits directly on the keyboard and the
+   message list gets the rest of the visible strip (messenger convention). The phone menu
+   following the keyboard (above) still applies on every other page. */
+html:has(.renewal-shell.v2-design .v2-chat)[data-v2-keyboard] .renewal-shell.v2-design {
+  --mobile-bottom-nav-total: 0px;
+}
+html:has(.renewal-shell.v2-design .v2-chat)[data-v2-keyboard] .bp-mobile-bottom-nav {
+  display: none !important;
+}
 
 .v2-design .bp-mobile-bottom-nav-item {
   position: relative !important;

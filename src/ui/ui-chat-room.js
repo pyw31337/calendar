@@ -757,9 +757,24 @@ export function ChatRoomView({
     if (handleChatScroll) handleChatScroll(e);
     const el = e.target;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const prevScrollTop = lastScrollTopRef.current;
+    lastScrollTopRef.current = el.scrollTop;
+    if (distanceFromBottom <= 60) {
+      isAtBottomRef.current = true;
+    } else if (el.scrollTop < prevScrollTop - 1) {
+      // Only moving up (a swipe into history, a jump to an older message) leaves the bottom.
+      isAtBottomRef.current = false;
+    } else if (isAtBottomRef.current) {
+      // Scroll events arrive a frame late. When messages, photos or an older page land between
+      // our own pin and that event, it reports the list as short of the bottom although nobody
+      // scrolled -- that used to unpin the room on open and leave it a few bubbles short of the
+      // newest message (and then the keyboard opened on the wrong spot). Stay pinned.
+      el.scrollTop = el.scrollHeight;
+      lastScrollTopRef.current = el.scrollTop;
+      return;
+    }
     setShowScrollToBottom(distanceFromBottom > 200);
     if (distanceFromBottom <= 200) setHasNewMessageBelow(false);
-    isAtBottomRef.current = distanceFromBottom <= 60;
   };
   const scrollToBottom = () => {
     if (chatMessagesContainerRef.current) {
@@ -780,6 +795,7 @@ export function ChatRoomView({
   // user is (still) at the bottom and, if so, follow any subsequent height growth of the
   // message list so a freshly-sent bubble never ends up hidden behind the input field.
   const isAtBottomRef = React.useRef(true);
+  const lastScrollTopRef = React.useRef(0);
   const messagesListInnerRef = React.useRef(null);
   React.useEffect(() => {
     const el = messagesListInnerRef.current;
@@ -790,6 +806,12 @@ export function ChatRoomView({
       if (container) container.scrollTop = container.scrollHeight;
     });
     ro.observe(el);
+    // The scroll box itself shrinks when the keyboard opens (the V2 shell follows the visual
+    // viewport) and grows back when it closes. Neither changes the list's content or fires a
+    // scroll event -- and when iOS pans the visual viewport instead of shrinking it,
+    // viewportBottom stays 0 too -- so watch the box as well to keep the newest message pinned.
+    const container = chatMessagesContainerRef.current;
+    if (container && container !== el) ro.observe(container);
     return () => ro.disconnect();
   }, []);
   // Land on the newest message when this view first mounts, not wherever the message list's

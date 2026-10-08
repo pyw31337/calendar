@@ -104,6 +104,11 @@
     // keyboard keeps visualViewport.scale at 1; an auto/manual zoom does not.
     const viewportScale = Number(vv?.scale || 1);
     const chromeShrink = layoutH - vvH - rawTop;
+    // The keyboard's height is layoutH - vvH no matter where the visible strip sits. iOS often
+    // pans the visual viewport down to the focused composer (offsetTop up to the keyboard
+    // height) instead of scrolling the page; subtracting that pan made a fully panned keyboard
+    // read as 0, so the shell stayed full height with the header scrolled off the top.
+    const keyboardShrink = layoutH - vvH;
     // Only a focused text field can raise the keyboard. Without one, a short
     // visual viewport is stale (an app switch or notification tap that has not
     // settled yet) and must never shrink the shell: the chat/memo composers
@@ -113,7 +118,7 @@
     // A real keyboard is most of the screen. Samsung/Safari toolbars can shrink
     // ~140px; treating that as a keyboard jumps the shell. Address bars under
     // ~8px are noise (scrollbar, rounding).
-    const keyboard = textFocused && viewportScale <= 1.01 && chromeShrink > 180;
+    const keyboard = textFocused && viewportScale <= 1.01 && keyboardShrink > 180;
     // Toolbars only exist in a browser tab (an installed app has none) and are
     // never keyboard-sized. While a field is focused, a smaller shrink (iPad
     // shortcut bar, accessory bar) still follows the visible viewport.

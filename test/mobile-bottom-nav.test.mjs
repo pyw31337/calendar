@@ -69,6 +69,11 @@ test('mobile bottom nav css contracts in dest-chrome-late.css', () => {
   assert.doesNotMatch(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\{\s*--mobile-bottom-nav-total:\s*0px\s*!important;\s*\}/);
   assert.doesNotMatch(css, /html:has\(\.renewal-shell\.v2-design\)\[data-v2-keyboard\]\s*\.bp-mobile-bottom-nav\s*\{\s*display:\s*none\s*!important;\s*\}/);
 
+  // 9b. Chat room only: while typing, the menu bar steps aside so the composer sits on the
+  //     keyboard. Scoped by :has(.v2-chat) so every other page keeps rule 9.
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design \.v2-chat\)\[data-v2-keyboard\] \.renewal-shell\.v2-design \{\s*--mobile-bottom-nav-total:\s*0px;\s*\}/);
+  assert.match(css, /html:has\(\.renewal-shell\.v2-design \.v2-chat\)\[data-v2-keyboard\] \.bp-mobile-bottom-nav \{\s*display:\s*none !important;\s*\}/);
+
   // 10. v2-chat-root is pinned to top: 0 and bottom: 0 so it never lifts upward on keyboard open
   assert.match(css, /html:has\(\.renewal-shell\.v2-design\)\s*\.v2-chat\s*\.v2-chat-root\s*\{[\s\S]*top:\s*0\s*!important;[\s\S]*bottom:\s*0\s*!important;/);
 
