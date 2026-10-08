@@ -6,6 +6,7 @@ import { resolveLightboxPhotoOrigin } from './lightbox-photo-origin.js';
 import { useParticipantSync } from '../core/current-participant.js';
 import { readAppVvHeight, readAppVvWidth, subscribeAppVvRemeasure } from '../core/app-vv-measure.js';
 import { todaySeoulDateKey } from '../core/seoul-date.js';
+import { ParticipantPickerButton as WidgetParticipantPickerButton } from './ui-widgets.js';
 import {
   subscribePhotoCommentThread, addPhotoComment, editPhotoComment, deletePhotoComment, restorePhotoComment,
   resolvePhotoCommentCalendarId
@@ -104,7 +105,7 @@ function CommentThread({ comments: commentsProp = [], actions, calendar, showToa
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
-  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton || WidgetParticipantPickerButton;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;

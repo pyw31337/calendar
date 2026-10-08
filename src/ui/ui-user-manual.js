@@ -1,6 +1,7 @@
 /**
  * User manual overlay (P4-6)
  */
+import { ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -24,7 +25,7 @@ export function UserManualOverlay({ calendar, onClose }) {
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
   const MenuIcon = __deps.MenuIcon;
-  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge || WidgetParticipantBadge;
 
   const participants = getActiveParticipants(calendar || {});
   const sampleParticipant = participants[0] || { name: '박영우', color: '#EF4444' };

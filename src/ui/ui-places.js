@@ -532,7 +532,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       if (place.address) {
         const addrEl = document.createElement('div');
         addrEl.style.fontSize = '0.75rem';
-        addrEl.style.color = '#64748B';
+        addrEl.style.color = 'var(--tone-slate-ink, #64748B)';
         addrEl.textContent = getDisplayPlaceAddress(place);
         infoEl.appendChild(addrEl);
       }
@@ -579,7 +579,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       if (displayVisitEntries.length > 0 || place.memo) {
         const dividerEl = document.createElement('hr');
         dividerEl.style.border = 'none';
-        dividerEl.style.borderTop = '1px solid #E2E8F0';
+        dividerEl.style.borderTop = '1px solid var(--tone-divider, #E2E8F0)';
         dividerEl.style.margin = '6px 0';
         popupNode.appendChild(dividerEl);
       }
@@ -613,7 +613,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
             const dateEl = document.createElement('div');
             dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
             dateEl.style.fontWeight = '700';
-            dateEl.style.color = '#64748B';
+            dateEl.style.color = 'var(--tone-slate-ink, #64748B)';
             dateEl.style.marginBottom = '2px';
             rowEl.appendChild(dateEl);
 
@@ -624,7 +624,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 
             if (idx < displayVisitEntries.length - 1) {
               const divider = document.createElement('div');
-              divider.style.borderTop = '1px solid #E2E8F0';
+              divider.style.borderTop = '1px solid var(--tone-divider, #E2E8F0)';
               divider.style.margin = '6px 0 2px 0';
               rowEl.appendChild(divider);
             }
@@ -638,7 +638,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
             dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
             dateEl.style.flexShrink = '0';
             dateEl.style.fontWeight = '700';
-            dateEl.style.color = '#64748B';
+            dateEl.style.color = 'var(--tone-slate-ink, #64748B)';
             rowEl.appendChild(dateEl);
 
             const noteEl = document.createElement('span');
@@ -1918,7 +1918,7 @@ export function PlacesView({
                 style: {
                   fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
                   backgroundColor: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                  color: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '#2563EB' : 'var(--status-green)'
+                  color: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? 'var(--tone-blue-ink, #2563EB)' : 'var(--status-green)'
                 }
               }, (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'),
               displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${countPlaceVisits ? countPlaceVisits(place, displayVisitEntries, category) : displayVisitEntries.length}회 ${(derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'}`)

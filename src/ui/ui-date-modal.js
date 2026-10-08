@@ -3107,9 +3107,9 @@ export function DateModal({
               padding: '3px 9px',
               borderRadius: 'var(--radius-full)',
               whiteSpace: 'nowrap',
-              backgroundColor: isNegative ? '#FEF2F2' : '#F0FDF4',
-              border: `1px solid ${isNegative ? '#FCA5A5' : '#BBF7D0'}`,
-              color: isNegative ? '#DC2626' : 'var(--status-green)'
+              backgroundColor: isNegative ? 'var(--tone-danger-bg, #FEF2F2)' : 'var(--tone-success-bg, #F0FDF4)',
+              border: `1px solid ${isNegative ? 'var(--tone-danger-border, #FCA5A5)' : 'var(--tone-success-border, #BBF7D0)'}`,
+              color: isNegative ? 'var(--tone-danger-ink, #DC2626)' : 'var(--status-green)'
             }
           }, `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원`);
         })()
