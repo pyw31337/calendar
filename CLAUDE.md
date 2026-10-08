@@ -20,7 +20,7 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 
 **V2 셸이 유일한 화면이다 (2026-10 V1 제거 완료).** 9/23 컷오버 뒤 한 릴리스 동안 두었던
 `?shell=v1` 폴백과 V1 뷰 트리(`app-calendar-views.js`, `withStickyVideo` 등)는 사용자의 명시적
-지시("옛화면은 제거해도 될것 같아")로 제거했다. `isRenewalShellEnabled()`는 항상 `true`이고,
+지시("옛화면은 제거해도 될것 같아")로 제거했다. 남아 있던 게이트 `isRenewalShellEnabled()`/`app-feature-flags.js`도 2026-10-08 제거했고,
 옛 `?shell=v1` 북마크도 V2로 열린다. **되돌릴 탈출구는 더 이상 없으니**, 문제가 생기면 해당 PR을
 revert하는 것이 롤백 방법이다. **Safari(아이폰) 실기기 검수는 2026-10-01 사용자가 전 페이지 완료했다**고 확인했다
 (부족한 부분은 그 사이 다른 에이전트들이 수정함).
