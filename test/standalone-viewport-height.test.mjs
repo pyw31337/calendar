@@ -52,6 +52,7 @@ function runShell({ userAgent, innerHeight, screenHeight, width, innerWidth = wi
   vm.runInNewContext(source, context);
   const read = () => ({
     height: props.get('--app-vv-height'),
+    offsetTop: props.get('--app-vv-offset-top'),
     standaloneTopInset: props.get('--app-vv-standalone-top-inset'),
     keyboard: attrs.has('data-v2-keyboard'),
   });
@@ -121,6 +122,39 @@ test('a keyboard-sized shrink still pins the shell and marks the keyboard', () =
 });
 
 const IOS_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+
+test('a keyboard is still a keyboard when iOS pans the visual viewport down to the composer', () => {
+  // iOS often reveals a bottom composer by panning the visible strip (offsetTop up to the
+  // keyboard height) instead of scrolling the page. The shell must move onto that strip
+  // (header visible at its top, composer on the keyboard) rather than stay full height.
+  for (const offsetTop of [0, 120, 336]) {
+    const tab = runShell({
+      userAgent: IOS_UA, innerHeight: 664, screenHeight: 844, width: 390,
+      visualViewport: { height: 328, offsetTop, scale: 1 },
+      activeElement: { tagName: 'TEXTAREA' },
+    });
+    assert.equal(tab.keyboard, true, `tab offsetTop=${offsetTop}`);
+    assert.equal(tab.height, '328px');
+    assert.equal(tab.offsetTop, `${offsetTop}px`);
+    const pwa = runShell({
+      userAgent: IOS_UA, innerHeight: 793, screenHeight: 852, width: 393, navStandalone: true,
+      visualViewport: { height: 457, offsetTop, scale: 1 },
+      activeElement: { tagName: 'TEXTAREA' },
+    });
+    assert.equal(pwa.keyboard, true, `pwa offsetTop=${offsetTop}`);
+    assert.equal(pwa.height, '457px');
+    assert.equal(pwa.offsetTop, `${offsetTop}px`);
+  }
+});
+
+test('a panned visual viewport without a focused field is never a keyboard', () => {
+  const result = runShell({
+    userAgent: IOS_UA, innerHeight: 664, screenHeight: 844, width: 390,
+    visualViewport: { height: 328, offsetTop: 336, scale: 1 },
+  });
+  assert.equal(result.keyboard, false);
+  assert.equal(result.offsetTop, '0px');
+});
 
 test('home-screen app opened from a notification ignores a stale short window height', () => {
   // Tapping a KakaoTalk-style notification: WebKit still reports the window at
