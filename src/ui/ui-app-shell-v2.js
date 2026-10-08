@@ -3544,7 +3544,7 @@ function renderMoreModal(React, openModal, onClose, modalProps, anniversaryOverr
   return null;
 }
 
-function SearchPage({ modalProps, searchExtra, onClose, initialQuery = '', onQueryChange }) {
+function SearchPage({ modalProps, searchExtra, onClose, initialQuery = '', onQueryChange, initialCategory = null, onCategoryChange }) {
   const React = window.React;
   const { GlobalSearchModal } = bindUiComponentAliases(React);
   const onCloseRef = React.useRef(onClose);
@@ -3567,6 +3567,8 @@ function SearchPage({ modalProps, searchExtra, onClose, initialQuery = '', onQue
     inline: true,
     initialQuery: initialQuery || modalProps?.initialQuery || '',
     onQueryChange,
+    initialCategory,
+    onCategoryChange,
     onClose,
   });
 }
@@ -3795,6 +3797,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
   const [openMoreModal, setOpenMoreModal] = React.useState(null);
   const searchQueryRef = React.useRef('');
+  const searchCategoryRef = React.useRef(null);
   // Set only when DateModal's "+ 기념일 등록"/편집 opens the 기념일 설정 modal on top of (or after
   // closing) it, so that modal opens pre-filled the same way the old side-menu flow did.
   const [anniversaryOverride, setAnniversaryOverride] = React.useState(null);
@@ -4237,6 +4240,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     closeAllOverlays({
       onClosed: () => {
         searchQueryRef.current = '';
+        searchCategoryRef.current = null;
         setActiveTab('search');
       },
     });
@@ -4523,7 +4527,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d, tab) => { setDateModalTab(['meeting', 'participant', 'settlement'].includes(tab) ? tab : null); setDateModalDate(d); }, onChangeView, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, onOpenGalleryAnalysis: () => { setInitialGalleryTab('analysis'); onChangeView('gallery'); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
-          ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: closeSearch, initialQuery: searchQueryRef.current, onQueryChange: (q) => { searchQueryRef.current = q || ''; } })
+          ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: closeSearch, initialQuery: searchQueryRef.current, initialCategory: searchCategoryRef.current, onCategoryChange: (key) => { searchCategoryRef.current = key || null; }, onQueryChange: (q) => { searchQueryRef.current = q || ''; } })
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext: v2ChatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('chat') })
           : activeTab === 'memo'

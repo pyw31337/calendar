@@ -7,6 +7,7 @@ import { useParticipantSync } from '../core/current-participant.js';
 import { SearchResultLogRow as WidgetSearchResultLogRow, ParticipantPickerButton as WidgetParticipantPickerButton, ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
 import { memoCommentDraftKey, loadMemoDraft, normalizeMemoDraft } from '../core/memo-draft-store.js';
 import { useMemoDraftAutosave } from './memo-draft-ui.js';
+import { pickSearchCategory } from './search-history.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -2706,7 +2707,9 @@ export function GlobalSearchModal({
   onOpenContent,
   initialQuery = '',
   inline = false,
-  onQueryChange = null
+  onQueryChange = null,
+  initialCategory = null,
+  onCategoryChange = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2843,17 +2846,25 @@ export function GlobalSearchModal({
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
 
-  const [activeTab, setActiveTab] = React.useState('schedules');
+  const [activeTab, setActiveTabState] = React.useState(initialCategory || 'schedules');
+  // Back from an opened result remounts the 통합검색 page with the category the user had picked
+  // (initialCategory). Results can arrive a beat later, so that choice wins over the "first
+  // non-empty category" jump below as soon as it has matches, until the user picks another tab.
+  const preferredCategoryRef = React.useRef(initialCategory || null);
+  const onCategoryChangeRef = React.useRef(onCategoryChange);
+  onCategoryChangeRef.current = onCategoryChange;
+  const setActiveTab = React.useCallback((key) => {
+    preferredCategoryRef.current = null;
+    setActiveTabState(key);
+  }, []);
+  React.useEffect(() => {
+    if (typeof onCategoryChangeRef.current === 'function') onCategoryChangeRef.current(activeTab);
+  }, [activeTab]);
   // Whenever the query (or its results) changes, jump to the first category that actually has
   // matches instead of leaving the user staring at an empty tab.
   React.useEffect(() => {
     if (!q) return;
-    setActiveTab(prev => {
-      const prevDef = tabDefs.find(t => t.key === prev);
-      if (prevDef && prevDef.count > 0) return prev;
-      const firstNonEmpty = tabDefs.find(t => t.count > 0);
-      return firstNonEmpty ? firstNonEmpty.key : prev;
-    });
+    setActiveTabState(prev => pickSearchCategory(prev, preferredCategoryRef.current, tabDefs));
   }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, (matches.files || []).length, contentMatches.length]);
 
   const finishPick = React.useCallback((next) => {
