@@ -755,14 +755,39 @@ const ANNIVERSARY_BAR_COLORS = {
   other: '#6B7280'
 };
 
-// Calendar corner labels wrap to at most two lines with word-break: keep-all, which removes the
-// break opportunity before "(" -- "대체공휴일(개천절)" gets a <wbr> there so it splits as
-// "대체공휴일 / (개천절)" when the cell is narrow and stays on one line when it fits.
-function withBreakBeforeParen(React, label) {
+// Calendar corner labels: a long holiday name with a parenthetical ("대체공휴일(개천절)") must
+// split as "대체공휴일 / (개천절)" when the cell is narrow and stay on one line when it fits.
+// Browser line breaking cannot be trusted for that (WebKit broke it as "대체공휴일( / 개천절)"
+// under keep-all + overflow-wrap:anywhere), so each half is its own unbreakable segment with a
+// <wbr> between them; the only break opportunity is right before "(".
+// `--corner-chars` is the visual width of the longer half (Hangul = 1, ASCII/brackets narrower)
+// so phone CSS can shrink the type just enough that each half fits a 320px-wide cell.
+const CORNER_NARROW_CHAR = /[\x20-\x7e]/;
+function cornerVisualLength(text) {
+  let n = 0;
+  for (const ch of String(text)) n += CORNER_NARROW_CHAR.test(ch) ? 0.5 : 1;
+  return n;
+}
+function splitCornerLabel(label) {
   const text = String(label ?? '');
   const at = text.indexOf('(');
-  if (at <= 0) return text;
-  return [text.slice(0, at), React.createElement('wbr', { key: 'wbr' }), text.slice(at)];
+  if (at <= 0) return null;
+  return [text.slice(0, at), text.slice(at)];
+}
+function cornerLabelProps(label) {
+  const parts = splitCornerLabel(label);
+  if (!parts) return {};
+  const chars = Math.max(...parts.map(cornerVisualLength));
+  return { style: { '--corner-chars': String(Math.round(chars * 10) / 10) } };
+}
+function withBreakBeforeParen(React, label) {
+  const parts = splitCornerLabel(label);
+  if (!parts) return String(label ?? '');
+  return [
+    React.createElement('span', { key: 'main', className: bentoClass('day-corner-seg') }, parts[0]),
+    React.createElement('wbr', { key: 'wbr' }),
+    React.createElement('span', { key: 'paren', className: bentoClass('day-corner-seg') }, parts[1]),
+  ];
 }
 
 function anniversaryBarPaint(ann) {
@@ -1264,7 +1289,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           // Holiday + 모임확정 share one row (no stacked lines). Never render participant
           // schedule memos / meeting.note as free cell-body text under v2.
           (cornerLabel || hasMeeting) ? React.createElement('div', { className: bentoClass('day-head-row') },
-            cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim()) }, withBreakBeforeParen(React, cornerLabel)) : null,
+            cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''} ${splitCornerLabel(cornerLabel) ? 'has-paren' : ''}`.trim()), ...cornerLabelProps(cornerLabel) }, withBreakBeforeParen(React, cornerLabel)) : null,
             hasMeeting ? React.createElement('span', {
               className: bentoClass('day-meeting-pill'),
               title: meeting.title || meeting.note || '모임확정',
