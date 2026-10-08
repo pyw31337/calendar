@@ -3590,7 +3590,13 @@ export function DateModal({
                 meta: visibleMeetingImages.map(p => ({
                   timestamp: p.createdAt,
                   tags: p.tags,
-                  source: p.source || 'meeting',
+                  // meetingPhotoIndex is a read-optimised projection, not a distinct media
+                  // owner.  Its transport-only `meeting-index` source used to leak into the
+                  // Lightbox, where it was neither recognised as an editable meeting photo nor
+                  // consistently routed back to the original message.  Preserve chat-tagged
+                  // results (they are genuinely chat-owned) but normalise every album/index
+                  // record to the domain source the editor understands.
+                  source: p.source === 'chat-tag' ? 'chat-tag' : 'meeting',
                   // A date-linked album entry (sourceMessageId) is only a reference: the photo's real
                   // origin is its source message -- a chat/gallery upload, or a 일정 upload -- so the
                   // Lightbox's 출처 row names (and jumps to) that, not "일정" for every album photo.

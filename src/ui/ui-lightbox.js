@@ -1016,8 +1016,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
   // entries DO carry a truthy messageId (the memo's own id), but that id only resolves against
   // memos via memo.imageTags[imageIndex] (see handleSaveImageTags memo branch in app-main.js).
-  const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
-  const isMeetingTagTarget = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && (
+  // `meetingPhotoIndex` is a denormalised read model. Older open lightboxes can still carry
+  // its transport source (`meeting-index`), so use the durable date + photo id rather than an
+  // exact display-source string when deciding whether a photo belongs to an 일정 album.
+  const isMeetingPhoto = !!currentMeta?.meetingDate && !!currentMeta?.photoId;
+  const isMeetingTagTarget = isMeetingPhoto && (
     (!!currentMeta?.sourceMessageId && Number.isInteger(currentMeta?.sourceImageIndex))
     || !!currentMeta?.photoId
   );
@@ -1034,7 +1037,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   };
   const currentImageIndex = toTagImageIndex(currentMeta?.imageIndex);
   const currentSourceImageIndex = toTagImageIndex(currentMeta?.sourceImageIndex);
-  const isMeetingMessageTagTarget = currentMeta?.source === 'meeting'
+  const isMeetingMessageTagTarget = (currentMeta?.source === 'meeting' || isMeetingPhoto)
     && !!currentMeta?.messageId
     && currentImageIndex != null;
   // Anniversary photos live on the anniversary doc's photos[] array (not a chat message), so
@@ -1045,7 +1048,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // need a real messageId. Gallery photo-index rows use source:'gallery' but still store tags on
   // the underlying messages document.
   const canEditTags = currentMeta && (
-    currentMeta.source === 'meeting' ? (isMeetingTagTarget || isMeetingMessageTagTarget) :
+    isMeetingPhoto || currentMeta.source === 'meeting' ? (isMeetingTagTarget || isMeetingMessageTagTarget) :
     currentMeta.source === 'anniversary' ? isAnniversaryPhoto :
     currentMeta.source === 'memo' ? (!!currentMeta.messageId && currentImageIndex != null) :
     currentMeta.messageId != null
@@ -1122,7 +1125,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     : null;
   // Memo photos support delete/replace and per-photo tags (imageTags[imageIndex]).
   const canEditPhoto = !!(currentMeta && !currentMeta.directMediaUrl && (
-    currentMeta.source === 'meeting' ? isMeetingPhoto : currentMeta.messageId != null
+    isMeetingPhoto || currentMeta.messageId != null || currentMeta.sourceMessageId != null
   ));
   // "채팅 #117" -- the message's 1-based position in the calendar's full chat history, fetched
   // on demand (Firestore count() aggregate, independent of how much chat history the client has
@@ -1276,12 +1279,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         // No good way to remove just this one entry from the static urls/meta snapshot the
         // parent handed in -- close and let the next open reflect live data instead.
         if (ok) closeLightbox();
+        else if (typeof showToast === 'function') showToast('사진을 삭제하지 못했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.', 'error', 4500);
+      } catch (err) {
+        console.error('Lightbox photo delete failed:', err);
+        if (typeof showToast === 'function') showToast('사진 삭제 중 오류가 발생했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.', 'error', 4500);
       } finally {
         setIsDeletingPhoto(false);
       }
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
+    } else {
+      // Some embedded/share shells do not mount the common confirm dialog.  A visible trash
+      // button must never become a no-op there; the mutation itself still carries its normal
+      // undo affordance after it succeeds.
+      void confirmAction();
     }
   };
   // 추억(여행) 사진 모음은 날짜 구간으로 자동으로 모아지는 목록이라, 같이 찍혔지만 그 여행과

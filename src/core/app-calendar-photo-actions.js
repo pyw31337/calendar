@@ -109,8 +109,19 @@ export function createCalendarPhotoActions({
     if (!deletedPhoto) return false;
     const previousMeetings = cloneConfirmedMeetings(existingMeetings);
     const now = Date.now();
+    // Do not compare an absent `id` (`undefined === undefined`) here.  That marked every
+    // legacy id-less photo in the same meeting as deleted.  A selected photo has an object
+    // identity, and modern records have one or more stable keys; only URL-match as the final
+    // legacy fallback when no stable key exists at all.
+    const deletedIdentityKeys = [deletedPhoto.id, photoId, options.refKey, options.mediaKey]
+      .filter(Boolean);
+    const matchesDeletedPhoto = photo => (
+      photo === deletedPhoto
+      || (deletedIdentityKeys.length > 0 && deletedIdentityKeys.some(key => photoMatchesIdentity(photo, key)))
+      || (deletedIdentityKeys.length === 0 && photoMatchesUrl(photo, deletedPhoto.imageUrl || deletedPhoto.thumbUrl || imageUrl))
+    );
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-      ? { ...m, photos: existingPhotos.map(p => (p === deletedPhoto || p.id === deletedPhoto.id || photoMatchesUrl(p, imageUrl)) ? { ...p, deletedAt: Date.now(), updatedAt: Date.now() } : p), updatedAt: Date.now() }
+      ? { ...m, photos: existingPhotos.map(p => (matchesDeletedPhoto(p) ? { ...p, deletedAt: now, updatedAt: now } : p)), updatedAt: now }
       : m);
     const targetDate = meeting.date || dateStr;
     const photoLog = createActivityLog(activeCal.id, 'photo_delete', targetDate, '', now, '일정 사진 삭제');
@@ -871,6 +882,7 @@ export function createCalendarPhotoActions({
   const handleDeletePhoto = async meta => {
     if (!meta || meta.directMediaUrl) return false;
     const silent = !!meta.silent;
+    try {
     const imageUrl = meta.imageUrl || meta.full || meta.thumb;
     const msgId = meta.messageId || meta.sourceMessageId;
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
@@ -944,12 +956,18 @@ export function createCalendarPhotoActions({
       // pointer. New uploads should almost always route through the shared chat/message asset
       // path above so one delete removes the photo everywhere.
       if (finish(await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, meetingOpts(meta)))) return true;
+      if (!silent) showToast('일정 사진을 찾지 못했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.', 'error', 4500);
       return false;
     }
 
     if (finish(await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, meetingOpts(meta)))) return true;
     if (!silent) showToast('삭제 대상 사진을 찾지 못했습니다.', 'error', 4000);
     return false;
+    } catch (err) {
+      console.error('handleDeletePhoto failed:', err);
+      if (!silent) showToast('사진 삭제 중 오류가 발생했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.', 'error', 4500);
+      return false;
+    }
   };
 
   const handleBulkDeletePhotos = async (photos, options = {}) => {
