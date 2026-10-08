@@ -51,3 +51,7 @@ test('shared widgets read from GATHER_UI_COMPONENTS have a static fallback', () 
     }
   }
 });
+
+test('블랙·핫핑크 D-day badges use black ink on the orange second accent', () => {
+  assert.match(lateCss, /\[data-accent="pink"\]:has\(\.renewal-shell\.v2-design\) \.renewal-shell\.v2-design \.bp-dday-expanded-badge \{\s*color: var\(--on-brand, #0D0D0D\) !important;/);
+});
