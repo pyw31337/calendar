@@ -1,7 +1,12 @@
 @import './segmented-toggle.css';
 /* Viewport pin + bottom-gap kill switch for V2 (loaded with chat-bubble-modules.css).
  * Selectors use html/body:has(.v2-design) so portaled/document chrome stays V2-scoped
- * (see test/v2-style-isolation.test.mjs). */
+ * (see test/v2-style-isolation.test.mjs).
+ * !important policy (audited 2026-10): declarations whose !important had no effect in any audited
+ * page/popup, width (320-1920) and light/dark theme were dropped. Kept: everything that depends on
+ * safe-area / visual-viewport values (env(), --v2-safe-*, --app-vv-*, dvh) because headless audits
+ * cannot reproduce iOS standalone/keyboard geometry, plus rules that beat inline or earlier !important
+ * layers. Replace those only together with a specificity fix, never by deleting the keyword. */
 
 html:has(.v2-design),
 html:has(.v2-design) body {
@@ -21,23 +26,23 @@ html:has(.v2-design) #root {
   height: var(--app-vv-height, 100dvh) !important;
   min-height: var(--app-vv-height, 100dvh) !important;
   max-height: var(--app-vv-height, 100dvh) !important;
-  position: fixed !important;
+  position: fixed;
   top: var(--app-vv-offset-top, 0px) !important;
   left: var(--app-vv-offset-left, 0px) !important;
-  right: auto !important;
-  width: 100% !important;
+  right: auto;
+  width: 100%;
   max-width: 100vw !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 0 !important;
-  padding-bottom: 0 !important;
+  padding-bottom: 0;
 }
 
 .v2-design .v2-destination {
-  padding: 0 !important;
-  height: 100% !important;
+  padding: 0;
+  height: 100%;
   min-height: 0 !important;
-  max-height: 100% !important;
+  max-height: 100%;
   /* backwards, not both: a kept end-state transform would make every screen a containing
      block for its position:fixed popups (off-center modals). */
   animation: bp-screen-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) backwards;
@@ -101,69 +106,69 @@ html:has(.v2-design)::view-transition-new(root) {
  */
 .renewal-shell.v2-design > main.bp-app-shell.is-bento-home,
 .renewal-shell.v2-design main.bp-app-shell.is-bento-home {
-  height: 100% !important;
+  height: 100%;
   max-height: 100% !important;
-  min-height: 0 !important;
+  min-height: 0;
   overflow-x: hidden !important;
   /* clip keeps horizontal bleed in without the WebKit bug that drops
      position:sticky when the scrollport is overflow-x:hidden. */
   overflow-x: clip !important;
-  overflow-y: auto !important;
+  overflow-y: auto;
   overscroll-behavior-y: contain;
-  box-sizing: border-box !important;
+  box-sizing: border-box;
 }
 
 .v2-design .renewal-shell-main {
-  height: 100% !important;
+  height: 100%;
   min-height: 0 !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .v2-design .renewal-shell-main .v2-chat,
 .v2-design .renewal-shell-main .v2-chat .chat-room-container,
 .v2-design .renewal-shell-main .v2-chat .v2-chat-root {
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 .v2-design .renewal-shell-main .v2-chat .v2-chat-scroll-wrap {
   flex: 1 1 auto !important;
-  min-height: 0 !important;
-  position: relative !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .v2-design .v2-chat-composer,
 .v2-design .v2-chat .chat-composer.v2-chat-composer,
 .v2-design .v2-chat .chat-composer {
-  position: relative !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
-  top: auto !important;
-  flex: 0 0 auto !important;
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
+  position: relative;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  top: auto;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   transform: none !important;
-  box-sizing: border-box !important;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1200px) {
   .v2-design .v2-chat .chat-composer,
   .v2-design .v2-chat .chat-composer.v2-chat-composer,
   .v2-design .v2-chat-composer {
-    position: absolute !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    top: auto !important;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
   }
 }
 
@@ -176,9 +181,9 @@ html:has(.v2-design)::view-transition-new(root) {
 .v2-design .v2-settlement .v2-dest-body .settlement-page-body {
   overflow: visible !important;
   height: auto !important;
-  max-height: none !important;
+  max-height: none;
   flex: none !important;
-  min-height: 0 !important;
+  min-height: 0;
 }
 /* Drop overflow:auto from the shared memo/settlement scroll-owner rule when it
  * also targeted .settlement-page-body (screens.css). Outer pane still scrolls. */
@@ -267,8 +272,8 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
     min-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
     max-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
     margin-top: var(--v2-safe-top) !important;
-    margin-bottom: 0 !important;
-    box-sizing: border-box !important;
+    margin-bottom: 0;
+    box-sizing: border-box;
   }
 
   /* PageHeader now lives inside the safe destination viewport.  Leaving its
@@ -276,7 +281,7 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
      page to page. */
   .renewal-shell.v2-design > main.renewal-shell-main .v2-page-header,
   .renewal-shell.v2-design > main.renewal-shell-main .v2-page-header.bp-header {
-    padding-top: 0 !important;
+    padding-top: 0;
   }
 
   /* `v2-fullscreen` is nested in the bounded pane.  It must not grow back to
@@ -292,7 +297,7 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
      The hidden-composer controls are positioned inside the safe pane too. */
   .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-scroll,
   .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .chat-messages-scroll {
-    padding-top: 56px !important;
+    padding-top: 56px;
   }
   .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
   .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
@@ -309,7 +314,7 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
   /* The drawer is fixed to the physical viewport.  Its surface remains full
      height while its first/last controls clear the iOS indicators. */
   .renewal-shell.v2-design .bp-side-nav {
-    box-sizing: border-box !important;
+    box-sizing: border-box;
     padding-top: var(--v2-safe-top) !important;
     padding-bottom: var(--v2-safe-bottom) !important;
   }
@@ -345,20 +350,20 @@ html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="di
      other destination. Same contract as the other headers: no inset here. */
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .bp-header.v2-page-header,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .bp-header.v2-page-header:not(.is-scroll-hidden) {
-    padding-top: 0 !important;
+    padding-top: 0;
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-scroll,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .chat-messages-scroll {
-    padding-top: 56px !important;
+    padding-top: 56px;
   }
 
   /* 기록(gallery/archive/content) frame was 100dvh tall inside the pane that
      already starts below the status bar, so its bottom (photos, pagination)
      ran one status bar + home indicator past the screen. Fill the pane. */
   .renewal-shell.v2-design > main.renewal-shell-main .v2-records-frame {
-    height: 100% !important;
-    min-height: 0 !important;
-    max-height: 100% !important;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
   }
 
   /* The status-bar strip above a destination pane showed the gray page
@@ -395,20 +400,20 @@ html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="di
     max-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-dest-body {
-    padding-bottom: calc(var(--v2-dest-content-pad-y, 20px) + var(--v2-pane-bottom)) !important;
+    padding-bottom: calc(var(--v2-dest-content-pad-y, 20px) + var(--v2-pane-bottom));
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-legacy-body,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .history-page-scroll {
-    padding-bottom: var(--v2-pane-bottom) !important;
+    padding-bottom: var(--v2-pane-bottom);
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .gallery-page-scroll {
-    padding-bottom: calc(88px + var(--v2-pane-bottom)) !important;
+    padding-bottom: calc(88px + var(--v2-pane-bottom));
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .culture-items-grid {
-    padding-bottom: calc(20px + var(--v2-pane-bottom)) !important;
+    padding-bottom: calc(20px + var(--v2-pane-bottom));
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-composer {
-    padding-bottom: calc(8px + var(--v2-pane-bottom)) !important;
+    padding-bottom: calc(8px + var(--v2-pane-bottom));
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
