@@ -160,7 +160,11 @@ export function pruneExpiredMemoDrafts({ storage, now = Date.now(), ttlMs = MEMO
 }
 
 /** Trailing-edge debounce with flush/cancel (flush runs a pending save right away). */
-export function createDebouncedSaver(fn, wait = MEMO_DRAFT_DEBOUNCE_MS, timers = { set: setTimeout, clear: clearTimeout }) {
+// Browsers throw "Illegal invocation" when setTimeout/clearTimeout run with a non-window `this`
+// (e.g. called as `timers.set(...)`), so the defaults are plain wrappers.
+const DEFAULT_TIMERS = { set: (cb, ms) => setTimeout(cb, ms), clear: (handle) => clearTimeout(handle) };
+
+export function createDebouncedSaver(fn, wait = MEMO_DRAFT_DEBOUNCE_MS, timers = DEFAULT_TIMERS) {
   let handle = null;
   let pending = null;
   const run = () => {

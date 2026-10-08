@@ -135,3 +135,27 @@ test('memo editor wires autosave, V2 restore prompt and the draft-kept close war
   const css = await readFile(new URL('../src/ui/v2/memo-draft.css', import.meta.url), 'utf8');
   assert.match(css, /var\(--a-brand, #7C2FE5\)/, 'V2 purple accent through the theme token');
 });
+
+test('default debounce timers work when setTimeout rejects a foreign `this` (browser Illegal invocation)', async () => {
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  const strict = (real) => function (...args) {
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+    return real(...args);
+  };
+  globalThis.setTimeout = strict(realSet);
+  globalThis.clearTimeout = strict(realClear);
+  try {
+    const calls = [];
+    const save = createDebouncedSaver((v) => calls.push(v), 1);
+    save('a');
+    save('b');
+    save.flush();
+    save('c');
+    save.cancel();
+    assert.deepEqual(calls, ['b']);
+  } finally {
+    globalThis.setTimeout = realSet;
+    globalThis.clearTimeout = realClear;
+  }
+});
