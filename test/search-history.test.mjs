@@ -56,3 +56,9 @@ test('flow: open search -> open a result tab -> Back returns to search -> close 
   assert.equal(stack.length, 1, 'never leaves the app');
   assert.equal(needsSearchColdStartSeed('search', null), true, 'cold start on ?tab=search gets a 캘린더 seed');
 });
+
+test('a memo result that app-main opens itself does not push a second 메모 entry', async () => {
+  const shell = await readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const fn = shell.slice(shell.indexOf('const searchExtra = {'), shell.indexOf('onSelectDate: (d, focus)'));
+  assert.match(fn, /recordsContext\.memoProps\.onOpenMemo\(id\);\s*setActiveTabState\('memo'\);\s*return;/);
+});
