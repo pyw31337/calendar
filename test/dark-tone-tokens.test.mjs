@@ -36,6 +36,9 @@ test('dark inline-ink overrides match the color property, not background-color/b
 
 test('the dark map inverts the vector layer only once', () => {
   assert.match(lateCss, /\.leaflet-tile-pane \.leaflet-gl-layer \{\s*filter: none;/);
+  // WebKit raster fallback: per-tile inversion, pane filter off (pane filter is not painted there).
+  assert.match(lateCss, /\.leaflet-tile-pane:has\(> \.places-map-raster-fallback\) \{\s*filter: none;/);
+  assert.match(lateCss, /\.places-map-raster-fallback \.leaflet-tile \{\s*filter: invert\(1\)/);
 });
 
 test('shared widgets read from GATHER_UI_COMPONENTS have a static fallback', () => {
