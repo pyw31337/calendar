@@ -9,6 +9,11 @@ import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 import { markFileIntakeSource, storedPhotoPayload } from '../core/upload-intake.js';
 import { buildMemoEditPatch } from '../core/memo-edit-patch.js';
 import { persistMemoCommentsChange, latestMemoCommentAt } from '../core/memo-comments.js';
+import {
+  memoDraftKey, loadMemoDraft, clearMemoDraft, isSameMemoDraftContent, isMemoDraftEmpty, normalizeMemoDraft,
+  memoDraftFieldsFromMemo, restorableDraftImages, pruneExpiredMemoDrafts, MEMO_DRAFT_CLOSE_MESSAGE,
+} from '../core/memo-draft-store.js';
+import { useMemoDraftAutosave, MemoDraftRestorePrompt } from './memo-draft-ui.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -517,11 +522,92 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const memoEditorDirtyGuard = useModalDirtyGuard(
     closeMemoEditor,
     onRequestConfirm,
-    undefined,
+    MEMO_DRAFT_CLOSE_MESSAGE,
     !!editingMemo,
     memoEditorDirtySnapshot,
     editingMemo?.id || 'new'
   );
+
+  // Memo draft autosave (core/memo-draft-store.js): title/body/tags (+ kept photo URLs for edits)
+  // go to localStorage per calendar + memo id ('new' for the composer), ~500ms after typing stops.
+  // Reopening offers 이어쓰기 / 새로 쓰기; a successful save or 새로 쓰기 clears it; 7-day expiry.
+  // Autosave stays off until the restore check for this editor ran, and while the offer is
+  // showing, so the untouched form can never overwrite the stored draft.
+  const memoDraftCalId = calendar?.id || '';
+  const editDraftKey = editingMemo ? memoDraftKey(memoDraftCalId, editingMemo.id || 'new') : '';
+  const newDraftKey = memoDraftKey(memoDraftCalId, 'new');
+  const [editDraftOffer, setEditDraftOffer] = React.useState(null);
+  const [editDraftCheckedKey, setEditDraftCheckedKey] = React.useState('');
+  const [newDraftOffer, setNewDraftOffer] = React.useState(null);
+  const [newDraftChecked, setNewDraftChecked] = React.useState(false);
+  React.useEffect(() => { pruneExpiredMemoDrafts(); }, []);
+  React.useEffect(() => {
+    if (!editingMemo || !editDraftKey) { setEditDraftOffer(null); setEditDraftCheckedKey(''); return; }
+    const draft = loadMemoDraft(editDraftKey);
+    if (draft && !isSameMemoDraftContent(draft, memoDraftFieldsFromMemo(editingMemo))) setEditDraftOffer(draft);
+    else { if (draft) clearMemoDraft(editDraftKey); setEditDraftOffer(null); }
+    setEditDraftCheckedKey(editDraftKey);
+    // Re-check only when a different memo opens, not on every keystroke.
+  }, [editDraftKey, !!editingMemo]);
+  const editDraftBaseline = React.useMemo(() => (editingMemo ? memoDraftFieldsFromMemo(editingMemo) : null), [editingMemo]);
+  const editDraftAutosave = useMemoDraftAutosave({
+    key: editDraftKey,
+    active: !!editingMemo && editDraftCheckedKey === editDraftKey && !editDraftOffer,
+    fields: { title: editTitle, text: editText, tags: editTags, tagInput: editTagInput, color: editColor, isPinned: editIsPinned, images: editImages },
+    baseline: editDraftBaseline,
+  });
+  const resumeEditDraft = () => {
+    const d = editDraftOffer;
+    if (!d) return;
+    setEditTitle(d.title || '');
+    setEditText(d.text || '');
+    setEditTags(Array.isArray(d.tags) ? d.tags : []);
+    setEditTagInput(d.tagInput || '');
+    if (typeof d.color === 'string' && d.color) setEditColor(d.color);
+    if (typeof d.isPinned === 'boolean') setEditIsPinned(d.isPinned);
+    const keptImages = restorableDraftImages(d, editingMemo);
+    if (keptImages) setEditImages(keptImages);
+    setEditDraftOffer(null);
+  };
+  const discardEditDraft = () => {
+    editDraftAutosave.clear(editDraftKey);
+    setEditDraftOffer(null);
+  };
+  React.useEffect(() => {
+    if (!isComposerExpanded) { setNewDraftOffer(null); setNewDraftChecked(false); return; }
+    // In-memory composer text is the newest copy; only offer the stored draft into an empty form.
+    const composerEmpty = isMemoDraftEmpty(normalizeMemoDraft({ title: newTitle, text: newText, tags: newTags, tagInput: newTagInput }));
+    const draft = composerEmpty ? loadMemoDraft(newDraftKey) : null;
+    setNewDraftOffer(draft || null);
+    setNewDraftChecked(true);
+  }, [isComposerExpanded, newDraftKey]);
+  const newDraftAutosave = useMemoDraftAutosave({
+    key: newDraftKey,
+    active: isComposerExpanded && newDraftChecked && !newDraftOffer,
+    fields: { title: newTitle, text: newText, tags: newTags, tagInput: newTagInput, color: newColor, isPinned: newIsPinned },
+    baseline: normalizeMemoDraft({}),
+  });
+  const resumeNewDraft = () => {
+    const d = newDraftOffer;
+    if (!d) return;
+    setNewTitle(d.title || '');
+    setNewText(d.text || '');
+    setNewTags(Array.isArray(d.tags) ? d.tags : []);
+    setNewTagInput(d.tagInput || '');
+    if (typeof d.color === 'string' && d.color) setNewColor(d.color);
+    if (typeof d.isPinned === 'boolean') setNewIsPinned(d.isPinned);
+    setNewDraftOffer(null);
+  };
+  const discardNewDraft = () => {
+    newDraftAutosave.clear(newDraftKey);
+    setNewDraftOffer(null);
+  };
+  // Closing the composer keeps its text (in memory and as a local draft) -- say so.
+  const closeComposerKeepingDraft = () => {
+    const hasText = !isMemoDraftEmpty(normalizeMemoDraft({ title: newTitle, text: newText, tags: newTags, tagInput: newTagInput }));
+    if (hasText && !newDraftOffer && typeof showToast === 'function') showToast('작성 중인 메모는 임시 저장했어요. 다음에 이어서 쓸 수 있어요.', 'info', 3000);
+    setIsComposerExpanded(false);
+  };
 
   // Emoji Picker States
   const [isComposerEmojiOpen, setIsComposerEmojiOpen] = React.useState(false);
@@ -686,6 +772,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }
         });
         if (queued) {
+          newDraftAutosave.clear(memoDraftKey(calendarId, 'new'));
           showToast('오프라인입니다. 연결되면 메모와 사진을 자동 저장합니다.', 'info', 5000);
           setNewTitle(''); setNewText(''); setNewColor('var(--bg-card)'); setNewIsPinned(false); setNewTags([]); setNewTagInput(''); setNewImages([]); setIsComposerExpanded(false);
           return;
@@ -753,6 +840,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
       }
 
+      newDraftAutosave.clear(memoDraftKey(calendarId, 'new'));
       showToast('메모가 저장되었습니다.', 'success');
       
       // Reset composer
@@ -805,6 +893,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }
         });
         if (queued) {
+          editDraftAutosave.clear(editDraftKey);
           showToast('오프라인입니다. 연결되면 메모 수정을 자동 저장합니다.', 'info', 5000);
           closeMemoEditor();
           return;
@@ -885,6 +974,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
       }
 
+      editDraftAutosave.clear(editDraftKey);
       showToast('메모가 수정되었습니다.', 'success');
       closeMemoEditor();
     } catch (err) {
@@ -922,6 +1012,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
         }
 
+        clearMemoDraft(memoDraftKey(memoDraftCalId, memo?.id));
         showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
           try {
             const restoreStamp = Date.now();
@@ -1473,6 +1564,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px' }
           },
+            newDraftOffer && /*#__PURE__*/React.createElement(MemoDraftRestorePrompt, { draft: newDraftOffer, onResume: resumeNewDraft, onDiscard: discardNewDraft }),
             /* Title & Pin row */
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
@@ -1702,7 +1794,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 /*#__PURE__*/React.createElement("button", {
                   type: "button",
                   className: "btn btn-secondary",
-                  onClick: () => setIsComposerExpanded(false),
+                  onClick: closeComposerKeepingDraft,
                   style: {
                     whiteSpace: 'nowrap',
                     cursor: 'pointer',
@@ -1935,6 +2027,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("div", {
           className: "memo-edit-modal-body"
         },
+        editDraftOffer && /*#__PURE__*/React.createElement(MemoDraftRestorePrompt, { draft: editDraftOffer, onResume: resumeEditDraft, onDiscard: discardEditDraft }),
         /* Textarea wrapped relatively with bottom-right emoji & file picker icons - Styled precisely as user requested */
         /*#__PURE__*/React.createElement("div", {
           style: { position: 'relative', width: '100%' }
@@ -2320,7 +2413,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       onSelectTag: (tag) => { setSelectedTag(tag); if (tag) setIsSearchOpen(true); },
       onCompose: () => setIsComposerExpanded(true),
       isComposerExpanded,
-      onCloseComposer: () => setIsComposerExpanded(false),
+      onCloseComposer: closeComposerKeepingDraft,
       slots: {},
     }), extraTree);
   }

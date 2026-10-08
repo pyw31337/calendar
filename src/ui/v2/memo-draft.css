@@ -1,0 +1,64 @@
+/* Memo draft restore prompt (src/ui/memo-draft-ui.js) -- V2 purple accent via theme tokens. */
+body:has(.v2-design) .memo-draft-restore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--a-brand-rgb, 124 47 229) / 0.28);
+  background: rgb(var(--a-brand-rgb, 124 47 229) / 0.08);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+body:has(.v2-design) .memo-draft-restore-text {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-weight: 700;
+}
+body:has(.v2-design) .memo-draft-restore-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+body:has(.v2-design) .memo-draft-restore-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+body:has(.v2-design) .memo-draft-restore-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+body:has(.v2-design) .memo-draft-restore-btn.is-secondary {
+  background: transparent;
+  border-color: rgb(var(--a-brand-rgb, 124 47 229) / 0.35);
+  color: var(--a-brand, #7C2FE5);
+}
+body:has(.v2-design) .memo-draft-restore-btn.is-primary {
+  background: var(--a-brand, #7C2FE5);
+  color: #fff;
+}
+html[data-theme="dark"]:has(.renewal-shell.v2-design) .memo-draft-restore {
+  border-color: rgb(var(--d-brand-rgb, 201 253 88) / 0.32);
+  background: rgb(var(--d-brand-rgb, 201 253 88) / 0.08);
+}
+html[data-theme="dark"]:has(.renewal-shell.v2-design) .memo-draft-restore-btn.is-secondary {
+  border-color: rgb(var(--d-brand-rgb, 201 253 88) / 0.4);
+  color: var(--d-brand, #C9FD58);
+}
+html[data-theme="dark"]:has(.renewal-shell.v2-design) .memo-draft-restore-btn.is-primary {
+  background: var(--d-brand, #C9FD58);
+  color: #111;
+}

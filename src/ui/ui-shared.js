@@ -2,6 +2,7 @@
  * Shared UI primitives (P4-22)
  */
 import { useTabStripGesture } from './tab-strip-gesture.js';
+import { registerOverlay, isBatchClosing, getBatchId, noteMarkerConsumed, findDirtyCompanion, confirmMessageFor, OVERLAY_CLOSE_CONFIRM_TITLE } from '../core/overlay-stack.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -2250,45 +2251,107 @@ export function ResizableListSection({
 /**
  * Browser Back closes the top overlay first (same pattern as the gallery lightbox).
  * Pushes a same-URL history marker when the overlay mounts; popstate calls onClose.
- * Closing via UI calls history.back() when our marker is still on top so PWA Back
- * never exits the app unexpectedly. Ephemeral dialogs should pass enabled:false.
+ * Closing via UI closes right away and calls history.back() when our marker is still on top,
+ * so the marker entry is consumed and PWA Back never exits the app unexpectedly.
+ * Ephemeral dialogs should pass enabled:false.
  * Deep links (?memory=, notification ?tab=) keep their own URL entries unchanged.
+ *
+ * Stacked overlays: each marker is `{ ...history.state, [stateKey]: true, [instanceKey]: true }`, so a real Back that
+ * pops the overlay ABOVE this one lands on an entry that still carries this overlay's key -- this
+ * one stays open. (Before, every open overlay closed on any popstate.)
+ * Every instance also registers in the overlay stack (overlay-stack.js) so one Esc / a new
+ * top-level dialog from navigation can close the whole stack in one go.
  */
+let overlayHistoryInstanceSeq = 0;
 export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } = {}) {
   const React = window.React;
+  const instanceRef = React.useRef(0);
+  if (!instanceRef.current) { overlayHistoryInstanceSeq += 1; instanceRef.current = overlayHistoryInstanceSeq; }
+  // Per-instance key: two stacked overlays that share `key` (e.g. two layer popups) still tell
+  // their own markers apart.
+  const instanceKey = `__moyeoraOverlayI_${instanceRef.current}`;
   const markerRef = React.useRef(false);
   const closingViaBackRef = React.useRef(false);
+  const closedInBatchRef = React.useRef(0);
   const onCloseRef = React.useRef(onClose);
   onCloseRef.current = onClose;
   const stateKey = `__moyeoraOverlay_${key}`;
 
+  const runClose = React.useCallback(() => {
+    const batchId = getBatchId();
+    if (batchId) {
+      if (closedInBatchRef.current === batchId) return;
+      closedInBatchRef.current = batchId;
+    }
+    if (typeof onCloseRef.current === 'function') onCloseRef.current();
+  }, []);
+
+  const requestClose = React.useCallback(() => {
+    if (closingViaBackRef.current) {
+      runClose();
+      return;
+    }
+    const markerOnTop = markerRef.current && window.history.state && window.history.state[instanceKey];
+    if (markerOnTop && isBatchClosing()) {
+      // closeAllOverlays() pops every consumed marker with a single history.go(-n).
+      markerRef.current = false;
+      noteMarkerConsumed();
+      runClose();
+      return;
+    }
+    if (markerOnTop) {
+      markerRef.current = false;
+      runClose();
+      try { window.history.back(); } catch (_) { /* best-effort */ }
+      return;
+    }
+    runClose();
+  }, [instanceKey, runClose]);
+
   React.useEffect(() => {
     if (!enabled || typeof window === 'undefined' || !window.history) return undefined;
     try {
-      window.history.pushState({ ...(window.history.state || {}), [stateKey]: true }, '', window.location.href);
+      window.history.pushState({ ...(window.history.state || {}), [stateKey]: true, [instanceKey]: true }, '', window.location.href);
       markerRef.current = true;
     } catch (_) {
       markerRef.current = false;
     }
-    const handlePopState = () => {
+    let stackEntry = null;
+    const handlePopState = (event) => {
       if (!markerRef.current) return;
+      // A real traversal that left our marker in place popped an overlay stacked above us.
+      if (event && event.isTrusted && window.history.state && window.history.state[instanceKey]) return;
+      // Back on a dialog with unsaved edits asks first, exactly like its X / Esc: restore the
+      // marker we just lost and close only once the user confirms.
+      const dirty = event && event.isTrusted ? findDirtyCompanion(stackEntry) : null;
+      if (dirty && typeof dirty.confirm === 'function') {
+        try {
+          window.history.pushState({ ...(window.history.state || {}), [stateKey]: true, [instanceKey]: true }, '', window.location.href);
+        } catch (_) { /* best-effort */ }
+        dirty.confirm(OVERLAY_CLOSE_CONFIRM_TITLE, confirmMessageFor(dirty), () => requestClose());
+        return;
+      }
       markerRef.current = false;
       closingViaBackRef.current = true;
       try {
-        if (typeof onCloseRef.current === 'function') onCloseRef.current();
+        runClose();
       } finally {
         closingViaBackRef.current = false;
       }
     };
     window.addEventListener('popstate', handlePopState);
+    const unregister = registerOverlay({ key, close: () => requestClose() });
+    stackEntry = unregister.entry || null;
     return () => {
+      unregister();
       window.removeEventListener('popstate', handlePopState);
       // If the overlay unmounts without going through history.back (parent navigated),
       // drop the marker quietly so a later Back does not reopen a ghost close.
-      if (markerRef.current && window.history.state && window.history.state[stateKey]) {
+      if (markerRef.current && window.history.state && window.history.state[instanceKey]) {
         markerRef.current = false;
         try {
           const next = { ...(window.history.state || {}) };
+          delete next[instanceKey];
           delete next[stateKey];
           window.history.replaceState(next, '', window.location.href);
         } catch (_) { /* best-effort */ }
@@ -2296,22 +2359,7 @@ export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } =
         markerRef.current = false;
       }
     };
-  }, [enabled, stateKey]);
-
-  const requestClose = React.useCallback(() => {
-    if (closingViaBackRef.current) {
-      if (typeof onCloseRef.current === 'function') onCloseRef.current();
-      return;
-    }
-    if (markerRef.current && window.history.state && window.history.state[stateKey]) {
-      markerRef.current = false;
-      try {
-        window.history.back();
-        return;
-      } catch (_) { /* fall through */ }
-    }
-    if (typeof onCloseRef.current === 'function') onCloseRef.current();
-  }, [stateKey]);
+  }, [enabled, stateKey, instanceKey, key, requestClose, runClose]);
 
   return requestClose;
 }
