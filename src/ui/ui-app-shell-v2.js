@@ -40,6 +40,8 @@ import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from './component-aliases.js';
 import { useOverlayHistory } from './ui-shared.js';
+import { closeAllOverlays, getOpenOverlays } from './overlay-stack.js';
+import { withSearchMarker, stateForTabWrite, planSearchClose, needsSearchColdStartSeed } from './search-history.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
@@ -125,7 +127,7 @@ function readRecordsSubTabFromLocation() {
  * for the very first mount, and to correct an invalid `?tab=`/`?sub=`) does not. `?sub=` is
  * dropped whenever the tab isn't 기록, so it never lingers into an unrelated tab's URL.
  */
-function writeLocationState(tabId, subTabId, { push } = { push: true }) {
+function writeLocationState(tabId, subTabId, { push, state } = { push: true }) {
   if (typeof window === 'undefined' || !window.history) return;
   const url = new URL(window.location.href);
   if (tabId === DEFAULT_TAB) url.searchParams.delete('tab');
@@ -147,7 +149,9 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   }
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
-  window.history[method](window.history.state, '', url);
+  // Only the 통합검색 entry carries the search marker (search-history.js): a result that
+  // navigates elsewhere pushes a clean entry so Back returns to search, not past it.
+  window.history[method](stateForTabWrite(tabId, window.history.state, state), '', url);
   // Existing core subscribers use popstate to select the correct data collection.
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
@@ -3482,8 +3486,8 @@ export function buildRenewalMoreContext(calendar, deps) {
 }
 
 // Modals that don't wire browser Back themselves (AnniversaryModal already calls useOverlayHistory;
-// search keeps its own URL handling) get a history marker here, so Back closes the popup first
-// instead of leaving the app.
+// 통합검색 is the ?tab=search page with its own marker -- search-history.js) get a history marker
+// here, so Back closes the popup first instead of leaving the app.
 const MORE_MODALS_WITH_BACK_MARKER = new Set(['share', 'app-settings', 'calendar-settings']);
 
 function MoreModalBackGate({ modalKey, onClose, render }) {
@@ -3515,13 +3519,29 @@ function renderMoreModal(React, openModal, onClose, modalProps, anniversaryOverr
   return null;
 }
 
-function SearchPage({ modalProps, searchExtra, onClose }) {
+function SearchPage({ modalProps, searchExtra, onClose, initialQuery = '', onQueryChange }) {
   const React = window.React;
   const { GlobalSearchModal } = bindUiComponentAliases(React);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  React.useEffect(() => {
+    // Esc closes 통합검색 like a popup -- unless a dialog is open above it (the overlay stack's
+    // own Esc closes those first) or a confirm/lightbox owns Esc right now.
+    const onKey = (event) => {
+      if (getOpenOverlays().length) return;
+      if (!event || (event.key !== 'Escape' && event.key !== 'Esc') || event.defaultPrevented || event.isComposing) return;
+      if (document.querySelector('.confirm-dialog-modal, .lightbox-overlay, .document-lightbox-modal')) return;
+      if (typeof onCloseRef.current === 'function') onCloseRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   return React.createElement(GlobalSearchModal, {
     ...modalProps,
     ...searchExtra,
     inline: true,
+    initialQuery: initialQuery || modalProps?.initialQuery || '',
+    onQueryChange,
     onClose,
   });
 }
@@ -3750,6 +3770,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
   const [openMoreModal, setOpenMoreModal] = React.useState(null);
+  const searchQueryRef = React.useRef('');
   // Set only when DateModal's "+ 기념일 등록"/편집 opens the 기념일 설정 modal on top of (or after
   // closing) it, so that modal opens pre-filled the same way the old side-menu flow did.
   const [anniversaryOverride, setAnniversaryOverride] = React.useState(null);
@@ -3935,6 +3956,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // Shared by the 더보기 list AND any other pane (e.g. ChatPane's "앱 설정" entry) that needs to
   // open one of the 4 real 더보기 modals directly, without going through the 더보기 tab's own list.
   const openMoreModalById = (id) => {
+    if (id === 'search') { openSearch(); return; }
     const trigger = {
       share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
       'app-settings': moreContext.onSelectAppSettings,
@@ -3942,7 +3964,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       search: moreContext.onSelectSearch,
     }[id];
     if (!trigger) return;
-    Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
+    // A new top-level dialog from navigation replaces whatever dialogs are open (overlay-stack.js):
+    // clean ones close, a dirty one keeps its "저장하지 않은 내용" confirm (cancel = stay put), and
+    // their history markers are popped before the new dialog pushes its own.
+    closeAllOverlays({
+      onClosed: () => { Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {}); },
+    });
   };
   const handleSelectMoreItem = (id) => {
     setSelectedMoreItem(id);
@@ -4087,7 +4114,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onChangeView('memo');
     },
     onSelectDate: (d, focus) => {
-      onChangeView('calendar');
+      // From 통합검색 the date sheet opens over the search page (it has its own Back marker), so
+      // Back / X returns to the results instead of jumping to 캘린더.
+      if (activeTab !== 'search') onChangeView('calendar');
       setDateModalTab(focus?.tab || null);
       setDateModalSearchFocus(focus || null);
       setDateModalDate(d);
@@ -4127,6 +4156,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         } else {
           writeLocationState(activeTab, recordsSubTab, { push: false });
         }
+      } else if (needsSearchColdStartSeed(activeTab, window.history.state)) {
+        // Booted straight onto 통합검색 (bookmark / PWA restore): put 캘린더 underneath and push
+        // search as our own marked entry, so Back closes search instead of leaving the site.
+        writeLocationState(DEFAULT_TAB, DEFAULT_RECORDS_SUBTAB, { push: false });
+        writeLocationState('search', DEFAULT_RECORDS_SUBTAB, { push: true, state: withSearchMarker(window.history.state) });
       } else {
         writeLocationState(activeTab, recordsSubTab, { push: false });
       }
@@ -4159,8 +4193,32 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const setActiveTab = (tabId) => {
     if (tabId === activeTab) return;
     const nextSub = tabId === 'records' ? recordsSubTab : DEFAULT_RECORDS_SUBTAB;
-    writeLocationState(tabId, nextSub, { push: true });
+    writeLocationState(tabId, nextSub, tabId === 'search'
+      ? { push: true, state: withSearchMarker(window.history.state) }
+      : { push: true });
     setActiveTabState(tabId);
+  };
+
+  // 통합검색 (search-history.js). Opening closes any stacked dialogs first (same rule as a new
+  // top-level dialog) and starts with an empty query; Back from a result that navigated to another
+  // tab returns here with the last query restored (searchQueryRef).
+  const openSearch = () => {
+    setIsSideNavOpen(false);
+    if (activeTab === 'search') return;
+    closeAllOverlays({
+      onClosed: () => {
+        searchQueryRef.current = '';
+        setActiveTab('search');
+      },
+    });
+  };
+  const closeSearch = () => {
+    if (activeTab !== 'search') return;
+    if (planSearchClose(window.history.state) === 'back') {
+      try { window.history.back(); return; } catch (_) { /* fall through to replace */ }
+    }
+    writeLocationState(DEFAULT_TAB, DEFAULT_RECORDS_SUBTAB, { push: false });
+    setActiveTabState(DEFAULT_TAB);
   };
 
   const setRecordsSubTab = (subTabId) => {
@@ -4294,7 +4352,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       type: 'button',
       className: bentoClass('side-nav-global-search'),
       'aria-label': '통합검색',
-      onClick: () => { setIsSideNavOpen(false); setActiveTab('search'); },
+      onClick: openSearch,
     },
       React.createElement('span', { className: bentoClass('side-nav-global-search-icon'), 'aria-hidden': 'true' }, React.createElement(TabIcon, { id: 'search', size: 20 })),
       React.createElement('span', { className: bentoClass('side-nav-global-search-label') }, '통합검색')
@@ -4436,7 +4494,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d, tab) => { setDateModalTab(['meeting', 'participant', 'settlement'].includes(tab) ? tab : null); setDateModalDate(d); }, onChangeView, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, onOpenGalleryAnalysis: () => { setInitialGalleryTab('analysis'); onChangeView('gallery'); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
-          ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
+          ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: closeSearch, initialQuery: searchQueryRef.current, onQueryChange: (q) => { searchQueryRef.current = q || ''; } })
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext: v2ChatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('chat') })
           : activeTab === 'memo'
