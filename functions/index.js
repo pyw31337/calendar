@@ -3042,7 +3042,10 @@ const MEDIA_ANALYSIS_REVIEW_DECISIONS = new Set(['applied', 'edited', 'rejected'
 // Independent of HTTP ingestion: bounded retries/audit cannot make a successful worker upload
 // appear failed. Own audit writes do not retrigger processing.
 exports.completeMediaAnalysisLocationTags = seoulTriggerFunctions()
-  .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'], failurePolicy: true })
+  // Retries are reserved and audited in media-auto-tags.js.  Cloud Functions' legacy
+  // failurePolicy would require a force deployment and could duplicate an external
+  // geocoding request after a successful write, so keep the platform trigger one-shot.
+  .runWith({ timeoutSeconds: 60, memory: '256MB', secrets: ['KAKAO_REST_API_KEY'] })
   .firestore.document('calendars/{calendarDocId}/mediaAnalysis/{analysisId}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;

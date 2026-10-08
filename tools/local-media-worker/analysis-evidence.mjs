@@ -25,18 +25,28 @@ export function captureDateKey(value) {
 export function classifyPhoto(photo = {}, insight = {}, calendar = {}, learned = []) {
   const existing = tokens(photo.tags);
   const tagEvidence = [];
+  // Suggested tags and recognised classifications serve different jobs.  Keeping the latter
+  // prevents the review UI from treating a photo which already has #영우 / #광명시 as if the
+  // analysis knew nothing about people or places simply because there is nothing new to add.
+  const recognizedEvidence = [];
   const add = (value, source, confidence = 0) => {
     const tag = compact(value);
     if (!tag || tag.length > 40) return '';
     if (!tagEvidence.some(entry => entry.tag === tag && entry.source === source)) tagEvidence.push({ tag, source, confidence });
     return tag;
   };
+  const recognize = (value, source = 'existing-tag', confidence = 1) => {
+    const tag = compact(value);
+    if (!tag || tag.length > 40) return '';
+    if (!recognizedEvidence.some(entry => entry.tag === tag && entry.source === source)) recognizedEvidence.push({ tag, source, confidence });
+    return tag;
+  };
   const has = value => existing.includes(compact(value));
   const participants = rows(calendar.participants).filter(active).map(row => String(row.name || '').trim()).filter(Boolean);
   const places = rows(calendar.places).filter(active);
   const existingTypes = classifyExistingPhotoTags(photo.tags, calendar, photo);
-  const people = existingTypes.people.map(name => add(name, 'existing-tag', 1));
-  const placeTags = existingTypes.places.map(name => add(name, 'existing-tag', 1));
+  const people = existingTypes.people.map(name => recognize(name));
+  const placeTags = existingTypes.places.map(name => recognize(name));
   // OCR may identify a written name, not the person in the photograph. Always manual.
   const words = new Set((insight.ocrText || []).flatMap(tokens));
   if (!existingTypes.personExcluded) participants.filter(name => name.length >= 2 && words.has(name) && !has(name)).forEach(name => people.push(add(name, 'ocr-person')));
@@ -64,6 +74,7 @@ export function classifyPhoto(photo = {}, insight = {}, calendar = {}, learned =
     .filter(tag => !hasEquivalentPhotoTag(tag, photo, calendar)).slice(0, 20);
   return {
     analysisVersion: 5, suggestedTags, tagEvidence: tagEvidence.filter(entry => suggestedTags.includes(entry.tag)).slice(0, 40),
+    recognizedEvidence: recognizedEvidence.slice(0, 40),
     people: [...new Set(people.filter(Boolean))], places: [...new Set(placeTags.filter(Boolean))], meetings: [...new Set(meetings)],
     scenes: (insight.labels || []).filter(row => Number(row.confidence) >= 0.65).map(row => row.name).slice(0, 12),
     // Backward-compatible field: scene confidence only. Never used for mutation eligibility.

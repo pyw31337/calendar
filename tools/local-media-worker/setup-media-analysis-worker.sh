@@ -44,7 +44,11 @@ CALENDAR_JSON="$(/usr/bin/env node -e 'const ids=process.argv[1].split(",").map(
     schemaVersion: 1,
     calendarIds: JSON.parse(calendarIds),
     projectId,
-    maxPerRun: 80,
+    // 100 is the server-side bounded page maximum. Two pages per scheduled launch means
+    // a newly imported backlog advances by up to 200 photos per calendar without dropping
+    // the durable cursor or turning one launch into an unbounded workload.
+    maxPerRun: 100,
+    backlogPagesPerCalendar: 2,
     analysisConcurrency: 4,
     tokenService: "Moyeora Media Analysis Worker",
     tokenAccount: process.env.USER || "moyeora",

@@ -45,6 +45,23 @@ test('GPS-nearest venues are not certain; multiple candidates and missing coordi
   assert.equal(getMediaAnalysisReview({ ...result, assetKey: 'asset:v1:a', status: 'suggested' }).canBulkApply, false);
 });
 
+test('already tagged people and places remain visible as recognised classifications, not repeat suggestions', () => {
+  const result = classifyPhoto({ tags: '영우 광명시' }, {}, {
+    participants: [{ name: '영우' }],
+    places: [{ name: '광명시' }]
+  });
+  assert.deepEqual(result.suggestedTags, []);
+  assert.deepEqual(result.people, ['영우']);
+  assert.deepEqual(result.places, ['광명시']);
+  assert.deepEqual(result.recognizedEvidence, [
+    { tag: '영우', source: 'existing-tag', confidence: 1 },
+    { tag: '광명시', source: 'existing-tag', confidence: 1 }
+  ]);
+  const stored = sanitizeAnalysisItem({ assetKey: 'asset:v1:a', ...result });
+  assert.deepEqual(stored.recognizedEvidence, result.recognizedEvidence);
+  assert.match(getMediaAnalysisReview({ ...stored, status: 'suggested' }).reasons.join(' '), /이미 분류됨: 영우 · 광명시/);
+});
+
 test('legacy/NaN evidence cannot bypass the policy and server drops unknown evidence types', () => {
   for (const confidence of [undefined, NaN, Infinity, '1', .999]) {
     assert.equal(getMediaAnalysisReview({ assetKey: 'asset:v1:a', status: 'suggested', places: ['서울'], confidence,

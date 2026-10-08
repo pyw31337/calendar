@@ -52,8 +52,13 @@ const DIRECT_SOURCES = new Set(['existing-tag', 'capture-date']);
 export function getMediaAnalysisReview(item, { photo } = {}) {
   const suggestedTags = getAnalysisSuggestedTags(item);
   const evidence = Array.isArray(item?.tagEvidence) ? item.tagEvidence : [];
+  const recognized = Array.isArray(item?.recognizedEvidence) ? item.recognizedEvidence : [];
   const reasons = [];
-  if (!evidence.length) reasons.push('태그별 근거가 없는 이전 분석입니다. 사진을 확인해 주세요.');
+  const recognisedNames = Array.from(new Set(recognized
+    .filter(entry => entry?.source === 'existing-tag' && Number(entry?.confidence) === 1)
+    .map(entry => String(entry.tag || '').trim()).filter(Boolean))).slice(0, 4);
+  if (recognisedNames.length) reasons.push(`이미 분류됨: ${recognisedNames.join(' · ')}.`);
+  if (!evidence.length && !recognisedNames.length) reasons.push('태그별 근거가 없는 이전 분석입니다. 사진을 확인해 주세요.');
   const stale = photo && Number(photo.updatedAt) > Number(item?.sourceUpdatedAt || 0);
   if (stale) reasons.push('분석 이후 사진 정보가 변경되었습니다.');
   const eligibleTags = suggestedTags.filter(tag => !stale && evidence.some(entry =>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
-import { isAnalysisWindow, parseHolidayIcs } from '../tools/local-media-worker/run-scheduled-media-analysis.mjs';
+import { isAnalysisWindow, normalizeBacklogPages, parseHolidayIcs } from '../tools/local-media-worker/run-scheduled-media-analysis.mjs';
 import { isRetryableAssetFailure } from '../tools/local-media-worker/analysis-retry-policy.mjs';
 import { fetchMediaAnalysisFeed, fetchMediaAnalysisPhoto, fetchMediaAnalysisWorkerStates, recordMediaAnalysisFeedback } from '../src/core/media-analysis-feed.js';
 
@@ -39,6 +39,13 @@ test('allowAllHours overrides weekday daytime restrictions for background analys
   const holidayKeys = new Set();
   assert.equal(isAnalysisWindow({ date: new Date('2026-09-29T01:00:00Z'), holidayKeys, allowAllHours: true }).allowed, true);
   assert.equal(isAnalysisWindow({ date: new Date('2026-09-29T01:00:00Z'), holidayKeys, allowAllHours: false }).allowed, false);
+});
+
+test('scheduled catch-up stays bounded while allowing contiguous cursor pages', () => {
+  assert.equal(normalizeBacklogPages(2), 2);
+  assert.equal(normalizeBacklogPages(99), 3);
+  assert.equal(normalizeBacklogPages(0), 1);
+  assert.equal(normalizeBacklogPages('not-a-number', 2), 2);
 });
 
 test('missing photos are recorded but do not pin the local analysis cursor', () => {

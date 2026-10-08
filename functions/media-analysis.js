@@ -74,6 +74,9 @@ function sanitizeAnalysisItem(item = {}, now = Date.now()) {
     analysisVersion: Math.max(1, integer(item.analysisVersion, 1)),
     suggestedTags: tags,
     tagEvidence: tagEvidenceList(item.tagEvidence),
+    // Existing person/place tags are recognition results, not new recommendations.  Retain
+    // their compact, non-image evidence so the client will not ask the family to add them again.
+    recognizedEvidence: tagEvidenceList(item.recognizedEvidence),
     people,
     places,
     meetings,
