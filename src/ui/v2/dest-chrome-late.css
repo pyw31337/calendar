@@ -6493,6 +6493,12 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-popup-tip {
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-popup-content-wrapper {
   border: 1px solid var(--border-subtle) !important;
 }
+/* 블랙·핫핑크 paints the D-day badges with its orange second accent (#FF7A1A); white on it is
+   2.6:1, so those badges take the black brand ink like every other dark brand fill. */
+html[data-theme="dark"][data-accent="pink"]:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-dday-compact-badge,
+html[data-theme="dark"][data-accent="pink"]:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-dday-expanded-badge {
+  color: var(--on-brand, #0D0D0D) !important;
+}
 
 /* PC home uses the same 40px page gutter as every other destination body (.v2-dest-body,
    .gallery-page-scroll, .places-list-body all pad 40px at desktop widths) instead of running
