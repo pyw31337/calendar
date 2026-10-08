@@ -5,6 +5,8 @@ import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { LikeButton } from './like-button.js';
 import { useParticipantSync } from '../core/current-participant.js';
 import { SearchResultLogRow as WidgetSearchResultLogRow, ParticipantPickerButton as WidgetParticipantPickerButton, ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
+import { memoCommentDraftKey, loadMemoDraft, normalizeMemoDraft } from '../core/memo-draft-store.js';
+import { useMemoDraftAutosave } from './memo-draft-ui.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -1718,6 +1720,25 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const [isSavingComment, setIsSavingComment] = React.useState(false);
   const commentInputRef = React.useRef(null);
+  // New-comment draft autosave (core/memo-draft-store.js): reopening this memo's composer
+  // brings back the half-typed comment; sending it or 취소 clears it. Editing an existing
+  // comment is not drafted.
+  const commentDraftKey = memoCommentDraftKey(calendar?.id, memo.id);
+  const [commentDraftChecked, setCommentDraftChecked] = React.useState(false);
+  React.useEffect(() => {
+    if (!isCommentComposerOpen || editingCommentId) { setCommentDraftChecked(false); return; }
+    if (!commentText) {
+      const draft = loadMemoDraft(commentDraftKey);
+      if (draft && draft.text) setCommentText(draft.text);
+    }
+    setCommentDraftChecked(true);
+  }, [isCommentComposerOpen, editingCommentId, commentDraftKey]);
+  const commentDraftAutosave = useMemoDraftAutosave({
+    key: commentDraftKey,
+    active: isCommentComposerOpen && !editingCommentId && commentDraftChecked,
+    fields: { text: commentText },
+    baseline: normalizeMemoDraft({}),
+  });
   const refocusComposerField = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField)
     || __deps.refocusComposerField
     || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
@@ -1736,6 +1757,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     try {
       const saved = await Promise.resolve(onCommentsChange(nextComments));
       if (saved === false) return;
+      if (!wasEditing) commentDraftAutosave.clear(commentDraftKey);
       setCommentText('');
       setEditingCommentId(null);
       // Keep composer open + focused so mobile keyboard stays for the next comment.
@@ -1751,6 +1773,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
   const handleCancelComment = e => {
     if (e) e.stopPropagation();
+    if (!editingCommentId) commentDraftAutosave.clear(commentDraftKey);
     setEditingCommentId(null);
     setCommentText('');
     setIsCommentComposerOpen(false);
@@ -2682,7 +2705,8 @@ export function GlobalSearchModal({
   onOpenPlaces,
   onOpenContent,
   initialQuery = '',
-  inline = false
+  inline = false,
+  onQueryChange = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2699,6 +2723,12 @@ export function GlobalSearchModal({
     || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.getChatFileTypeLabel);
 
   const [query, setQuery] = React.useState(initialQuery);
+  // The 통합검색 page reports its query so Back from an opened result can restore it.
+  const onQueryChangeRef = React.useRef(onQueryChange);
+  onQueryChangeRef.current = onQueryChange;
+  React.useEffect(() => {
+    if (typeof onQueryChangeRef.current === 'function') onQueryChangeRef.current(query);
+  }, [query]);
   const inputRef = React.useRef(null);
   React.useEffect(() => { inputRef.current?.focus(); }, []);
 
