@@ -2263,7 +2263,7 @@ export function ResizableListSection({
  * top-level dialog from navigation can close the whole stack in one go.
  */
 let overlayHistoryInstanceSeq = 0;
-export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } = {}) {
+export function useOverlayHistory(onClose, { enabled = true, key = 'overlay', stack = true } = {}) {
   const React = window.React;
   const instanceRef = React.useRef(0);
   if (!instanceRef.current) { overlayHistoryInstanceSeq += 1; instanceRef.current = overlayHistoryInstanceSeq; }
@@ -2340,7 +2340,9 @@ export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } =
       }
     };
     window.addEventListener('popstate', handlePopState);
-    const unregister = registerOverlay({ key, close: () => requestClose() });
+    // stack:false -- an in-page view marker (e.g. 정산 카테고리별보기) gets Back handling only; Esc and
+    // "a new dialog closes the open ones" must never flip the page view.
+    const unregister = stack ? registerOverlay({ key, close: () => requestClose() }) : () => {};
     stackEntry = unregister.entry || null;
     return () => {
       unregister();
@@ -2359,7 +2361,7 @@ export function useOverlayHistory(onClose, { enabled = true, key = 'overlay' } =
         markerRef.current = false;
       }
     };
-  }, [enabled, stateKey, instanceKey, key, requestClose, runClose]);
+  }, [enabled, stateKey, instanceKey, key, stack, requestClose, runClose]);
 
   return requestClose;
 }

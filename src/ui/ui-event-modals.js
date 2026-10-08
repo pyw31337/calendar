@@ -7,6 +7,8 @@ import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core
 import { filterSelectableSettlementExpenses, getReservedSettlementItemKeys } from '../core/settlement-card-selection.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CommonPagination, useOverlayHistory } from './ui-shared.js';
+import { buildSettlementCategoryView, SETTLEMENT_CATEGORY_ALL } from '../core/settlement-category.js';
+import { SettlementCategoryBarRow, SettlementCategoryChips, SettlementCategorySummary } from './settlement-category-view.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -3248,6 +3250,33 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
+  // 카테고리별보기: selected chip + Back handling. Tapping a 누적보기 category row pushes one history
+  // marker (same useOverlayHistory pattern as popups, but kept out of the dialog stack so Esc /
+  // opening a dialog never flips the view), so Back returns to 누적보기. Switching tabs from the
+  // tab bar consumes that marker instead of leaving it behind; plain tab/chip changes push nothing,
+  // like 누적/월별 always did.
+  const [settlementCategory, setSettlementCategory] = React.useState(SETTLEMENT_CATEGORY_ALL);
+  const [categoryPage, setCategoryPage] = React.useState(1);
+  const [categoryBackArmed, setCategoryBackArmed] = React.useState(false);
+  const tabAfterCategoryBackRef = React.useRef('total');
+  const closeCategoryBack = useOverlayHistory(() => {
+    setCategoryBackArmed(false);
+    setActiveTab(tabAfterCategoryBackRef.current);
+    tabAfterCategoryBackRef.current = 'total';
+  }, { enabled: categoryBackArmed, key: 'settlement-category', stack: false });
+  const openSettlementCategoryFromTotal = categoryId => {
+    setSettlementCategory(categoryId);
+    setActiveTab('category');
+    setCategoryBackArmed(true);
+  };
+  const handleSettlementTabChange = nextTab => {
+    if (categoryBackArmed && nextTab !== 'category') {
+      tabAfterCategoryBackRef.current = nextTab;
+      closeCategoryBack();
+      return;
+    }
+    setActiveTab(nextTab);
+  };
   const [settlementSearchQuery, setSettlementSearchQuery] = React.useState('');
   const [isSettlementSearchOpen, setIsSettlementSearchOpen] = React.useState(false);
   const [openMenuCardId, setOpenMenuCardId] = React.useState(null);
@@ -3488,7 +3517,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   React.useEffect(() => {
     setLedgerPage(1);
     setDailyPage(1);
-  }, [activeTab, year, month, settlementSearchQuery]);
+    setCategoryPage(1);
+  }, [activeTab, year, month, settlementSearchQuery, settlementCategory]);
 
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const pagedAllTimeItems = paginateGalleryItems(allTimeItems, ledgerPage, SETTLEMENT_PAGE_SIZE);
@@ -3564,7 +3594,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     }
   }, "자비부담");
 
-  const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
+  const renderItemRow = (item, showDate = false, hideBalance = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
     className: "settlement-ledger-row",
     onClick: () => onSelectDate && onSelectDate(item.date),
@@ -3577,7 +3607,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : (item.isSelfPay ? '#64748B' : '#DC2626'), whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
-  }, highlightSettlement(item.label)), !item.isSelfPay && settlementBalanceByKey.get(item.ledgerKey) != null && /*#__PURE__*/React.createElement("span", {
+  }, highlightSettlement(item.label)), !hideBalance && !item.isSelfPay && settlementBalanceByKey.get(item.ledgerKey) != null && /*#__PURE__*/React.createElement("span", {
     className: "settlement-running-balance"
   }, `잔액\u00a0\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey)).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -3614,16 +3644,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }
   }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-light)', fontSize: 'var(--font-size-md)' }
-  }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement("div", {
+  }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement(SettlementCategoryBarRow, {
     key: item.category.id,
-    style: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', marginTop: '8px' }
-  }, categoryBadge(item.category), /*#__PURE__*/React.createElement("div", {
-    style: { height: '8px', borderRadius: 'var(--radius-full)', background: 'var(--border-subtle)', overflow: 'hidden' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { width: `${allTimeExpense ? Math.max(4, item.total / allTimeExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: 'var(--radius-full)' }
-  })), /*#__PURE__*/React.createElement("strong", {
-    style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'nowrap' }
-  }, item.total.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("section", {
+    row: item,
+    grandTotal: allTimeExpense,
+    badge: categoryBadge(item.category),
+    onOpen: openSettlementCategoryFromTotal
+  }))), /*#__PURE__*/React.createElement("section", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
     className: 'settlement-base-budget-card', style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-md)', background: '#F0FDF4' }
@@ -3686,7 +3713,24 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     label: '월별 정산 목록'
   }));
 
-  const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
+  const categoryView = activeTab === 'category' ? buildSettlementCategoryView(allTimeItems, categories, settlementCategory) : null;
+  const pagedCategoryEntries = paginateGalleryItems(categoryView ? categoryView.entries : [], categoryPage, SETTLEMENT_PAGE_SIZE);
+  const selectedCategoryName = categoryView?.summary.category?.name || '';
+  const categoryContent = categoryView && /*#__PURE__*/React.createElement("div", {
+    className: "settle-cat-list"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "settle-cat-list-head"
+  }, selectedCategoryName ? `${selectedCategoryName} 내역` : '전체 지출 내역', /*#__PURE__*/React.createElement("span", null, "최신순")),
+  categoryView.entries.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "settle-cat-empty"
+  }, "아직 지출 항목이 없습니다.") : pagedCategoryEntries.items.map(item => renderItemRow(item, true, true)), renderSettlementPagination({
+    page: pagedCategoryEntries.currentPage,
+    pageCount: pagedCategoryEntries.pageCount,
+    onChange: setCategoryPage,
+    label: '카테고리별 정산 목록'
+  }));
+
+  const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : activeTab === 'category' ? categoryContent : dailyContent;
 
   const v2Shell = typeof document !== 'undefined' && !!document.querySelector('.renewal-shell.v2-design');
 
@@ -3758,11 +3802,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     }
   }, /*#__PURE__*/React.createElement(UnderlineTabs, {
     className: "settlement-view-tabs",
-    ariaLabel: "누적 또는 월별 정산 보기",
+    ariaLabel: "누적, 월별 또는 카테고리별 정산 보기",
     value: activeTab,
-    onChange: v => setActiveTab(v),
+    onChange: handleSettlementTabChange,
     style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
-    options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }]
+    options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }, { value: 'category', label: '카테고리별보기' }]
   })),
 
   /*#__PURE__*/React.createElement("div", {
@@ -3774,7 +3818,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
        not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards
        exist yet" (정산 목록이 없습니다.), so this area only needs to exist when there's something
        to show. */
+    /* 카테고리별보기: chip row right under the tabs (in-progress cards stay on 누적/월별). */
+    categoryView && /*#__PURE__*/React.createElement(SettlementCategoryChips, {
+      totals: categoryView.totals,
+      selected: categoryView.selected,
+      onSelect: setSettlementCategory
+    }),
     (() => {
+      if (activeTab === 'category') return null;
       const activeParticipants = settlementParticipants;
       const displayCards = pagedVisibleSettlementCards.items;
       if (displayCards.length === 0) return null;
@@ -3993,15 +4044,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         })
       );
     })(),
-    renderSettlementPagination({
+    activeTab !== 'category' && renderSettlementPagination({
       page: pagedVisibleSettlementCards.currentPage,
       pageCount: pagedVisibleSettlementCards.pageCount,
       onChange: setSettlementCardPage,
       label: '진행 중 정산 카드'
     }),
 
-    /* Metric Grid (총수입 / 총지출 / 현재잔액) */
-    /*#__PURE__*/React.createElement("div", {
+    /* Metric Grid (총수입 / 총지출 / 현재잔액); 카테고리별보기 shows its own category summary. */
+    categoryView ? /*#__PURE__*/React.createElement(SettlementCategorySummary, {
+      view: categoryView,
+      onSelect: setSettlementCategory
+    }) : /*#__PURE__*/React.createElement("div", {
       className: "settlement-metric-grid"
     }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
       key: card.label,
