@@ -1754,6 +1754,12 @@ function isValidDateString(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 // 공유 URL 규칙: 항상 /share/{calId}/[view]/[itemId]/ 슬래시 경로 (OG 크롤러용)
+const parseCalendarAppPathFromLocation = GATHER_APP_UTILS.parseCalendarAppPathFromLocation
+  ? (pathname = window.location.pathname) => GATHER_APP_UTILS.parseCalendarAppPathFromLocation(pathname)
+  : function parseCalendarAppPathFromLocation(pathname = window.location.pathname) {
+    const m = String(pathname || '').match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+    return m ? { calendarId: m[1] } : null;
+  };
 const parseSharePathFromLocation = GATHER_APP_UTILS.parseSharePathFromLocation
   ? (pathname = window.location.pathname) => GATHER_APP_UTILS.parseSharePathFromLocation(pathname)
   : function parseSharePathFromLocation(pathname = window.location.pathname) {
@@ -1793,10 +1799,15 @@ function isRealCalendarId(id) {
 function getCalendarIdFromURL() {
   const href = window.location.href;
   const urlParams = new URLSearchParams(window.location.search);
-  if (isRealCalendarId(urlParams.get('id'))) return urlParams.get('id');
-  if (isRealCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
+  // A path-scoped web app is already bound to one calendar. It must win over any
+  // copied/stale query id so `/app/jhair/?id=cw` can never load 모아엘가 inside the
+  // 제이헤어 URL (the same rule applies to a canonical /share/<id>/ URL).
+  const app = parseCalendarAppPathFromLocation();
+  if (app && isRealCalendarId(app.calendarId)) return app.calendarId;
   const share = parseSharePathFromLocation();
   if (share && isRealCalendarId(share.calendarId)) return share.calendarId;
+  if (isRealCalendarId(urlParams.get('id'))) return urlParams.get('id');
+  if (isRealCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
   const shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
   if (shareMatch && isRealCalendarId(shareMatch[1])) return shareMatch[1];
   const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
@@ -1806,8 +1817,9 @@ function getCalendarIdFromURL() {
 
 function getRawCalendarIdFromURL() {
   const urlParams = new URLSearchParams(window.location.search);
+  const app = parseCalendarAppPathFromLocation();
   const share = parseSharePathFromLocation();
-  return urlParams.get('id') || urlParams.get('cal') || (share && share.calendarId) || '';
+  return (app && app.calendarId) || (share && share.calendarId) || urlParams.get('id') || urlParams.get('cal') || '';
 }
 
 function getCalendarMonthFromURL() {
@@ -1823,8 +1835,15 @@ function getCalendarMonthFromURL() {
 function normalizeCalendarUrlParams(fallbackCalId = null) {
   try {
     const url = new URL(window.location.href);
-    if (url.pathname.includes('/share/')) return;
-    let id = url.searchParams.get('id') || url.searchParams.get('cal');
+    const app = parseCalendarAppPathFromLocation(url.pathname);
+    const share = parseSharePathFromLocation(url.pathname);
+    const scopedId = (app && app.calendarId) || (share && share.calendarId) || '';
+    // A canonical app/share path already carries the calendar identity. Remove both
+    // query aliases, especially a conflicting copied id, so the address cannot mix
+    // two calendars or reveal one through another calendar's URL.
+    const hasScopedId = isRealCalendarId(scopedId);
+    if ((app || share) && !hasScopedId) return;
+    let id = hasScopedId ? scopedId : (url.searchParams.get('id') || url.searchParams.get('cal'));
     // isRealCalendarId, not the bare isValidCalendarId shape check -- see its definition above
     // for why: without this, the "no calendar selected yet" placeholder itself satisfies the
     // shape check and gets written into the address bar as if it were a real calendar id.
@@ -1834,7 +1853,10 @@ function normalizeCalendarUrlParams(fallbackCalId = null) {
     if (!id && fallbackCalId && isRealCalendarId(fallbackCalId)) {
       id = fallbackCalId;
     }
-    if (id) {
+    if (hasScopedId) {
+      url.searchParams.delete('id');
+      url.searchParams.delete('cal');
+    } else if (id) {
       url.searchParams.delete('cal');
       url.searchParams.set('id', id);
     }
@@ -3245,6 +3267,7 @@ export {
   normalizeColorValue,
   isValidDateString,
   parseSharePathFromLocation,
+  parseCalendarAppPathFromLocation,
   getCalendarIdFromURL,
   getRawCalendarIdFromURL,
   getCalendarMonthFromURL,

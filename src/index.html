@@ -100,18 +100,31 @@
       // iOS reads apple-mobile-web-app-title at the moment the share sheet opens.
       (function () {
         var params = new URLSearchParams(window.location.search);
-        var id = params.get('id') || params.get('cal');
         var appMatch = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
-        if (!id && appMatch) {
-          id = appMatch[1];
-          params.set('id', id);
+        var shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
+        var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+        var queryId = params.get('id') || params.get('cal');
+        // An app-scoped path can be left over from a previously installed web app.
+        // If a valid requested calendar accompanies it, promote that requested id
+        // into the matching path before React or the manifest chooser starts. Thus
+        // `/app/jhair/?id=cw` becomes `/app/cw/`, preserving the intended 모아엘가
+        // visit while leaving only one calendar identity in the visible URL.
+        if (appMatch && queryId && queryId !== appMatch[1] && manifestByCalendar[queryId]) {
+          var correctedAppPath = window.location.pathname.replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/app/' + queryId + '/');
+          params.delete('id');
+          params.delete('cal');
+          try { history.replaceState(history.state, '', correctedAppPath + (params.toString() ? '?' + params.toString() : '') + window.location.hash); } catch (_) {}
+          appMatch = correctedAppPath.match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+        }
+        // A share path is always authoritative. For an app path without a requested
+        // replacement, clean legacy duplicate query aliases from the address bar.
+        var scopedId = appMatch ? appMatch[1] : (shareMatch ? shareMatch[1] : '');
+        var id = scopedId || queryId;
+        if (scopedId) {
+          params.delete('id');
+          params.delete('cal');
           try { history.replaceState(history.state, '', window.location.pathname + '?' + params.toString() + window.location.hash); } catch (_) {}
         }
-        if (!id) {
-          var shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
-          if (shareMatch) id = shareMatch[1];
-        }
-        var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
         // Per-calendar install scope. Every manifest used to share scope "./" (/calendar/), so on
         // Android (Chrome/Samsung Internet/Whale) the first installed calendar claimed every
         // /calendar/ URL: visiting ?id=cw offered "open 제이헤어" instead of installing 모아엘가.
@@ -130,12 +143,17 @@
           && !params.has('admin') && params.get('mode') !== 'admin') {
           var rootPath = window.location.pathname.replace(/[^/]*$/, '');
           try {
+            // Once the root URL is promoted to its calendar-scoped app path, the
+            // path is the sole calendar identity; retain only ordinary route state.
+            params.delete('id');
+            params.delete('cal');
             if (!document.querySelector('base')) {
               var baseEl = document.createElement('base');
               baseEl.setAttribute('href', rootPath);
               document.head.insertBefore(baseEl, document.head.firstChild);
             }
-            history.replaceState(history.state, '', rootPath + 'app/' + id + '/' + window.location.search + window.location.hash);
+            var routedQuery = params.toString();
+            history.replaceState(history.state, '', rootPath + 'app/' + id + '/' + (routedQuery ? '?' + routedQuery : '') + window.location.hash);
           } catch (_) {}
         }
         var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };

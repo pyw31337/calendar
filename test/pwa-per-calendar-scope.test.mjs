@@ -14,7 +14,7 @@ test('each calendar manifest has its own /app/<id>/ scope and a start_url inside
     const id = file.match(/^manifest-(.+)\.json$/)[1];
     const m = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(m.scope, `./app/${id}/`, file);
-    assert.ok(m.start_url.startsWith(m.scope), `${file} start_url outside scope`);
+    assert.equal(m.start_url, `./app/${id}/`, `${file} keeps the calendar id only in its scoped path`);
     assert.ok(m.id, `${file} keeps an explicit id so existing installs update in place`);
     scopes.add(m.scope);
   }
@@ -28,6 +28,7 @@ test('the build writes the /app/<id>/ pages and the root page only moves there w
   const html = fs.readFileSync('src/index.html', 'utf8');
   assert.match(html, /meta\[name="gather-app-paths"\]/);
   assert.match(html, /history\.replaceState\(history\.state, '', rootPath \+ 'app\/' \+ id \+ '\/'/);
+  assert.match(html, /\/app\/jhair\/\?id=cw.*\/app\/cw\//s);
 });
 
 test('share/base URLs strip the /app/<id>/ path back to the site root', async () => {
@@ -35,4 +36,5 @@ test('share/base URLs strip the /app/<id>/ path back to the site root', async ()
   const loc = { origin: 'https://x.test', pathname: '/calendar/app/cw/' };
   assert.equal(utils.getAppBaseUrl(loc), 'https://x.test/calendar/');
   assert.equal(utils.getCalendarShareUrl('cw', loc), 'https://x.test/calendar/share/cw/');
+  assert.deepEqual(utils.parseCalendarAppPathFromLocation('/calendar/app/jhair/'), { calendarId: 'jhair' });
 });

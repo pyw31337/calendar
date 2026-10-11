@@ -965,6 +965,13 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return { calendarId, view: 'calendar', memoId: null };
   }
 
+  // An installed calendar owns its `/app/<calendarId>/` scope. Treat that path as the
+  // canonical identity instead of trusting a stale or pasted `?id=` from another calendar.
+  function parseCalendarAppPathFromLocation(pathname) {
+    const m = String(pathname || '').match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+    return m ? { calendarId: m[1] } : null;
+  }
+
   function getAppBaseUrl(locationLike) {
     const loc = locationLike || (typeof window !== 'undefined' ? window.location : null);
     if (!loc) return '/';
@@ -1208,6 +1215,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     parseGatherPlacesClipboardText,
     trimLatLngOutliers,
     parseSharePathFromLocation,
+    parseCalendarAppPathFromLocation,
     getAppBaseUrl,
     getCalendarShareUrl,
     getViewShareUrl,

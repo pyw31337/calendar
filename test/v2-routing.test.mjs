@@ -15,6 +15,16 @@ test('V2 is the only shell: tab/sub routing with or without a shell param', () =
   assert.equal(params.has('sub'), false);
   assert.equal(params.get('id'), 'example');
 });
+test('calendar-scoped paths never preserve a conflicting query id during navigation', () => {
+  const scoped = { pathname: '/calendar/app/jhair/', search: '?id=cw&cal=cw&shell=v2&tab=records&sub=content' };
+  const url = buildAppViewUrl(scoped, 'content', new Date(2026, 10, 1));
+  const parsed = new URL(url, 'https://example.test');
+  assert.equal(parsed.pathname, '/calendar/app/jhair/');
+  assert.equal(parsed.searchParams.has('id'), false);
+  assert.equal(parsed.searchParams.has('cal'), false);
+  assert.equal(parsed.searchParams.get('tab'), 'records');
+  assert.equal(parsed.searchParams.get('sub'), 'content');
+});
 test('an old ?shell=v1 bookmark opens V2 routing (the V1 fallback was removed)', () => {
   assert.equal(getInitialAppView(location('?shell=v1&id=example&tab=records&sub=memo')), 'memo');
   assert.equal(getInitialAppView(location('?shell=v1&view=chat')), 'chat');

@@ -1069,7 +1069,10 @@ function CalendarApp() {
   const syncCurrentMonthInUrl = nextDate => {
     if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return;
     const params = new URLSearchParams(window.location.search);
-    const keepId = params.get('id') || params.get('cal');
+    // The app/share path is the calendar identity. Do not reintroduce a stale query
+    // id while changing months inside a scoped calendar URL.
+    const isScopedCalendarPath = /\/(?:app|share)\/[A-Za-z0-9_-]+(?:\/|$)/.test(window.location.pathname);
+    const keepId = isScopedCalendarPath ? '' : (params.get('id') || params.get('cal'));
     params.delete('id');
     params.delete('cal');
     if (keepId) params.set('id', keepId);

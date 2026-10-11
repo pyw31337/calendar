@@ -17,7 +17,10 @@ export function getInitialAppView(locationLike, parseSharePath) {
 
 export function buildAppViewUrl(locationLike, view, currentMonthDate) {
   const params = new URLSearchParams(locationLike?.search || '');
-  const keepId = params.get('id') || params.get('cal');
+  // `/app/<id>/` and `/share/<id>/` are canonical calendar-scoped URLs. Keeping an
+  // old `?id=` here would let a normal tab switch recreate a conflicting identity.
+  const isScopedCalendarPath = /\/(?:app|share)\/[A-Za-z0-9_-]+(?:\/|$)/.test(locationLike?.pathname || '');
+  const keepId = isScopedCalendarPath ? '' : (params.get('id') || params.get('cal'));
   // Notification and search deep links (?msg=&memo=&comment=) must survive the
   // view switch that opens them. Leaving the destination drops them.
   const keepMsg = view === 'chat' ? params.get('msg') : null;
