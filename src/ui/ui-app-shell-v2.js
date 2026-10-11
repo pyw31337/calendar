@@ -60,7 +60,7 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
-import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
+import { getAnniversariesForDate, isCultureLinkedAnniversary } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 import { fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
 import { getWeatherIcon } from './weather-icon.js';
@@ -369,7 +369,7 @@ function TopHeader({ calendarName, onOpenCalendarSettings, onOpenAnniversaries }
  *   `activeCal` below) -- kept as a parameter only for signature symmetry with
  *   `buildRenewalMoreContext`.
  * @param {object} deps - activeCal, anniversariesWithPosters, isInitialDataLoading,
- *   handleMoveAvailability, displayChatMessages, memos, customCultureItems,
+ *   handleMoveAvailability, handleMoveCultureLinkedAnniversary, displayChatMessages, memos, customCultureItems,
  *   handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability,
  *   handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense,
  *   handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto,
@@ -391,7 +391,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     // and reads straight into `calendar.availabilities`, so passing it the nullable one crashes
     // (caught via Playwright: "Cannot read properties of null (reading 'availabilities')").
     activeCal, currentMonthDate, setCurrentMonthAndSync,
-    anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability,
+    anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, handleMoveCultureLinkedAnniversary,
     displayChatMessages, memos, customCultureItems,
     handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate,
     handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses,
@@ -419,6 +419,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
     handleMoveAvailability,
+    handleMoveCultureLinkedAnniversary: handleMoveCultureLinkedAnniversary || window.__gatherMoveCultureLinkedAnniversary,
     // Bento 시안: 최대 8개까지 가로 칩 스트립으로 표시.
     upcomingMeetings: visibleConfirmedMeetings.slice(0, 8),
     hasVisiblePolls,
@@ -900,6 +901,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   // above BentoCalendarCard), so without this the move-by-drag gesture v1 users rely on had no
   // equivalent here at all -- only opening the date's detail modal and re-registering by hand.
   const onMoveAvailability = calendarContext?.handleMoveAvailability;
+  const onMoveCultureLinkedAnniversary = calendarContext?.handleMoveCultureLinkedAnniversary;
   const TOUCH_LONG_PRESS_MS = 350;
   const TOUCH_MOVE_CANCEL_PX = 10;
   const touchDragRef = React.useRef(null);
@@ -935,7 +937,12 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     if (!state || !state.dragging) return;
     justTouchDraggedRef.current = true;
     setTimeout(() => { justTouchDraggedRef.current = false; }, 300);
-    if (targetDate && targetDate !== state.sourceDate && typeof onMoveAvailability === 'function') {
+    if (!targetDate || targetDate === state.sourceDate) return;
+    if (state.kind === 'anniversary') {
+      if (typeof onMoveCultureLinkedAnniversary === 'function') {
+        onMoveCultureLinkedAnniversary(state.anniversaryId, state.sourceDate, targetDate, state.title);
+      }
+    } else if (typeof onMoveAvailability === 'function') {
       onMoveAvailability(state.entryReferId, state.sourceDate, targetDate, state.participantId, state.participantName);
     }
   };
@@ -961,6 +968,35 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       dragInfo.dragging = true;
       setIsTouchDragging(true);
       setTouchDragBadge({ name: dragInfo.participantName, color: dragInfo.color, x: dragInfo.startX, y: dragInfo.startY });
+      setTouchDropTargetDate(dateStr);
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(15); } catch (e) {}
+      }
+    }, TOUCH_LONG_PRESS_MS);
+    touchDragRef.current = dragInfo;
+  };
+
+  const handleAnniversaryTouchStart = (event, ann, dateStr, color) => {
+    if (event.touches.length !== 1 || !isCultureLinkedAnniversary(ann)) return;
+    const touch = event.touches[0];
+    if (touchDragRef.current) clearTimeout(touchDragRef.current.timer);
+    const dragInfo = {
+      kind: 'anniversary',
+      anniversaryId: ann.id,
+      sourceDate: dateStr,
+      title: ann.title || '기념일',
+      color: color || 'var(--accent-primary)',
+      touchId: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      dragging: false,
+      timer: null,
+    };
+    dragInfo.timer = setTimeout(() => {
+      if (touchDragRef.current !== dragInfo) return;
+      dragInfo.dragging = true;
+      setIsTouchDragging(true);
+      setTouchDragBadge({ name: dragInfo.title, color: dragInfo.color, x: dragInfo.startX, y: dragInfo.startY });
       setTouchDropTargetDate(dateStr);
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         try { navigator.vibrate(15); } catch (e) {}
@@ -1276,7 +1312,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               if (!rawData) return;
               const data = JSON.parse(rawData);
               if (data.sourceDate === dateStr) return;
-              if (typeof onMoveAvailability === 'function') {
+              if (data.kind === 'anniversary') {
+                if (typeof onMoveCultureLinkedAnniversary === 'function') {
+                  onMoveCultureLinkedAnniversary(data.anniversaryId, data.sourceDate, dateStr, data.title);
+                }
+              } else if (typeof onMoveAvailability === 'function') {
                 onMoveAvailability(data.entryReferId, data.sourceDate, dateStr, data.participantId, data.participantName);
               }
             } catch (err) {
@@ -1330,12 +1370,29 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             anns.slice(0, 4).map((ann, annIdx) => {
               const title = ann.title || '기념일';
               const paint = anniversaryBarPaint(ann);
+              const isMovableCultureAnniversary = isCultureLinkedAnniversary(ann);
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
-                className: bentoClass(`day-anniversary solo cat-${paint.category}`),
-                title,
-                'aria-label': title,
-                style: { '--anniversary-color': paint.color, '--ann-c': paint.color },
+                className: bentoClass(`day-anniversary solo cat-${paint.category}${isMovableCultureAnniversary ? ' is-draggable' : ''}`),
+                title: isMovableCultureAnniversary ? `${title} — 드래그하여 날짜 이동` : title,
+                'aria-label': isMovableCultureAnniversary ? `${title}, 드래그하여 날짜 이동` : title,
+                draggable: isMovableCultureAnniversary,
+                onDragStart: isMovableCultureAnniversary ? event => {
+                  event.stopPropagation();
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData('text/plain', JSON.stringify({
+                    kind: 'anniversary', anniversaryId: ann.id, sourceDate: dateStr, title,
+                  }));
+                } : undefined,
+                onTouchStart: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleAnniversaryTouchStart(event, ann, dateStr, paint.color); } : undefined,
+                onTouchMove: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchMove(event); } : undefined,
+                onTouchEnd: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchEnd(event); } : undefined,
+                onTouchCancel: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchCancel(); } : undefined,
+                style: {
+                  '--anniversary-color': paint.color,
+                  '--ann-c': paint.color,
+                  ...(isMovableCultureAnniversary ? { cursor: 'grab', touchAction: 'auto' } : {}),
+                },
               }, React.createElement('span', {
                 className: bentoClass('day-anniversary-label'),
               }, title));

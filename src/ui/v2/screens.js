@@ -1188,7 +1188,9 @@ export function SettlementScreen(p) {
             onShare: p.onShare,
             onMenu: p.onMenu,
             extra: settlementHeaderExtra,
-          }, flushTabs),
+          },
+          flushTabs,
+          h('div', { id: 'v2-settlement-category-slot', className: 'v2-settlement-subcat-slot' })),
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
         ),

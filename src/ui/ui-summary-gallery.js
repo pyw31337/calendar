@@ -32,6 +32,7 @@ import { PhotoBulkActionBar } from './photo-bulk-action-bar.js';
 import { isExcludedFromPeople, personNameVariants, tagMatchesPerson, withNotAPersonTag, withoutPersonTag } from './archive-person-exclusion.js';
 import { CommonPagination } from './ui-shared.js';
 import { contentPosterStatusBadge } from '../core/culture-poster-badge.js';
+import { orderCultureEventItems } from '../core/culture-event-order.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -5268,22 +5269,6 @@ function filterAndSortCultureItems(items, category) {
   });
 }
 
-// Keeps `isPinned` items first in their given order and shuffles the rest deterministically for
-// `seed` (a hash of seed+id, not Math.random per call), so re-renders with the same seed give the
-// same order and "더 보기" pages never repeat or skip an item.
-function pinAndShuffleCultureItems(items, isPinned, seed) {
-  const pinned = [];
-  const rest = [];
-  (items || []).forEach(item => (isPinned(item) ? pinned : rest).push(item));
-  const rank = (item) => {
-    let h = (seed ^ 0x9e3779b9) >>> 0;
-    const key = String(item && (item.id || item.title) || '');
-    for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
-    return h;
-  };
-  return pinned.concat(rest.map(item => ({ item, r: rank(item) })).sort((a, b) => a.r - b.r).map(entry => entry.item));
-}
-
 // 컨텐츠 상세의 "공유" 버튼/컨텐츠 등록의 "붙여넣기"가 쓰는 인코더/파서 -- 사진 공유와 같은
 // 원칙으로, 카드의 모든 필드(포스터~설명)를 URL 프래그먼트에 실어 보낸다. 복사 시점의 데이터를
 // 그대로 복제하는 개념이라, 공유한 뒤 원본을 수정/삭제해도 이미 붙여넣은 쪽에는 영향이 없다.
@@ -6133,9 +6118,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 문화공연 스냅샷은 수천 건까지 자랄 수 있다. 무한 스크롤/더 보기는 누적 DOM과 이미지
   // 관찰자를 계속 키우므로, Gallery와 같은 100건 번호 페이지로 한 화면의 작업량을 고정한다.
   const [contentPage, setContentPage] = React.useState(1);
-  // One shuffle seed per tab mount: 문화행사's crawled list is shown in a fresh random order each
-  // visit (so thousands of shows all get exposure, not the same first 60), but stays put while
-  // the user scrolls, loads more, or toggles a checkbox.
+  // One shuffle seed per tab mount: 문화행사의 행사중/이번주 다음 나머지 카드가 새 방문마다
+  // 고르게 노출되되, 스크롤·페이지 이동·필터 재렌더 중에는 순서가 고정된다.
   const shuffleSeedRef = React.useRef(Math.floor(Math.random() * 0x7fffffff));
   // 필터가 바뀌면(지역/카테고리) 첫 페이지부터 보여 준다.
   React.useEffect(() => {
@@ -6354,22 +6338,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
   const lifecycleSorted = filterAndSortCultureItems(mergedItems, anniversaryCategory);
-  // 문화행사: 개별등록 and 캘린더연동 (already added to this calendar) stay pinned on top in date
-  // order; every other crawled show is shuffled.
+  // 문화행사: 행사중 → 이번주 순으로 먼저 두고, 그 외의 예정 행사는 매 탭 방문마다 랜덤으로
+  // 섞는다. 상태 우선순위는 포스터 뱃지와 같은 날짜 규칙을 공유한다.
   let lifecycleItems = lifecycleSorted;
   if (anniversaryCategory === 'event') {
-    // Same matching as findRegisteredAnniversary (source id, own id, or same-category title),
-    // indexed once instead of scanning every anniversary for each of ~4k items.
-    const linkedIds = new Set();
-    const linkedTitles = new Set();
-    (anniversaries || []).forEach(a => {
-      if (!a) return;
-      if (a.cultureSourceId) linkedIds.add(a.cultureSourceId);
-      if (a.id) linkedIds.add(a.id);
-      if (a.category === anniversaryCategory && a.title) linkedTitles.add(String(a.title).trim());
+    lifecycleItems = orderCultureEventItems(lifecycleSorted, {
+      today: todayIsoLocal(),
+      seed: shuffleSeedRef.current,
     });
-    const isPinned = item => !!(item && (item.isCustomRegistered || linkedIds.has(item.id) || linkedTitles.has(String(item.title || '').trim())));
-    lifecycleItems = pinAndShuffleCultureItems(lifecycleSorted, isPinned, shuffleSeedRef.current);
   }
   const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
 

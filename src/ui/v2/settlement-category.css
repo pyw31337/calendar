@@ -31,7 +31,7 @@
   background: color-mix(in srgb, var(--settle-cat-color, var(--v2-primary, #7C2FE5)) 14%, transparent);
 }
 .v2-design .settle-cat-row:focus-visible,
-.v2-design .settle-cat-chip:focus-visible,
+.v2-design .v2-settlement .bp-cat-chip:focus-visible,
 .v2-design .settle-cat-legend-item:focus-visible {
   outline: 2px solid var(--v2-primary, #7C2FE5);
   outline-offset: 1px;
@@ -63,55 +63,7 @@
   transform: translateX(2px);
 }
 
-/* 카테고리 chips (second row under the main tabs; scrolls sideways on phones).
- * This intentionally uses the same compact selected-pill language as the
- * Contents filters: one clear purple selection, with the category colour only
- * acting as a small, scannable marker. */
-.v2-design .settle-cat-chips {
-  position: sticky;
-  top: -8px;
-  z-index: 3;
-  display: flex;
-  gap: 7px;
-  margin: -8px -16px 0;
-  padding: 10px 16px 12px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  background: var(--bg-primary);
-  -webkit-overflow-scrolling: touch;
-}
-.v2-design .settle-cat-chips::-webkit-scrollbar { display: none; }
-.v2-design .settle-cat-chip {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 32px;
-  padding: 0 11px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-full, 999px);
-  background: color-mix(in srgb, var(--v2-primary, #7C2FE5) 6%, var(--bg-card));
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--font-size-sm, 0.8125rem);
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-.v2-design .settle-cat-chip:hover {
-  background: color-mix(in srgb, var(--v2-primary, #7C2FE5) 12%, var(--bg-card));
-  color: var(--v2-primary, #7C2FE5);
-}
-.v2-design .settle-cat-chip.is-active {
-  border-color: var(--v2-primary, #7C2FE5);
-  background: var(--v2-primary, #7C2FE5);
-  color: var(--on-brand, #fff);
-}
+/* Category chips reuse Content's bp-cat-scroll-row / bp-cat-chip styling in the page header. */
 .v2-design .settle-cat-chip-dot {
   flex: 0 0 auto;
   width: 7px;
@@ -119,17 +71,6 @@
   border-radius: 50%;
   background: var(--settle-cat-color);
 }
-.v2-design .settle-cat-chip-count {
-  font-size: var(--font-size-xs, 0.75rem);
-  font-weight: 800;
-  color: currentColor;
-  opacity: 0.66;
-}
-.v2-design .settle-cat-chip.is-active .settle-cat-chip-count {
-  color: inherit;
-  opacity: 0.82;
-}
-
 /* Summary */
 .v2-design .settle-cat-overview {
   display: flex;
@@ -272,12 +213,6 @@
 }
 
 @media (max-width: 480px) {
-  .v2-design .settle-cat-chips {
-    margin-left: -14px;
-    margin-right: -14px;
-    padding-left: 14px;
-    padding-right: 14px;
-  }
   .v2-design .settle-cat-breakdown {
     padding: 12px;
   }

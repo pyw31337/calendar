@@ -5,6 +5,19 @@ import KoreanLunarCalendar from 'korean-lunar-calendar';
 // pure date/badge math with no React or component-state dependency. getAnniversaryDisplayColor
 // stays in app-main.js because it needs getActiveParticipants.
 
+// 컨텐츠 화면에서 "캘린더와 연동"한 항목은 원본의 상영/행사 기간과 별개로, 사용자가
+// 선택한 하나의 날짜에만 기념일 뱃지를 둔다. 일반 사용자가 직접 만든 연일 행사는 여전히
+// 연일로 표시해야 하므로 category만으로 판단하지 않고 cultureSourceId까지 확인한다.
+export const CULTURE_LINKED_ANNIVERSARY_CATEGORIES = new Set(['festival', 'event', 'sports', 'movie']);
+
+export function isCultureLinkedAnniversary(ann) {
+  return !!(
+    ann
+    && String(ann.cultureSourceId || '').trim()
+    && CULTURE_LINKED_ANNIVERSARY_CATEGORIES.has(ann.category)
+  );
+}
+
 export function isRepeatAnniversaryOnDate(ann, dateStr) {
   if (!ann || ann.type !== 'repeat' || !dateStr) return false;
   if (ann.startDate && dateStr < ann.startDate) return false;
@@ -30,8 +43,8 @@ export function getAnniversariesForDate(dateStr, anniversariesList) {
   const withAnnDetail = (base, ann) => ({
     ...base,
     type: base.type || ann.type,
-    date: ann.date,
-    targetDate: ann.targetDate,
+    date: base.date || ann.date,
+    targetDate: base.targetDate || ann.targetDate,
     isCountDown: ann.isCountDown,
     isLunar: ann.isLunar,
     isLeap: ann.isLeap,
@@ -43,7 +56,9 @@ export function getAnniversariesForDate(dateStr, anniversariesList) {
     photos: ann.photos,
     createdAt: ann.createdAt,
     updatedAt: ann.updatedAt,
-    category: ann.category
+    category: ann.category,
+    cultureSourceId: ann.cultureSourceId,
+    isCultureLinked: isCultureLinkedAnniversary(ann)
   });
 
   const results = [];
@@ -194,6 +209,25 @@ export function getAnniversariesForDate(dateStr, anniversariesList) {
         }, ann));
       }
     } else if (ann.type === 'range') {
+      // Before one-day culture-linking was introduced, content registrations were stored as
+      // `range`. Keep those records backwards compatible without a migration: their original
+      // period remains in the source snapshot, but the calendar badge belongs only on the
+      // release/start date and can therefore be moved just like a normal one-day anniversary.
+      if (isCultureLinkedAnniversary(ann)) {
+        const badgeDate = ann.date || ann.startDate;
+        if (badgeDate !== dateStr) return;
+        const catBadge = getAnniversaryCategoryBadge(ann.category, ann.genre);
+        results.push(withAnnDetail({
+          id: ann.id,
+          title: `${ann.title || ''}`,
+          badgeColor: catBadge.badgeColor,
+          icon: catBadge.icon,
+          type: 'once',
+          date: badgeDate,
+          isCultureLinked: true
+        }, ann));
+        return;
+      }
       // Multi-day (연일) event/festival spanning a start/end date range. type/startDate/endDate
       // are kept on the result (unlike the other branches above) so the calendar grid can tell
       // a spanning festival apart from a single-day anniversary and render it as one connected

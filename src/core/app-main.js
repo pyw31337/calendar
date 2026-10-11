@@ -59,7 +59,8 @@ import {
 import {
   getAnniversariesForDate,
   calculateDday,
-  getSolarFromLunar
+  getSolarFromLunar,
+  isCultureLinkedAnniversary
 } from './app-anniversary-dates.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
@@ -1547,7 +1548,9 @@ function CalendarApp() {
     if (!activeCal?.id || !item?.id || !item?.title) return null;
     const stamp = Date.now();
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
-    const startDate = normalizeDateString(item.startDate || item.endDate);
+    // 영화는 상영 기간보다 명시된 개봉일을 우선한다. 행사·축제·스포츠에는 releaseDate가
+    // 없으므로 동일한 식이 곧 시작일을 선택한다.
+    const startDate = normalizeDateString(item.releaseDate || item.startDate || item.endDate);
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
     // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab도 event로 등록한다 --
     // 기념일 수동 등록 폼(ANNIVERSARY_CATEGORY_OPTIONS.filter(opt => opt.value !== 'sports'),
@@ -1571,9 +1574,13 @@ function CalendarApp() {
       calendarId: activeCal.id,
       title: item.title,
       category,
-      type: 'range',
-      startDate,
-      endDate: normalizeDateString(item.endDate || startDate) || startDate,
+      // 콘텐츠의 상영/행사 기간은 원본 카드 스냅샷에 보존하되, 캘린더 기념일 자체는
+      // 개봉일·시작일 하루에만 표시한다. 그래서 사용자가 일반 기념일처럼 날짜를 옮겨도
+      // 원본 콘텐츠의 기간 정보는 바뀌지 않는다.
+      type: 'once',
+      date: startDate,
+      isLunar: false,
+      isLeap: false,
       cultureSourceId: item.id,
       cultureSnapshot,
       createdAt: stamp,
@@ -4070,6 +4077,56 @@ function CalendarApp() {
       await updateCalendars(nextCalendars, '일정 이동완료', 'success', updatedCal.id, 'availability', logs);
     });
   };
+  // Content-linked movies, events, festivals and sports are one-day anniversary badges. Moving
+  // one deliberately changes only the calendar reminder date; the crawled source card (including
+  // its actual release/start/end dates) stays intact in cultureSnapshot/movieMeta.
+  const handleMoveCultureLinkedAnniversary = (anniversaryId, sourceDate, targetDate, title) => {
+    if (!anniversaryId || !sourceDate || !targetDate || sourceDate === targetDate) return;
+    const sourceAnn = (anniversaries || []).find(ann => ann && ann.id === anniversaryId);
+    if (!sourceAnn || !isCultureLinkedAnniversary(sourceAnn)) {
+      showToast('옮길 기념일을 찾을 수 없습니다.', 'error');
+      return;
+    }
+    const formatDate = dateStr => formatDateWithDayName(dateStr) || dateStr;
+    showConfirmDialog(
+      '기념일 이동',
+      `“${title || sourceAnn.title || '기념일'}”을 ${formatDate(sourceDate)}에서 ${formatDate(targetDate)}으로 옮기시겠습니까?`,
+      async () => {
+        if (!activeCalLoaded || !activeCal?.id) {
+          showToast('잠시 후 다시 시도해 주세요.', 'error');
+          return;
+        }
+        const current = (anniversaries || []).find(ann => ann && ann.id === anniversaryId);
+        if (!current || !isCultureLinkedAnniversary(current)) {
+          showToast('옮길 기념일을 찾을 수 없습니다.', 'error');
+          return;
+        }
+        const now = Date.now();
+        const patch = {
+          type: 'once',
+          date: targetDate,
+          isLunar: false,
+          isLeap: false,
+          updatedAt: now
+        };
+        try {
+          const saved = await writeCollectionDocumentWithFallback(
+            'anniversaries', activeCal.id, anniversaryId, patch, 'update', '기념일 날짜 이동'
+          );
+          if (!saved?.success) throw new Error('Culture-linked anniversary move failed');
+          handleAnniversarySaved({ ...current, ...patch });
+          showToast('기념일 날짜를 옮겼습니다.', 'success');
+        } catch (err) {
+          console.error('Failed to move culture-linked anniversary:', err);
+          showToast('기념일 날짜 이동 실패', 'error');
+        }
+      }
+    );
+  };
+  // renderRenewalShellIfEnabled receives its calendar dependencies through the legacy adapter
+  // below. Keep this bridge alongside the other V2-only bridges so the shell can move a
+  // content-linked anniversary without widening that frozen, high-churn adapter call site.
+  window.__gatherMoveCultureLinkedAnniversary = handleMoveCultureLinkedAnniversary;
   // Registers one participant's availability across several dates in a single save -- used by
   // the recurring-schedule template ("반복 일정") so applying a weekly pattern doesn't fire one
   // network write per date.

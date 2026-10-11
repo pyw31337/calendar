@@ -1264,9 +1264,10 @@ html:has(.renewal-shell.v2-design) :is(
   color: var(--brand, #7C2FE5) !important;
 }
 
-/* ---- Content 3rd-level chips: grey pills, solid purple selected, count as type ---- */
+/* ---- Content + Settlement subcategory chips: grey pills, solid purple selected, count as type ---- */
 .v2-design .v2-content .v2-content-subcat-slot,
-.v2-design .v2-content .history-header-stack > .v2-content-subcat-slot {
+.v2-design .v2-content .history-header-stack > .v2-content-subcat-slot,
+.v2-design .v2-settlement .v2-settlement-subcat-slot {
   display: flex !important;
   align-items: center !important;
   min-height: 0 !important;
@@ -1275,7 +1276,13 @@ html:has(.renewal-shell.v2-design) :is(
   background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
-.v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
+.v2-design .v2-settlement .v2-settlement-subcat-slot:empty {
+  display: none !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row,
+.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-scroll-row {
   display: flex !important;
   align-items: center !important;
   width: 100% !important;
@@ -1283,7 +1290,8 @@ html:has(.renewal-shell.v2-design) :is(
   margin: 0 !important;
   gap: 6px !important;
 }
-.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip {
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip,
+.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-chip {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1302,16 +1310,19 @@ html:has(.renewal-shell.v2-design) :is(
   box-shadow: none !important;
   white-space: nowrap;
 }
-.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected {
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected,
+.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-chip.bp-is-selected {
   background: var(--brand, #7C2FE5) !important;
   color: var(--on-brand, white) !important;
   border: 0 !important;
   box-shadow: none !important;
 }
-.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip {
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip,
+.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-chip {
   gap: 6px !important;
 }
-.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip .section-count-badge {
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip .section-count-badge,
+.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-chip .section-count-badge {
   min-width: 0 !important;
   height: auto !important;
   min-height: 0 !important;
@@ -6132,6 +6143,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   border-color: var(--border-hover) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-scroll-row > button,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
   background: var(--bg-secondary) !important;
   color: var(--text-muted) !important;
@@ -6273,6 +6285,10 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected .section-count-badge {
+  background: transparent !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .v2-settlement-subcat-slot .bp-cat-chip.bp-is-selected .section-count-badge {
   background: transparent !important;
   color: var(--on-brand) !important;
 }
@@ -8283,4 +8299,23 @@ html:has(.renewal-shell.v2-design) .v2-memo-card-wrap .link-preview-card > div {
   max-width: none !important;
   width: 100% !important;
   min-height: 0 !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Popup first-frame stability
+ *
+ * The base layer, responsive sheet module, and V2 chrome each define an
+ * entrance animation for the same popup surfaces.  On their first mount the
+ * browser can paint the already-visible popup, then apply the later opacity /
+ * scale animation on the next composite frame.  That reads as a one-time
+ * flash, especially for the calendar's date sheet.  A popup needs one stable
+ * first paint; keep motion for page/card content and for the explicit closing
+ * ghost, but do not animate the shared overlay or its dialog surface in.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) :is(.modal-overlay, .bottom-sheet-overlay):not(.is-exit-ghost) {
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design) :is(.modal-overlay, .bottom-sheet-overlay):not(.is-exit-ghost) :is(.modal-container, .bottom-sheet, .poll-voter-sheet),
+html:has(.renewal-shell.v2-design) .poll-voter-sheet:not(.is-exit-ghost) {
+  animation: none !important;
 }

@@ -4,6 +4,7 @@
 
 import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
 import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core/gallery-data.js';
+import { isCultureLinkedAnniversary } from '../core/app-anniversary-dates.js';
 import { filterSelectableSettlementExpenses, getReservedSettlementItemKeys } from '../core/settlement-card-selection.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CommonPagination, useOverlayHistory } from './ui-shared.js';
@@ -383,7 +384,17 @@ export function AnniversaryModal({
     setPlaceQuery('');
     setPlaceResults([]);
     setPhotos(Array.isArray(ann.photos) ? ann.photos.map(p => ({ isExisting: true, original: p.url, thumbnail: p.thumbUrl || p.url, tags: p.tags || '', photoId: p.id || '', fingerprint: p.fingerprint || '' })) : []);
-    if (ann.type === 'dday') {
+    // Content-linked entries are always a one-day calendar reminder even when this record was
+    // saved before that rule existed as a range. Opening its editor converts the old shape to the
+    // same single-date form used by new movie/event/festival/sports links.
+    if (isCultureLinkedAnniversary(ann)) {
+      setIsLegacyDdayEdit(false);
+      setDayMode('single');
+      setRepeatYearly(false);
+      setOnceDate(ann.date || ann.startDate || todayStr());
+      setIsLunar(false);
+      setIsLeap(false);
+    } else if (ann.type === 'dday') {
       // Pre-existing D-Day entries can no longer be created from this form, but must still be
       // editable in place rather than silently losing their targetDate/isCountDown fields.
       setIsLegacyDdayEdit(true);
@@ -3733,6 +3744,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : activeTab === 'category' ? categoryContent : dailyContent;
 
   const v2Shell = typeof document !== 'undefined' && !!document.querySelector('.renewal-shell.v2-design');
+  const categoryChips = categoryView && /*#__PURE__*/React.createElement(SettlementCategoryChips, {
+    totals: categoryView.totals,
+    selected: categoryView.selected,
+    onSelect: setSettlementCategory
+  });
+  // The V2 header owns the same subcategory slot that Content uses. Keep the live filters in
+  // that header instead of treating them as an extra body toolbar; outside V2 the legacy body
+  // still receives the same live component.
+  const v2CategoryChipSlot = v2Shell && typeof document !== 'undefined'
+    ? document.getElementById('v2-settlement-category-slot')
+    : null;
+  const renderedCategoryChips = categoryChips && v2CategoryChipSlot && window.ReactDOM?.createPortal
+    ? window.ReactDOM.createPortal(categoryChips, v2CategoryChipSlot)
+    : categoryChips;
 
   const __settlementLegacyTree = /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-container",
@@ -3818,12 +3843,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
        not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards
        exist yet" (정산 목록이 없습니다.), so this area only needs to exist when there's something
        to show. */
-    /* 카테고리별보기: chip row right under the tabs (in-progress cards stay on 누적/월별). */
-    categoryView && /*#__PURE__*/React.createElement(SettlementCategoryChips, {
-      totals: categoryView.totals,
-      selected: categoryView.selected,
-      onSelect: setSettlementCategory
-    }),
+    /* 카테고리별보기: V2에서는 헤더의 콘텐츠 공용 칩 슬롯, 그 외에는 본문. */
+    renderedCategoryChips,
     (() => {
       if (activeTab === 'category') return null;
       const activeParticipants = settlementParticipants;

@@ -3,8 +3,8 @@
  *  - SettlementCategoryBarRow: a 누적보기 "카테고리별 지출" row as a real button (opens 카테고리별보기)
  *  - SettlementCategoryChips: 전체 + used categories, horizontally scrollable
  *  - SettlementCategorySummary: the top summary for 전체 / one category
- * Data comes from core/settlement-category.js. Styling: ./v2/settlement-category.css on the
- * existing tokens and the existing settlement-metric-* cards.
+ * Data comes from core/settlement-category.js. The chip row deliberately reuses Content's
+ * bp-cat-scroll-row / bp-cat-chip markup; only the summary needs settlement-specific styling.
  */
 import './v2/settlement-category.css';
 import { SETTLEMENT_CATEGORY_ALL, formatSettlementShare } from '../core/settlement-category.js';
@@ -40,23 +40,30 @@ export function SettlementCategoryBarRow({ row, grandTotal, badge, onOpen }) {
 export function SettlementCategoryChips({ totals, selected, onSelect }) {
   const React = window.React;
   const allCount = (totals || []).reduce((sum, row) => sum + (Number(row.count) || 0), 0);
-  const chip = (id, label, color, count) => {
+  const countBadge = count => {
+    const normalizedCount = Number(count || 0);
+    if (!Number.isFinite(normalizedCount) || normalizedCount <= 0) return null;
+    const countText = String(normalizedCount);
+    return React.createElement('span', {
+      className: `section-count-badge ${countText.length > 1 ? 'is-multi-digit' : 'is-single-digit'}`,
+      'data-digits': countText.length > 1 ? 'multi' : 'single',
+    }, normalizedCount);
+  };
+  const chip = (id, label, count) => {
     const active = selected === id;
     return React.createElement('button', {
       key: id,
       type: 'button',
-      className: `settle-cat-chip${active ? ' is-active' : ''}${id === SETTLEMENT_CATEGORY_ALL ? ' is-all' : ''}`,
-      style: color ? { '--settle-cat-color': color } : undefined,
+      className: `bp-cat-chip${active ? ' bp-is-selected' : ''}`,
       'aria-pressed': active,
       onClick: () => onSelect(id),
     },
-    color ? React.createElement('span', { className: 'settle-cat-chip-dot', 'aria-hidden': true }) : null,
     React.createElement('span', { className: 'settle-cat-chip-label' }, label),
-    count != null ? React.createElement('span', { className: 'settle-cat-chip-count' }, count) : null);
+    countBadge(count));
   };
-  return React.createElement('div', { className: 'settle-cat-chips', role: 'group', 'aria-label': '카테고리 선택' },
-    chip(SETTLEMENT_CATEGORY_ALL, '전체', null, allCount),
-    (totals || []).map(row => chip(row.category.id, row.category.name, row.category.color, row.count)));
+  return React.createElement('div', { className: 'bp-cat-scroll-row', role: 'group', 'aria-label': '카테고리 선택' },
+    chip(SETTLEMENT_CATEGORY_ALL, '전체', allCount),
+    (totals || []).map(row => chip(row.category.id, row.category.name, row.count)));
 }
 
 function MetricCard({ label, value, color, children }) {
