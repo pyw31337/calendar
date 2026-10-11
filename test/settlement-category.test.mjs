@@ -75,6 +75,10 @@ test('정산 page wires three tabs, tappable category rows and a Back marker out
   assert.match(src, /onChange: handleSettlementTabChange/);
   const view = await readFile(new URL('../src/ui/settlement-category-view.js', import.meta.url), 'utf8');
   assert.match(view, /className: 'settle-cat-row'[\s\S]{0,40}|type: 'button',\s*className: 'settle-cat-row'/);
+  assert.match(view, /const allCount = \(totals \|\| \[\]\)\.reduce/, 'the 전체 filter exposes the same aggregate count as the other filters');
+  assert.match(view, /className: 'settle-cat-breakdown-head'/, 'the category breakdown has a scoped heading instead of an unlabeled colour bar');
+  assert.match(view, /className: 'settle-cat-legend-count'/, 'each category keeps its item count next to its amount and share');
   const css = await readFile(new URL('../src/ui/v2/settlement-category.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /!important/, 'no new !important');
+  assert.match(css, /grid-template-areas:\s*'dot name count'\s*'dot detail detail'/, 'breakdown facts stay grouped as a card at narrow widths');
 });

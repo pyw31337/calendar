@@ -63,15 +63,18 @@
   transform: translateX(2px);
 }
 
-/* 카테고리 chips (second row under the main tabs; scrolls sideways on phones) */
+/* 카테고리 chips (second row under the main tabs; scrolls sideways on phones).
+ * This intentionally uses the same compact selected-pill language as the
+ * Contents filters: one clear purple selection, with the category colour only
+ * acting as a small, scannable marker. */
 .v2-design .settle-cat-chips {
   position: sticky;
   top: -8px;
   z-index: 3;
   display: flex;
-  gap: 6px;
+  gap: 7px;
   margin: -8px -16px 0;
-  padding: 10px 16px;
+  padding: 10px 16px 12px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -85,32 +88,28 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--v2-card-border, var(--border-subtle));
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid transparent;
   border-radius: var(--radius-full, 999px);
-  background: var(--bg-card);
-  color: var(--text-main);
+  background: color-mix(in srgb, var(--v2-primary, #7C2FE5) 6%, var(--bg-card));
+  color: var(--text-muted);
   font: inherit;
   font-size: var(--font-size-sm, 0.8125rem);
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .v2-design .settle-cat-chip:hover {
-  border-color: color-mix(in srgb, var(--settle-cat-color, var(--v2-primary, #7C2FE5)) 45%, var(--bg-card));
+  background: color-mix(in srgb, var(--v2-primary, #7C2FE5) 12%, var(--bg-card));
+  color: var(--v2-primary, #7C2FE5);
 }
 .v2-design .settle-cat-chip.is-active {
-  border-color: var(--settle-cat-color, var(--v2-primary, #7C2FE5));
-  background: color-mix(in srgb, var(--settle-cat-color, var(--v2-primary, #7C2FE5)) 12%, var(--bg-card));
-  color: var(--settle-cat-color, var(--v2-primary, #7C2FE5));
-}
-.v2-design .settle-cat-chip.is-all.is-active {
-  background: var(--v2-primary, #7C2FE5);
   border-color: var(--v2-primary, #7C2FE5);
+  background: var(--v2-primary, #7C2FE5);
   color: var(--on-brand, #fff);
 }
 .v2-design .settle-cat-chip-dot {
@@ -122,12 +121,13 @@
 }
 .v2-design .settle-cat-chip-count {
   font-size: var(--font-size-xs, 0.75rem);
-  font-weight: 700;
-  color: var(--text-light);
+  font-weight: 800;
+  color: currentColor;
+  opacity: 0.66;
 }
 .v2-design .settle-cat-chip.is-active .settle-cat-chip-count {
   color: inherit;
-  opacity: 0.8;
+  opacity: 0.82;
 }
 
 /* Summary */
@@ -166,16 +166,34 @@
 .v2-design .settle-cat-breakdown {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid var(--v2-card-border, var(--border-subtle));
-  border-radius: var(--radius-md, 12px);
+  border-radius: var(--radius-lg, 16px);
   background: var(--bg-card);
+}
+.v2-design .settle-cat-breakdown-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-main);
+}
+.v2-design .settle-cat-breakdown-head strong {
+  font-size: var(--font-size-sm, 0.8125rem);
+  font-weight: 900;
+}
+.v2-design .settle-cat-breakdown-head span {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .v2-design .settle-cat-stack {
   display: flex;
-  gap: 2px;
-  height: 8px;
+  gap: 3px;
+  height: 10px;
   border-radius: var(--radius-full, 999px);
   overflow: hidden;
   background: var(--border-subtle);
@@ -187,21 +205,25 @@
 }
 .v2-design .settle-cat-legend {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
-  gap: 2px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 172px), 1fr));
+  gap: 8px;
 }
 .v2-design .settle-cat-legend-item {
   -webkit-appearance: none;
   appearance: none;
   display: grid;
-  grid-template-columns: 7px minmax(0, 1fr) auto auto;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'dot name count'
+    'dot detail detail';
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: var(--radius-sm, 8px);
-  background: transparent;
+  column-gap: 7px;
+  row-gap: 5px;
+  min-height: 66px;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--settle-cat-color) 18%, var(--v2-card-border, var(--border-subtle)));
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--settle-cat-color) 5%, var(--bg-card));
   color: var(--text-main);
   font: inherit;
   font-size: var(--font-size-sm, 0.8125rem);
@@ -209,14 +231,33 @@
   cursor: pointer;
 }
 .v2-design .settle-cat-legend-item:hover {
-  background: color-mix(in srgb, var(--settle-cat-color) 8%, transparent);
+  background: color-mix(in srgb, var(--settle-cat-color) 11%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--settle-cat-color) 38%, var(--v2-card-border, var(--border-subtle)));
 }
+.v2-design .settle-cat-legend-item .settle-cat-chip-dot { grid-area: dot; }
 .v2-design .settle-cat-legend-name {
+  grid-area: name;
   min-width: 0;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.v2-design .settle-cat-legend-count {
+  grid-area: count;
+  color: var(--text-light);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v2-design .settle-cat-legend-detail {
+  grid-area: detail;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 .v2-design .settle-cat-legend-pct {
   color: var(--text-light);
@@ -224,8 +265,28 @@
   font-variant-numeric: tabular-nums;
 }
 .v2-design .settle-cat-legend-amount {
+  color: var(--text-main);
+  font-size: var(--font-size-sm, 0.8125rem);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .v2-design .settle-cat-chips {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .v2-design .settle-cat-breakdown {
+    padding: 12px;
+  }
+  .v2-design .settle-cat-legend {
+    grid-template-columns: 1fr;
+  }
+  .v2-design .settle-cat-legend-item {
+    min-height: 58px;
+  }
 }
 
 /* Entry list */
