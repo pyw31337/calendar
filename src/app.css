@@ -4603,8 +4603,11 @@ select.form-select {
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
 
-/* Poster cards inside culture grid */
-.culture-items-grid > button {
+/* Poster cards inside culture grid. A filterable status badge is a sibling of
+   the detail button, so its card uses a wrapper rather than nesting one button
+   inside another. */
+.culture-items-grid > button,
+.culture-items-grid > .culture-poster-card > .culture-poster-card-open {
   min-height: auto;
   height: 100%;
 }

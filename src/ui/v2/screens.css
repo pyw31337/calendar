@@ -1809,6 +1809,11 @@
   overflow: hidden;
   background: var(--bg-card) !important;
 }
+.v2-design .v2-content .culture-items-grid > .culture-poster-card > .culture-poster-card-open {
+  border: 0 !important;
+  border-radius: inherit !important;
+  box-shadow: none !important;
+}
 /* Shared pager (CommonPagination / .gallery-pagination). Card rules must not
    paint a plate behind it on any page. */
 .v2-design .gallery-pagination,

@@ -6114,17 +6114,19 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // renders only one of these two tabs at a time (mutually exclusive `historyTab === ...` guards),
   // switching tabs unmounts this component and this state naturally resets with it.
   const [categoryFilter, setCategoryFilter] = React.useState('');
+  // 문화행사 포스터의 상태 뱃지를 누르면 해당 상태만 본다. 빈 값은 기본 전체 셔플이다.
+  const [eventStatusFilter, setEventStatusFilter] = React.useState('');
 
   // 문화공연 스냅샷은 수천 건까지 자랄 수 있다. 무한 스크롤/더 보기는 누적 DOM과 이미지
   // 관찰자를 계속 키우므로, Gallery와 같은 100건 번호 페이지로 한 화면의 작업량을 고정한다.
   const [contentPage, setContentPage] = React.useState(1);
-  // One shuffle seed per tab mount: 문화행사의 행사중/이번주 다음 나머지 카드가 새 방문마다
-  // 고르게 노출되되, 스크롤·페이지 이동·필터 재렌더 중에는 순서가 고정된다.
+  // One shuffle seed per tab mount: 문화행사 전체 카드가 새 방문마다 고르게 노출되되,
+  // 스크롤·페이지 이동·필터 재렌더 중에는 순서가 고정된다.
   const shuffleSeedRef = React.useRef(Math.floor(Math.random() * 0x7fffffff));
-  // 필터가 바뀌면(지역/카테고리) 첫 페이지부터 보여 준다.
+  // 필터가 바뀌면(지역/카테고리/포스터 상태) 첫 페이지부터 보여 준다.
   React.useEffect(() => {
     setContentPage(1);
-  }, [categoryFilter, regionSelections, dataUrl, searchQuery]);
+  }, [categoryFilter, eventStatusFilter, regionSelections, dataUrl, searchQuery]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -6338,13 +6340,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
   const lifecycleSorted = filterAndSortCultureItems(mergedItems, anniversaryCategory);
-  // 문화행사: 행사중 → 이번주 순으로 먼저 두고, 그 외의 예정 행사는 매 탭 방문마다 랜덤으로
-  // 섞는다. 상태 우선순위는 포스터 뱃지와 같은 날짜 규칙을 공유한다.
+  // 문화행사 기본 목록은 전체 셔플이다. 포스터의 행사중/이번주 뱃지를 누르면 같은 날짜
+  // 규칙으로 해당 상태 카드만 남긴다.
   let lifecycleItems = lifecycleSorted;
   if (anniversaryCategory === 'event') {
     lifecycleItems = orderCultureEventItems(lifecycleSorted, {
       today: todayIsoLocal(),
       seed: shuffleSeedRef.current,
+      statusFilter: eventStatusFilter,
     });
   }
   const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
@@ -6535,16 +6538,22 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
         const posterUrl = culturePosterUrl(item);
         const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
-        return /*#__PURE__*/React.createElement("button", {
+        const eventStatusKey = anniversaryCategory === 'event' && posterBadge?.text === '행사중'
+          ? 'ongoing'
+          : (anniversaryCategory === 'event' && posterBadge?.text === '이번주' ? 'thisWeek' : '');
+        const isFilterableEventBadge = !!eventStatusKey;
+        const isFocusedItem = (focusItemId && item.id === focusItemId) || (focusTitle && String(item.title || '').trim() === String(focusTitle || '').trim());
+        return /*#__PURE__*/React.createElement("div", {
           key: item.id,
+          className: "culture-poster-card",
+          style: { position: 'relative', minWidth: 0, height: '100%' }
+        }, /*#__PURE__*/React.createElement("button", {
           type: "button",
           "data-content-id": item.id,
-          className: (focusItemId && item.id === focusItemId) || (focusTitle && String(item.title || '').trim() === String(focusTitle || '').trim())
-            ? 'search-result-focus'
-            : undefined,
+          className: ['culture-poster-card-open', isFocusedItem ? 'search-result-focus' : ''].filter(Boolean).join(' '),
           onClick: () => setSelected(item),
           style: {
-            display: 'flex', flexDirection: 'column', gap: '6px', padding: 0,
+            display: 'flex', flexDirection: 'column', gap: '6px', padding: 0, width: '100%', height: '100%',
             border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left',
             minWidth: 0,
@@ -6578,7 +6587,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 img.style.display = 'none';
               }
             }),
-            posterBadge && /*#__PURE__*/React.createElement("span", {
+            posterBadge && !isFilterableEventBadge && /*#__PURE__*/React.createElement("span", {
               className: "culture-poster-badge is-" + posterBadge.tone,
               style: {
                 position: 'absolute', top: '8px', left: '8px', zIndex: 3,
@@ -6718,6 +6727,23 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'keep-all', overflowWrap: 'anywhere', lineHeight: 1.25 }
             }, highlightKeyword(item.address || CULTURE_MISSING_LABEL, searchQuery)))
           )
+        ),
+        isFilterableEventBadge && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: ['culture-poster-badge', 'culture-poster-status-filter', 'is-' + posterBadge.tone, eventStatusFilter === eventStatusKey ? 'is-selected' : ''].filter(Boolean).join(' '),
+          "aria-pressed": eventStatusFilter === eventStatusKey,
+          "aria-label": eventStatusFilter === eventStatusKey ? `${posterBadge.text} 필터 해제` : `${posterBadge.text} 행사만 보기`,
+          title: eventStatusFilter === eventStatusKey ? `${posterBadge.text} 필터 해제` : `${posterBadge.text} 행사만 보기`,
+          onClick: () => setEventStatusFilter(current => current === eventStatusKey ? '' : eventStatusKey),
+          style: {
+            position: 'absolute', top: '8px', left: '8px', zIndex: 4,
+            display: 'inline-flex', alignItems: 'center', padding: '4px 9px', border: 0,
+            borderRadius: 'var(--radius-full)', backgroundColor: posterBadge.backgroundColor, color: '#FFFFFF',
+            fontSize: 'var(--font-size-2xs)', fontWeight: 800, lineHeight: 1,
+            boxShadow: eventStatusFilter === eventStatusKey ? '0 0 0 2px var(--bg-card), 0 0 0 4px ' + posterBadge.backgroundColor : '0 1px 4px rgba(0,0,0,0.28)',
+            cursor: 'pointer'
+          }
+        }, posterBadge.text)
         );
       }),
       /*#__PURE__*/React.createElement(ExistingPageNavigation, {

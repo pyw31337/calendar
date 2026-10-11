@@ -1,19 +1,18 @@
 import { getCulturePosterBadge } from './culture-poster-badge.js';
 
-// 문화행사는 상태가 가장 중요한 탐색 단서다. 행사중과 이번주 시작 행사를 먼저 보이게
-// 하고, 나머지는 한 번의 탭 방문 동안에는 순서가 흔들리지 않는 결정적 셔플을 사용한다.
-// 따라서 페이지네이션/필터 재렌더링에서도 카드가 중복되거나 건너뛰지 않는다.
-export function orderCultureEventItems(items, { today, seed = 0 } = {}) {
-  const ongoing = [];
-  const thisWeek = [];
-  const rest = [];
+export const CULTURE_EVENT_STATUS_FILTERS = Object.freeze({
+  ongoing: '행사중',
+  thisWeek: '이번주',
+});
 
-  (items || []).forEach(item => {
-    const badge = getCulturePosterBadge(item, { today, isOngoingKind: true });
-    if (badge?.label === '행사중') ongoing.push(item);
-    else if (badge?.label === '이번주') thisWeek.push(item);
-    else rest.push(item);
-  });
+// 기본 목록은 모든 행사를 한 번의 탭 방문 동안 안정적으로 섞는다. 포스터 상태 뱃지를
+// 선택했을 때에만 그 상태와 일치하는 카드로 범위를 좁힌다. 따라서 "행사중"이 많은 날에도
+// 기본 그리드가 한 상태에 쏠리지 않고, 페이지네이션/재렌더링 중에는 순서가 흔들리지 않는다.
+export function orderCultureEventItems(items, { today, seed = 0, statusFilter = '' } = {}) {
+  const statusLabel = CULTURE_EVENT_STATUS_FILTERS[statusFilter] || '';
+  const candidates = statusLabel
+    ? (items || []).filter(item => getCulturePosterBadge(item, { today, isOngoingKind: true })?.label === statusLabel)
+    : [...(items || [])];
 
   const rank = item => {
     let hash = (seed ^ 0x9e3779b9) >>> 0;
@@ -23,10 +22,8 @@ export function orderCultureEventItems(items, { today, seed = 0 } = {}) {
     }
     return hash;
   };
-  const shuffledRest = rest
+  return candidates
     .map((item, index) => ({ item, index, rank: rank(item) }))
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map(entry => entry.item);
-
-  return ongoing.concat(thisWeek, shuffledRest);
 }

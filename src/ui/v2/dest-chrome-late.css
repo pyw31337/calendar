@@ -5865,7 +5865,19 @@ html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-chil
   width: 100% !important;
   aspect-ratio: 3 / 4 !important;
 }
+html:has(.renewal-shell.v2-design) .culture-items-grid > .culture-poster-card > .culture-poster-card-open > div:first-child {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  aspect-ratio: 3 / 4 !important;
+}
 html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child > img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > .culture-poster-card > .culture-poster-card-open > div:first-child > img {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
@@ -8133,11 +8145,32 @@ html:has(.renewal-shell.v2-design) .culture-items-grid > button {
   height: 100% !important;
   align-self: stretch !important;
 }
+html:has(.renewal-shell.v2-design) .culture-items-grid > .culture-poster-card > .culture-poster-card-open {
+  height: 100% !important;
+  align-self: stretch !important;
+}
 html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child {
   flex: 1 1 auto !important;
   min-height: 0 !important;
 }
+html:has(.renewal-shell.v2-design) .culture-items-grid > .culture-poster-card > .culture-poster-card-open > div:last-child {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
 html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:last-child > div {
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > .culture-poster-card > .culture-poster-card-open > div:last-child > div {
   white-space: normal !important;
   overflow: hidden !important;
   display: -webkit-box !important;
