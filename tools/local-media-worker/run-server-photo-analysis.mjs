@@ -38,7 +38,7 @@ function kstDateStamp(date = new Date()) {
 }
 
 function parseArgs(argv) {
-  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, concurrency: DEFAULT_CONCURRENCY, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false };
+  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, concurrency: DEFAULT_CONCURRENCY, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false, rebuild: false };
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     if (key === '--calendar') args.calendar = argv[++index] || '';
@@ -52,6 +52,9 @@ function parseArgs(argv) {
     else if (key === '--token-account') args.tokenAccount = argv[++index] || '';
     else if (key === '--vision-bin') args.visionBinary = argv[++index] || '';
     else if (key === '--force') args.force = true;
+    // Start at the first canonical row again after an inference-policy upgrade. This is not a
+    // tag mutation; it only replaces the bounded review metadata for live asset keys.
+    else if (key === '--rebuild') { args.force = true; args.rebuild = true; }
   }
   return args;
 }
@@ -332,7 +335,7 @@ async function upload(args, token, runId, items, window, { status = 'completed',
       calendarId: args.calendar,
       runId,
       workerId: 'macos-vision-m2',
-      workerVersion: '5',
+      workerVersion: '6',
       window,
       status,
       error,
@@ -351,7 +354,7 @@ async function main() {
   const statePath = resolve(args.state);
   const outputPath = resolve(args.output);
   const state = await readJson(statePath, { schemaVersion: 1, calendars: {} });
-  const current = state.calendars?.[args.calendar] || {};
+  const current = args.rebuild ? {} : (state.calendars?.[args.calendar] || {});
   const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService, args.tokenAccount)]);
   const now = Date.now();
   const runId = `macos_${args.calendar}_${kstDateStamp(new Date(now))}`;
