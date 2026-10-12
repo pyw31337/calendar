@@ -1150,11 +1150,15 @@ function CalendarApp() {
   // handleSavePlace/handleConfirmMeeting-family handlers' own "existing entries" lookups --
   // sees the merged view for free from this single point, rather than needing every call site
   // updated individually.
-  const activeCal = React.useMemo(() => ({
-    ...rawActiveCal,
-    places: unionPlaces(rawActiveCal, placesSubcollection),
-    confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
-  }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
+  const activeCal = React.useMemo(() => {
+    const cal = {
+      ...rawActiveCal,
+      places: unionPlaces(rawActiveCal, placesSubcollection),
+      confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
+    };
+    if (typeof window !== 'undefined') window.__gatherActiveCalendar = cal;
+    return cal;
+  }, [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
   const meetingPhotoMessageIds = React.useMemo(() => getMeetingOwnedPhotoMessageIds(activeCal), [activeCal]);
   // Mirrors meetingPhotoMessageIds for effects that need its latest value without depending on
   // (and being restarted by) its object identity, which changes on essentially every realtime
@@ -1304,9 +1308,16 @@ function CalendarApp() {
   React.useEffect(() => {
     if (activeCal && activeCalId) {
       const getStored = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+      const setStored = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
       const resolved = typeof getStored === 'function' ? getStored(activeCalId, activeCal) : '';
       if (resolved && resolved !== chatParticipantIdRef.current) {
         setChatParticipantId(resolved);
+      }
+      if (resolved && typeof setStored === 'function') {
+        const scopedKey = `gather_active_participant_id_${activeCalId}_v1`;
+        if (typeof localStorage !== 'undefined' && !localStorage.getItem(scopedKey)) {
+          setStored(activeCalId, resolved);
+        }
       }
     }
   }, [activeCalId, activeCal]);

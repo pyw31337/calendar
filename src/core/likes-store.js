@@ -98,27 +98,43 @@ function createLikesStore(calendarId) {
     },
     getSnapshot: () => snapshot,
     isLiked(kind, ref) {
-      const id = likeDocId(kind, ref, readCurrentParticipantId(calendarId));
+      const pid = readCurrentParticipantId(calendarId);
+      const id = likeDocId(kind, ref, pid);
       if (pending.has(id)) return Boolean(pending.get(id));
-      return byId.has(id);
+      if (byId.has(id)) return true;
+      const legacyId = likeDocId(kind, ref);
+      if (pending.has(legacyId)) return Boolean(pending.get(legacyId));
+      if (byId.has(legacyId)) return true;
+      return false;
     },
     async toggle(item) {
       const participantId = readCurrentParticipantId(calendarId);
       const doc = buildLikeDocument(item, Date.now(), participantId);
       if (!doc) return false;
       const id = likeDocId(doc.kind, doc.ref, participantId);
+      const legacyId = likeDocId(doc.kind, doc.ref);
       const wasLiked = this.isLiked(doc.kind, doc.ref);
       pending.set(id, wasLiked ? null : { ...doc, id });
+      if (wasLiked && byId.has(legacyId)) pending.set(legacyId, null);
       rebuild();
       const { writeCollectionDocumentWithFallback } = await firebaseData();
       const result = wasLiked
         ? await writeCollectionDocumentWithFallback('likes', calendarId, id, null, 'delete', '좋아요 취소')
         : await writeCollectionDocumentWithFallback('likes', calendarId, id, doc, 'set', '좋아요');
+      if (wasLiked && byId.has(legacyId)) {
+        await writeCollectionDocumentWithFallback('likes', calendarId, legacyId, null, 'delete', '좋아요 취소').catch(() => {});
+      }
       const ok = Boolean(result && result.success !== false);
       if (ok) {
-        if (wasLiked) byId.delete(id); else byId.set(id, { ...doc, id });
+        if (wasLiked) {
+          byId.delete(id);
+          byId.delete(legacyId);
+        } else {
+          byId.set(id, { ...doc, id });
+        }
       }
       pending.delete(id);
+      pending.delete(legacyId);
       rebuild();
       return ok ? !wasLiked : wasLiked;
     }

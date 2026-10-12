@@ -8,8 +8,9 @@ export const PARTICIPANT_CHANGE_EVENT = 'gather:participant-change';
 
 export function readCurrentParticipantId(calendarId, calendar) {
   try {
+    const cal = calendar || (typeof window !== 'undefined' && window.__gatherActiveCalendar) || null;
     const read = typeof window !== 'undefined' && window.GATHER_APP_NOTIFICATIONS?.getStoredChatParticipantId;
-    return typeof read === 'function' ? String(read(calendarId, calendar) || '') : '';
+    return typeof read === 'function' ? String(read(calendarId, cal) || '') : '';
   } catch (_) {
     return '';
   }
@@ -18,8 +19,9 @@ export function readCurrentParticipantId(calendarId, calendar) {
 /** The participant someone actually picked on this device, or '' before the first pick. */
 export function readChosenParticipantId(calendarId, calendar) {
   try {
+    const cal = calendar || (typeof window !== 'undefined' && window.__gatherActiveCalendar) || null;
     const read = typeof window !== 'undefined' && window.GATHER_APP_NOTIFICATIONS?.getChosenChatParticipantId;
-    return typeof read === 'function' ? String(read(calendarId, calendar) || '') : '';
+    return typeof read === 'function' ? String(read(calendarId, cal) || '') : '';
   } catch (_) {
     return '';
   }
