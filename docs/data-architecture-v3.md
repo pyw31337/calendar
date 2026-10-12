@@ -328,3 +328,20 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
 - 편집 화면(메모·채팅)도 슬롯이 어긋난 지문 목록은 기존 사진에 넘기지 않는다.
 - 테스트: `functions/test/photo-tombstones.emulator.test.js`(트리거·GC·규칙), 스트레스 R11/R12, `test/photo-tombstones.test.mjs`,
   `test/image-dedupe-reuse.test.mjs`.
+
+## 10. P2-B(규칙에 로그인 요구) 검토 (2026-10-12) — 보류 권고
+
+`request.auth != null`만 요구하는 규칙은 지금 켜면 얻는 것보다 위험이 크다.
+- **보호 효과가 작다**: 익명 로그인은 공개 웹 API 키만 있으면 누구나 할 수 있다. 링크(캘린더 ID)를 아는 사람은 지금도 앱을
+  열면 자동 로그인되므로, 막히는 것은 "토큰 없이 REST를 직접 부르는 스크립트"뿐이다. 실제 보호는 멤버 확인(초대 링크·참여자
+  계정)이 있어야 생긴다 — 사용자가 미뤄 둔 "로그인" 작업.
+- **깨지는 곳이 남아 있다**:
+  - 앱: 익명 로그인은 첫 화면이 그려진 뒤 시작한다(`src/main.jsx`). 그 전에 나가는 REST 요청과 Firestore 실시간 구독은
+    토큰이 없어 거부되고, 거부된 구독은 다시 붙지 않는다. 켜려면 부팅 순서를 "로그인 먼저"로 바꿔야 하고, 그러면 앱을 열 때마다
+    로그인 SDK(gzip 39KB) 로드와 토큰 확인만큼 첫 데이터가 늦어진다.
+  - 맥 도구: `import-people-tags.py`, `run-server-photo-analysis.mjs`(그리고 이를 쓰는 얼굴 인식 흐름)가 Firestore를
+    토큰 없이 읽는다. 매일 밤 자동 태그가 멈춘다.
+  - 깃허브 워크플로는 대부분 `firestore-anon-auth.mjs`로 준비돼 있다(backup, live-smoke, verify, tag-maintenance, ops report).
+- **켜기로 하면 순서**: ① 맥 도구에 익명 로그인 추가 ② 앱 부팅에서 로그인을 먼저 기다리기(실패하면 지금처럼 토큰 없이)
+  ③ 실사용 오류 수집으로 로그인 실패 기기 수 확인 ④ 에뮬레이터 규칙 테스트와 함께 규칙 변경 ⑤ 문제가 생기면 규칙만 되돌리기.
+
