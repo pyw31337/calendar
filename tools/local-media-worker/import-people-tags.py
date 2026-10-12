@@ -327,10 +327,20 @@ def main():
                 if not (entry[0]['id'] in seen or seen.add(entry[0]['id']))]
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
-    source = from_apple() if args.apple else from_takeout(args.takeout)
+    # Materialise only compact JSON/paths descriptors, then decode originals in parallel. On a
+    # 50 GB Takeout the old serial decoder spent close to an hour before it could even show a
+    # dry-run result; image bytes remain local and are discarded as soon as their hash is made.
+    source = list(from_apple() if args.apple else from_takeout(args.takeout))
+    print(f'원본 메타데이터 {len(source)}건을 읽었습니다. 지각 해시를 병렬로 계산합니다.')
+
+    def item_hash(item):
+        return next((value for value in (hash_file(path) for path in item['paths']) if value), None)
+
     unknown, plan, seen_src, no_image, hashed_src, closest_hist, ambiguous = {}, {}, 0, 0, 0, {}, 0
     print('원본 사진과 비교하는 중...')
-    for item in source:
+    with ThreadPoolExecutor(8) as pool:
+      hashed_source = pool.map(item_hash, source)
+      for item, h in zip(source, hashed_source):
         seen_src += 1
         if seen_src % 200 == 0:
             print(f'  {seen_src}장 확인', flush=True)
@@ -344,7 +354,6 @@ def main():
         geo = item.get('geo') if args.places else None
         if not mapped and not geo and not item.get('date'):
             continue
-        h = next((x for x in (hash_file(p) for p in item['paths']) if x), None)
         if not h:
             no_image += 1
             continue
