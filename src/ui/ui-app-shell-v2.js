@@ -4704,6 +4704,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     toast && React.createElement('div', {
       className: `toast ${(toast.type === 'delete' || toast.type === 'error') ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
     }, React.createElement('span', { className: 'toast-message' }, toast.message),
+      ...(toast.extraActions || []).map((extra, index) => React.createElement('button', {
+        key: `extra-${index}`,
+        type: 'button',
+        onClick: () => {
+          if (typeof dismissToast === 'function') dismissToast();
+          Promise.resolve(extra.onAction()).catch(console.warn);
+        },
+        className: 'toast-action'
+      }, extra.label)),
       toast.onAction && React.createElement('button', {
         type: 'button',
         onClick: () => {

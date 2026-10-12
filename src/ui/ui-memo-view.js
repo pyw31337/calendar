@@ -664,7 +664,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         console.error('Image compression failed for:', failed.map(f => f.fileName));
         if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
       } else if (succeeded.length > 0 && showToast) {
-        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+        // Only the unsent draft changes: 되돌리기 takes exactly these photos back out.
+        showUndoableToast(showToast, `${succeeded.length}장 첨부완료`, () => { setNewImages(prev => prev.filter(item => !succeeded.includes(item))); return '첨부를 취소했습니다.'; });
       }
     } catch (err) {
       console.error('attachComposerFiles unexpected error:', err);
@@ -708,7 +709,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         console.error('Image compression failed for:', failed.map(f => f.fileName));
         if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
       } else if (succeeded.length > 0 && showToast) {
-        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+        showUndoableToast(showToast, `${succeeded.length}장 첨부완료`, () => { setEditImages(prev => prev.filter(item => !succeeded.includes(item))); return '첨부를 취소했습니다.'; });
       }
     } catch (err) {
       console.error('attachEditFiles unexpected error:', err);

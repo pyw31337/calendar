@@ -23,6 +23,7 @@ import { createPhotoCommentIdentityResolver } from '../core/app-domain-helpers.j
 import { useLikes } from '../core/likes-store.js';
 import { groupLikesByKind, LIKE_KIND_LABELS, photoLikeItem as galleryPhotoLikeItem } from '../core/likes-model.js';
 import { LikeButton } from './like-button.js';
+import { showUndoableToast } from '../core/undo-toast.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1682,15 +1683,17 @@ export function ChatGalleryModal({
         } else if (activeTab === 'files') {
           if (typeof onDeleteFiles !== 'function') return;
           const files = (filteredFiles || []).filter(item => keySet.has(item.galleryKey || String(item.id || item.url || '')));
-          const deleted = await onDeleteFiles(files);
-          if (showToast) showToast(deleted ? `파일 ${deleted}개를 삭제했습니다.` : '삭제할 파일을 처리하지 못했습니다.', deleted ? 'success' : 'error');
+          const outcome = await onDeleteFiles(files);
+          const deleted = outcome && typeof outcome === 'object' ? outcome.deleted : outcome;
+          if (deleted) showUndoableToast(showToast, `파일 ${deleted}개를 삭제했습니다.`, outcome?.undo, { doneMessage: '파일 삭제를 되돌렸습니다.' });
+          else if (showToast) showToast('삭제할 파일을 처리하지 못했습니다.', 'error');
         } else {
           if (typeof onDeleteGalleryLinks !== 'function') return;
           const links = (filteredLinks || []).filter(item => keySet.has(item.galleryKey || item.messageId || item.url));
           const result = await onDeleteGalleryLinks(links) || { deleted: 0, skipped: 0 };
           if (showToast) {
-            if (result.deleted && result.skipped) showToast(`링크 ${result.deleted}개 삭제, ${result.skipped}개는 본문에 있어 건너뛰었습니다.`, 'info');
-            else if (result.deleted) showToast(`링크 ${result.deleted}개를 삭제했습니다.`, 'success');
+            if (result.deleted && result.skipped) showUndoableToast(showToast, `링크 ${result.deleted}개 삭제, ${result.skipped}개는 본문에 있어 건너뛰었습니다.`, result.undo, { type: 'info', doneMessage: '링크 삭제를 되돌렸습니다.' });
+            else if (result.deleted) showUndoableToast(showToast, `링크 ${result.deleted}개를 삭제했습니다.`, result.undo, { doneMessage: '링크 삭제를 되돌렸습니다.' });
             else showToast('채팅/메모/일정 본문에 있는 링크는 해당 화면에서 수정해 주세요.', 'error');
           }
         }

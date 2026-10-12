@@ -1,5 +1,5 @@
 import { showUndoableToast } from '../core/undo-toast.js';
-import { snapshotPlaces, revertPlaceSave } from '../core/app-undo-actions.js';
+import { snapshotPlaces, revertPlaceSave, revertPlaceChanges } from '../core/app-undo-actions.js';
 import { readAppVvHeight, subscribeAppVvRemeasure } from '../core/app-vv-measure.js';
 /**
  * Places map + places view (P4-10)
@@ -1106,12 +1106,10 @@ export function PlacesView({
     const run = async () => {
       setIsBulkDeleting(true);
       try {
-        let deleted = 0;
-        for (const place of selected) {
-          const ok = await Promise.resolve(onDeletePlace(place.id, { silent: true }));
-          if (ok !== false) deleted += 1;
-        }
-        if (showToast) showToast(deleted ? `장소 ${deleted}개를 삭제했습니다.` : '삭제할 장소를 처리하지 못했습니다.', deleted ? 'success' : 'error');
+        // One call for all of them: it saves once and shows '장소 N개를 삭제했습니다.' with 되돌리기.
+        const ok = await Promise.resolve(onDeletePlace(selected.map(place => place.id)));
+        const deleted = ok !== false ? count : 0;
+        if (!deleted && showToast) showToast('삭제할 장소를 처리하지 못했습니다.', 'error');
         setSelectedBulkShareKeys(new Set());
         if (deleted) setIsBulkShareMode(false);
       } finally {
@@ -1173,6 +1171,7 @@ export function PlacesView({
   const handleConfirmGatherPlacesPaste = async () => {
     if (!gatherPlacesPastePreview || typeof onSavePlace !== 'function' || isSavingGatherPlacesPaste) return;
     setIsSavingGatherPlacesPaste(true);
+    const placesBefore = snapshotPlaces();
     try {
       let added = 0;
       for (const place of gatherPlacesPastePreview) {
@@ -1190,7 +1189,8 @@ export function PlacesView({
         }));
         if (ok !== false) added += 1;
       }
-      if (showToast) showToast(added ? `장소 ${added}개를 붙여넣었습니다.` : '장소 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+      if (added) showUndoableToast(showToast, `장소 ${added}개를 붙여넣었습니다.`, () => revertPlaceChanges(placesBefore, added), { doneMessage: '장소 붙여넣기를 되돌렸습니다.' });
+      else if (showToast) showToast('장소 붙여넣기에 실패했습니다.', 'error');
       if (added) setGatherPlacesPastePreview(null);
     } finally {
       setIsSavingGatherPlacesPaste(false);

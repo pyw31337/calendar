@@ -851,7 +851,8 @@ assert(placesViewSource.includes('input, textarea, select, [contenteditable="tru
 assert(placesViewSource.includes("e.key !== 'Escape'"), 'places Escape must cancel edit/paste without stealing from inputs');
 assert(placesViewSource.includes("role: isBulkShareMode ? \"checkbox\""), 'places bulk share must use checkboxes');
 assert(placesViewSource.includes('kind: \'gather-places\'') || placesViewSource.includes('parseGatherPlacesClipboardText'), 'places bulk share must use the gatherPlaces fragment');
-assert(placesViewSource.includes('onDeletePlace(place.id, { silent: true })'), 'places bulk delete must reuse handleDeletePlace without stacking undo toasts');
+assert(placesViewSource.includes('onDeletePlace(selected.map(place => place.id))'), 'places bulk delete must hand handleDeletePlace every id at once (one save, one undo toast) -- a per-place loop re-sent the earlier deleted places from a stale list');
+assert(appMainSource.includes('deletedPlaceIds: deletedIds'), 'handleDeletePlace must tell the server merge every id it removed');
 assert(appMainSource.includes('ok && !(options && options.silent)'), 'bulk place delete must be able to skip the per-item undo toast');
 assert(!/handleConfirmGatherPlacesPaste[\s\S]{0,700}id: place\.id/.test(placesViewSource), 'pasted places must not reuse the source calendar id');
 assert(summaryGallerySource.includes("className: \"btn btn-action btn-action-dark\""), 'memory-add backdrop must use the black plus action button');
