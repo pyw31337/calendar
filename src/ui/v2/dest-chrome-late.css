@@ -5902,6 +5902,12 @@ html:has(.renewal-shell.v2-design) .culture-items-grid > .culture-poster-card > 
   height: 100% !important;
   object-fit: cover !important;
 }
+html:has(.renewal-shell.v2-design) .culture-detail-modal-container > div > img {
+  width: 100% !important;
+  max-height: 260px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
 
 /* V2 rule: text sits in the vertical middle of its own control.
    line-height above 1 leaves a fractional line box that the browser rounds

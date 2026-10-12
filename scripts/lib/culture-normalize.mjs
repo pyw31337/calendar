@@ -61,7 +61,7 @@ export function isVisible(endDate, startDate, todayIso, { openEnded = false } = 
 // from our own domain a relative path 404s silently, so resolve against Culture Flow's origin.
 export const CULTURE_FLOW_ORIGIN = 'https://pyw31337.github.io/culture';
 export function resolveImageUrl(raw) {
-  const value = String(raw || '').trim();
+  const value = decodeHtmlEntities(String(raw || '')).trim();
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
   if (value.startsWith('//')) return `https:${value}`;
@@ -255,6 +255,8 @@ function isRealPoster(url) {
 
 function mergePair(base, other) {
   const image = isRealPoster(base.image) ? base.image : (isRealPoster(other.image) ? other.image : pickRicher(base.image, other.image));
+  const backupCandidate = [base.backupPoster, other.backupPoster, base.image, other.image]
+    .find(u => isRealPoster(u) && u !== image && !isFallbackOrEmptyPoster(u)) || '';
   const startDate = [base.startDate, other.startDate].filter(Boolean).sort()[0] || null;
   const endDate = [base.endDate, other.endDate].filter(Boolean).sort().pop() || null;
   const sources = [...new Set(`${base.source || ''}+${other.source || ''}`.split('+').filter(Boolean))];
@@ -272,6 +274,7 @@ function mergePair(base, other) {
     lat: base.lat ?? other.lat,
     lng: base.lng ?? other.lng,
     image,
+    backupPoster: backupCandidate,
     price: pickRicher(base.price, other.price),
     contact: pickRicher(base.contact, other.contact),
     organizer: pickRicher(base.organizer, other.organizer),
@@ -374,6 +377,28 @@ function resolveNormalizedPoster(raw) {
   return '';
 }
 
+function resolveBackupPoster(raw, primaryImage) {
+  const posterSources = Array.isArray(raw.posterSourceUrls) ? raw.posterSourceUrls : [];
+  const candidates = [
+    raw.backupPoster,
+    raw.posterUrl,
+    raw.poster,
+    raw.image,
+    ...posterSources
+  ];
+  for (const c of candidates) {
+    const resolved = resolveImageUrl(c);
+    if (resolved && resolved !== primaryImage && !isFallbackOrEmptyPoster(resolved)) {
+      return resolved;
+    }
+  }
+  const interparkUrl = interparkPosterFromGoods(raw.link || raw.website);
+  if (interparkUrl && interparkUrl !== primaryImage && !isFallbackOrEmptyPoster(interparkUrl)) {
+    return interparkUrl;
+  }
+  return '';
+}
+
 export function normalizeItem(raw) {
   const movie = raw.genre === 'movie';
   const openRun = !movie && isOpenRunDate(raw.date);
@@ -391,6 +416,8 @@ export function normalizeItem(raw) {
   const cast = Array.isArray(raw.cast)
     ? raw.cast.map(name => cleanInlineText(name)).filter(Boolean).slice(0, 12)
     : [];
+  const primaryImage = resolveNormalizedPoster(raw);
+  const backupPoster = resolveBackupPoster(raw, primaryImage);
   return {
     startDate: normalizedStartDate, endDate: normalizedEndDate, openEnded,
     item: {
@@ -407,7 +434,8 @@ export function normalizeItem(raw) {
       lat: typeof raw.lat === 'number' && Number.isFinite(raw.lat) ? raw.lat : null,
       lng: typeof raw.lng === 'number' && Number.isFinite(raw.lng) ? raw.lng : null,
       genre: raw.genre || '',
-      image: resolveNormalizedPoster(raw),
+      image: primaryImage,
+      backupPoster,
       link: String(raw.link).trim(),
       price: cleanInlineText(raw.price),
       contact: cleanInlineText(raw.contact),
@@ -501,7 +529,7 @@ export function isFallbackOrEmptyPoster(url) {
   return !s
     || /fallbacks\/|\.svg$/i.test(s)
     || /placeholder|default[-_ ]?poster|no[-_ ]?image|no[-_ ]?img|no_poster|empty[-_ ]?image|blank\.gif|none\.png/i.test(s)
-    || /https_p\.gif|\/large\/ht\//i.test(s);
+    || /https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(s);
 }
 
 export function extractInterparkGoodsCode(goodsCodeOrLink) {

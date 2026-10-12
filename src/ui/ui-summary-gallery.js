@@ -5057,9 +5057,9 @@ function culturePosterUrl(item) {
   ];
   let fallbackCandidate = '';
   for (const value of candidates) {
-    const url = String(value || '').trim();
+    const url = String(value || '').replace(/&amp;/gi, '&').trim();
     if (!url || url === 'undefined' || url === 'null') continue;
-    if (/https_p\.gif|\/large\/ht\//i.test(url)) continue;
+    if (/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(url)) continue;
     if (/fallbacks\/|\.svg$/i.test(url) || /placeholder|default[-_ ]?poster|no[-_ ]?image/i.test(url)) {
       if (!fallbackCandidate) fallbackCandidate = url;
       continue;
@@ -5070,12 +5070,24 @@ function culturePosterUrl(item) {
 }
 
 function mergeCultureItemPreferPoster(base, overlay) {
-  const poster = culturePosterUrl(overlay) || culturePosterUrl(base);
-  const merged = { ...(base || {}), ...(overlay || {}) };
+  const baseObj = base || {};
+  const overlayObj = overlay || {};
+  const overlayPoster = culturePosterUrl(overlayObj);
+  const basePoster = culturePosterUrl(baseObj);
+  const poster = overlayPoster || basePoster;
+  const merged = { ...baseObj };
+  for (const [key, value] of Object.entries(overlayObj)) {
+    if (value === '' || value === null || value === undefined) continue;
+    if (Array.isArray(value) && value.length === 0 && Array.isArray(baseObj[key]) && baseObj[key].length > 0) continue;
+    merged[key] = value;
+  }
   if (poster) {
     merged.image = poster;
     if (!merged.imageUrl) merged.imageUrl = poster;
     if (!merged.thumbUrl) merged.thumbUrl = poster;
+  }
+  if (overlayPoster && basePoster && overlayPoster !== basePoster && !merged.backupPoster) {
+    merged.backupPoster = basePoster;
   }
   return merged;
 }
@@ -6598,8 +6610,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                   return;
                 }
                 const next = [item.backupPoster, item.posterUrl, item.imageUrl, item.thumbUrl, item.image, item.poster]
-                  .map(value => String(value || '').trim())
-                  .find(value => value && value !== img.src && !/https_p\.gif|\/large\/ht\//i.test(value));
+                  .map(value => String(value || '').replace(/&amp;/gi, '&').trim())
+                  .find(value => value && value !== img.src && !/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(value));
                 if (next) {
                   img.dataset.posterFallback = '1';
                   img.src = next;
@@ -6818,21 +6830,26 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           },
             /*#__PURE__*/React.createElement("img", {
               src: culturePosterUrl(selected), alt: selected.title, loading: 'lazy',
+              style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
               onError: e => {
                 const img = e.currentTarget;
                 if (!img || img.dataset.posterFallback === '1') {
-                  if (img) img.style.display = 'none';
+                  if (img) {
+                    img.style.display = 'none';
+                    if (img.parentElement) img.parentElement.style.display = 'none';
+                  }
                   return;
                 }
                 const next = [selected.backupPoster, selected.posterUrl, selected.imageUrl, selected.thumbUrl, selected.image, selected.poster]
-                  .map(v => String(v || '').trim())
-                  .find(v => v && v !== img.src && !/https_p\.gif|\/large\/ht\//i.test(v));
+                  .map(v => String(v || '').replace(/&amp;/gi, '&').trim())
+                  .find(v => v && v !== img.src && !/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(v));
                 if (next) {
                   img.dataset.posterFallback = '1';
                   img.src = next;
                   return;
                 }
                 img.style.display = 'none';
+                if (img.parentElement) img.parentElement.style.display = 'none';
               }
             }),
             (anniversaryCategory === 'movie' || selected.genre === 'movie') && /*#__PURE__*/React.createElement("span", {

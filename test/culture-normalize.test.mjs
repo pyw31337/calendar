@@ -12,6 +12,7 @@ import {
   normalizeItem,
   normalizeTitleForMatch,
   parseDateRange,
+  resolveImageUrl,
   venuesMatch,
   isUsefulPosterUrl,
   interparkPosterFromGoods,
@@ -190,8 +191,29 @@ test('isFallbackOrEmptyPoster catches fallbacks, placeholders, and corrupted URL
   assert.equal(isFallbackOrEmptyPoster(''), true);
   assert.equal(isFallbackOrEmptyPoster('/images/fallbacks/tourism-template.svg'), true);
   assert.equal(isFallbackOrEmptyPoster('https://ticketimage.interpark.com/Play/image/large/ht/https_p.gif'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://www.culture.go.kr/upload/rdf/26/01/rdf_2026010821244330374.jpg'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://search.pstatic.net/common/?src=https%3A%2F%2Fblogpfthumb-phinf.pstatic.net%2Ffoo.png'), true);
   assert.equal(isFallbackOrEmptyPoster('https://example.com/images/default_poster.png'), true);
   assert.equal(isFallbackOrEmptyPoster('https://ticketimage.interpark.com/Play/image/large/26/26005759_p.gif'), false);
   assert.equal(isFallbackOrEmptyPoster('https://pyw31337.github.io/culture/images/posters/remote-cache/kopis/perf_123.webp'), false);
 });
 
+test('resolveImageUrl decodes HTML entities and normalizeItem preserves backupPoster', () => {
+  assert.equal(
+    resolveImageUrl('https://search.pstatic.net/common?type=f208_312&amp;src=https%3A%2F%2Fs.pstatic.net%2Fmovie.jpg'),
+    'https://search.pstatic.net/common?type=f208_312&src=https%3A%2F%2Fs.pstatic.net%2Fmovie.jpg'
+  );
+  const { item } = normalizeItem({
+    id: 'perf_1',
+    title: '테스트 공연',
+    date: '2026.10.13 (화) ~ 2026.10.20 (화)',
+    venue: '예술의전당',
+    address: '서울 서초구 남부순환로 2406',
+    genre: 'musical',
+    image: '/images/posters/remote-cache/kopis/perf_1.webp',
+    backupPoster: 'https://www.kopis.or.kr/upload/pfmPoster/PF_PF123456.jpg',
+    link: 'https://tickets.interpark.com/goods/26005759'
+  });
+  assert.equal(item.image, 'https://pyw31337.github.io/culture/images/posters/remote-cache/kopis/perf_1.webp');
+  assert.equal(item.backupPoster, 'https://www.kopis.or.kr/upload/pfmPoster/PF_PF123456.jpg');
+});
