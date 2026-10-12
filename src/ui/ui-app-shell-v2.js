@@ -61,7 +61,8 @@ import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { useHomeSummarySwipe } from './home-summary-swipe.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
-import { getAnniversariesForDate, isCultureLinkedAnniversary } from '../core/app-anniversary-dates.js';
+import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
+import { isMovableAnniversary } from '../core/app-anniversary-move.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 import { fetchFourDayForecast, readFourDayWeatherMem, resolveDailyForecast } from '../core/app-weather.js';
 import { getWeatherIcon } from './weather-icon.js';
@@ -991,7 +992,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   };
 
   const handleAnniversaryTouchStart = (event, ann, dateStr, color) => {
-    if (event.touches.length !== 1 || !isCultureLinkedAnniversary(ann)) return;
+    if (event.touches.length !== 1 || !isMovableAnniversary(ann)) return;
     const touch = event.touches[0];
     if (touchDragRef.current) clearTimeout(touchDragRef.current.timer);
     const dragInfo = {
@@ -1284,11 +1285,26 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             // the full text fits and centers on the whole bar instead of repeating per day.
             const span = bar.endCol - col + 1;
             const spansCells = atStart && span > 1;
+            // Any segment of a 연일 bar drags the whole period (planAnniversaryMove shifts both
+            // ends by the distance from this cell to the drop cell).
+            const movable = isMovableAnniversary(bar);
             return React.createElement('div', {
               key: `ann-range-${bar.id}-${dateStr}`,
-              className: bentoClass(`ann-range day-anniversary ${edge}${atStart ? ' has-label' : ''}${spansCells ? ' label-spans' : ''} cat-${paint.category}`),
-              title,
-              'aria-label': title,
+              className: bentoClass(`ann-range day-anniversary ${edge}${atStart ? ' has-label' : ''}${spansCells ? ' label-spans' : ''} cat-${paint.category}${movable ? ' is-draggable' : ''}`),
+              title: movable ? `${title} — 드래그하여 날짜 이동` : title,
+              'aria-label': movable ? `${title}, 드래그하여 날짜 이동` : title,
+              draggable: movable,
+              onDragStart: movable ? event => {
+                event.stopPropagation();
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'anniversary', anniversaryId: bar.id, sourceDate: dateStr, title }));
+                setDragActive(event.currentTarget, true);
+              } : undefined,
+              onDragEnd: movable ? event => setDragActive(event.currentTarget, false) : undefined,
+              onTouchStart: movable ? event => { event.stopPropagation(); handleAnniversaryTouchStart(event, bar, dateStr, paint.color); } : undefined,
+              onTouchMove: movable ? event => { event.stopPropagation(); handleBadgeTouchMove(event); } : undefined,
+              onTouchEnd: movable ? event => { event.stopPropagation(); handleBadgeTouchEnd(event); } : undefined,
+              onTouchCancel: movable ? event => { event.stopPropagation(); handleBadgeTouchCancel(); } : undefined,
               style: {
                 '--ann-level': bar.level || 0,
                 '--anniversary-color': paint.color,
@@ -1389,14 +1405,14 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             anns.slice(0, 4).map((ann, annIdx) => {
               const title = ann.title || '기념일';
               const paint = anniversaryBarPaint(ann);
-              const isMovableCultureAnniversary = isCultureLinkedAnniversary(ann);
+              const movableAnn = isMovableAnniversary(ann);
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
-                className: bentoClass(`day-anniversary solo cat-${paint.category}${isMovableCultureAnniversary ? ' is-draggable' : ''}`),
-                title: isMovableCultureAnniversary ? `${title} — 드래그하여 날짜 이동` : title,
-                'aria-label': isMovableCultureAnniversary ? `${title}, 드래그하여 날짜 이동` : title,
-                draggable: isMovableCultureAnniversary,
-                onDragStart: isMovableCultureAnniversary ? event => {
+                className: bentoClass(`day-anniversary solo cat-${paint.category}${movableAnn ? ' is-draggable' : ''}`),
+                title: movableAnn ? `${title} — 드래그하여 날짜 이동` : title,
+                'aria-label': movableAnn ? `${title}, 드래그하여 날짜 이동` : title,
+                draggable: movableAnn,
+                onDragStart: movableAnn ? event => {
                   event.stopPropagation();
                   event.dataTransfer.effectAllowed = 'move';
                   event.dataTransfer.setData('text/plain', JSON.stringify({
@@ -1404,15 +1420,15 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                   }));
                   setDragActive(event.currentTarget, true);
                 } : undefined,
-                onDragEnd: isMovableCultureAnniversary ? event => setDragActive(event.currentTarget, false) : undefined,
-                onTouchStart: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleAnniversaryTouchStart(event, ann, dateStr, paint.color); } : undefined,
-                onTouchMove: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchMove(event); } : undefined,
-                onTouchEnd: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchEnd(event); } : undefined,
-                onTouchCancel: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchCancel(); } : undefined,
+                onDragEnd: movableAnn ? event => setDragActive(event.currentTarget, false) : undefined,
+                onTouchStart: movableAnn ? event => { event.stopPropagation(); handleAnniversaryTouchStart(event, ann, dateStr, paint.color); } : undefined,
+                onTouchMove: movableAnn ? event => { event.stopPropagation(); handleBadgeTouchMove(event); } : undefined,
+                onTouchEnd: movableAnn ? event => { event.stopPropagation(); handleBadgeTouchEnd(event); } : undefined,
+                onTouchCancel: movableAnn ? event => { event.stopPropagation(); handleBadgeTouchCancel(); } : undefined,
                 style: {
                   '--anniversary-color': paint.color,
                   '--ann-c': paint.color,
-                  ...(isMovableCultureAnniversary ? { cursor: 'grab', touchAction: 'auto' } : {}),
+                  ...(movableAnn ? { cursor: 'grab', touchAction: 'auto' } : {}),
                 },
               }, React.createElement('span', {
                 className: bentoClass('day-anniversary-label'),
