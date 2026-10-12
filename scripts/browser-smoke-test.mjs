@@ -28,6 +28,7 @@ import { chromium, firefox, webkit } from 'playwright';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { routeSearchParams } from '../src/core/app-address.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -283,6 +284,16 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
   ];
   // Legacy ?tab=records&sub=memo|places bookmarks promote on load to tab=memo|places with sub cleared.
   const firstClassDests = [['places', '장소'], ['memo', '메모']];
+  // The shown address carries the page in its path (/app/cw/gallery/, src/core/app-address.js);
+  // read it back as tab/sub so these checks hold for both the short and the query form.
+  const routeOf = href => routeSearchParams(new URL(href));
+  const assertShortAddress = (href, label) => {
+    const query = new URL(href).searchParams;
+    const leftovers = ['shell', 'id', 'cal', 'tab', 'sub', 'view'].filter(key => query.has(key));
+    if (/\/app\/[A-Za-z0-9_-]+\//.test(new URL(href).pathname) && leftovers.length) {
+      throw new Error(`${label} 주소에 ${leftovers.join(',')}가 남아 있음: ${href}`);
+    }
+  };
   for (const viewport of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.hasTouch });
     const page = await context.newPage();
@@ -306,7 +317,7 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
       // Visibility confirms the first render, not the URL-normalizing React effect. WebKit
       // can paint that render before the effect runs. Require the actual destination change.
       await page.waitForFunction(() => new URL(location.href).searchParams.get('tab') !== 'records', null, { timeout: 10000 });
-      const hub = new URL(page.url()).searchParams;
+      const hub = routeOf(page.url());
       if (hub.get('tab') === 'records') {
         throw new Error(`기록 허브가 남아 있음 sub=${hub.get('sub') || '(없음)'}`);
       }
@@ -315,7 +326,8 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
       for (const [sub, title] of recordDests) {
         await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${sub}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
-        const params = new URL(page.url()).searchParams;
+        const params = routeOf(page.url());
+        assertShortAddress(page.url(), title);
         if (params.get('tab') !== 'records' || params.get('sub') !== sub) {
           throw new Error(`${title} 진입 후 tab=${params.get('tab') || '(없음)'} sub=${params.get('sub') || '(없음)'}`);
         }
@@ -332,10 +344,11 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${dest}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
         await page.waitForFunction(expected => {
-          const params = new URL(location.href).searchParams;
-          return params.get('tab') === expected && !params.get('sub');
+          const url = new URL(location.href);
+          const page = (url.pathname.match(/\/app\/[A-Za-z0-9_-]+\/([a-z]+)\/?$/) || [])[1];
+          return (url.searchParams.get('tab') || page) === expected && !url.searchParams.get('sub');
         }, dest, { timeout: 10000 });
-        const promoted = new URL(page.url()).searchParams;
+        const promoted = routeOf(page.url());
         if (promoted.get('tab') !== dest) {
           throw new Error(`기록 full-chrome ${label} URL 진입 후 tab=${promoted.get('tab') || '(없음)'}`);
         }
@@ -348,7 +361,7 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         // Direct first-class URL also lands cleanly.
         await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=${dest}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
-        const direct = new URL(page.url()).searchParams;
+        const direct = routeOf(page.url());
         if (direct.get('tab') !== dest || direct.get('sub')) {
           throw new Error(`${label} 직접 tab=${dest} 진입 후 tab=${direct.get('tab') || '(없음)'} sub=${direct.get('sub') || '(없음)'}`);
         }
