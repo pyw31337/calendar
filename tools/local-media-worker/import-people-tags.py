@@ -18,10 +18,16 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
     #    --takeout 에는 테이크아웃 zip 파일들이 든 폴더(압축 안 풀어도 됨), zip 하나, 또는 푼 폴더를 줄 수 있다.
     #    --places 를 붙이면 원본의 촬영 위치도 가져온다: 위치가 없는 우리 사진(아이폰 Safari 업로드는 GPS가
     #    지워져 옴)에 위치를 넣고, 서버가 그 위치로 장소 태그를 붙인다. 이름이 없는 사진도 위치는 가져온다.
+    #    --fix-dates 를 붙이면 업로드한 날짜로 붙은 날짜 태그를 원본의 실제 촬영일로 바꾼다 (모임 날짜 태그나
+    #    사람이 직접 고친 날짜는 그대로 둔다). 붙이지 않아도 미리보기에서 바꿀 수 있는 사진 수를 알려 준다.
     # 2) 이름이 다르게 저장돼 있으면 짝지어 주기 (예: 구글 "박서준" -> 우리 "서준")
     ... --alias 박서준=서준 --alias "Yuri Kim=유리"
+    #    미리보기가 같은 사진들의 기존 태그를 보고 짝을 추천한다. 맞으면 --accept-aliases 로 한 번에 받는다.
+    #    한 번 정한 짝은 이 맥에 저장돼 다음부터 자동으로 쓰인다 (지우기: --forget-alias 이름).
     # 3) 확인 후 적용
     ... --apply
+    #    적용하면 구글/애플이 확인한 "이 사진에 누가 있다" 목록을 이 맥에 남겨 얼굴 인식(face-tags.py)이 그 사진들로
+    #    가족 얼굴을 더 정확히 배운다. 사진이나 얼굴은 저장하지 않고, 사진 키와 이름만 남는다.
 """
 import argparse
 import hashlib
@@ -33,8 +39,9 @@ import sys
 import urllib.parse
 import urllib.request
 import zipfile
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     from PIL import Image, ImageOps
@@ -50,9 +57,16 @@ PROJECT = 'metro-live-2918e'
 ROOT = f'https://firestore.googleapis.com/v1/projects/{PROJECT}/databases/(default)/documents'
 COMMAND = f'https://asia-northeast3-{PROJECT}.cloudfunctions.net/mediaCommand'
 CACHE = os.path.expanduser('~/Library/Caches/moyeora-people-import')
+# Confirmed name pairs and the people Google/Apple verified per photo stay on this Mac.
+PEOPLE_DIR = os.environ.get('MOYEORA_PEOPLE_DIR') or os.path.expanduser('~/Library/Application Support/Moyeora/people')
 MAX_TAGS = 20
 SAME_DAY_DISTANCE = 8     # of 64 bits; thumbnails of the same shot land well under this
 ANY_DAY_DISTANCE = 2      # no date agreement: accept only an almost exact duplicate
+KST = timezone(timedelta(hours=9))
+NON_PERSON_TAGS = {'인물아님'}
+ALIAS_MIN_PHOTOS = 3      # a name pair is suggested only after this many shared photos
+ALIAS_MIN_SHARE = 0.6     # ...and when the tag sits on most of that name's photos
+ALIAS_MIN_LIFT = 2.0      # ...far more often than on photos in general (not just a common tag)
 
 
 # ---------- Firestore REST (read) ----------
@@ -105,6 +119,14 @@ def hamming(a, b):
     return bin(a ^ b).count('1')
 
 
+def _read_cached_hash(path):
+    try:
+        with open(path) as fh:
+            return int(fh.read() or 0)
+    except (OSError, ValueError):
+        return 0
+
+
 def hash_file(path):
     """path is a file path, or a callable returning an open binary file (a zip member)."""
     cache_file = None
@@ -117,7 +139,7 @@ def hash_file(path):
             key = hashlib.sha256(f'{path}\0{info.st_size}\0{info.st_mtime_ns}'.encode()).hexdigest()
             cache_file = os.path.join(CACHE, 'source-' + key + '.hash')
             if os.path.exists(cache_file):
-                value = int(open(cache_file).read() or 0)
+                value = _read_cached_hash(cache_file)
                 if value:
                     return value
         except (OSError, ValueError):
@@ -146,7 +168,7 @@ def hash_url(url):
     key = re.sub(r'[^A-Za-z0-9]', '_', url.split('?')[0].split('%2F')[-1])[-120:]
     cached = os.path.join(CACHE, key + '.hash')
     if os.path.exists(cached):
-        return int(open(cached).read() or 0) or None
+        return _read_cached_hash(cached) or None
     try:
         with urllib.request.urlopen(url, timeout=30) as r:
             h = dhash(Image.open(io.BytesIO(r.read())))
@@ -165,6 +187,185 @@ def date_tokens(tags):
         except ValueError:
             pass
     return out
+
+
+def tag_tokens(tags):
+    return [t for t in re.split(r'[\s,#]+', str(tags or '')) if t]
+
+
+def token_date(token):
+    """The day a YYMMDD tag names, or None for any other tag."""
+    if not re.fullmatch(r'\d{6}', token or ''):
+        return None
+    try:
+        return datetime.strptime('20' + token, '%Y%m%d').date()
+    except ValueError:
+        return None
+
+
+def kst_day(ms):
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000, KST).date() if int(ms) > 0 else None
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def upload_days(row):
+    """Days (KST) the photo was posted: the row's and every owner's message time."""
+    days = {kst_day(row.get('timestamp'))}
+    days.update(kst_day((owner or {}).get('timestamp')) for owner in row.get('owners') or [] if isinstance(owner, dict))
+    return {day for day in days if day}
+
+
+def meeting_days(row):
+    """Scheduled meeting days a photo belongs to; their date tag is a calendar fact, never "wrong"."""
+    days = set()
+    for item in [row] + [o for o in row.get('owners') or [] if isinstance(o, dict)]:
+        for value in (item.get('meetingDate'), item.get('messageId'), item.get('sourceOwner')):
+            m = re.search(r'(?:^|meeting_.*?_)(\d{4}-\d{2}-\d{2})(?:_|$)', str(value or ''))
+            if m:
+                try:
+                    days.add(datetime.strptime(m.group(1), '%Y-%m-%d').date())
+                except ValueError:
+                    pass
+    return days
+
+
+def plan_date_fix(row, capture):
+    """(new tag tokens, removed tags, added tags) that put the capture day in place of an upload-day
+    date tag, or None. A meeting's scheduled day stays, and a date tag on any other day (someone
+    chose it) leaves the photo untouched. One day of slack absorbs time zones."""
+    if not capture:
+        return None
+    tokens = tag_tokens(row.get('tags'))
+    uploads, keep = upload_days(row), meeting_days(row)
+    wrong, near_capture = [], False
+    for token in tokens:
+        day = token_date(token)
+        if not day:
+            continue
+        if abs((day - capture).days) <= 1:
+            near_capture = True
+        elif day in keep:
+            continue
+        elif day in uploads:
+            wrong.append(token)
+        else:
+            return None
+    if not wrong:
+        return None
+    capture_tag = capture.strftime('%y%m%d')
+    out, placed = [], near_capture
+    for token in tokens:
+        if token in wrong:
+            if not placed:
+                out.append(capture_tag)
+                placed = True
+            continue
+        out.append(token)
+    return out, sorted(set(wrong)), ([] if near_capture else [capture_tag])
+
+
+class NearIndex:
+    """Rows within ANY_DAY_DISTANCE bits of a hash without scanning every row: with at most 3
+    differing bits one of the four 16-bit quarters is identical (pigeonhole)."""
+    def __init__(self, entries):
+        assert ANY_DAY_DISTANCE <= 3
+        self.buckets = [defaultdict(list) for _ in range(4)]
+        for entry in entries:
+            for i in range(4):
+                self.buckets[i][(entry[1] >> (16 * i)) & 0xFFFF].append(entry)
+
+    def near(self, value):
+        seen, out = set(), []
+        for i in range(4):
+            for entry in self.buckets[i].get((value >> (16 * i)) & 0xFFFF, ()):
+                if entry[0]['id'] not in seen:
+                    seen.add(entry[0]['id'])
+                    out.append(entry)
+        return out
+
+
+# ---------- local files (this Mac only) ----------
+def _people_file(kind, calendar_id):
+    return os.path.join(PEOPLE_DIR, f'{kind}-{calendar_id}.json')
+
+
+def _read_json_file(path):
+    try:
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_json_file(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + '.part'
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=1, sort_keys=True)
+        fh.write('\n')
+    os.replace(tmp, path)
+
+
+def load_aliases(calendar_id):
+    aliases = _read_json_file(_people_file('aliases', calendar_id)).get('aliases') or {}
+    return {str(k): str(v) for k, v in aliases.items() if k and v}
+
+
+def save_aliases(calendar_id, aliases):
+    _write_json_file(_people_file('aliases', calendar_id), {'aliases': dict(sorted(aliases.items()))})
+
+
+def load_verified_people(calendar_id):
+    """{assetKey: [tag names]} for photos whose people Google/Apple named (face-tags.py learns from these)."""
+    photos = _read_json_file(_people_file('verified-people', calendar_id)).get('photos') or {}
+    return {key: [str(n) for n in (value or {}).get('people') or [] if n] for key, value in photos.items()
+            if isinstance(value, dict)}
+
+
+def save_verified_people(calendar_id, verified, source):
+    path = _people_file('verified-people', calendar_id)
+    photos = _read_json_file(path).get('photos') or {}
+    now = int(datetime.now(timezone.utc).timestamp() * 1000)
+    for key, people in verified.items():
+        if people:
+            photos[key] = {'people': sorted(set(people)), 'source': source, 'at': now}
+    _write_json_file(path, {'calendar': calendar_id, 'photos': photos})
+    return path
+
+
+def suggest_aliases(entries, to_label, token_rows, row_count, person_set):
+    """[(source name, our tag, shared photos, photos with that name)] for names we could not place:
+    the tag that already sits on most of that person's matched photos, far more often than on photos
+    in general. Tags another name of the same photo already explains do not count, and two names
+    with the same best tag (siblings who are always together) get no suggestion."""
+    totals, together = Counter(), defaultdict(Counter)
+    for entry in entries:
+        tokens = {t for t in tag_tokens(entry['row'].get('tags')) if not token_date(t) and t not in NON_PERSON_TAGS}
+        names = list(dict.fromkeys(entry['raw']))
+        explained = {to_label(n) for n in names} - {None}
+        for name in names:
+            if to_label(name):
+                continue
+            totals[name] += 1
+            for token in tokens - explained:
+                together[name][token] += 1
+    picks = {}
+    for name, total in totals.items():
+        good = []
+        for token, shared in together[name].items():
+            lift = (shared / total) / max(token_rows.get(token, 0) / max(row_count, 1), 1e-9)
+            if shared >= ALIAS_MIN_PHOTOS and shared / total >= ALIAS_MIN_SHARE and lift >= ALIAS_MIN_LIFT:
+                good.append((token in person_set, shared, token))
+        good.sort(reverse=True)
+        if not good or (len(good) > 1 and good[1][:2] == good[0][:2]):
+            continue
+        picks[name] = (good[0][2], good[0][1], total)
+    by_tag = Counter(tag for tag, _, _ in picks.values())
+    return sorted(((name, tag, shared, total) for name, (tag, shared, total) in picks.items() if by_tag[tag] == 1),
+                  key=lambda item: (-item[2], item[0]))
 
 
 # ---------- sources ----------
@@ -299,14 +500,28 @@ def main():
     src.add_argument('--apple', action='store_true')
     src.add_argument('--takeout')
     ap.add_argument('--alias', action='append', default=[], help='원본이름=우리태그')
+    ap.add_argument('--accept-aliases', action='store_true', help='미리보기가 추천한 이름 짝을 모두 받아 저장하고 이번에 바로 쓴다')
+    ap.add_argument('--forget-alias', action='append', default=[], help='저장해 둔 이름 짝 지우기 (원본이름)')
     ap.add_argument('--places', action='store_true',
                     help='원본의 촬영 위치도 가져온다 (위치가 없는 우리 사진만; 서버가 그 위치로 장소 태그를 붙인다)')
+    ap.add_argument('--fix-dates', action='store_true',
+                    help='업로드한 날짜로 붙은 날짜 태그를 원본의 실제 촬영일로 바꾼다 (모임 날짜·직접 고친 날짜는 유지)')
     ap.add_argument('--apply', action='store_true')
     args = ap.parse_args()
     if not re.fullmatch(r'[a-z0-9_-]{1,60}', args.calendar, re.I):
         sys.exit('calendar id 형식이 아닙니다')
 
-    aliases = dict(a.split('=', 1) for a in args.alias if '=' in a)
+    # Name pairs chosen before (this Mac only) apply automatically; --alias adds or overrides one.
+    saved_aliases = load_aliases(args.calendar)
+    aliases = dict(saved_aliases)
+    aliases.update(dict(a.split('=', 1) for a in args.alias if '=' in a))
+    for name in args.forget_alias:
+        aliases.pop(name, None)
+    if aliases != saved_aliases:
+        save_aliases(args.calendar, aliases)
+        print(f'이름 짝 {len(aliases)}개를 이 맥에 저장했습니다 (다음부터 자동으로 씁니다).')
+    elif aliases:
+        print(f'저장해 둔 이름 짝 {len(aliases)}개를 씁니다: ' + ', '.join(f'{k}={v}' for k, v in sorted(aliases.items())[:10]))
     print('우리 사진 목록을 읽는 중...')
     rows = [r for r in list_all(f'calendars/cal_{args.calendar}/photoIndex') if r.get('thumb') or r.get('full')]
     # People are often only ever written as photo tags (e.g. "리아", "지후") rather than as calendar
@@ -323,30 +538,31 @@ def main():
             if i % 100 == 0 or i == len(rows):
                 print(f'  {i}/{len(rows)}', flush=True)
     ours = [(r, h, date_tokens(r.get('tags'))) for r, h in zip(rows, hashes) if h]
+    token_rows = Counter(t for r in rows for t in set(tag_tokens(r.get('tags'))))
     # Comparing every Takeout original with every calendar thumbnail turns 38k originals into
     # tens of millions of Python hash comparisons. Date is an independent source fact, so use
     # it to form the candidate set first; keep untagged calendar photos in the set so the
     # importer can still repair their missing date. The no-date fallback stays intentionally
     # strict (ANY_DAY_DISTANCE) and is only used when the source lacks a camera date.
     ours_by_date = {}
-    undated_ours = []
     for entry in ours:
-        if entry[2]:
-            for date in entry[2]:
-                ours_by_date.setdefault(date, []).append(entry)
-        else:
-            undated_ours.append(entry)
+        for date in entry[2]:
+            ours_by_date.setdefault(date, []).append(entry)
+    # Any of our photos can still match at the almost-exact threshold, whatever its date tag says:
+    # an undated photo, one tagged with the day it was uploaded (its real capture day's bucket
+    # never holds it; --fix-dates then gives it the real date) or a meeting photo taken earlier.
+    # The index finds those few without comparing against every photo.
+    strict = NearIndex(ours)
 
-    def candidate_rows(source_date):
+    def candidate_rows(source_date, value):
         if not source_date:
-            return ours
+            return strict.near(value)
         dated = []
         for offset in (-1, 0, 1):
             dated.extend(ours_by_date.get(source_date + timedelta(days=offset), []))
-        # A photo without a current date tag can only match at the almost-exact threshold below.
         # Deduplicate burst photos that happen to have both adjacent date labels.
         seen = set()
-        return [entry for entry in dated + undated_ours
+        return [entry for entry in dated + strict.near(value)
                 if not (entry[0]['id'] in seen or seen.add(entry[0]['id']))]
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
@@ -359,7 +575,7 @@ def main():
     def item_hash(item):
         return next((value for value in (hash_file(path) for path in item['paths']) if value), None)
 
-    unknown, plan, seen_src, no_image, hashed_src, closest_hist, ambiguous = {}, {}, 0, 0, 0, {}, 0
+    plan, seen_src, no_image, hashed_src, closest_hist, ambiguous = {}, 0, 0, 0, {}, 0
     print('원본 사진과 비교하는 중...')
     with ThreadPoolExecutor(8) as pool:
       hashed_source = pool.map(item_hash, source)
@@ -367,15 +583,10 @@ def main():
         seen_src += 1
         if seen_src % 200 == 0:
             print(f'  {seen_src}장 확인', flush=True)
-        mapped = []
-        for n in item['names']:
-            label = to_label(n)
-            if label:
-                mapped.append(label)
-            else:
-                unknown[n] = unknown.get(n, 0) + 1
+        # Names are mapped to our tags after matching, so a name pair suggested from these very
+        # matches (--accept-aliases) applies in the same run.
         geo = item.get('geo') if args.places else None
-        if not mapped and not geo and not item.get('date'):
+        if not item['names'] and not geo and not item.get('date'):
             continue
         if not h:
             no_image += 1
@@ -383,7 +594,7 @@ def main():
         hashed_src += 1
         matches = []
         closest = 64
-        for row, rh, dates in candidate_rows(item['date']):
+        for row, rh, dates in candidate_rows(item['date'], h):
             same_day = item['date'] and any(abs((item['date'] - d).days) <= 1 for d in dates)
             limit = SAME_DAY_DISTANCE if same_day else ANY_DAY_DISTANCE
             dist = hamming(h, rh)
@@ -403,8 +614,8 @@ def main():
             ambiguous += 1
             continue
         row = matches[0][0]
-        entry = plan.setdefault(row['id'], {'row': row, 'names': [], 'dates': [], 'geo': None})
-        entry['names'].extend(x for x in mapped if x not in entry['names'])
+        entry = plan.setdefault(row['id'], {'row': row, 'raw': [], 'dates': [], 'geo': None})
+        entry['raw'].extend(x for x in item['names'] if x not in entry['raw'])
         if item.get('date') and not entry['dates']:
             entry['dates'].append(item['date'])
         elif item.get('date') and entry['dates'][0] != item['date']:
@@ -414,19 +625,40 @@ def main():
         if geo and not entry['geo']:
             entry['geo'] = geo
 
-    changes = []
+    # Name pairs: for each source name we could not place, the tag already on most of its photos.
+    person_set = set(person_labels(args.calendar))
+    alias_suggestions = suggest_aliases(plan.values(), to_label, token_rows, len(rows), person_set)
+    if args.accept_aliases and alias_suggestions:
+        aliases.update({name: tag for name, tag, _, _ in alias_suggestions})
+        save_aliases(args.calendar, aliases)
+        to_label = name_mapper(labels, aliases)
+        print(f'추천된 이름 짝 {len(alias_suggestions)}개를 받아 저장했습니다: '
+              + ', '.join(f'{name}={tag}' for name, tag, _, _ in alias_suggestions))
+        alias_suggestions = []
+    unknown = Counter()
+    for entry in plan.values():
+        entry['names'] = list(dict.fromkeys(label for label in map(to_label, entry['raw']) if label))
+        unknown.update(name for name in entry['raw'] if not to_label(name))
+
+    changes, date_fixes = [], 0
     for key, entry in plan.items():
         row = entry['row']
-        current = [t for t in re.split(r'[\s,#]+', row.get('tags') or '') if t]
-        add = [n for n in entry['names'] if n not in current]
+        current = tag_tokens(row.get('tags'))
+        # An upload-day date tag on a photo whose camera date we now know is the wrong day.
+        fix = plan_date_fix(row, entry['dates'][0]) if entry['dates'] and not entry.get('dateConflict') else None
+        if fix:
+            date_fixes += 1
+        base = fix[0] if fix and args.fix_dates else current
+        add = [n for n in entry['names'] if n not in base]
         # A Takeout camera date is a direct metadata fact. Never add a second date when the
         # calendar already has one, even if its spelling is the long YYYYMMDD variant.
         if not entry.get('dateConflict') and not date_tokens(row.get('tags')):
             add.extend(date.strftime('%y%m%d') for date in entry['dates'] if date.strftime('%y%m%d') not in current)
-        if not add:
+        fixed = fix if fix and args.fix_dates else None
+        if not add and not fixed:
             continue
-        tags = ' '.join((current + add)[:MAX_TAGS])
-        changes.append({'assetKey': key, 'add': add, 'item': {
+        tags = ' '.join((base + add)[:MAX_TAGS])
+        changes.append({'assetKey': key, 'add': (fixed[2] if fixed else []) + add, 'remove': fixed[1] if fixed else [], 'item': {
             'imageUrl': row.get('full') or row.get('thumb'), 'thumbUrl': row.get('thumb') or row.get('full'),
             'messageId': row.get('messageId') or '', 'memoId': row.get('messageId') if row.get('source') == 'memo' else '',
             'directMediaUrl': row.get('directMediaUrl') or '', 'tags': tags}})
@@ -448,6 +680,9 @@ def main():
             geo_changes.append({'assetKey': key, 'geo': entry['geo'], 'owners': owners})
 
     print(f'\n원본 사진 {seen_src}장 중 검증 메타데이터를 우리 사진 {len(plan)}장과 연결, 새 인물/촬영일 태그가 붙을 사진 {len(changes)}장')
+    if date_fixes:
+        print(f'업로드한 날짜로 날짜 태그가 붙은 사진 {date_fixes}장: '
+              + ('실제 촬영일로 바꿉니다.' if args.fix_dates else '--fix-dates 를 붙이면 실제 촬영일로 바꿉니다.'))
     if ambiguous:
         print(f'가까운 일치가 둘 이상이라 안전하게 건너뛴 사진 {ambiguous}장')
     if args.places:
@@ -460,10 +695,19 @@ def main():
         print('가장 비슷한 우리 사진과의 차이(64칸 중 다른 칸 수, 작을수록 같은 사진): '
               + ', '.join(f'{k}: {closest_hist[k]}장' for k in order if k in closest_hist))
     for c in changes[:30]:
-        print(f"  {c['assetKey']}: +{' '.join('#' + a for a in c['add'])}")
-    if unknown:
-        print('\n우리 인물 태그와 짝을 못 찾은 이름 (필요하면 --alias 원본=우리태그):')
-        for n, k in sorted(unknown.items(), key=lambda x: -x[1])[:30]:
+        removed = ' '.join('-#' + r for r in c.get('remove') or [])
+        print(f"  {c['assetKey']}: {removed + ' ' if removed else ''}+{' '.join('#' + a for a in c['add'])}")
+    if alias_suggestions:
+        print('\n같은 사진들의 기존 태그로 본 이름 짝 추천 (맞으면 --accept-aliases, 일부만이면 --alias 로):')
+        for name, tag, shared, total in alias_suggestions[:30]:
+            note = '' if tag in person_set else '  (인물 탭에 아직 없는 태그)'
+            print(f"  {name} = {tag}   ({name} 사진 {total}장 중 {shared}장에 #{tag}){note}")
+        print('  ' + ' '.join(f'--alias "{name}={tag}"' for name, tag, _, _ in alias_suggestions[:30]))
+    suggested = {name for name, _, _, _ in alias_suggestions}
+    rest = [(n, k) for n, k in unknown.most_common() if n not in suggested]
+    if rest:
+        print('\n우리 사진과 맞춘 사진에서 우리 인물 태그와 짝을 못 찾은 이름 (필요하면 --alias 원본=우리태그):')
+        for n, k in rest[:30]:
             print(f'  {n}: {k}장')
     if not args.apply:
         print('\n미리보기만 했습니다. 확인 후 --apply 를 붙여 다시 실행하세요.')
@@ -497,6 +741,13 @@ def main():
         if res.get('ok') is not False:
             applied += len(chunk)
     print(f'\n{applied}장에 검증된 인물/촬영일 태그를 붙였습니다.')
+    # Face learning: the people Google/Apple named on each matched photo (local file only).
+    # A photo two different originals matched (different camera dates) is not verified.
+    verified = {key: entry['names'] for key, entry in plan.items() if entry['names'] and not entry.get('dateConflict')}
+    if verified:
+        path = save_verified_people(args.calendar, verified, 'apple' if args.apple else 'takeout')
+        print(f'얼굴 인식이 배울 수 있게 인물이 확인된 사진 {len(verified)}장을 이 맥에 남겼습니다 ({path}).')
+        print('  -> python tools/local-media-worker/face-tags.py --calendar ' + args.calendar + ' 로 추천 정확도를 다시 확인하세요.')
 
 
 if __name__ == '__main__':
