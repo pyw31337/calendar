@@ -69,7 +69,7 @@ test('share labels', () => {
 
 test('정산 page wires three tabs, tappable category rows and a Back marker outside the dialog stack', async () => {
   const src = await readFile(new URL('../src/ui/ui-event-modals.js', import.meta.url), 'utf8');
-  assert.match(src, /\{ value: 'total', label: '누적보기' \}, \{ value: 'daily', label: '월별보기' \}, \{ value: 'category', label: '카테고리별보기' \}/);
+  assert.match(src, /\{ value: 'total', label: '누적' \}, \{ value: 'daily', label: '일자별' \}, \{ value: 'category', label: '항목별' \}/);
   assert.match(src, /React\.createElement\(SettlementCategoryBarRow, \{[\s\S]{0,200}onOpen: openSettlementCategoryFromTotal/);
   assert.match(src, /useOverlayHistory\([\s\S]{0,200}\{ enabled: categoryBackArmed, key: 'settlement-category', stack: false \}\)/);
   assert.match(src, /onChange: handleSettlementTabChange/);

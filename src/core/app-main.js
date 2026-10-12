@@ -4404,7 +4404,7 @@ function CalendarApp() {
       expenseLogNote = buildFieldChangeNote(cleanLabel || cleanUrl || '정산', [
         { key: '금액', before: fmtAmt(prevExp.amount), after: fmtAmt(cleanAmount) },
         { key: '명목', before: prevExp.label || prevExp.url || '', after: cleanLabel || cleanUrl },
-        { key: '카테고리', before: expCatName(prevExp.categoryId), after: expCatName(cleanCategoryId) },
+        { key: '항목', before: expCatName(prevExp.categoryId), after: expCatName(cleanCategoryId) },
         { key: '지출자', before: payerLabel(prevExp.payerId, prevExp.isSelfPay), after: payerLabel(cleanPayerId, cleanIsSelfPay) }
       ]);
     } else {
@@ -4776,7 +4776,7 @@ function CalendarApp() {
         { key: '별칭', before: prevPlace.alias || '', after: cleanAlias },
         { key: '이름', before: prevPlace.name || '', after: cleanName },
         { key: '메모', before: prevPlace.memo || '', after: nextMemo },
-        { key: '카테고리', before: catName(prevPlace.categoryId), after: catName(cleanCategoryId) },
+        { key: '항목', before: catName(prevPlace.categoryId), after: catName(cleanCategoryId) },
         { key: '주소', before: prevPlace.address || '', after: cleanAddress },
         { key: '방문', before: prevPlace.visitStatus === 'planned' ? '예정' : '방문', after: cleanVisitStatus === 'planned' ? '예정' : '방문' },
         { key: '일자', before: prevPlace.visitDate || '', after: cleanVisitDate }
@@ -4785,7 +4785,7 @@ function CalendarApp() {
       const bits = [displayLabel];
       if (cleanAlias && cleanAlias !== cleanName) bits.push(`별칭 ${cleanAlias}`);
       if (nextMemo) bits.push(`메모 ${sanitizeText(nextMemo, 40)}`);
-      if (cleanCategoryId && cleanCategoryId !== 'etc') bits.push(`카테고리 ${catName(cleanCategoryId)}`);
+      if (cleanCategoryId && cleanCategoryId !== 'etc') bits.push(`항목 ${catName(cleanCategoryId)}`);
       if (cleanVisitDate) bits.push(`일자 ${cleanVisitDate}`);
       placeLogNote = sanitizeText(bits.join(' · '), 300);
     }

@@ -28,7 +28,7 @@ export function SettlementCategoryBarRow({ row, grandTotal, badge, onOpen }) {
     className: 'settle-cat-row',
     style: { '--settle-cat-color': category.color },
     onClick: () => onOpen(category.id),
-    'aria-label': `${category.name} ${wonText(total)}, ${count}건 · 카테고리별보기에서 보기`,
+    'aria-label': `${category.name} ${wonText(total)}, ${count}건 · 항목별에서 보기`,
   },
   badge,
   React.createElement('span', { className: 'settle-cat-track', 'aria-hidden': true },
@@ -61,7 +61,7 @@ export function SettlementCategoryChips({ totals, selected, onSelect }) {
     React.createElement('span', { className: 'settle-cat-chip-label' }, label),
     countBadge(count));
   };
-  return React.createElement('div', { className: 'bp-cat-scroll-row', role: 'group', 'aria-label': '카테고리 선택' },
+  return React.createElement('div', { className: 'bp-cat-scroll-row', role: 'group', 'aria-label': '항목 선택' },
     chip(SETTLEMENT_CATEGORY_ALL, '전체', allCount),
     (totals || []).map(row => chip(row.category.id, row.category.name, row.count)));
 }
@@ -91,11 +91,10 @@ export function SettlementCategorySummary({ view, onSelect }) {
   return React.createElement('div', { className: 'settle-cat-overview' },
     React.createElement('div', { className: 'settlement-metric-grid settle-cat-summary' },
       React.createElement(MetricCard, { label: '총 지출', value: wonText(summary.total), color: '#DC2626' }),
-      React.createElement(MetricCard, { label: '건수', value: `${summary.count.toLocaleString()}건` }),
-      React.createElement(MetricCard, { label: '카테고리', value: `${totals.length}개` })),
+      React.createElement(MetricCard, { label: '건수', value: `${summary.count.toLocaleString()}건` })),
     totals.length > 0 && React.createElement('div', { className: 'settle-cat-breakdown' },
       React.createElement('div', { className: 'settle-cat-breakdown-head' },
-        React.createElement('strong', null, '카테고리별 지출'),
+        React.createElement('strong', null, '항목별 지출'),
         React.createElement('span', null, `총 ${wonText(grandTotal)}`)),
       React.createElement('div', { className: 'settle-cat-stack', role: 'img', 'aria-label': totals.map(r => `${r.category.name} ${formatSettlementShare(grandTotal ? r.total / grandTotal : 0)}`).join(', ') },
         totals.map(row => React.createElement('span', {
@@ -110,7 +109,7 @@ export function SettlementCategorySummary({ view, onSelect }) {
           className: 'settle-cat-legend-item',
           style: { '--settle-cat-color': row.category.color },
           onClick: () => onSelect(row.category.id),
-          'aria-label': `${row.category.name} ${wonText(row.total)}, ${formatSettlementShare(grandTotal ? row.total / grandTotal : 0)} · 이 카테고리 보기`,
+          'aria-label': `${row.category.name} ${wonText(row.total)}, ${formatSettlementShare(grandTotal ? row.total / grandTotal : 0)} · 이 항목 보기`,
         },
         React.createElement('span', { className: 'settle-cat-chip-dot', 'aria-hidden': true }),
         React.createElement('span', { className: 'settle-cat-legend-name' }, row.category.name),

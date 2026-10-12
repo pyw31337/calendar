@@ -468,11 +468,11 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "카테고리"),
         /*#__PURE__*/React.createElement("div", { style: { width: '100%' } },
           /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "카테고리 선택",
+            title: "항목 선택",
             value: categoryId,
             options: categoryOptions,
             onSelect: setCategoryId,
-            placeholder: "카테고리 선택"
+            placeholder: "항목 선택"
           })
         )
       ),

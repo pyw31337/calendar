@@ -844,6 +844,46 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     e.stopPropagation();
     handlePanStart(e.clientX, e.clientY);
   };
+  // Mouse wheel over the photo zooms it (up = in, down = out) around the cursor, in the same
+  // ZOOM_STEP steps as the buttons; a trackpad's small deltas add up to whole steps and its
+  // pinch (ctrl+wheel) zooms the photo instead of the page. PC only -- phones pinch natively.
+  const wheelZoomRef = React.useRef({ zoom: ZOOM_DEFAULT, pan: { x: 0, y: 0 }, carry: 0 });
+  wheelZoomRef.current.zoom = zoomLevel;
+  wheelZoomRef.current.pan = panOffset;
+  React.useEffect(() => {
+    if (!isDesktop) return undefined;
+    const onWheel = e => {
+      const img = zoomedImgRef.current;
+      if (!img || !(e.target === img || img.contains(e.target))) return;
+      e.preventDefault();
+      const state = wheelZoomRef.current;
+      state.carry += e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      const steps = Math.trunc(state.carry / 100);
+      if (!steps) return;
+      state.carry -= steps * 100;
+      const from = state.zoom;
+      const to = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, from - steps * ZOOM_STEP));
+      if (to === from) return;
+      let pan = { x: 0, y: 0 };
+      if (to > ZOOM_DEFAULT) {
+        // Keep the point under the cursor in place: the scale is around the image box centre.
+        const rect = img.getBoundingClientRect();
+        const ratio = to / from;
+        const areaRect = imgAreaRef.current ? imgAreaRef.current.getBoundingClientRect() : null;
+        const maxX = Math.max(0, (rect.width * ratio - (areaRect?.width || window.innerWidth * 0.92)) / 2);
+        const maxY = Math.max(0, (rect.height * ratio - (areaRect?.height || window.innerHeight * 0.82)) / 2);
+        const x = state.pan.x + (e.clientX - (rect.left + rect.width / 2)) * (1 - ratio);
+        const y = state.pan.y + (e.clientY - (rect.top + rect.height / 2)) * (1 - ratio);
+        pan = { x: Math.min(maxX, Math.max(-maxX, x)), y: Math.min(maxY, Math.max(-maxY, y)) };
+      }
+      state.zoom = to;
+      state.pan = pan;
+      setZoomLevel(to);
+      setPanOffset(pan);
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [isDesktop]);
   const zoomImageStyle = zoomLevel !== ZOOM_DEFAULT
     ? {
         transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel / 100})`,

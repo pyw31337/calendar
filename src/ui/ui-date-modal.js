@@ -2947,14 +2947,14 @@ export function DateModal({
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
-          }, "카테고리"),
+          }, "항목"),
           /*#__PURE__*/React.createElement("div", { style: { width: '100%' } },
             /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-              title: "카테고리 선택",
+              title: "항목 선택",
               value: placeCategoryId,
               options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category: c, size: 18 }) })),
               onSelect: setPlaceCategoryId,
-              placeholder: "카테고리 선택"
+              placeholder: "항목 선택"
             })
           )
         ),
@@ -3176,7 +3176,7 @@ export function DateModal({
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
-          }, "구분 / 카테고리"),
+          }, "구분 / 항목"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
             /*#__PURE__*/React.createElement(SegmentedToggle, {
               ariaLabel: "수입/지출 전환",
@@ -3189,8 +3189,8 @@ export function DateModal({
               ]
             }),
             !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-              title: "지출 카테고리 선택",
-              placeholder: "지출 카테고리 선택",
+              title: "지출 항목 선택",
+              placeholder: "지출 항목 선택",
               value: expenseCategoryInput,
               disabled: isSavingExpense,
               onSelect: setExpenseCategoryInput,

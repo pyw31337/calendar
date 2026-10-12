@@ -997,7 +997,7 @@ export function AnniversaryModal({
                     textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
                     fontSize: 'var(--font-size-md)', lineHeight: '1.5'
                   }
-                }, "해당 카테고리에 등록된 기념일이 없습니다.");
+                }, "해당 항목에 등록된 기념일이 없습니다.");
               })()
         ),
 
@@ -1018,7 +1018,7 @@ export function AnniversaryModal({
               /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
                 ANNIVERSARY_CATEGORY_ICONS[newCategory] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[newCategory], { size: 18 }),
                 /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-main)' } },
-                  ANNIVERSARY_CATEGORY_OPTIONS.find(o => o.value === newCategory)?.label || '카테고리 선택'
+                  ANNIVERSARY_CATEGORY_OPTIONS.find(o => o.value === newCategory)?.label || '항목 선택'
                 )
               ),
               /*#__PURE__*/React.createElement("svg", {
@@ -3653,7 +3653,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', background: 'var(--bg-primary)' }
   }, /*#__PURE__*/React.createElement("h4", {
     style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }
-  }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "항목별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-light)', fontSize: 'var(--font-size-md)' }
   }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement(SettlementCategoryBarRow, {
     key: item.category.id,
@@ -3738,7 +3738,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     page: pagedCategoryEntries.currentPage,
     pageCount: pagedCategoryEntries.pageCount,
     onChange: setCategoryPage,
-    label: '카테고리별 정산 목록'
+    label: '항목별 정산 목록'
   }));
 
   const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : activeTab === 'category' ? categoryContent : dailyContent;
@@ -3809,7 +3809,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   typeof renderV2 !== 'function' && isSettlementSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
     fixed: true,
     value: settlementSearchQuery,
-    placeholder: "정산 항목, 날짜 또는 카테고리 검색...",
+    placeholder: "정산 내용, 날짜 또는 항목 검색...",
     onChange: event => setSettlementSearchQuery(event.target.value),
     onClose: () => { setIsSettlementSearchOpen(false); setSettlementSearchQuery(''); }
   }),
@@ -3827,11 +3827,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     }
   }, /*#__PURE__*/React.createElement(UnderlineTabs, {
     className: "settlement-view-tabs",
-    ariaLabel: "누적, 월별 또는 카테고리별 정산 보기",
+    ariaLabel: "누적, 일자별 또는 항목별 정산 보기",
     value: activeTab,
     onChange: handleSettlementTabChange,
     style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
-    options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }, { value: 'category', label: '카테고리별보기' }]
+    options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '일자별' }, { value: 'category', label: '항목별' }]
   })),
 
   /*#__PURE__*/React.createElement("div", {
@@ -4612,7 +4612,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         onBack,
         searchQuery: settlementSearchQuery,
         onSearchQuery: (value) => setSettlementSearchQuery(typeof value === 'string' ? value : ''),
-        searchPlaceholder: '정산 항목, 날짜 또는 카테고리 검색',
+        searchPlaceholder: '정산 내용, 날짜 또는 항목 검색',
         onShare: onOpenShare,
         onMenu: () => setIsSettlementMenuOpen(true),
         onOpenCreate: handleOpenCreateSettlement,

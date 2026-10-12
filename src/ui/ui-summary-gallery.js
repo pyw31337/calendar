@@ -6448,7 +6448,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     : null;
 
   if (filteredItems.length === 0) {
-    return renderEmptyGrid("선택한 카테고리에 해당하는 항목이 없습니다.", renderedCategoryChipRow);
+    return renderEmptyGrid("선택한 항목에 해당하는 내용이 없습니다.", renderedCategoryChipRow);
   }
 
   const focusedItem = (focusItemId || focusTitle)
