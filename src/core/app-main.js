@@ -59,9 +59,9 @@ import {
 import {
   getAnniversariesForDate,
   calculateDday,
-  getSolarFromLunar,
-  isCultureLinkedAnniversary
+  getSolarFromLunar
 } from './app-anniversary-dates.js';
+import { planAnniversaryMove, describeAnniversaryMove } from './app-anniversary-move.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
 if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
@@ -4055,51 +4055,40 @@ function CalendarApp() {
       if (await updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', logs)) showAttendanceMoveUndo('일정 이동완료', sourceDate, targetDate, participantId, note, targetBefore);
     });
   };
-  // Content-linked movies, events, festivals and sports are one-day anniversary badges. Moving
-  // one deliberately changes only the calendar reminder date; the crawled source card (including
-  // its actual release/start/end dates) stays intact in cultureSnapshot/movieMeta.
+  // Drag a calendar anniversary badge to another date (planAnniversaryMove decides the fields):
+  // a content-linked movie/event keeps its crawled source dates and only moves its reminder day,
+  // a 연일 anniversary moves as a whole, a yearly one changes its every-year date.
   const handleMoveCultureLinkedAnniversary = (anniversaryId, sourceDate, targetDate, title) => {
     if (!anniversaryId || !sourceDate || !targetDate || sourceDate === targetDate) return;
     const sourceAnn = (anniversaries || []).find(ann => ann && ann.id === anniversaryId);
-    if (!sourceAnn || !isCultureLinkedAnniversary(sourceAnn)) {
+    const plan = planAnniversaryMove(sourceAnn, sourceDate, targetDate);
+    if (!plan) {
       showToast('옮길 기념일을 찾을 수 없습니다.', 'error');
       return;
     }
     const formatDate = dateStr => formatDateWithDayName(dateStr) || dateStr;
-    showConfirmDialog(
-      '기념일 이동',
-      `“${title || sourceAnn.title || '기념일'}”을 ${formatDate(sourceDate)}에서 ${formatDate(targetDate)}으로 옮기시겠습니까?`,
-      async () => {
-        if (!activeCalLoaded || !activeCal?.id) {
-          showToast('잠시 후 다시 시도해 주세요.', 'error');
-          return;
-        }
-        const current = (anniversaries || []).find(ann => ann && ann.id === anniversaryId);
-        if (!current || !isCultureLinkedAnniversary(current)) {
-          showToast('옮길 기념일을 찾을 수 없습니다.', 'error');
-          return;
-        }
-        const now = Date.now();
-        const patch = {
-          type: 'once',
-          date: targetDate,
-          isLunar: false,
-          isLeap: false,
-          updatedAt: now
-        };
-        try {
-          const saved = await writeCollectionDocumentWithFallback(
-            'anniversaries', activeCal.id, anniversaryId, patch, 'update', '기념일 날짜 이동'
-          );
-          if (!saved?.success) throw new Error('Culture-linked anniversary move failed');
-          handleAnniversarySaved({ ...current, ...patch });
-          showAnniversaryUndo('기념일 날짜를 옮겼습니다.', anniversaryId, { type: current.type || 'once', date: current.date ?? null, isLunar: !!current.isLunar, isLeap: !!current.isLeap });
-        } catch (err) {
-          console.error('Failed to move culture-linked anniversary:', err);
-          showToast('기념일 날짜 이동 실패', 'error');
-        }
+    showConfirmDialog('기념일 이동', describeAnniversaryMove(title || sourceAnn.title, sourceDate, targetDate, plan, formatDate), async () => {
+      if (!activeCalLoaded || !activeCal?.id) {
+        showToast('잠시 후 다시 시도해 주세요.', 'error');
+        return;
       }
-    );
+      const current = (anniversaries || []).find(ann => ann && ann.id === anniversaryId);
+      const latestPlan = planAnniversaryMove(current, sourceDate, targetDate);
+      if (!latestPlan) {
+        showToast('옮길 기념일을 찾을 수 없습니다.', 'error');
+        return;
+      }
+      const patch = { ...latestPlan.patch, updatedAt: Date.now() };
+      try {
+        const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, patch, 'update', '기념일 날짜 이동');
+        if (!saved?.success) throw new Error('Anniversary move failed');
+        handleAnniversarySaved({ ...current, ...patch });
+        showAnniversaryUndo('기념일 날짜를 옮겼습니다.', anniversaryId, latestPlan.previous);
+      } catch (err) {
+        console.error('Failed to move anniversary:', err);
+        showToast('기념일 날짜 이동 실패', 'error');
+      }
+    });
   };
   // renderRenewalShellIfEnabled receives its calendar dependencies through the legacy adapter
   // below. Keep this bridge alongside the other V2-only bridges so the shell can move a

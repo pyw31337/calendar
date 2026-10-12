@@ -872,6 +872,12 @@
 .v2-design .bp-cal-weekdays { margin-bottom: 8px !important; }
 .v2-design .bp-cal-weekdays .bp-weekday-label { font-size: 0.78rem !important; font-weight: 800; }
 .v2-design .bp-cal-days-grid { row-gap: 7px !important; }
+/* The bar stack ignores the pointer so a tap reaches the day cell, but a movable anniversary
+   (once / yearly / 연일 / content-linked, isMovableAnniversary) has to be grabbable to drag. */
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-is-draggable { pointer-events: auto; cursor: grab; }
+/* An :active style also makes Chrome's touch adjustment count a movable badge as a tap target, like
+   the participant dots (which have :hover); without it a finger near a dot grabs the dot instead. */
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-is-draggable:active { cursor: grabbing; }
 /* Mouse drag of a dot/anniversary: the day cell itself is the drop target (Safari ignores a drop
    over a child of the <button> cell). Toggled by setDragActive in ui-app-shell-v2.js. */
 .v2-design .bp-cal-days-grid.is-dnd-active .bp-day-cell > * { pointer-events: none; }

@@ -5654,6 +5654,16 @@ html:has(.renewal-shell.v2-design) .bp-ann-range {
   border: 0 !important;
   width: auto !important;
 }
+/* A movable range (연일 기념일, isMovableAnniversary) is grabbable so it can be dragged to a new start date. */
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-draggable {
+  pointer-events: auto !important;
+  cursor: grab;
+}
+/* :active makes Chrome's touch adjustment treat the 4px phone bar as a tap target, so a finger on
+   it grabs the bar rather than the participant dot just above it (dots have :hover styles). */
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-draggable:active {
+  cursor: grabbing;
+}
 html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-single {
   left: 3px !important;
   right: 3px !important;
