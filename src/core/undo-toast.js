@@ -13,14 +13,16 @@ export function showUndoableToast(showToast, message, undo, {
   duration = UNDO_TOAST_MS,
   doneMessage = '되돌렸습니다.',
   failMessage = '되돌리지 못했습니다.',
+  extraActions = [],
+  type = 'success',
 } = {}) {
   if (typeof showToast !== 'function') return;
   if (typeof undo !== 'function') {
-    showToast(message, 'success');
+    showToast(message, type, extraActions.length ? duration : 3000, null, null, undefined, extraActions);
     return;
   }
   let used = false;
-  showToast(message, 'success', duration, async () => {
+  showToast(message, type, duration, async () => {
     if (used) return;
     used = true;
     try {
@@ -31,5 +33,5 @@ export function showUndoableToast(showToast, message, undo, {
       console.error('undo failed:', error);
       showToast(failMessage, 'error', 4000);
     }
-  }, null, '되돌리기');
+  }, null, '되돌리기', extraActions);
 }

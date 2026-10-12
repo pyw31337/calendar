@@ -83,6 +83,7 @@ export async function deleteGalleryFileAttachments(items, deps) {
         if (!deletedDoc) continue;
         deps.removeLocalChatMessage(messageId);
         deleted += removed.length;
+        deps.restores?.push({ kind: 'recreate', message: { ...sourceMessage, id: messageId } });
       } else {
         const data = nextFiles.length ? { fileAttachments: nextFiles } : {};
         const deletePaths = nextFiles.length ? [] : ['fileAttachments'];
@@ -90,6 +91,7 @@ export async function deleteGalleryFileAttachments(items, deps) {
         if (!ok) continue;
         deps.patchLocalChatMessage(messageId, nextFiles.length ? { fileAttachments: nextFiles } : { fileAttachments: [] });
         deleted += removed.length;
+        deps.restores?.push({ kind: 'files', messageId, previous: current, removed });
       }
       for (const att of removed) {
         await queueOwnedChatFileForStorageGc(att, {
@@ -114,6 +116,7 @@ export async function deleteGalleryLinkItems(items, deps) {
   if (!activeCal || !activeCal.id) return { deleted: 0, skipped: 0 };
   let deleted = 0;
   let skipped = 0;
+  const restores = [];
   for (const item of list) {
     const source = String(item && item.source || 'chat');
     if (source === 'memo' || source === 'meeting') {
@@ -148,6 +151,7 @@ export async function deleteGalleryLinkItems(items, deps) {
         }
         deps.removeLocalChatMessage(messageId);
         deleted += 1;
+        restores.push({ kind: 'recreate', message: { ...sourceMessage, id: messageId } });
       } else {
         const ok = await deps.writeCollectionDocumentWithFallback('messages', activeCal.id, messageId, { text: stripped }, 'update', '갤러리 링크 삭제');
         if (!ok) {
@@ -156,13 +160,77 @@ export async function deleteGalleryLinkItems(items, deps) {
         }
         deps.patchLocalChatMessage(messageId, { text: stripped });
         deleted += 1;
+        restores.push({ kind: 'text', messageId, previous: text, written: stripped });
       }
     } catch (err) {
       console.error('handleDeleteGalleryLinks failed:', err);
       skipped += 1;
     }
   }
-  return { deleted, skipped };
+  return { deleted, skipped, undo: restores.length ? () => restoreGalleryMessages(restores, deps) : null };
+}
+
+/** 파일 일괄 삭제 with 되돌리기: `{ deleted, undo }` (see restoreGalleryMessages). */
+export async function deleteGalleryFilesWithUndo(items, deps) {
+  const restores = [];
+  const deleted = await deleteGalleryFileAttachments(items, { ...deps, restores });
+  return { deleted, undo: deleted && restores.length ? () => restoreGalleryMessages(restores, deps) : null };
+}
+
+// Fields a client may create a message with (firestore.rules messages `create` hasOnly), and
+// the media metadata only an update may write.
+const MESSAGE_CREATE_KEYS = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageFingerprints', 'imageTags', 'imageTagMap', 'imageGeoMap', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType', 'imageIntake'];
+const MESSAGE_PATCH_KEYS = ['imageShareUrls', 'directMediaTags'];
+const pickKeys = (source, keys) => keys.reduce((out, key) => {
+  if (source && source[key] !== undefined) out[key] = source[key];
+  return out;
+}, {});
+const attachmentKey = att => String((att && (att.id || att.url)) || '');
+
+/**
+ * 되돌리기 for a gallery link/file bulk delete: re-create the messages it removed and put the
+ * removed links/files back into the ones it edited, applied to each message's latest version
+ * (files someone added since stay). A restored file is referenced again, so the Storage GC
+ * sweeper keeps it (functions/media-commands.js sweepStorageGc checks fileAttachments).
+ * Returns true, a partial-result message, or false.
+ */
+export async function restoreGalleryMessages(restores, deps) {
+  const calendarId = deps.activeCal && deps.activeCal.id;
+  if (!calendarId || typeof deps.writeCollectionDocumentWithFallback !== 'function') return false;
+  let restored = 0;
+  for (const entry of restores) {
+    try {
+      if (entry.kind === 'recreate') {
+        const message = entry.message;
+        const created = await deps.writeCollectionDocumentWithFallback('messages', calendarId, message.id, pickKeys(message, MESSAGE_CREATE_KEYS), 'set', '갤러리 삭제 되돌리기');
+        if (!created) continue;
+        const patch = pickKeys(message, MESSAGE_PATCH_KEYS);
+        if (Object.keys(patch).length) await deps.writeCollectionDocumentWithFallback('messages', calendarId, message.id, patch, 'update', '갤러리 삭제 되돌리기');
+        deps.upsertLocalChatMessage?.(message);
+        restored += 1;
+        continue;
+      }
+      const latest = await deps.findChatMessageById(entry.messageId);
+      if (!latest) continue;
+      let patch = null;
+      if (entry.kind === 'text') {
+        if (String(latest.text || '') !== entry.written) continue;
+        patch = { text: entry.previous };
+      } else if (entry.kind === 'files') {
+        const current = Array.isArray(latest.fileAttachments) ? latest.fileAttachments : [];
+        const keep = new Set([...current, ...entry.removed].map(attachmentKey));
+        const known = new Set(entry.previous.map(attachmentKey));
+        patch = { fileAttachments: entry.previous.filter(att => keep.has(attachmentKey(att))).concat(current.filter(att => !known.has(attachmentKey(att)))) };
+      }
+      if (!patch || !(await deps.writeCollectionDocumentWithFallback('messages', calendarId, entry.messageId, patch, 'update', '갤러리 삭제 되돌리기'))) continue;
+      deps.patchLocalChatMessage?.(entry.messageId, patch);
+      restored += 1;
+    } catch (err) {
+      console.error('restoreGalleryMessages failed:', err);
+    }
+  }
+  if (!restored) return false;
+  return restored === restores.length ? true : `${restored}건만 되돌렸습니다.`;
 }
 
 export function filterDeletedPhotoFromIndexItems(items, meta) {

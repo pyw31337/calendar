@@ -3276,7 +3276,7 @@ export function EditMessageModal({
         if (classified.documents.length > remaining && showToast) showToast('파일은 최대 20개까지 첨부할 수 있습니다.', 'info');
         if (docs.length) {
           setFileAttachments(prev => [...(prev || []), ...docs]);
-          if (showToast) showToast(docs.length + '개 파일 첨부완료', 'success', 3000);
+          showUndoableToast(showToast, docs.length + '개 파일 첨부완료', () => { setFileAttachments(prev => (prev || []).filter(item => !docs.includes(item))); return '첨부를 취소했습니다.'; });
         }
       }
     } catch (err) {

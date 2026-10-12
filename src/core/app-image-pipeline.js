@@ -8,6 +8,7 @@ import { firebaseConfig, ensureFirebaseStorageReady, checkFirebaseStorageHealth,
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
 import { stampCompressedIntake, intakeFromCompressed, markFileIntakeSource } from './upload-intake.js';
 import { CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY, SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY } from './image-variants.js';
+import { showUndoableToast } from './undo-toast.js';
 
 // Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
 // global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
@@ -1083,7 +1084,8 @@ async function appendChatImageFiles({
     if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
   } else if (succeeded.length > 0 && showToast) {
     const duplicateSuffix = duplicates?.length ? ` · 중복 ${duplicates.length}장 제외` : '';
-    showToast(`${succeeded.length}장 첨부완료${duplicateSuffix}`, 'success', 3000);
+    // Only the unsent draft changes: 되돌리기 takes exactly these photos back out.
+    showUndoableToast(showToast, `${succeeded.length}장 첨부완료${duplicateSuffix}`, () => { setChatImages(prev => prev.filter(item => !succeeded.includes(item))); return '첨부를 취소했습니다.'; });
   } else if (duplicates?.length && showToast) {
     showToast(`이미 선택한 사진과 같은 ${duplicates.length}장을 제외했습니다.`, 'info', 4000);
   }

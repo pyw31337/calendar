@@ -7,6 +7,7 @@ import { useChatTypingPresence } from '../core/chat-typing-presence.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
 import { PanelResizeHandle } from './ui-widgets.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
+import { showUndoableToast } from '../core/undo-toast.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1108,7 +1109,7 @@ export function ChatRoomView({
         if (classified.documents.length > remaining && showToast) showToast('파일은 최대 20개까지 첨부할 수 있습니다.', 'info');
         if (docs.length) {
           setChatFileAttachments(prev => [...(prev || []), ...docs]);
-          if (showToast) showToast(docs.length + '개 파일 첨부완료', 'success', 3000);
+          showUndoableToast(showToast, docs.length + '개 파일 첨부완료', () => { setChatFileAttachments(prev => (prev || []).filter(item => !docs.includes(item))); return '첨부를 취소했습니다.'; });
         }
       }
     } catch (err) {

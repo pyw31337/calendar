@@ -1049,7 +1049,9 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
         setToast(null);
       }, 180);
     }
-    function showToast(message, type, duration, onAction, onExpire, actionLabel) {
+    // extraActions: further [{ label, onAction }] buttons shown before the main action (e.g.
+    // '정산 만들기' beside '되돌리기', which stays at the right end).
+    function showToast(message, type, duration, onAction, onExpire, actionLabel, extraActions) {
       if (type === void 0) type = 'info';
       if (duration === void 0) duration = 3000;
       if (onAction === void 0) onAction = null;
@@ -1061,6 +1063,9 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
         type: type,
         onAction: typeof onAction === 'function' ? onAction : null,
         actionLabel: typeof actionLabel === 'string' && actionLabel.trim() ? actionLabel.trim() : null,
+        extraActions: Array.isArray(extraActions)
+          ? extraActions.filter(function (item) { return item && typeof item.onAction === 'function' && String(item.label || '').trim(); })
+          : [],
         isExiting: false
       });
       timer = setTimeout(function () {

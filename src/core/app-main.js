@@ -12,7 +12,7 @@ import {
   sanitizeFileAttachment,
 } from './chat-file-attachments.js';
 import {
-  deleteGalleryFileAttachments,
+  deleteGalleryFilesWithUndo,
   deleteGalleryLinkItems
 } from './gallery-bulk-delete.js';
 import {
@@ -203,7 +203,7 @@ import {
 import { getInitialAppView, buildAppViewUrl, buildMonthUrl } from './app-routing-state.js';
 import { calendarSwitchAddress, pushAppPage, readSharedContentFromHash, routeSearchParams } from './app-address.js';
 import { useNotificationOpen } from './use-notification-open.js';
-import { showAnniversaryUndo } from './app-undo-actions.js';
+import { showAnniversaryUndo, showMeetingConfirmUndo, showAttendanceMoveUndo, showCalendarSaveToast, restoreDeletedPlaces } from './app-undo-actions.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
 import { useBrowserUiCompatibility } from './app-browser-ui-state.js';
@@ -575,7 +575,7 @@ function CalendarApp() {
       saveLocalCache(normalizedCalendars);
       saveLocalMeta(serverRevisionRef.current);
       if (toastMsg !== null && toastMsg !== undefined && toastMsg !== '') {
-        showToast(toastMsg, toastType, 3000);
+        showCalendarSaveToast(toastMsg, toastType, saveMode, currentCal.id, auxiliaryData?.settingsFields, activeCal?.id === currentCal.id ? activeCal : (previousCalendars || []).find(c => c.id === currentCal.id), currentCal);
       }
       return true;
     } catch (err) {
@@ -3154,7 +3154,7 @@ function CalendarApp() {
     }
   };
 
-  const handleDeleteGalleryFiles = items => deleteGalleryFileAttachments(items, {
+  const handleDeleteGalleryFiles = items => deleteGalleryFilesWithUndo(items, {
     activeCal,
     activeCalId,
     projectId: firebaseConfig?.projectId || '',
@@ -3162,7 +3162,7 @@ function CalendarApp() {
     findChatMessageById,
     getMessageImageEntries,
     writeCollectionDocumentWithFallback,
-    removeLocalChatMessage,
+    removeLocalChatMessage, upsertLocalChatMessage,
     patchLocalChatMessage,
     getLiveFirebaseStorage,
     ensureFirebaseStorageReady
@@ -3174,7 +3174,7 @@ function CalendarApp() {
     findChatMessageById,
     getMessageImageEntries,
     writeCollectionDocumentWithFallback,
-    removeLocalChatMessage,
+    removeLocalChatMessage, upsertLocalChatMessage,
     patchLocalChatMessage
   });
 
@@ -4051,7 +4051,8 @@ function CalendarApp() {
       };
       
       const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-      await updateCalendars(nextCalendars, '일정 이동완료', 'success', updatedCal.id, 'availability', logs);
+      const targetBefore = targetIndex >= 0 && !isTombstone(existing[targetIndex]) ? { note: existing[targetIndex].note || '' } : null;
+      if (await updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', logs)) showAttendanceMoveUndo('일정 이동완료', sourceDate, targetDate, participantId, note, targetBefore);
     });
   };
   // Content-linked movies, events, festivals and sports are one-day anniversary badges. Moving
@@ -4333,19 +4334,17 @@ function CalendarApp() {
     // Confirming offers "정산 만들기": the settlement editor opens with that day's attendees and
     // expenses filled in (settlement-draft.js). Nothing is saved until the editor's 생성.
     const offerSettlement = !isAlreadyConfirmed && canUseSettlement;
-    const result = commitConfirmedMeetings(nextConfirmedMeetings, offerSettlement ? null : (isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정'), meetingLog ? [meetingLog] : []);
-    if (offerSettlement) {
-      Promise.resolve(result).then(ok => {
-        if (!ok) return;
-        showToast('모임 확정', 'success', 8000, () => {
-          const meeting = (getConfirmedMeetings(activeCalRef.current || activeCal) || []).find(m => m.date === dateStr) || { date: dateStr, note };
-          const draft = buildSettlementDraftFromMeeting(meeting, activeCalRef.current || activeCal);
-          if (!draft) return;
-          try { pushAppPage('settlement'); } catch (_) {}
-          setEditingSettlementCard(draft);
-        }, null, '정산 만들기');
-      }).catch(() => {});
-    }
+    const result = commitConfirmedMeetings(nextConfirmedMeetings, null, meetingLog ? [meetingLog] : []);
+    Promise.resolve(result).then(ok => {
+      if (!ok) return;
+      showMeetingConfirmUndo(isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', dateStr, note, offerSettlement ? [{ label: '정산 만들기', onAction: () => {
+        const meeting = (getConfirmedMeetings(activeCalRef.current || activeCal) || []).find(m => m.date === dateStr) || { date: dateStr, note };
+        const draft = buildSettlementDraftFromMeeting(meeting, activeCalRef.current || activeCal);
+        if (!draft) return;
+        try { pushAppPage('settlement'); } catch (_) {}
+        setEditingSettlementCard(draft);
+      } }] : []);
+    }).catch(() => {});
     return result;
   };
   // Confirmed-meeting writes declare their field scope in commitConfirmedMeetings, so unrelated
@@ -4822,51 +4821,47 @@ function CalendarApp() {
       { places: nextPlaces, settingsFields: ['places'] }
     );
   };
-  const handleDeletePlace = async (placeId, options) => {
-    if (!activeCal || !placeId) return false;
-    const existingPlaces = getCalendarPlaces(activeCal);
-    const deletedPlace = existingPlaces.find(p => p.id === placeId);
-    if (!deletedPlace) return false;
-    const placeSnapshot = JSON.parse(JSON.stringify(deletedPlace));
-    const calId = activeCal.id;
+  // One id or several (보관함 장소 일괄 삭제): every delete is one save built from the latest
+  // place list. Calling this once per place in a loop re-sent the earlier, already deleted
+  // places from a stale list and the by-id merge put them back.
+  const handleDeletePlace = async (placeIdOrIds, options) => {
+    const baseCal = activeCalRef.current?.id === activeCal?.id ? activeCalRef.current : activeCal;
+    const placeIds = [].concat(placeIdOrIds || []).filter(Boolean);
+    if (!baseCal || !placeIds.length) return false;
+    const existingPlaces = getCalendarPlaces(baseCal);
+    const deletedPlaces = existingPlaces.filter(p => placeIds.includes(p.id));
+    if (!deletedPlaces.length) return false;
+    const placeSnapshots = JSON.parse(JSON.stringify(deletedPlaces));
+    const deletedIds = deletedPlaces.map(p => p.id);
+    const calId = baseCal.id;
     if (firebaseDb) {
-      try {
-        await writeCollectionDocumentWithFallback('places', calId, placeId, null, 'delete', '장소 삭제');
-      } catch (e) {
-        console.warn('Failed to delete place from Firestore:', e);
+      for (const placeId of deletedIds) {
+        try {
+          await writeCollectionDocumentWithFallback('places', calId, placeId, null, 'delete', '장소 삭제');
+        } catch (e) {
+          console.warn('Failed to delete place from Firestore:', e);
+        }
       }
     }
     const now = Date.now();
-    const nextPlaces = existingPlaces.filter(p => p.id !== placeId);
-    const placeActivityLog = createActivityLog(activeCal.id, 'place_delete', '', '', now, deletedPlace.name || '장소');
+    const nextPlaces = existingPlaces.filter(p => !deletedIds.includes(p.id));
+    const placeActivityLogs = deletedPlaces.map(place => createActivityLog(calId, 'place_delete', '', '', now, place.name || '장소')).filter(Boolean);
     const updatedCal = {
-      ...activeCal, places: nextPlaces, updatedAt: now, revision: (activeCal.revision || 0) + 1,
-      activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
+      ...baseCal, places: nextPlaces, updatedAt: now, revision: (baseCal.revision || 0) + 1,
+      activityLogs: [...getCalendarActivityLogs(baseCal), ...placeActivityLogs]
     };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    const nextCalendars = (calendarsRef.current || calendars).map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
-    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : [], {
+    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLogs, {
       places: nextPlaces,
       settingsFields: ['places'],
-      deletedPlaceIds: [placeId]
+      deletedPlaceIds: deletedIds
     });
     if (ok && !(options && options.silent)) {
-      showUndoableDeleteToast('장소가 삭제되었습니다.', async () => {
+      showUndoableDeleteToast(deletedIds.length > 1 ? `장소 ${deletedIds.length}개를 삭제했습니다.` : '장소가 삭제되었습니다.', async () => {
         try {
-          const restoreNow = Date.now();
-          if (firebaseDb) {
-            const { id: _pid, ...placeBody } = placeSnapshot;
-            await writeCollectionDocumentWithFallback('places', calId, placeId, { ...placeBody, updatedAt: restoreNow }, 'set', '장소 복원');
-          }
-          const latestCal = activeCalRef.current?.id === calId ? activeCalRef.current : updatedCal;
-          const currentPlaces = getCalendarPlaces(latestCal);
-          const restoredPlaces = currentPlaces.some(p => p.id === placeId)
-            ? currentPlaces.map(p => p.id === placeId ? { ...placeSnapshot, updatedAt: restoreNow } : p)
-            : [...currentPlaces, { ...placeSnapshot, updatedAt: restoreNow }];
-          setPlacesSubcollection(restoredPlaces);
-          const restoredCal = { ...latestCal, places: restoredPlaces, updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1 };
-          const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
-          await updateCalendars(next, '장소 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings', [], { places: restoredPlaces, settingsFields: ['places'] });
+          if (await restoreDeletedPlaces(calId, placeSnapshots)) showToast('장소 삭제를 되돌렸습니다.', 'success', 3000);
+          else showToast('장소 복원 실패', 'error', 4000);
         } catch (err) {
           console.error('handleDeletePlace undo failed:', err);
           showToast('장소 복원 실패', 'error', 4000);
@@ -5220,7 +5215,7 @@ function CalendarApp() {
               updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1
             };
             const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
-            await updateCalendars(next, '공지 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings', [], { settingsFields: ['pinnedNotices', 'pinnedNotice'] });
+            if (await updateCalendars(next, null, null, restoredCal.id, 'settings', [], { settingsFields: ['pinnedNotices', 'pinnedNotice'] })) showToast('공지 삭제를 되돌렸습니다.', 'success');
           } catch (err) {
             console.error('handleRemovePinnedNotice undo failed:', err);
             showToast('공지 복원 실패', 'error', 4000);
@@ -5241,7 +5236,7 @@ function CalendarApp() {
   // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
   window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
   // 되돌리기 (app-undo-actions.js) may run after its screen closed: reach this render's handlers.
-  window.__gatherUndoDeps = { getActiveCalendar: () => activeCalRef.current || activeCal, getConfirmedMeetings, getCalendarPlaces, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleSavePlace, handleDeletePlace, handleReorderPlaces, getCalendarSettlementCards, handleSaveSettlementCard, handleDeleteSettlementCard, showToast, writeCollectionDocumentWithFallback, handleAnniversarySaved, handleAnniversaryDeleted };
+  window.__gatherUndoDeps = { getActiveCalendar: () => activeCalRef.current || activeCal, getCalendars: () => calendarsRef.current, updateCalendars, setPlacesSubcollection, getConfirmedMeetings, getCalendarPlaces, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleSavePlace, handleDeletePlace, handleReorderPlaces, getCalendarSettlementCards, handleSaveSettlementCard, handleDeleteSettlementCard, handleConfirmMeeting, showToast, writeCollectionDocumentWithFallback, handleAnniversarySaved, handleAnniversaryDeleted };
   const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, selectColorTheme, activeColorThemeId, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: (needed) => setMemosLimit(prev => {
     const floor = Number(needed);
     if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));
@@ -5263,20 +5258,9 @@ function extractDirectImageUrls(text) {
   return extractAllUrlInfos(text).filter(info => getDirectChatMediaInfo(info.url)?.type === 'image');
 }
 
-// Appending a fresh <script> tag per mount makes embed.js rescan the DOM for this blockquote.
-// onFailed fires if no player iframe shows up in time, so the caller can fall back to the
-// link-preview card.
-
-// Floating video player kept alive via a document.body portal so it survives App()'s
-// activeView-based tab switches without unmounting (see the withStickyVideo wrapper around
-// every one of App()'s 5 return branches). zIndex 40000 sits above regular modals (up to
-// ~30000) so it stays visible while browsing other tabs, but below toast (99999) and confirm
-// dialogs (100000) so those never get obscured by it.
-
 const { DirectChatMediaText, DeadlineDateTimePicker, PlacesSection, ImageUrlModal } = uiWrapperAliases;
 
 const { ImageUploadOverlay, ImageProcessingOverlay, EmojiPickerSheet } = uiWrapperAliases;
-
 
 // U1a (docs/app-main-split-units.md): the icon components below are aliases bound from
 // GATHER_UI_COMPONENTS by bindUiComponentAliases (src/ui/component-aliases.js), reusing the
@@ -5298,64 +5282,15 @@ const {
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
 
-
-// Black-gradient info panel shown at the bottom of the active photo when the Lightbox's
-// tap-to-toggle info mode is on. Fixed 4-line layout: 업로드 date, 파일정보 (format/size/
-// dimensions), 해시태그 capsules + URL button, and the 태그입력 input row. 해시태그 is the
-// public-facing name for what's stored as one space/comma-delimited string per image (see
-// handleSaveImageTags) -- parsed into individual #tag capsules here for display/delete/search.
-
-
-
-
 // Full-screen image viewer for a message's photo(s) -- swipeable (touch) with left/right arrow
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
 const { Lightbox } = uiWrapperAliases;
 
-
-
-
-
 const { ChatRoomView } = uiWrapperAliases;
 
-
-// A single emoji cell: renders the shared Twemoji image, falling back to the native character
-// (via the system font) if the CDN image fails to load, so a network hiccup never blocks
-// picking an emoji outright.
-
-
-
-
-// Colored capsule button that opens a ChatParticipantSheet -- the "누구 작성" trigger used by
-// the memo composer/editor and the chat edit modal (so a message posted under the wrong
-// participant can be corrected). One definition so the pill's look stays identical everywhere.
-
-
-// Speech-bubble "comment" icon (Lucide message), used by the memo comment toggle button.
-
-
-// Pencil "edit" icon, matching the exact glyph the chat message action row already uses --
-// shared here so the memo comment feature's edit button looks identical rather than a copy.
-
-
-// "building-2" icon -- same path data as the raw SVG string PlaceMapView's Leaflet popup builds
-// for its "지도에서 업체정보 보기" button (see businessInfoBtn.innerHTML), so the place list's icon
-// version of 업체보기 looks identical to the map popup's.
-
-
-
-
-
 const { ChatParticipantSheet, ConfirmDialog } = uiWrapperAliases;
-
-
-
-
-
-
-
 
 // canvas-confetti creates ONE shared canvas on the first confetti() call anywhere in the app and
 // bakes that call's zIndex into it permanently -- later calls with a different zIndex are
@@ -5363,19 +5298,7 @@ const { ChatParticipantSheet, ConfirmDialog } = uiWrapperAliases;
 // value, or an earlier low-zIndex call (e.g. a chat send burst) locks the canvas behind modals.
 const CONFETTI_Z_INDEX = 2147483646;
 
-
 const { DateModal } = uiWrapperAliases;
-
-
-
-
-
-// A <input type="color">-replacement: native color inputs open the OS/browser's own color
-// picker (a system popup outside the app's control, and inconsistent across browsers/dark
-// mode) -- this instead opens the same bottom-sheet pattern as every other picker in the app,
-// letting the user choose from the same PRESET_COLORS palette new participants are auto-assigned
-// from. Used for calendar accent color, participant color, and expense category color alike.
-
 
 // Admin Modal
 // A <select>-replacement styled as a form-select trigger button that opens the same bottom-sheet
@@ -5383,213 +5306,11 @@ const { DateModal } = uiWrapperAliases;
 // native <select>, the open dropdown list is entirely CSS-styled and follows dark mode.
 const { SectionCountBadge, SectionToggleButton, SearchCategoryTabs, SimpleBottomSheetPicker, PhotoGallery, SummaryList, MemoPreviewSection } = uiWrapperAliases;
 
-
-
-
-// Wraps every case-insensitive match of `keyword` inside `text` in a <mark>. Shared by
-// GlobalSearchModal (single-calendar) and AdminUnifiedSearchResultsView (cross-calendar).
-
-// Formats a timestamp the same way the admin 로그 tab does, so every search result row (and the
-// admin chat log itself) reads identically: "8/13 오후 2:05:31" style, ko-KR locale.
-
-// Left-pointing chevron/arrow used by every "back to previous screen" header in this app
-// (memo view, unified search results, etc.) -- one definition so the stroke weight/shape never
-// drifts between screens.
-// The single "<" back-button glyph used at the left of every page header in the app (chat room,
-// memo, admin unified search, and any future page) -- a chevron-down rotated 90deg, matching the
-// exact shape/weight this app has always used for "go back", not a full arrow-with-shaft.
-
-
-// One keyword-search pass over a single calendar's 일정/채팅/태그/정산/메모 data. Shared by
-// GlobalSearchModal (single active calendar) and AdminUnifiedSearchResultsView (looped across
-// every calendar) so the two search surfaces can never drift out of sync on matching rules.
-
-// Underlined tab bar with count badges, used by both search surfaces to switch between the
-// 일정/채팅/태그/정산/메모 result categories.
-
-
-// Admin-로그-tab-style result row: colorful name/category badge on top, matched content in the
-// middle, timestamp on the bottom. Shared by GlobalSearchModal and AdminUnifiedSearchResultsView
-// for every category except 태그 (which shows a photo thumbnail instead of a badge+text line).
-
-
-// Global Search Modal -- searches the active calendar's schedule memos, participant names, and
-// chat message text all in one place. Clicking a schedule result opens that date's DateModal;
-// clicking a chat result opens the full chat view scrolled to that exact message bubble. Kept
-// intentionally simple (substring match, no fuzzy search/indexing) since a single calendar's
-// data is small enough that this is instant.
-
-
-// Admin unified cross-calendar search: keyword input layer-popup. Submitting hands the query
-// up to AdminDashboard, which swaps its normal tab content for AdminUnifiedSearchResultsView.
-
-
-// Admin unified cross-calendar search: full result page, grouped by calendar then by category
-// (일정/대화/투표/태그). Reuses the same helper functions/matching rules GlobalSearchModal uses
-// per calendar, just looped across every calendar already held in AdminDashboard's memory
-// (serverCalendars/messagesMap) instead of a single one.
-// Builds the citizen-facing calendar URL that actually shows a given search result's real
-// content, so a click can open it in a new tab instead of just linking back to admin state.
-// Mirrors the deep-link params App reads on load (date / view=chat&msg=&img= / view=memo).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const { WeatherBadge, WeatherLocationModal } = uiWrapperAliases;
-
-
-
-
-
 
 const { UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveButton, InlineSearchBar, MemoShareModal, ChatGalleryModal, MemoView } = uiWrapperAliases;
 
-
-
-
-
-// Memo Card component for clean grid layout separation
-
-
-
 const { AnniversaryModal, SettlementSummaryModal, PollModal } = uiWrapperAliases;
-
-
-
-// Icon helper function for gift
-
-
-
-
-
-
-
-
-
-
-
-
-// Shared slide-down search row used by chat / memo / places (and gallery). Visual baseline is
-// the places search field: left magnifier, borderless transparent input, optional trailing
-// actions (prev/next/close, clear, etc.) stay page-specific.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Shared "remove attached image" button for thumbnail previews (chat composer, memo composer
-// new/edit) -- keeps the delete affordance visually identical everywhere a photo can be staged,
-// so a style change here applies to every composer instead of drifting between copies.
-
-
-
-
-// Standard 2(+)-way exclusive-choice control: a single bordered rounded-box container (not a
-// capsule/pill -- see PlaceRegisterModal 방문/예정) holding each option as its own segment, thin
-// divider between segments, selected segment filled with its own color + white text. Each option
-// can carry its own activeColor (e.g. green for 수입, red for 지출) instead of defaulting to the
-// app's purple accent, so this covers both neutral toggles (방문/예정, 누적보기/일자별보기) and
-// semantically-colored ones (수입/지출) with one shared component.
-
-
-// Shared numeric badge for section-title counts (진행중 투표, 모임 확정, 전원 참석 가능, 갤러리 등) --
-// uses currentColor so it automatically tints to whatever accent color the surrounding title sets.
-
-
-
-
-
-
-
-
-// Custom date+time picker replacing the browser's native <input type="datetime-local"> overlay
-// (which renders with its own OS-styled chrome that doesn't follow the app's dark mode) with a
-// layer-popup matching the main calendar's year/month picker look and feel.
-// Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
-
-
-
-
 
 // Default center/zoom for a calendar with no places registered yet -- Seoul City Hall, a
 // reasonable default since this app is Korean-audience-only.
@@ -5601,32 +5322,11 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 
 const { PlaceMapView, PlacesView } = uiWrapperAliases;
 
-
 // Address/업체명 search (Nominatim, same free geocoder the weather feature already uses as a
 // fallback -- chosen as the PRIMARY geocoder here since it supports POI/business search, unlike
 // Open-Meteo's city-only geocoder) + memo + category select, used for both creating a new place
 // and editing an existing one (editingPlace present).
 const { PlaceRegisterModal } = uiWrapperAliases;
-
-
-// Main-screen collapsible map preview -- collapsed shows a short 16:9 map, expanded shows a
-// taller 4:3 map (the toggle only resizes the map, it never hides the section like PhotoGallery
-// does, since the map itself is the content). "전체보기" sits immediately before the fold arrow,
-// both wrapped in one group pushed to the header's right edge.
-
-
-// Full-page map view -- header follows the same fixed-back-button + centered-title +
-// right-action-button convention as MemoView, with "장소등록" as the action button. Body is a
-// taller interactive map (marker click opens the register modal pre-filled for editing) plus a
-// scrollable place-card list below it, since editing/deleting via Leaflet popup controls isn't
-// practical to build or to verify structurally -- the card list is plain React DOM instead.
-
-
-
-
-
-
-
 
 // Shown only on the main calendar screen -- chat/memo/settlement have a pinned bottom input bar.
 const FOOTER_FAMILY_LINKS = [
@@ -5635,20 +5335,6 @@ const FOOTER_FAMILY_LINKS = [
 ];
 // .app-footer/.app-footer-family flip flex-direction at 768px (see app.css): stacked 3 lines
 // on mobile, a single copyright-left/FAMILY LINK-right row on desktop.
-
-
-// Switching between in-app views (main/chat/admin/memo) is a React state change, not a real
-// page navigation -- a tab left open for a while (very common on mobile: backgrounded,
-// resumed from the home screen, or just never closed) keeps running whatever JS was loaded
-// at the LAST actual page load, even though a fresh reload always gets the latest deploy.
-// Rather than leave that tab silently stuck on old code (missing something like the direct-
-// media-link rendering fix) until the user happens to reload on their own, periodically
-// re-check the page's own ETag with a cache-busting HEAD request and prompt a reload once it
-// changes -- a forced reload mid-typing would be worse than just asking.
-
-
-
-
 
 function bindGatherUiDeps() {
   window.GATHER_UI_DEPS = Object.assign({}, window.GATHER_UI_DEPS || {}, {
