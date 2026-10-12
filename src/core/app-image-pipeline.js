@@ -754,6 +754,57 @@ async function readStoredPhotoTags(calendarId, imageUrl) {
   }
 }
 
+// A photo deleted from every record leaves a note naming its stored file, keyed by its sha256
+// fingerprint (functions/photo-tombstones.js). Originals are never deleted, so picking that photo
+// again points the new record at the file instead of storing a second copy. Only an exact sha256
+// match counts, the file must still answer, and any failure just lets the photo upload.
+const TOMBSTONE_FINGERPRINT = /^sha256:([0-9a-f]{64})$/;
+async function storedFileAnswers(url) {
+  try {
+    const response = await withTimeout(fetch(url, { method: 'HEAD', cache: 'no-store' }), 6000, 'stored file check');
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
+}
+async function findTombstonedOriginals(calendarId, fingerprints) {
+  const found = new Map();
+  const projectId = String(firebaseConfig?.projectId || '').trim();
+  const id = String(calendarId || '').trim();
+  const ids = Array.from(new Set(Array.from(fingerprints || [])
+    .map(value => (normalizeImageFingerprint(value).match(TOMBSTONE_FINGERPRINT) || [])[1]).filter(Boolean)));
+  if (!projectId || !id || !ids.length || typeof fetch !== 'function') return found;
+  const database = `projects/${projectId}/databases/(default)`;
+  const notes = [];
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    try {
+      const response = await withTimeout(fetch(`https://firestore.googleapis.com/v1/${database}/documents:batchGet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ documents: ids.slice(offset, offset + 100).map(hex => `${database}/documents/calendars/cal_${id}/photoTombstones/${hex}`) })
+      }), 6000, 'deleted photo lookup');
+      if (!response.ok) continue;
+      const rows = await response.json();
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        const fields = row?.found?.fields || {};
+        const fingerprint = normalizeImageFingerprint(fields.fingerprint?.stringValue);
+        const imageUrl = String(fields.imageUrl?.stringValue || '');
+        if (TOMBSTONE_FINGERPRINT.test(fingerprint) && /^https:\/\//.test(imageUrl)) {
+          notes.push({ fingerprint, imageUrl, thumbUrl: String(fields.thumbUrl?.stringValue || '') || imageUrl });
+        }
+      });
+    } catch (error) {
+      console.warn('Deleted photo lookup skipped:', error);
+    }
+  }
+  await Promise.all(notes.map(async note => {
+    const [original, thumb] = await Promise.all([storedFileAnswers(note.imageUrl), note.thumbUrl === note.imageUrl ? true : storedFileAnswers(note.thumbUrl)]);
+    if (original) found.set(note.fingerprint, { imageUrl: note.imageUrl, thumbUrl: thumb ? note.thumbUrl : note.imageUrl });
+  }));
+  return found;
+}
+
 function readFirestoreFingerprintValues(document) {
   const values = document?.fields?.imageFingerprints?.arrayValue?.values;
   return Array.isArray(values)
@@ -1524,6 +1575,17 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
       const original = await findReusableOriginal(calendarId, entry.item.fingerprint);
       if (original) reuseByIndex.set(entry.index, { ...original, tags: await readStoredPhotoTags(calendarId, original.imageUrl) });
     }));
+    // Not in any record now, but deleted earlier: its file is still stored. It comes back as a
+    // new photo (its old tags went with it), on the same file.
+    const deletedBefore = accepted.filter(entry => !entry.item?.isExisting && !reuseByIndex.has(entry.index)
+      && TOMBSTONE_FINGERPRINT.test(normalizeImageFingerprint(entry.item?.fingerprint)));
+    if (deletedBefore.length) {
+      const stored = await findTombstonedOriginals(calendarId, deletedBefore.map(entry => entry.item.fingerprint));
+      deletedBefore.forEach(entry => {
+        const original = stored.get(normalizeImageFingerprint(entry.item.fingerprint));
+        if (original) reuseByIndex.set(entry.index, { ...original, tags: '' });
+      });
+    }
   }
   const reusedResult = (item, index) => {
     revokeCompressedObjectUrls(item);
@@ -1709,7 +1771,7 @@ export {
   loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, isImageUploadFile, getImageUploadCandidates, limitImageUploadSelection, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
   imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
-  buildImageFingerprint, rememberKnownImageFingerprints, rememberKnownImageOriginals, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, selectNonDuplicateCompressedImages,
+  buildImageFingerprint, rememberKnownImageFingerprints, rememberKnownImageOriginals, hydrateKnownImageFingerprintsForCalendar, lookupKnownImageFingerprintsForCalendar, findTombstonedOriginals, selectNonDuplicateCompressedImages,
   acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
   describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
   uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles,

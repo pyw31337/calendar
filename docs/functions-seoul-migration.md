@@ -52,3 +52,12 @@ Exception: `ingestMediaAnalysis` and `getMediaAnalysisCalibration` keep a us-cen
 (`workerFunctions()`) until the Mac worker has pulled; `run-media-worker.sh` now pulls main
 (fast-forward only, clean tree) once a day. Once its runs show up in asia-northeast3 only, move
 those two to `seoulFunctions()` and delete the copies.
+
+## Step 4 — the Mac worker endpoints Seoul-only (2026-10-12)
+
+Every Mac tool (`face-tags.py`, `import-people-tags.py`, `run-server-photo-analysis.mjs`,
+`mac-backup-sync.mjs`) calls the asia-northeast3 URL by default, and `run-media-worker.sh` pulls
+main daily. `ingestMediaAnalysis` and `getMediaAnalysisCalibration` are now `seoulFunctions()`
+and listed in `functions/seoul-moved-http-functions.txt`; deploy with `delete_us_copies: http`
+(the names already deleted in step 3 are skipped). A worker config that pins an old
+`us-central1` `endpoint` would now get 404: remove that key from its config file.

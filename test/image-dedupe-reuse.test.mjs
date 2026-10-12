@@ -107,3 +107,62 @@ test('an anniversary photo or poster that is already stored links the original t
     assert.equal(results[0].reused, true);
   });
 });
+
+test('a photo deleted earlier goes back onto the file its note names instead of uploading again', async () => {
+  const cal = 'dedupe-tombstone';
+  const hex = '7'.repeat(64);
+  const calls = [];
+  await withFetch(async (input, init = {}) => {
+    const target = String(input);
+    calls.push([target, init.method || 'GET', init.body || '']);
+    if (target.includes(':runQuery')) return new Response('[]', { status: 200 });
+    if (target.endsWith('/documents:batchGet')) {
+      return new Response(JSON.stringify([{ found: { fields: {
+        fingerprint: { stringValue: `sha256:${hex}` },
+        imageUrl: { stringValue: url('g_original.jpg') },
+        thumbUrl: { stringValue: url('g_thumb.jpg') }
+      } } }]), { status: 200 });
+    }
+    return new Response(null, { status: 200 });
+  }, async () => {
+    const results = await resolveChatImageBatch(cal, [{ fingerprint: `sha256:${hex}`, original: 'blob:x', thumbnail: 'blob:x', metadata: { tags: '261012' } }], null);
+    assert.equal(results[0].imageUrl, url('g_original.jpg'));
+    assert.equal(results[0].thumbUrl, url('g_thumb.jpg'));
+    assert.equal(results[0].reused, true);
+    assert.equal(results[0].metadata?.inheritedTags, undefined, 'its old tags went with the delete');
+    assert.deepEqual(results.reusedIndexes, [0]);
+  });
+  const lookup = calls.find(([u]) => u.endsWith('/documents:batchGet'));
+  assert.ok(lookup, 'the note is read');
+  assert.match(JSON.parse(lookup[2]).documents[0], new RegExp(`/calendars/cal_${cal}/photoTombstones/${hex}$`));
+  assert.ok(calls.some(([u, m]) => u === url('g_original.jpg') && m === 'HEAD'), 'the stored file is checked first');
+});
+
+test('a deleted photo note is used only for a sha256 match whose file still answers', async () => {
+  const { findTombstonedOriginals } = await import('../src/core/app-image-pipeline.js');
+  const note = (n, name) => ({ found: { fields: {
+    fingerprint: { stringValue: `sha256:${String(n).repeat(64)}` },
+    imageUrl: { stringValue: url(`${name}_original.jpg`) },
+    thumbUrl: { stringValue: url(`${name}_thumb.jpg`) }
+  } } });
+  let lookups = 0;
+  await withFetch(async (input, init = {}) => {
+    const target = String(input);
+    if (target.endsWith('/documents:batchGet')) {
+      lookups += 1;
+      return new Response(JSON.stringify([note(1, 'gone'), note(2, 'nothumb'), { missing: 'x' }]), { status: 200 });
+    }
+    if (init.method === 'HEAD') return new Response(null, { status: target.includes('gone_original') || target.includes('nothumb_thumb') ? 404 : 200 });
+    return new Response(null, { status: 500 });
+  }, async () => {
+    const found = await findTombstonedOriginals('dedupe-notes', [`sha256:${'1'.repeat(64)}`, `sha256:${'2'.repeat(64)}`, 'descriptor:abc', `sha256:${'3'.repeat(64)}`]);
+    assert.equal(found.has(`sha256:${'1'.repeat(64)}`), false, 'its original is gone: upload normally');
+    assert.deepEqual(found.get(`sha256:${'2'.repeat(64)}`), { imageUrl: url('nothumb_original.jpg'), thumbUrl: url('nothumb_original.jpg') });
+    assert.equal(found.size, 1);
+    assert.equal((await findTombstonedOriginals('dedupe-notes', ['descriptor:abc'])).size, 0);
+  });
+  assert.equal(lookups, 1, 'a descriptor fingerprint is never looked up');
+  await withFetch(async () => { throw new Error('offline'); }, async () => {
+    assert.equal((await findTombstonedOriginals('dedupe-notes', [`sha256:${'4'.repeat(64)}`])).size, 0, 'a failed lookup never blocks the upload');
+  });
+});

@@ -3424,7 +3424,8 @@ function CalendarApp() {
         ? editingMessage.imageUrls
         : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []);
       const originalTags = Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [];
-      const originalFingerprints = Array.isArray(editingMessage.imageFingerprints) ? editingMessage.imageFingerprints : [];
+      // Only a slot-aligned list names each kept photo's own fingerprint.
+      const originalFingerprints = Array.isArray(editingMessage.imageFingerprints) && editingMessage.imageFingerprints.length === originalUrls.length ? editingMessage.imageFingerprints : [];
       const consumedOriginalIndexes = new Set();
       const nextImageTags = resolvedImages.map(resolved => {
         const img = (newImages || [])[resolved.sourceIndex];

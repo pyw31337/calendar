@@ -5,7 +5,8 @@
 //
 // Uploads follow the browser's rules (src/core/app-image-pipeline.js: same bytes in one
 // selection count once; a photo whose bytes are already stored reuses that original when the
-// record holding it is slot-aligned and the file still exists). Tagging, album copies and
+// record holding it is slot-aligned and the file still exists, and a photo deleted earlier
+// reuses the file its photoTombstones note names). Tagging, album copies and
 // deletes go through the real server code (functions/media-commands.js), and the photoIndex
 // triggers (functions/index.js) run after every step in a shuffled order, sometimes twice,
 // the way Firestore delivers events. After every step the data is checked against the rules
@@ -90,7 +91,7 @@ async function readAll() {
 }
 
 async function reset() {
-  for (const name of ['messages', 'memos', 'confirmedMeetings', 'photoIndex', 'photoIndexMeta', 'assetGraph', 'photoCommentItems']) {
+  for (const name of ['messages', 'memos', 'confirmedMeetings', 'photoIndex', 'photoIndexMeta', 'assetGraph', 'photoCommentItems', 'photoTombstones']) {
     const snap = await root.collection(name).get();
     await Promise.all(snap.docs.map(doc => doc.ref.delete()));
   }
@@ -156,6 +157,13 @@ async function findReusableOriginals(fingerprints) {
     const [exists] = await bucket.file(media.storagePathFromUrl(original.imageUrl)).exists();
     if (!exists) map.delete(fp);
   }
+  // Not in any record now: a photo deleted earlier still has its stored file.
+  for (const fp of fingerprints.filter(value => !map.has(value))) {
+    const note = await root.collection('photoTombstones').doc(fp.slice(7)).get();
+    if (!note.exists) continue;
+    const [exists] = await bucket.file(media.storagePathFromUrl(note.data().imageUrl)).exists();
+    if (exists) map.set(fp, { imageUrl: note.data().imageUrl, thumbUrl: note.data().thumbUrl, deletedBefore: true });
+  }
   return map;
 }
 
@@ -168,9 +176,9 @@ async function clientUpload(collection, picks, stats) {
   for (const [index, file] of files.entries()) {
     if (reuse.has(file.fingerprint)) {
       // The reused photo keeps its current tags (readStoredPhotoTags in app-image-pipeline.js).
-      const original = reuse.get(file.fingerprint);
-      const row = await root.collection('photoIndex').doc(keyOf(original.imageUrl)).get();
-      slots.push({ ...original, fingerprint: file.fingerprint, tags: String(row.data()?.tags || '') });
+      const { deletedBefore, ...original } = reuse.get(file.fingerprint);
+      const row = deletedBefore ? null : await root.collection('photoIndex').doc(keyOf(original.imageUrl)).get();
+      slots.push({ ...original, fingerprint: file.fingerprint, tags: String(row?.data()?.tags || '') });
       stats.reused += 1;
       continue;
     }
@@ -262,6 +270,11 @@ function checkInvariants(state, model, stepLabel, problems) {
     pathsByFingerprint.get(fp).add(path);
   }
   pathsByFingerprint.forEach((paths, fp) => { if (paths.size > 1) fail('R8 one stored copy per photo', `${fp.slice(7, 19)} stored ${paths.size}x`); });
+  // R11 a photo deleted and picked again goes back onto its first file: over the whole run each
+  // photo content was stored once.
+  const everStored = new Map();
+  model.fingerprintByPath.forEach((fp, path) => everStored.set(fp, (everStored.get(fp) || new Set()).add(path)));
+  everStored.forEach((paths, fp) => { if (paths.size > 1) fail('R11 never stored twice, deletes included', `${fp.slice(7, 19)} stored ${paths.size}x`); });
   return referenced;
 }
 
@@ -370,6 +383,13 @@ async function runSeed(seed) {
   for (const path of model.fingerprintByPath.keys()) {
     const [exists] = await bucket.file(path).exists();
     if (!exists) problems.push(`seed ${seed} after GC | R10 originals are never deleted | ${path}`);
+  }
+  // R12 a deleted photo's note names files that are still there, thumbnail included.
+  for (const note of (await root.collection('photoTombstones').get()).docs) {
+    for (const url of [note.data().imageUrl, note.data().thumbUrl]) {
+      const [exists] = await bucket.file(media.storagePathFromUrl(url)).exists();
+      if (!exists) problems.push(`seed ${seed} after GC | R12 a deleted photo keeps its files for reuse | ${note.id.slice(0, 12)}`);
+    }
   }
   return { seed, stats, gc, problems };
 }

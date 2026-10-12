@@ -669,8 +669,9 @@ async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
   for (const calendar of calendars) {
     // In-use set must cover every document type that can hold a Storage URL / path — not only
     // photoIndex. Messages, memos, places, chat fileAttachments, anniversaries and posters all
-    // keep shared files alive.
-    const [index, anniversaries, cultureItems, calendarDoc, messages, memos, places] = await Promise.all([
+    // keep shared files alive, and so do photoTombstones: a deleted photo's original and thumbnail
+    // stay so picking the same photo again reuses them (photo-tombstones.js).
+    const [index, anniversaries, cultureItems, calendarDoc, messages, memos, places, tombstones] = await Promise.all([
       calendar.collection('photoIndex').get(),
       calendar.collection('anniversaries').get(),
       calendar.collection('customCultureItems').get(),
@@ -678,8 +679,10 @@ async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
       calendar.collection('messages').select('imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'fileAttachments', 'smallThumbUrl', 'smallThumbUrls').get(),
       calendar.collection('memos').select('imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'fileAttachments').get(),
       calendar.collection('places').get(),
+      calendar.collection('photoTombstones').get(),
     ]);
     index.docs.forEach(row => { const data = row.data() || {}; [data.full, data.thumb].forEach(url => { const p = storagePathFromUrl(url); if (p) referenced.add(p); }); });
+    tombstones.docs.forEach(note => { const data = note.data() || {}; [data.imageUrl, data.thumbUrl].forEach(url => { const p = storagePathFromUrl(url); if (p) referenced.add(p); }); });
     [...anniversaries.docs, ...cultureItems.docs, ...messages.docs, ...memos.docs, ...places.docs].forEach(doc => {
       const data = doc.data() || {};
       collectStoragePaths(data, referenced);

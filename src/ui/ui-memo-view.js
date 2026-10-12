@@ -488,10 +488,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     const rawTags = Array.isArray(memo.tags) ? memo.tags : (memo.tags ? [memo.tags] : []);
     setEditTags(rawTags.map(tag => String(tag || '').startsWith('#') ? String(tag).slice(1).trim() : String(tag || '').trim()).filter(Boolean));
     setEditTagInput('');
-    setEditImages((Array.isArray(memo.imageUrls) ? memo.imageUrls : []).map((url, idx) => ({
+    const memoUrls = Array.isArray(memo.imageUrls) ? memo.imageUrls : [];
+    // A fingerprint list that lost a slot would hand a neighbour's fingerprint to a kept photo.
+    const memoFingerprints = Array.isArray(memo.imageFingerprints) && memo.imageFingerprints.length === memoUrls.length ? memo.imageFingerprints : [];
+    setEditImages(memoUrls.map((url, idx) => ({
       original: url,
       thumbnail: memo.thumbUrls?.[idx] || url,
-      fingerprint: memo.imageFingerprints?.[idx] || '',
+      fingerprint: memoFingerprints[idx] || '',
       isExisting: true
     })));
     setEditParticipantId(memo.participantId || '');

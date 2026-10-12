@@ -1,7 +1,8 @@
 # HTTP endpoints that ran in both regions during the Seoul move. Step 3 of
 # docs/functions-seoul-migration.md deletes exactly these names in us-central1
-# (delete_us_copies: http). ingestMediaAnalysis and getMediaAnalysisCalibration stay until every
-# Mac worker has pulled (they now update themselves daily).
+# (delete_us_copies: http). A name already gone there is skipped, so the list can be re-run.
+# ingestMediaAnalysis and getMediaAnalysisCalibration kept a us-central1 copy until the Mac workers
+# called Seoul only (step 4, 2026-10-12).
 peekalinkProxy
 kakaoLocalSearchProxy
 googlePlacesSearchProxy
@@ -27,3 +28,5 @@ recordMediaAnalysisFeedback
 recordFaceFeedback
 rebuildPhotoIndex
 prepareMediaIntegrityReview
+ingestMediaAnalysis
+getMediaAnalysisCalibration
