@@ -7,12 +7,10 @@ const functions = require('firebase-functions/v1');
 // push is claimed once via claimPushDelivery); scheduled jobs, which have no claim, run in Seoul
 // only. docs/functions-seoul-migration.md has the step that drops the US copies.
 const SEOUL_REGION = 'asia-northeast3';
-// Everything runs in Seoul (docs/functions-seoul-migration.md, steps 2 and 3). The app always
-// loads the latest build and calls Seoul only. The two endpoints a Mac worker that has not pulled
-// yet still calls (it updates itself daily now) keep a us-central1 copy: workerFunctions().
+// Everything runs in Seoul (docs/functions-seoul-migration.md, steps 2-4). The app always loads
+// the latest build and calls Seoul only, and so do the Mac workers (they update themselves daily).
 const seoulFunctions = () => functions.region(SEOUL_REGION);
 const seoulTriggerFunctions = seoulFunctions;
-const workerFunctions = () => functions.region(SEOUL_REGION, 'us-central1');
 const { defineString, defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -2968,7 +2966,7 @@ async function ingestFaceSuggestions(req, res, calendarId, rawItems, now) {
   }
 }
 
-exports.ingestMediaAnalysis = workerFunctions().runWith({
+exports.ingestMediaAnalysis = seoulFunctions().runWith({
   timeoutSeconds: 60,
   memory: '256MB',
   secrets: [MEDIA_WORKER_TOKEN]
@@ -3204,7 +3202,7 @@ exports.recordFaceFeedback = seoulFunctions().runWith({
 
 // The local Mac receives only compact, user-reviewed calibration signals. The same worker secret
 // used for ingestion is required; no browser can enumerate this private feedback collection.
-exports.getMediaAnalysisCalibration = workerFunctions().runWith({
+exports.getMediaAnalysisCalibration = seoulFunctions().runWith({
   timeoutSeconds: 30,
   memory: '256MB',
   secrets: [MEDIA_WORKER_TOKEN]
