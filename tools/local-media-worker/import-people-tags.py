@@ -16,6 +16,8 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
     python3 tools/local-media-worker/import-people-tags.py --calendar cw --apple
     python3 tools/local-media-worker/import-people-tags.py --calendar cw --takeout "$HOME/Pictures/Moyeora Inbox/takeout"
     #    --takeout 에는 테이크아웃 zip 파일들이 든 폴더(압축 안 풀어도 됨), zip 하나, 또는 푼 폴더를 줄 수 있다.
+    #    --places 를 붙이면 원본의 촬영 위치도 가져온다: 위치가 없는 우리 사진(아이폰 Safari 업로드는 GPS가
+    #    지워져 옴)에 위치를 넣고, 서버가 그 위치로 장소 태그를 붙인다. 이름이 없는 사진도 위치는 가져온다.
     # 2) 이름이 다르게 저장돼 있으면 짝지어 주기 (예: 구글 "박서준" -> 우리 "서준")
     ... --alias 박서준=서준 --alias "Yuri Kim=유리"
     # 3) 확인 후 적용
@@ -27,13 +29,14 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except ImportError:
     sys.exit("Pillow가 필요합니다:  source ~/.venvs/photos/bin/activate && pip install pillow")
 try:
@@ -107,7 +110,10 @@ def hash_file(path):
         source = path() if callable(path) else path
         with Image.open(source) as im:
             im.draft('RGB', (256, 256))
-            return dhash(im)
+            # Phone cameras store the pixels sideways with an EXIF Orientation flag, while our copy
+            # was re-encoded upright by the browser. Hash the photo the way it is shown: without
+            # this a portrait phone photo never matched its own upload.
+            return dhash(ImageOps.exif_transpose(im))
     except Exception:
         return None
 
@@ -139,6 +145,17 @@ def date_tokens(tags):
 
 
 # ---------- sources ----------
+def _geo_pair(lat, lng):
+    """(lat, lng) when it is a real coordinate; Takeout writes 0.0/0.0 for "no location"."""
+    try:
+        lat, lng = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180) or (abs(lat) < 1e-6 and abs(lng) < 1e-6):
+        return None
+    return (round(lat, 6), round(lng, 6))
+
+
 def from_apple():
     try:
         import osxphotos
@@ -147,11 +164,12 @@ def from_apple():
     db = osxphotos.PhotosDB()
     for p in db.photos():
         names = [n for n in (p.persons or []) if n and n != '_UNKNOWN_']
-        if not names or p.ismovie or p.intrash:
+        geo = _geo_pair(*(p.location or (None, None)))
+        if (not names and not geo) or p.ismovie or p.intrash:
             continue
         # A JPEG derivative avoids HEIC decoding and works when the original is still in iCloud.
         paths = [x for x in (p.path_derivatives or []) if x and os.path.exists(x)] + ([p.path] if p.path else [])
-        yield {'names': names, 'paths': paths, 'date': p.date.date() if p.date else None, 'label': p.original_filename}
+        yield {'names': names, 'paths': paths, 'date': p.date.date() if p.date else None, 'label': p.original_filename, 'geo': geo}
 
 
 def _takeout_entries(target):
@@ -206,7 +224,10 @@ def from_takeout(target):
             continue
         names = [p.get('name') for p in (meta.get('people') or []) if isinstance(p, dict) and p.get('name')]
         title = meta.get('title')
-        if not names or not title:
+        geo_data = meta.get('geoData') or {}
+        geo_exif = meta.get('geoDataExif') or {}
+        geo = _geo_pair(geo_data.get('latitude'), geo_data.get('longitude')) or _geo_pair(geo_exif.get('latitude'), geo_exif.get('longitude'))
+        if (not names and not geo) or not title:
             continue
         folder = os.path.dirname(key)
         image = entries.get(os.path.join(folder, title)) if folder else entries.get(title)
@@ -220,7 +241,7 @@ def from_takeout(target):
             continue
         ts = (meta.get('photoTakenTime') or {}).get('timestamp')
         when = (datetime.utcfromtimestamp(int(ts)) + timedelta(hours=9)).date() if ts else None
-        yield {'names': names, 'paths': [opener(image)], 'date': when, 'label': title}
+        yield {'names': names, 'paths': [opener(image)], 'date': when, 'label': title, 'geo': geo}
 
 
 # ---------- names ----------
@@ -250,6 +271,8 @@ def main():
     src.add_argument('--apple', action='store_true')
     src.add_argument('--takeout')
     ap.add_argument('--alias', action='append', default=[], help='원본이름=우리태그')
+    ap.add_argument('--places', action='store_true',
+                    help='원본의 촬영 위치도 가져온다 (위치가 없는 우리 사진만; 서버가 그 위치로 장소 태그를 붙인다)')
     ap.add_argument('--apply', action='store_true')
     args = ap.parse_args()
     if not re.fullmatch(r'[a-z0-9_-]{1,60}', args.calendar, re.I):
@@ -288,7 +311,8 @@ def main():
                 mapped.append(label)
             else:
                 unknown[n] = unknown.get(n, 0) + 1
-        if not mapped:
+        geo = item.get('geo') if args.places else None
+        if not mapped and not geo:
             continue
         h = next((x for x in (hash_file(p) for p in item['paths']) if x), None)
         if not h:
@@ -309,8 +333,10 @@ def main():
         if not best:
             continue
         row = best[0]
-        entry = plan.setdefault(row['id'], {'row': row, 'names': []})
+        entry = plan.setdefault(row['id'], {'row': row, 'names': [], 'geo': None})
         entry['names'].extend(x for x in mapped if x not in entry['names'])
+        if geo and not entry['geo']:
+            entry['geo'] = geo
 
     changes = []
     for key, entry in plan.items():
@@ -325,7 +351,25 @@ def main():
             'messageId': row.get('messageId') or '', 'memoId': row.get('messageId') if row.get('source') == 'memo' else '',
             'directMediaUrl': row.get('directMediaUrl') or '', 'tags': tags}})
 
+    # Location: only for our photos that have none (iOS Safari strips GPS from web uploads). The
+    # coordinate goes onto each message/memo showing the photo (imageGeoMap, the same field the
+    # browser writes after an upload); completePhotoLocationTags then adds the place tags.
+    geo_changes = []
+    for key, entry in plan.items():
+        row = entry['row']
+        if not entry.get('geo') or (row.get('latitude') is not None and row.get('longitude') is not None):
+            continue
+        owners = []
+        for owner in row.get('owners') or []:
+            m = re.match(r'^(message|memo):(.+):\d+$', str((owner or {}).get('sourceOwner') or ''))
+            if m and (m.group(1), m.group(2)) not in owners:
+                owners.append((m.group(1), m.group(2)))
+        if owners:
+            geo_changes.append({'assetKey': key, 'geo': entry['geo'], 'owners': owners})
+
     print(f'\n원본 사진 {seen_src}장 중 이름 있는 사진을 우리 사진 {len(plan)}장과 연결, 새 인물 태그가 붙을 사진 {len(changes)}장')
+    if args.places:
+        print(f'위치가 없던 우리 사진 {len(geo_changes)}장에 원본의 촬영 위치를 넣습니다 (장소 태그는 서버가 위치로 붙임)')
     print(f'비교에 쓴 원본 사진 {hashed_src}장, 이 맥에 이미지가 없어 건너뛴 사진 {no_image}장')
     if no_image:
         print('  -> 사진 앱 > 설정 > iCloud > "이 Mac에 원본 다운로드"를 켜고, 다운로드가 끝난 뒤 다시 실행하면 늘어납니다.')
@@ -342,6 +386,25 @@ def main():
     if not args.apply:
         print('\n미리보기만 했습니다. 확인 후 --apply 를 붙여 다시 실행하세요.')
         return
+    placed = 0
+    for change in geo_changes:
+        lat, lng = change['geo']
+        value = {'mapValue': {'fields': {'lat': {'doubleValue': lat}, 'lng': {'doubleValue': lng}}}}
+        body = {'fields': {'imageGeoMap': {'mapValue': {'fields': {change['assetKey']: value}}}}}
+        ok = False
+        for kind, doc_id in change['owners']:
+            collection = 'messages' if kind == 'message' else 'memos'
+            url = (f'{ROOT}/calendars/cal_{args.calendar}/{collection}/{urllib.parse.quote(doc_id)}'
+                   f'?updateMask.fieldPaths=imageGeoMap.%60{change["assetKey"]}%60&currentDocument.exists=true')
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'}, method='PATCH')
+            try:
+                with urllib.request.urlopen(req, timeout=30):
+                    ok = True
+            except Exception as error:
+                print(f"  위치 저장 실패 {collection}/{doc_id}: {error}")
+        placed += 1 if ok else 0
+    if geo_changes:
+        print(f'{placed}장에 촬영 위치를 넣었습니다.')
     applied = 0
     for i in range(0, len(changes), 80):
         chunk = [c['item'] for c in changes[i:i + 80]]
