@@ -32,7 +32,6 @@ import {
   mergeDuplicates,
   normalizeItem,
   timeTicketPosterFromHtml,
-  timeTicketPosterNeedsCanonical,
   timeTicketProductUrl
 } from './lib/culture-normalize.mjs';
 

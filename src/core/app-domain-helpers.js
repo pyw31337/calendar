@@ -413,12 +413,12 @@ const parseVisitEntriesFromMemo = GATHER_APP_UTILS.parseVisitEntriesFromMemo;
 const reformatMemoIntoDateLines = GATHER_APP_UTILS.reformatMemoIntoDateLines;
 const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
 const isDummyPhotoVisitNote = GATHER_APP_UTILS.isDummyPhotoVisitNote || (note => {
-  const clean = String(note || '').trim().replace(/^[\/\s,-]+|[\/\s,-]+$/g, '');
+  const clean = String(note || '').trim().replace(/^[/\s,-]+|[/\s,-]+$/g, '');
   return clean === '사진' || /^사진\s*\d*장?$/i.test(clean);
 });
 const stripDummyPhotoVisitMemos = GATHER_APP_UTILS.stripDummyPhotoVisitMemos || (text => {
   if (!text) return '';
-  const dummyVisitRegex = /(?:^|[\s\/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s\/\n]|$)/gi;
+  const dummyVisitRegex = /(?:^|[\s/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s/\n]|$)/gi;
   return String(text).replace(dummyVisitRegex, ' ').replace(/\s+/g, ' ').replace(/^\/\s*|\s*\/$/g, '').trim();
 });
 const parsePlaceMemoEntries = GATHER_APP_UTILS.parsePlaceMemoEntries;
