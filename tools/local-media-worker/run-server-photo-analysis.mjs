@@ -28,6 +28,10 @@ const IDLE_HEARTBEAT_MS = 12 * 60 * 60 * 1000;
 const VIDEO_EXTENSIONS = new Set(['.3gp', '.avi', '.m4v', '.mkv', '.mov', '.mp4', '.webm']);
 const FFMPEG = process.env.MOYEORA_FFMPEG || '/opt/homebrew/bin/ffmpeg';
 const FFPROBE = process.env.MOYEORA_FFPROBE || '/opt/homebrew/bin/ffprobe';
+// Bump when the meaning of review metadata changes. A durable state cursor is normally a
+// performance win; this marker intentionally starts one controlled full pass after a policy
+// change so old noisy rows are replaced without a human having to find and reset local state.
+const ANALYSIS_POLICY_VERSION = 6;
 
 function kstDateStamp(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -354,7 +358,9 @@ async function main() {
   const statePath = resolve(args.state);
   const outputPath = resolve(args.output);
   const state = await readJson(statePath, { schemaVersion: 1, calendars: {} });
-  const current = args.rebuild ? {} : (state.calendars?.[args.calendar] || {});
+  const stored = state.calendars?.[args.calendar] || {};
+  const rebuilding = args.rebuild || Number(stored.analysisPolicyVersion || 0) !== ANALYSIS_POLICY_VERSION;
+  const current = rebuilding ? {} : stored;
   const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService, args.tokenAccount)]);
   const now = Date.now();
   const runId = `macos_${args.calendar}_${kstDateStamp(new Date(now))}`;
@@ -454,6 +460,7 @@ async function main() {
         : (last ? { updatedAt: Number(last.data.updatedAt) || 0, name: last.name } : current.cursor || null),
       failures: nextFailures,
       lookHashes,
+      analysisPolicyVersion: ANALYSIS_POLICY_VERSION,
       lastRunAt: now,
       lastIdleHeartbeatAt: now
     }
@@ -468,6 +475,7 @@ async function main() {
     uploaded: result.accepted || 0,
     failures,
     retrying: mustRetrySamePage,
+    rebuilding,
     hasMore: pageMayHaveMore,
     summary: result.summary || {}
   };
