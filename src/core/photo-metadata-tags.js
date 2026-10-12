@@ -422,6 +422,10 @@ export function nearestPlaceForCoords(lat, lng, places = registeredPlaces, maxMe
 }
 
 export function buildMetadataTags(metadata, scheduledDateOrOptions = '') {
+  // A re-upload that reused a stored original keeps that photo's tags (app-image-pipeline.js
+  // readStoredPhotoTags) -- the same photo carries the same tags everywhere.
+  const inherited = String(metadata?.inheritedTags || '').trim();
+  if (inherited) return inherited;
   const options = typeof scheduledDateOrOptions === 'string'
     ? { scheduledDate: scheduledDateOrOptions }
     : (scheduledDateOrOptions && typeof scheduledDateOrOptions === 'object' ? scheduledDateOrOptions : {});

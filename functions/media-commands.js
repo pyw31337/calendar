@@ -170,14 +170,50 @@ function removeAssetSlots(data, asset) {
   const removedKeys = new Set(dead.map(index => getPhotoAssetKey(slots[index].imageUrl || slots[index].thumbUrl)));
   const tagMap = data.imageTagMap && typeof data.imageTagMap === 'object' && !Array.isArray(data.imageTagMap) ? data.imageTagMap : {};
   const imageTagMap = Object.fromEntries(Object.entries(tagMap).filter(([key]) => !removedKeys.has(key)));
+  // Every other per-photo list must lose the same slot. A fingerprint left behind shifts onto
+  // the next photo, and the browser then distrusts the whole record for duplicate detection
+  // (app-image-pipeline.js rememberKnownImageOriginals), so re-uploading a remaining photo
+  // stored a second copy. A list that was already out of step is left as it is: there is no
+  // way to tell which of its entries belongs to the removed photo.
+  const parallel = {};
+  PER_PHOTO_LISTS.forEach(field => {
+    if (Array.isArray(data[field]) && data[field].length === slots.length) parallel[field] = data[field].filter(keep);
+  });
+  const geoMap = data.imageGeoMap && typeof data.imageGeoMap === 'object' && !Array.isArray(data.imageGeoMap) ? data.imageGeoMap : null;
+  if (geoMap) parallel.imageGeoMap = Object.fromEntries(Object.entries(geoMap).filter(([key]) => !removedKeys.has(key)));
   const hasOtherContent = imageUrls.length > 0
     || !PLACEHOLDER_TEXTS.has(String(data.text || '').trim())
     || (Array.isArray(data.fileAttachments) && data.fileAttachments.length > 0);
   return {
     deleteDoc: !hasOtherContent,
     removed: dead,
-    patch: { imageUrls, thumbUrls, imageTags, imageTagMap, imageUrl: imageUrls[0] || null, thumbUrl: thumbUrls[0] || null },
+    patch: { imageUrls, thumbUrls, imageTags, imageTagMap, ...parallel, imageUrl: imageUrls[0] || null, thumbUrl: thumbUrls[0] || null },
   };
+}
+const PER_PHOTO_LISTS = ['imageFingerprints', 'imageIntake', 'imageShareUrls'];
+
+// Album copies of the OTHER photos in a message that loses a slot point at it by position
+// (sourceImageIndex), and rewriteMeetingPhotos re-links them -- but only in meetings it reads.
+// With a complete owner list the delete reads just the deleted photo's meetings, so also read
+// the meetings that own a photo sitting after the removed slot. Unknown owners: full scan.
+async function widenScopeForShiftedSlots(root, messageIds, asset, scope) {
+  if (!scope.complete || !messageIds.size) return scope;
+  const messageSnaps = await Promise.all(Array.from(messageIds).map(id => root.collection('messages').doc(id).get()));
+  const shiftedKeys = new Set();
+  messageSnaps.forEach(snap => {
+    if (!snap.exists) return;
+    const slots = slotsOf(snap.data() || {});
+    const first = slots.findIndex(slot => sameFile(slot, asset));
+    if (first < 0) return;
+    slots.slice(first + 1).forEach(slot => {
+      if (!sameFile(slot, asset)) shiftedKeys.add(getPhotoAssetKey(slot.imageUrl || slot.thumbUrl));
+    });
+  });
+  shiftedKeys.delete('');
+  if (!shiftedKeys.size) return scope;
+  const rows = await root.firestore.getAll(...Array.from(shiftedKeys).map(key => root.collection('photoIndex').doc(key)));
+  if (rows.some(row => !row.exists)) return { ids: scope.ids, complete: false };
+  return mergeMeetingOwnerScopes([scope, ...rows.map(row => meetingOwnerScope(row.data()))]);
 }
 
 // Drop album copies of `asset`; re-link positional references into edited messages by file.
@@ -205,9 +241,9 @@ async function deleteAsset({ db, calendarDocId, asset, now = Date.now() }) {
   if (!assetKey) return { ok: false, reason: 'invalid-asset' };
   const indexSnap = await root.collection('photoIndex').doc(assetKey).get();
   const owners = ownerDocIds(indexSnap.exists ? indexSnap.data() : null);
-  const meetingScope = meetingOwnerScope(indexSnap.exists ? indexSnap.data() : null);
   (asset.messageId ? [asset.messageId] : []).forEach(id => owners.messages.add(id));
   (asset.memoId ? [asset.memoId] : []).forEach(id => owners.memos.add(id));
+  const meetingScope = await widenScopeForShiftedSlots(root, owners.messages, asset, meetingOwnerScope(indexSnap.exists ? indexSnap.data() : null));
 
   return db.runTransaction(async tx => {
     const messageRefs = Array.from(owners.messages).map(id => root.collection('messages').doc(id));

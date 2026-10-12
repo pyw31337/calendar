@@ -9,6 +9,7 @@ import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurren
 import { stampCompressedIntake, intakeFromCompressed, markFileIntakeSource } from './upload-intake.js';
 import { CHAT_THUMB_MAX_EDGE, CHAT_THUMB_QUALITY, SMALL_THUMB_MAX_EDGE, SMALL_THUMB_QUALITY } from './image-variants.js';
 import { showUndoableToast } from './undo-toast.js';
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 
 // Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
 // global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
@@ -731,6 +732,25 @@ async function findReusableOriginal(calendarId, fingerprint) {
     return response.ok ? original : null;
   } catch (_) {
     return null;
+  }
+}
+
+// The same photo carries the same tags everywhere. A re-upload that reuses the stored original
+// takes that photo's current tags (its photoIndex row) instead of fresh upload-date tags: the
+// new copy is the photo's newest editable owner, so its tags replaced the photo's tags in the
+// gallery (functions/photo-index-tag-contract.js picks the newest editable owner).
+async function readStoredPhotoTags(calendarId, imageUrl) {
+  const projectId = String(firebaseConfig?.projectId || '').trim();
+  const key = canonicalPhotoAssetKey({ imageUrl });
+  if (!projectId || !key || typeof fetch !== 'function') return '';
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(String(calendarId || ''))}/photoIndex/${key}?mask.fieldPaths=tags`;
+    const response = await withTimeout(fetch(url, { cache: 'no-store' }), 6000, 'stored photo tags');
+    if (!response.ok) return '';
+    const document = await response.json();
+    return String(document?.fields?.tags?.stringValue || '').trim();
+  } catch (_) {
+    return '';
   }
 }
 
@@ -1502,14 +1522,16 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   if (options.reuseStoredOriginals !== false) {
     await Promise.all(accepted.filter(entry => entry.alreadyStored && !entry.item?.isExisting).map(async entry => {
       const original = await findReusableOriginal(calendarId, entry.item.fingerprint);
-      if (original) reuseByIndex.set(entry.index, original);
+      if (original) reuseByIndex.set(entry.index, { ...original, tags: await readStoredPhotoTags(calendarId, original.imageUrl) });
     }));
   }
   const reusedResult = (item, index) => {
     revokeCompressedObjectUrls(item);
     const original = reuseByIndex.get(index);
     const intake = intakeFromCompressed(item, '');
-    return { imageUrl: original.imageUrl, thumbUrl: original.thumbUrl, smallThumbUrl: '', metadata: item.metadata || null, fingerprint: item.fingerprint || '', reused: true, sourceIndex: Number.isInteger(item.sourceIndex) ? item.sourceIndex : index, ...(intake ? { intake } : {}) };
+    // buildMetadataTags returns inheritedTags as the slot's tags (photo-metadata-tags.js).
+    const metadata = original.tags ? { ...(item.metadata || {}), inheritedTags: original.tags } : (item.metadata || null);
+    return { imageUrl: original.imageUrl, thumbUrl: original.thumbUrl, smallThumbUrl: '', metadata, fingerprint: item.fingerprint || '', reused: true, sourceIndex: Number.isInteger(item.sourceIndex) ? item.sourceIndex : index, ...(intake ? { intake } : {}) };
   };
   const reusedIndexes = Array.from(reuseByIndex.keys());
   const uploadIndexes = accepted.filter(({ item, index }) => !item.isExisting && !reuseByIndex.has(index));
