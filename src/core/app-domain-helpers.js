@@ -5,6 +5,7 @@
  * 청크로 분리해 app-main 청크의 번들 예산 압박을 줄이는 것이 이 분리의 목적.
  */
 import { GATHER_APP_UTILS } from './app-utils.js';
+import { parseAppPath, readAddressMonth } from './app-address.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { bindAppServiceWorker } from './service-worker-registration.js';
@@ -1757,8 +1758,8 @@ function isValidDateString(...args) {
 const parseCalendarAppPathFromLocation = GATHER_APP_UTILS.parseCalendarAppPathFromLocation
   ? (pathname = window.location.pathname) => GATHER_APP_UTILS.parseCalendarAppPathFromLocation(pathname)
   : function parseCalendarAppPathFromLocation(pathname = window.location.pathname) {
-    const m = String(pathname || '').match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
-    return m ? { calendarId: m[1] } : null;
+    const app = parseAppPath(pathname);
+    return app ? { calendarId: app.calendarId } : null;
   };
 const parseSharePathFromLocation = GATHER_APP_UTILS.parseSharePathFromLocation
   ? (pathname = window.location.pathname) => GATHER_APP_UTILS.parseSharePathFromLocation(pathname)
@@ -1822,14 +1823,9 @@ function getRawCalendarIdFromURL() {
   return (app && app.calendarId) || (share && share.calendarId) || urlParams.get('id') || urlParams.get('cal') || '';
 }
 
+// ?month=2026-11 (the short address) or the older ?year=2026&month=11.
 function getCalendarMonthFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  let year = Number(params.get('year'));
-  const month = Number(params.get('month'));
-  if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
-  if (year < 100) year += 2000;
-  if (year < 2000 || year > 2099 || month < 1 || month > 12) return null;
-  return { year, month };
+  return readAddressMonth(window.location);
 }
 
 function normalizeCalendarUrlParams(fallbackCalId = null) {
@@ -1880,7 +1876,8 @@ function normalizeCalendarUrlParams(fallbackCalId = null) {
 const getAppBaseUrl = GATHER_APP_UTILS.getAppBaseUrl
   ? () => GATHER_APP_UTILS.getAppBaseUrl(window.location)
   : function getAppBaseUrl() {
-    let basePath = window.location.pathname.replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+    const app = parseAppPath(window.location.pathname);
+    let basePath = (app ? app.prefix : window.location.pathname).replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
     if (!basePath.endsWith('/')) basePath += '/';
     return `${window.location.origin}${basePath}`;
   };

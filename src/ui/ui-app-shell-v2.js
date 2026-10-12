@@ -37,6 +37,7 @@ function galleryCommentMotion(photo, index) {
 
 import { fieldLineModeFromBox } from '../core/field-shape.js';
 import { getInitialAppView } from '../core/app-routing-state.js';
+import { routeSearchParams, toDisplayUrl } from '../core/app-address.js';
 import { bindUiComponentAliases } from './component-aliases.js';
 import { useOverlayHistory } from './ui-shared.js';
 import { closeAllOverlays, getOpenOverlays } from '../core/overlay-stack.js';
@@ -92,7 +93,7 @@ const DEFAULT_RECORDS_SUBTAB = 'all';
 function readTabFromLocation() {
   if (typeof window === 'undefined' || !window.location) return DEFAULT_TAB;
   try {
-    const params = new URLSearchParams(window.location.search);
+    const params = routeSearchParams(window.location);
     const view = getInitialAppView(window.location);
     // Bare records hub (?tab=records / sub=all) is not a V2 destination — treat as calendar
     // so browser Back never resurfaces the mystery "모아엘가 기록" overview.
@@ -108,7 +109,7 @@ function readTabFromLocation() {
 function readRecordsSubTabFromLocation() {
   if (typeof window === 'undefined' || !window.location) return DEFAULT_RECORDS_SUBTAB;
   try {
-    const params = new URLSearchParams(window.location.search);
+    const params = routeSearchParams(window.location);
     const raw = params.get('sub') || ({ gallery: 'media', history: 'archive', content: 'content' }[params.get('view')]);
     // memo/places are first-class now — ignore as records sub.
     if (raw === 'memo' || raw === 'places') return DEFAULT_RECORDS_SUBTAB;
@@ -120,7 +121,8 @@ function readRecordsSubTabFromLocation() {
 
 /**
  * Writes the tab (and, for 기록, its sub-tab) into the URL without touching any other query
- * param (`?id=`, `?shell=v2`, ...) or reloading the page. `push` adds a history entry (a
+ * param (`?msg=`, `?memo=`, ...) or reloading the page. The address shown is the page's short
+ * path (core/app-address.js: /app/<id>/content/), so a refresh reopens the same page. `push` adds a history entry (a
  * deliberate tab switch, so the back button steps back through tabs one at a time -- 마스터플랜
  * §4.1's "브라우저 뒤로가기는 탭 내부 상세 → 탭 루트 → 이전 브라우저 위치 순"); `replace` (used
  * for the very first mount, and to correct an invalid `?tab=`/`?sub=`) does not. `?sub=` is
@@ -129,8 +131,8 @@ function readRecordsSubTabFromLocation() {
 function writeLocationState(tabId, subTabId, { push, state } = { push: true }) {
   if (typeof window === 'undefined' || !window.history) return;
   const url = new URL(window.location.href);
-  if (tabId === DEFAULT_TAB) url.searchParams.delete('tab');
-  else url.searchParams.set('tab', tabId);
+  // An explicit tab=calendar lets the address leave the current /<page>/ path; it is never shown.
+  url.searchParams.set('tab', tabId);
   // Only gallery/content/archive (records) keep ?sub=; memo/places are first-class tabs.
   if (tabId !== 'records' || !subTabId || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
   else url.searchParams.set('sub', subTabId);
@@ -150,7 +152,7 @@ function writeLocationState(tabId, subTabId, { push, state } = { push: true }) {
   const method = push ? 'pushState' : 'replaceState';
   // Only the 통합검색 entry carries the search marker (search-history.js): a result that
   // navigates elsewhere pushes a clean entry so Back returns to search, not past it.
-  window.history[method](stateForTabWrite(tabId, window.history.state, state), '', url);
+  window.history[method](stateForTabWrite(tabId, window.history.state, state), '', toDisplayUrl(url.href, window.location.href));
   // Existing core subscribers use popstate to select the correct data collection.
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
@@ -3554,7 +3556,10 @@ export function buildRenewalMoreContext(calendar, deps) {
     // has no loaded-calendar guard in the original either.
     onSelectSearch: () => Promise.resolve(),
     onOpenAdmin: () => {
-      const adminUrl = new URL(window.location.href);
+      // Admin lives on the site root (the calendar is the ?id= it opens with), never under a
+      // calendar's own /app/<id>/<page>/ address.
+      const adminUrl = new URL(window.GATHER_APP_UTILS?.getAppBaseUrl?.(window.location) || window.location.href);
+      adminUrl.search = window.location.search;
       adminUrl.searchParams.delete('view');
       adminUrl.searchParams.delete('msg');
       adminUrl.searchParams.delete('img');

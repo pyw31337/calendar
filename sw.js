@@ -195,7 +195,9 @@ async function fetchFreshDocument(req) {
   } catch (_) {
     try {
       const url = new URL(req.url);
-      const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)\/?$/);
+      // /app/<id>/ or one of its pages, /app/<id>/<page>/ (src/core/app-address.js). The page
+      // itself is read from this document's own path, so the fallback only needs the calendar.
+      const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)(?:\/[a-z]+)?\/?$/);
       if (appPath) {
         const fallback = new URL(`${appPath[1]}/`, url.origin);
         fallback.search = url.search;

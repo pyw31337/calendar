@@ -1,6 +1,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { APP_PAGE_SLUGS } from '../src/core/app-address.js';
 
 const root = process.cwd();
 const dist = path.join(root, 'dist');
@@ -72,12 +73,19 @@ if (fs.existsSync(distIndex)) {
     fs.writeFileSync(distIndex, html);
   }
   const appHtml = html.replace(/<head>/i, '<head>\n    <base href="../../" />');
+  // Each page's short address, app/<id>/<page>/ (src/core/app-address.js), is the same page one
+  // level deeper, so a refresh or a shared link opens directly with no redirect.
+  const pageHtml = html.replace(/<head>/i, '<head>\n    <base href="../../../" />');
   for (const id of calendarIds) {
     const dir = path.join(dist, 'app', id);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'index.html'), appHtml);
+    for (const page of APP_PAGE_SLUGS) {
+      fs.mkdirSync(path.join(dir, page), { recursive: true });
+      fs.writeFileSync(path.join(dir, page, 'index.html'), pageHtml);
+    }
   }
-  console.log(`[copy-static-to-dist] app/<id>/ pages: ${calendarIds.join(', ')}`);
+  console.log(`[copy-static-to-dist] app/<id>/ pages: ${calendarIds.join(', ')} (+ ${APP_PAGE_SLUGS.join(', ')})`);
 }
 
 // MapLibre's ESM worker falls back to `new URL('./maplibre-gl-worker.mjs', import.meta.url)`.

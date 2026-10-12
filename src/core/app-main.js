@@ -200,7 +200,9 @@ import {
   todayUploadTagOptions,
   withUploadDateTag
 } from './photo-metadata-tags.js';
-import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
+import { getInitialAppView, buildAppViewUrl, buildMonthUrl } from './app-routing-state.js';
+import { calendarSwitchAddress, pushAppPage, readSharedContentFromHash, routeSearchParams } from './app-address.js';
+import { useNotificationOpen } from './use-notification-open.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
 import { useBrowserUiCompatibility } from './app-browser-ui-state.js';
@@ -362,18 +364,7 @@ function App() {
   // 로드됐든 안 됐든 상관없이 그 컨텐츠 백드롭이 바로 보이도록 최상위에서 한 번만 파싱한다.
   // 실제 등록(Firestore 쓰기)은 하지 않는 읽기 전용 미리보기 -- 등록은 컨텐츠 등록 화면의
   // "붙여넣기"에서 사용자가 명시적으로 한다.
-  const [sharedContentItem, setSharedContentItem] = React.useState(() => {
-    try {
-      const hash = window.location.hash || '';
-      const marker = '#gatherContent=';
-      const idx = hash.indexOf(marker);
-      if (idx === -1) return null;
-      const json = decodeURIComponent(escape(atob(hash.slice(idx + marker.length))));
-      const payload = JSON.parse(json);
-      if (!payload || payload.kind !== 'gather-content' || !payload.item || !payload.item.title) return null;
-      return payload.item;
-    } catch (_) { return null; }
-  });
+  const [sharedContentItem, setSharedContentItem] = React.useState(() => readSharedContentFromHash(window.location.hash));
   React.useEffect(() => {
     if (!sharedContentItem) return;
     try { window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) { /* best-effort */ }
@@ -984,24 +975,8 @@ function CalendarApp() {
     return () => window.removeEventListener('popstate', handleUrlChange);
   }, []);
 
-  // A push click on an already-open calendar tab cannot rely on a full reload.
-  // The service worker posts the same URL a cold load would open.
-  React.useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.serviceWorker || !navigator.serviceWorker.addEventListener) return undefined;
-    const onMessage = (event) => {
-      const data = event && event.data;
-      if (!data || data.type !== 'notification-open' || !data.url) return;
-      let next;
-      try { next = new URL(String(data.url), window.location.href); } catch (_) { return; }
-      if (next.origin !== window.location.origin) return;
-      const target = `${next.pathname}${next.search}${next.hash}`;
-      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      if (target !== current) window.history.pushState(window.history.state, '', target);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    };
-    navigator.serviceWorker.addEventListener('message', onMessage);
-    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
-  }, []);
+  // A push click on an already-open tab moves it to the push's page (sw.js 'notification-open').
+  useNotificationOpen(React);
 
   // Deep-link support: ?date=YYYY-MM-DD auto-opens that date's DateModal on load. Used by the
   // admin 통합검색결과 page so clicking a 일정/정산 search result can open a new tab that lands
@@ -1067,20 +1042,8 @@ function CalendarApp() {
     window.history.pushState({}, '', buildAppViewUrl(window.location, view, currentMonthDate));
   };
   const syncCurrentMonthInUrl = nextDate => {
-    if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return;
-    const params = new URLSearchParams(window.location.search);
-    // The app/share path is the calendar identity. Do not reintroduce a stale query
-    // id while changing months inside a scoped calendar URL.
-    const isScopedCalendarPath = /\/(?:app|share)\/[A-Za-z0-9_-]+(?:\/|$)/.test(window.location.pathname);
-    const keepId = isScopedCalendarPath ? '' : (params.get('id') || params.get('cal'));
-    params.delete('id');
-    params.delete('cal');
-    if (keepId) params.set('id', keepId);
-    params.set('year', String(nextDate.getFullYear()));
-    params.set('month', String(nextDate.getMonth() + 1).padStart(2, '0'));
-    const qs = params.toString();
-    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
+    const nextUrl = buildMonthUrl(window.location, nextDate);
+    if (nextUrl) window.history.replaceState({}, '', nextUrl);
   };
   const setCurrentMonthAndSync = nextDate => {
     setCurrentMonthDate(nextDate);
@@ -2189,7 +2152,7 @@ function CalendarApp() {
   // message may not be in the DOM yet on first paint) but only acts once via the ref guard.
   const chatDeepLinkHandledRef = React.useRef('');
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = routeSearchParams(window.location);
     const msgParam = params.get('msg');
     if (!msgParam) return undefined;
     const onChat = activeView === 'chat' || params.get('view') === 'chat' || params.get('tab') === 'chat';
@@ -3946,7 +3909,8 @@ function CalendarApp() {
     }
     setActiveCalId(id);
     try { window.localStorage?.setItem('gather_last_active_cal_id', id); } catch (_) {}
-    window.history.replaceState({}, '', getCalendarShareUrl(id));
+    // Same page, other calendar (/app/jhair/content/ -> /app/cw/content/): one calendar id only.
+    window.history.replaceState({}, '', calendarSwitchAddress(id, window.location) || getCalendarShareUrl(id));
   };
   const guardLoadedCalendar = (message = 'Firebase 데이터를 불러온 뒤 다시 시도해 주세요.') => {
     if (activeCalLoaded) return true;
@@ -4367,13 +4331,7 @@ function CalendarApp() {
           const meeting = (getConfirmedMeetings(activeCalRef.current || activeCal) || []).find(m => m.date === dateStr) || { date: dateStr, note };
           const draft = buildSettlementDraftFromMeeting(meeting, activeCalRef.current || activeCal);
           if (!draft) return;
-          try {
-            const url = new URL(window.location.href);
-            url.searchParams.set('tab', 'settlement');
-            url.searchParams.delete('sub');
-            window.history.pushState(window.history.state, '', url);
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          } catch (_) {}
+          try { pushAppPage('settlement'); } catch (_) {}
           setEditingSettlementCard(draft);
         }, null, '정산 만들기');
       }).catch(() => {});

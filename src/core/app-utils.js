@@ -1,4 +1,5 @@
 import { todaySeoulDateKey, diffDaysFromSeoulToday, addDaysToDateKey, seoulHour } from './seoul-date.js';
+import { parseAppPath } from './app-address.js';
 const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   // Firestore rejects `undefined` anywhere in an SDK payload, while the REST encoder used by
@@ -967,15 +968,17 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   // An installed calendar owns its `/app/<calendarId>/` scope. Treat that path as the
   // canonical identity instead of trusting a stale or pasted `?id=` from another calendar.
+  // `/app/<id>/<page>/` (app-address.js) belongs to the same calendar as `/app/<id>/`.
   function parseCalendarAppPathFromLocation(pathname) {
-    const m = String(pathname || '').match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
-    return m ? { calendarId: m[1] } : null;
+    const app = parseAppPath(pathname);
+    return app ? { calendarId: app.calendarId } : null;
   }
 
   function getAppBaseUrl(locationLike) {
     const loc = locationLike || (typeof window !== 'undefined' ? window.location : null);
     if (!loc) return '/';
-    let basePath = String(loc.pathname || '/').replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+    const app = parseAppPath(loc.pathname);
+    let basePath = String(app ? app.prefix : (loc.pathname || '/')).replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
     if (!basePath.endsWith('/')) basePath += '/';
     return `${loc.origin || ''}${basePath}`;
   }

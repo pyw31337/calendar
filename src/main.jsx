@@ -9,6 +9,11 @@ import './ui/celebrate-confetti.js';
 import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
 import { installOverlayExitMotion } from './core/overlay-exit-motion.js';
 import { installFieldShape } from './core/field-shape.js';
+import { installCanonicalAddress } from './core/app-address.js';
+
+// One short address per page with only this calendar's id in it (/calendar/app/cw/content/);
+// tidies old bookmarks (?shell=v2&id=…&tab=records&sub=content) before anything reads the URL.
+installCanonicalAddress(window);
 
 // A deploy while this tab was open leaves it asking for chunk names that no longer exist the
 // first time it opens a lazy screen; reload once to pick up the current build.

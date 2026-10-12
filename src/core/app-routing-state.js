@@ -1,7 +1,10 @@
+import { routeSearchParams, displayAddress } from './app-address.js';
+
 export function getInitialAppView(locationLike, parseSharePath) {
   const share = typeof parseSharePath === 'function' ? parseSharePath(locationLike?.pathname) : null;
   if (share?.view && share.view !== 'calendar') return share.view;
-  const params = new URLSearchParams(locationLike?.search || '');
+  // /app/<id>/<page>/ carries the page in its path (app-address.js).
+  const params = routeSearchParams(locationLike);
   // The V2 shell maps tab/sub onto the existing data views.
   if (params.has('tab')) {
     const tab = params.get('tab');
@@ -15,6 +18,8 @@ export function getInitialAppView(locationLike, parseSharePath) {
   return params.get('view') || 'calendar';
 }
 
+// Returns the address to show (app-address.js displayAddress): on /app/<id>/ that is the
+// page's short path, e.g. /calendar/app/cw/content/.
 export function buildAppViewUrl(locationLike, view, currentMonthDate) {
   const params = new URLSearchParams(locationLike?.search || '');
   // `/app/<id>/` and `/share/<id>/` are canonical calendar-scoped URLs. Keeping an
@@ -60,11 +65,21 @@ export function buildAppViewUrl(locationLike, view, currentMonthDate) {
       params.set('sub', recordsSub);
     } else {
       params.delete('sub');
-      if (view === 'calendar') params.delete('tab');
-      else params.set('tab', view);
+      // tab=calendar tells displayAddress to leave a /<page>/ path; it never reaches the address.
+      params.set('tab', view === 'calendar' ? 'calendar' : view);
     }
   }
-  const query = params.toString();
-  const pathname = locationLike?.pathname || '/';
-  return query ? `${pathname}?${query}` : pathname;
+  return displayAddress({ pathname: locationLike?.pathname || '/', search: `?${params.toString()}` });
+}
+
+// The current address with the calendar month changed (app-address.js keeps it short:
+// ?month=2026-11 on the calendar page only). null for an invalid date.
+export function buildMonthUrl(locationLike, nextDate) {
+  if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return null;
+  const params = new URLSearchParams(locationLike?.search || '');
+  // A /share/<id>/ path is the calendar identity too: never put a stale ?id= back beside it.
+  if (/\/share\/[A-Za-z0-9_-]+(?:\/|$)/.test(locationLike?.pathname || '')) ['id', 'cal'].forEach(key => params.delete(key));
+  params.set('year', String(nextDate.getFullYear()));
+  params.set('month', String(nextDate.getMonth() + 1).padStart(2, '0'));
+  return displayAddress({ pathname: locationLike?.pathname || '/', search: `?${params}` });
 }

@@ -100,7 +100,9 @@
       // iOS reads apple-mobile-web-app-title at the moment the share sheet opens.
       (function () {
         var params = new URLSearchParams(window.location.search);
-        var appMatch = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+        // /app/<id>/ or a page under it, /app/<id>/<page>/ (src/core/app-address.js).
+        var APP_PATH_RE = /\/app\/([A-Za-z0-9_-]+)(?:\/[a-z]+)?\/?$/;
+        var appMatch = window.location.pathname.match(APP_PATH_RE);
         var shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
         var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
         var queryId = params.get('id') || params.get('cal');
@@ -110,11 +112,11 @@
         // `/app/jhair/?id=cw` becomes `/app/cw/`, preserving the intended 모아엘가
         // visit while leaving only one calendar identity in the visible URL.
         if (appMatch && queryId && queryId !== appMatch[1] && manifestByCalendar[queryId]) {
-          var correctedAppPath = window.location.pathname.replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/app/' + queryId + '/');
+          var correctedAppPath = window.location.pathname.replace(/\/app\/[A-Za-z0-9_-]+(?=\/|$)/, '/app/' + queryId);
           params.delete('id');
           params.delete('cal');
           try { history.replaceState(history.state, '', correctedAppPath + (params.toString() ? '?' + params.toString() : '') + window.location.hash); } catch (_) {}
-          appMatch = correctedAppPath.match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+          appMatch = correctedAppPath.match(APP_PATH_RE);
         }
         // A share path is always authoritative. For an app path without a requested
         // replacement, clean legacy duplicate query aliases from the address bar.
@@ -123,7 +125,7 @@
         if (scopedId) {
           params.delete('id');
           params.delete('cal');
-          try { history.replaceState(history.state, '', window.location.pathname + '?' + params.toString() + window.location.hash); } catch (_) {}
+          try { history.replaceState(history.state, '', window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash); } catch (_) {}
         }
         // Per-calendar install scope. Every manifest used to share scope "./" (/calendar/), so on
         // Android (Chrome/Samsung Internet/Whale) the first installed calendar claimed every
