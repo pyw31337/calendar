@@ -329,7 +329,7 @@ export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoD
       const latest = [...known, ...dates].sort().pop();
       const memoAdd = dates.map(date => `${date.slice(2, 4)}.${date.slice(5, 7)}.${date.slice(8, 10)}`).join(' ');
       const cleanedExistingMemo = String(place.memo || '')
-        .replace(/(?:^|[\s\/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s\/\n]|$)/gi, ' ')
+        .replace(/(?:^|[\s/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s/\n]|$)/gi, ' ')
         .replace(/\s+/g, ' ').trim();
       return {
         id: `visit:${place.id || placeTagToken(place)}`,

@@ -676,14 +676,14 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   }
 
   function isDummyPhotoVisitNote(note) {
-    const clean = String(note || '').trim().replace(/^[\/\s,-]+|[\/\s,-]+$/g, '');
+    const clean = String(note || '').trim().replace(/^[/\s,-]+|[/\s,-]+$/g, '');
     return clean === '사진' || /^사진\s*\d*장?$/i.test(clean);
   }
 
   function stripDummyPhotoVisitMemos(memoText) {
     if (!memoText) return '';
     let text = String(memoText);
-    const dummyVisitRegex = /(?:^|[\s\/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s\/\n]|$)/gi;
+    const dummyVisitRegex = /(?:^|[\s/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s/\n]|$)/gi;
     text = text.replace(dummyVisitRegex, ' ').replace(/\s+/g, ' ').trim();
     return text.replace(/^\/\s*|\s*\/$/g, '').trim();
   }
