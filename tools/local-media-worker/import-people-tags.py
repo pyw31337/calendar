@@ -300,6 +300,31 @@ def main():
             if i % 100 == 0 or i == len(rows):
                 print(f'  {i}/{len(rows)}', flush=True)
     ours = [(r, h, date_tokens(r.get('tags'))) for r, h in zip(rows, hashes) if h]
+    # Comparing every Takeout original with every calendar thumbnail turns 38k originals into
+    # tens of millions of Python hash comparisons. Date is an independent source fact, so use
+    # it to form the candidate set first; keep untagged calendar photos in the set so the
+    # importer can still repair their missing date. The no-date fallback stays intentionally
+    # strict (ANY_DAY_DISTANCE) and is only used when the source lacks a camera date.
+    ours_by_date = {}
+    undated_ours = []
+    for entry in ours:
+        if entry[2]:
+            for date in entry[2]:
+                ours_by_date.setdefault(date, []).append(entry)
+        else:
+            undated_ours.append(entry)
+
+    def candidate_rows(source_date):
+        if not source_date:
+            return ours
+        dated = []
+        for offset in (-1, 0, 1):
+            dated.extend(ours_by_date.get(source_date + timedelta(days=offset), []))
+        # A photo without a current date tag can only match at the almost-exact threshold below.
+        # Deduplicate burst photos that happen to have both adjacent date labels.
+        seen = set()
+        return [entry for entry in dated + undated_ours
+                if not (entry[0]['id'] in seen or seen.add(entry[0]['id']))]
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
     source = from_apple() if args.apple else from_takeout(args.takeout)
@@ -326,7 +351,7 @@ def main():
         hashed_src += 1
         matches = []
         closest = 64
-        for row, rh, dates in ours:
+        for row, rh, dates in candidate_rows(item['date']):
             same_day = item['date'] and any(abs((item['date'] - d).days) <= 1 for d in dates)
             limit = SAME_DAY_DISTANCE if same_day else ANY_DAY_DISTANCE
             dist = hamming(h, rh)
