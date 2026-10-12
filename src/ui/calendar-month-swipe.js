@@ -40,6 +40,15 @@ export function getCalendarSwipeDirection(deltaX, deltaY, width) {
   return deltaX < 0 ? 1 : -1;
 }
 
+// A calendar item that is being moved has to own its pointer from the very first
+// press.  Waiting until native dragstart is too late: the parent swipe surface can
+// otherwise recognise a horizontal gesture and capture the same pointer first.
+// Keep this target check in the shared hook so V1 and the V2 Bento calendar obey
+// the same priority rule.
+export function isCalendarMoveDragSource(target) {
+  return Boolean(target && typeof target.closest === 'function' && target.closest('[draggable="true"]'));
+}
+
 export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () => false } = {}) {
   const React = window.React;
   const onMonthDeltaRef = React.useRef(onMonthDelta);
@@ -156,6 +165,7 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
     ? {
         onPointerDown: event => {
           if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+          if (isCalendarMoveDragSource(event.target)) return;
           beginGesture({ clientX: event.clientX, clientY: event.clientY, currentTarget: event.currentTarget }, event.pointerId);
         },
         onPointerMove: event => moveGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
@@ -164,6 +174,7 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
       }
     : {
         onTouchStart: event => {
+          if (isCalendarMoveDragSource(event.target)) return;
           const touch = event.touches?.[0];
           if (touch) beginGesture({ clientX: touch.clientX, clientY: touch.clientY, currentTarget: event.currentTarget }, touch.identifier);
         },

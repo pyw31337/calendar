@@ -4,7 +4,8 @@ import {
   CALENDAR_SWIPE_MIN_PX,
   getCalendarSwipeAxis,
   getCalendarSwipeDirection,
-  getCalendarSwipeThreshold
+  getCalendarSwipeThreshold,
+  isCalendarMoveDragSource
 } from '../src/ui/calendar-month-swipe.js';
 
 test('calendar month swipe recognises only deliberate horizontal movement', () => {
@@ -22,6 +23,19 @@ test('calendar month swipe threshold stays reachable on phones and bounded on wi
   assert.ok(getCalendarSwipeThreshold(2400) < 100);
 });
 
+test('a draggable calendar item owns its pointer before month-swipe recognition', () => {
+  const draggableTarget = {
+    closest: selector => selector === '[draggable="true"]' ? {} : null
+  };
+  const ordinaryTarget = {
+    closest: () => null
+  };
+
+  assert.equal(isCalendarMoveDragSource(draggableTarget), true);
+  assert.equal(isCalendarMoveDragSource(ordinaryTarget), false);
+  assert.equal(isCalendarMoveDragSource(null), false);
+});
+
 test('calendar month swipe preserves clicks on date cells and defers pointer capture to drag', async () => {
   const fs = await import('node:fs/promises');
   const swipeSource = await fs.readFile(new URL('../src/ui/calendar-month-swipe.js', import.meta.url), 'utf8');
@@ -32,6 +46,11 @@ test('calendar month swipe preserves clicks on date cells and defers pointer cap
   assert.ok(
     !onPointerDownMatch[1].includes('setPointerCapture'),
     'onPointerDown must NOT call setPointerCapture, so date cell clicks are not swallowed'
+  );
+  assert.match(
+    onPointerDownMatch[1],
+    /isCalendarMoveDragSource\(event\.target\)/,
+    'a native draggable event source must not also start a month-swipe gesture'
   );
 
   // Verify pointer capture is only acquired in moveGesture after horizontal drag is confirmed
@@ -44,4 +63,3 @@ test('calendar month swipe preserves clicks on date cells and defers pointer cap
     'pointer capture must be released on gesture end or cancel'
   );
 });
-
