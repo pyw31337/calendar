@@ -19,11 +19,9 @@ test('calendar-scoped paths never preserve a conflicting query id during navigat
   const scoped = { pathname: '/calendar/app/jhair/', search: '?id=cw&cal=cw&shell=v2&tab=records&sub=content' };
   const url = buildAppViewUrl(scoped, 'content', new Date(2026, 10, 1));
   const parsed = new URL(url, 'https://example.test');
-  assert.equal(parsed.pathname, '/calendar/app/jhair/');
-  assert.equal(parsed.searchParams.has('id'), false);
-  assert.equal(parsed.searchParams.has('cal'), false);
-  assert.equal(parsed.searchParams.get('tab'), 'records');
-  assert.equal(parsed.searchParams.get('sub'), 'content');
+  // The page is the short path (core/app-address.js); nothing else is left in the query.
+  assert.equal(parsed.pathname, '/calendar/app/jhair/content/');
+  assert.equal(parsed.search, '');
 });
 test('an old ?shell=v1 bookmark opens V2 routing (the V1 fallback was removed)', () => {
   assert.equal(getInitialAppView(location('?shell=v1&id=example&tab=records&sub=memo')), 'memo');
@@ -80,7 +78,8 @@ test('V2 home clears stale detail routes while retaining calendar identity', () 
   const result = buildAppViewUrl(location('?shell=v2&id=example&tab=memo&view=memo'), 'calendar');
   const params = new URL(result, 'https://example.test').searchParams;
   for (const key of ['tab', 'sub', 'view']) assert.equal(params.has(key), false);
-  assert.equal(params.get('shell'), 'v2');
+  // ?shell= switched V1/V2; with V1 gone it is never written back into the address.
+  assert.equal(params.has('shell'), false);
   assert.equal(params.get('id'), 'example');
 });
 test('direct share views remain authoritative', () => {

@@ -1,4 +1,5 @@
 import qrcode from 'qrcode-generator';
+import { parseAppPath } from '../core/app-address.js';
 
 /**
  * ShareModal (P4-2). Site rule: URL + copy + QR.
@@ -52,7 +53,8 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       return `${base}${encodeURIComponent(view)}/`;
     };
     const getCalendarShareUrl = deps.getCalendarShareUrl || function (id) {
-      const basePath = String(window.location.pathname || '/').replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+      const appPath = parseAppPath(window.location.pathname);
+      const basePath = String(appPath ? appPath.prefix : (window.location.pathname || '/')).replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
       const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
       return `${window.location.origin}${normalizedBasePath}share/${encodeURIComponent(id)}/`;
     };

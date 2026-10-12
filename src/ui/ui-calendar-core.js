@@ -1,5 +1,6 @@
 import { shortParticipantName } from './v2/view-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
+import { routeSearchParams } from '../core/app-address.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { LikeButton } from './like-button.js';
@@ -1702,7 +1703,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   React.useEffect(() => {
     const read = () => {
       try {
-        const params = new URLSearchParams(window.location.search);
+        const params = routeSearchParams(window.location);
         const onMemoScreen = params.get('view') === 'memo' || params.get('tab') === 'memo';
         const targetMemo = params.get('memo') || params.get('memoFocus') || '';
         const comment = params.get('comment') || '';

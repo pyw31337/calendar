@@ -5,6 +5,8 @@
  * Keep the parser free of Firestore/UI dependencies so memo compose, chat cards and
  * tests all apply the same origin and identifier guard before attempting a read.
  */
+import { parseAppPath } from './app-address.js';
+
 function runtimeLocation(locationLike) {
   if (locationLike) return locationLike;
   if (typeof window !== 'undefined') return window.location;
@@ -48,7 +50,8 @@ export function parseMemoShareUrl(value, options = {}) {
     calendarId = decodeURIComponent(parts[shareIndex + 1] || '');
     memoId = decodeURIComponent(parts[shareIndex + 3] || '');
   } else {
-    const qCal = url.searchParams.get('id') || url.searchParams.get('cal');
+    // A copied app address carries the calendar in its path: /calendar/app/cw/memo/?memo=…
+    const qCal = url.searchParams.get('id') || url.searchParams.get('cal') || parseAppPath(url.pathname)?.calendarId;
     const qMemo = url.searchParams.get('memo');
     if (qCal && qMemo) {
       calendarId = decodeURIComponent(qCal);
