@@ -204,13 +204,15 @@ export function memoDraftFieldsFromMemo(memo) {
 export function restorableDraftImages(draft, memo) {
   if (!draft || !Array.isArray(draft.images) || !memo) return null;
   const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : [];
+  // Only a slot-aligned fingerprint list names each photo's own fingerprint.
+  const fingerprints = Array.isArray(memo.imageFingerprints) && memo.imageFingerprints.length === urls.length ? memo.imageFingerprints : [];
   return draft.images
     .map(img => urls.indexOf(img.original))
     .filter((idx, pos, arr) => idx >= 0 && arr.indexOf(idx) === pos)
     .map(idx => ({
       original: urls[idx],
       thumbnail: (memo.thumbUrls && memo.thumbUrls[idx]) || urls[idx],
-      fingerprint: (memo.imageFingerprints && memo.imageFingerprints[idx]) || '',
+      fingerprint: fingerprints[idx] || '',
       isExisting: true,
     }));
 }

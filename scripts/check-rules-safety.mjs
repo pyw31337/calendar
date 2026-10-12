@@ -20,6 +20,7 @@ assert(/match \/typingPresence\/\{sessionId\}[\s\S]{0,260}allow get, list: if is
 assert(/hasValidTypingPresence\(sessionId\)[\s\S]{0,900}expiresAt <= request\.resource\.data\.updatedAt \+ 15000;/.test(firestore), 'typing presence writes must keep a strict shape and bounded TTL');
 assert(/match \/meetingPhotoIndex\/\{photoId\}[\s\S]*allow write: if false;/.test(firestore), 'meeting photo index must remain server-maintained');
 assert(/match \/photoIndex\/\{photoKey\}[\s\S]{0,180}allow write: if false;/.test(firestore), 'canonical photo index must remain server-maintained');
+assert(/match \/photoTombstones\/\{fingerprintId\} \{\s*allow read: if isCalendarDoc\(calendarDocId\);\s*allow write: if false;/.test(firestore), 'photo tombstones must stay calendar-scoped reads and server-written');
 const activityLogRules = firestore.match(/match \/activityLogs\/\{logId\} \{([\s\S]*?)\n\s{6}\}/)?.[1] || '';
 assert(/allow create:/.test(activityLogRules) && /allow update: if false;/.test(activityLogRules), 'activity logs must be append-only');
 assert(!/allow create,\s*update:/.test(activityLogRules), 'activity log updates must not be granted by an earlier rule');

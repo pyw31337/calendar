@@ -25,6 +25,7 @@ const nodemailer = require('nodemailer');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 const mediaCommands = require('./media-commands');
 const { readImageGeo, pickPhotoIndexGeo } = require('./photo-index-geo');
+const photoTombstones = require('./photo-tombstones');
 const { buildKakaoLocationTags, appendLocationTags } = require('./photo-location-tags');
 const { completeAnalysisLocationTags } = require('./media-auto-tags');
 const { MAX_BATCH_ITEMS, MAX_TAGS, faceName, sanitizeAnalysisItem, sanitizeFaceItem, sanitizeSimilarGroups, stableAnalysisId, summarize } = require('./media-analysis');
@@ -97,6 +98,7 @@ function getMessageImageEntriesForIndex(message) {
   const smalls = Array.isArray(message.smallThumbUrls) && message.smallThumbUrls.length
     ? message.smallThumbUrls : (message.smallThumbUrl ? [message.smallThumbUrl] : []);
   const tags = Array.isArray(message.imageTags) ? message.imageTags : [];
+  const fingerprints = Array.isArray(message.imageFingerprints) ? message.imageFingerprints : [];
   const tagMap = message?.imageTagMap && typeof message.imageTagMap === 'object' && !Array.isArray(message.imageTagMap)
     ? message.imageTagMap
     : {};
@@ -117,7 +119,8 @@ function getMessageImageEntriesForIndex(message) {
       thumbUrl,
       smallThumbUrl,
       tags: hasAssetTag ? (tagMap[assetKey] || '') : (hasEditableTags ? (tags[index] || '') : (message.tags || '')),
-      tagAuthority: hasEditableTags ? 'editable' : ''
+      tagAuthority: hasEditableTags ? 'editable' : '',
+      fingerprint: photoTombstones.alignedFingerprint(fingerprints, urls, index)
     };
   }).filter(entry => entry.imageUrl || entry.thumbUrl);
 }
@@ -222,8 +225,10 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     // Per-photo GPS written by the client after upload (src/core/photo-geo.js), keyed like
     // imageTagMap. Copied onto the index row so 보관함 > 장소 can file the photo by distance.
     const geo = readImageGeo(data, assetKey);
+    const fingerprint = photoTombstones.fingerprintId(photo?.fingerprint) ? String(photo.fingerprint).trim() : '';
     entries.push({
       ...(geo || {}),
+      ...(fingerprint ? { fingerprint } : {}),
       assetKey,
       full,
       thumb,
@@ -405,8 +410,10 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       dataUrlBytes += String(selected.full || '').length + String(selected.thumb || '').length;
     }
     const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
+    const fingerprint = photoTombstones.rowFingerprint(persistedOwners, null);
     rows.push({
       ...selected,
+      ...(fingerprint ? { fingerprint } : {}),
       assetKey,
       legacyKeys,
       owners: persistedOwners,
@@ -422,12 +429,16 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   });
   rows.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
   const nextKeys = new Set(rows.map(row => row.assetKey));
-  const staleRefs = byName.photoIndex.docs.filter(doc => !nextKeys.has(doc.id)).map(doc => doc.ref);
+  const staleDocs = byName.photoIndex.docs.filter(doc => !nextKeys.has(doc.id));
+  const staleRefs = staleDocs.map(doc => doc.ref);
 
   if (apply) {
+    // A stale row's photo is gone from every record: keep the note the trigger would have left.
+    const tombstones = staleDocs.map(doc => photoTombstones.tombstoneFor({ assetKey: doc.id, existing: doc.data() })).filter(Boolean);
     const operations = [
       ...rows.map(row => ({ type: 'set', ref: root.collection('photoIndex').doc(row.assetKey), row })),
-      ...staleRefs.map(ref => ({ type: 'delete', ref }))
+      ...staleRefs.map(ref => ({ type: 'delete', ref })),
+      ...tombstones.map(note => ({ type: 'set', ref: root.collection(photoTombstones.COLLECTION).doc(note.id), row: note.data }))
     ];
     for (let offset = 0; offset < operations.length; offset += 350) {
       const batch = db.batch();
@@ -491,6 +502,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   const current = currentSnap.exists ? getPhotoIndexEntries(sourceType, sourceId, currentSnap.data() || {}) : [];
   const ownerRoot = `${sourceType}:${sourceId}:`;
   const afterByKey = new Map(current.map(entry => [entry.assetKey, entry]));
+  const beforeByKey = new Map(before.map(entry => [entry.assetKey, entry]));
   const touchedKeys = new Set([...before.map(entry => entry.assetKey), ...after.map(entry => entry.assetKey), ...afterByKey.keys()]);
   // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
   // owners inside the canonical row prevents deleting one source from erasing the remaining
@@ -519,6 +531,9 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       .sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0));
     if (!owners.length) {
       transaction.delete(ref);
+      // Gone from every record: remember its stored file so picking it again reuses that file.
+      const tombstone = photoTombstones.tombstoneFor({ assetKey, existing, removed: beforeByKey.get(assetKey) });
+      if (tombstone) transaction.set(indexRef.parent.collection(photoTombstones.COLLECTION).doc(tombstone.id), tombstone.data);
       return;
     }
     const ownerCount = ownerListWasComplete ? owners.length : Math.max(Number(existing.ownerCount) || 0, owners.length);
@@ -530,9 +545,11 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       ? Math.max(0, Number(commentSnapshot.data()?.counts?.[assetKey]) || 0) : 0;
     const tagState = pickCanonicalPhotoIndexTagState(persistedOwners, selected.tags, selected.sourceOwner);
     const geo = pickPhotoIndexGeo(persistedOwners, existing);
+    const fingerprint = photoTombstones.rowFingerprint(persistedOwners, existing);
     transaction.set(ref, {
       ...selected,
       ...geo,
+      ...(fingerprint ? { fingerprint } : {}),
       assetKey,
       legacyKeys,
       owners: persistedOwners,

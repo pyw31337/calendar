@@ -308,3 +308,23 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
   `ops:export` 백업 후 실행, 몇 번 돌려도 같음). 옛 키는 그 키를 legacyKeys로 가진 사진이 딱 하나일 때만 그 사진으로 옮기고,
   아니면 옛 키 그대로 둔다(라이트박스가 옛 키도 함께 읽으므로 숨지 않음).
 - 코드: `functions/photo-comment-items.js`, `src/core/photo-comment-items.js`, 테스트 `functions/test/photo-comment-items.emulator.test.js`.
+
+## 9. 지운 사진을 다시 올리면 원래 파일로 (2026-10-12) — `photoTombstones`
+
+**문제:** 같은 사진 다시 올리기는 이미 원본을 재사용한다(H8, `findReusableOriginal`). 그런데 그 사진을 라이트박스에서
+지운 뒤 다시 고르면, 지금 그 사진을 가진 기록이 하나도 없어서 새 파일로 또 올라갔다. 원본 파일은 지우지 않으므로
+서버에는 같은 사진 파일이 두 개가 된다(스트레스 테스트 R11이 옛 코드에서 598건 잡음).
+
+**새 구조:**
+- `calendars/{cal}/photoTombstones/{sha256 hex}` — `{ fingerprint, imageUrl, thumbUrl, assetKey, deletedAt }`.
+  photoIndex 행의 마지막 주인이 사라질 때(`syncCanonicalPhotoIndex`, 재구축의 stale 행 포함) 서버 함수만 쓴다.
+  규칙: 캘린더 문서 범위 읽기만, 쓰기는 누구도 불가. 코드 `functions/photo-tombstones.js`.
+- 지문은 슬롯 정렬된 `imageFingerprints`에서만 믿는다. photoIndex 행과 owner에 `fingerprint`를 함께 저장해서, 일정 앨범
+  사본처럼 지문이 없는 주인이 마지막으로 사라져도 노트가 남는다.
+- 업로드(`resolveImageBatch`): 지금 기록에서 못 찾은 sha256 사진은 `documents:batchGet`으로 노트를 읽고, 원본(과 썸네일)이
+  HEAD로 응답하면 그 파일을 연결한다. 옛 태그는 지울 때 함께 사라졌으므로 새 사진처럼 오늘 태그가 붙는다. 실패하면 그냥 올린다.
+- Storage GC는 노트가 가리키는 원본·썸네일을 "사용 중"으로 센다 → 지운 사진의 썸네일은 이제 7일 뒤에도 남는다
+  (작은 파일이고, 다시 올리면 바로 쓰인다).
+- 편집 화면(메모·채팅)도 슬롯이 어긋난 지문 목록은 기존 사진에 넘기지 않는다.
+- 테스트: `functions/test/photo-tombstones.emulator.test.js`(트리거·GC·규칙), 스트레스 R11/R12, `test/photo-tombstones.test.mjs`,
+  `test/image-dedupe-reuse.test.mjs`.
