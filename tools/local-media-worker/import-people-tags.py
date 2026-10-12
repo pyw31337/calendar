@@ -30,6 +30,7 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
     #    가족 얼굴을 더 정확히 배운다. 사진이나 얼굴은 저장하지 않고, 사진 키와 이름만 남는다.
 """
 import argparse
+import gzip
 import hashlib
 import io
 import json
@@ -473,6 +474,77 @@ def from_takeout(target):
                'album': os.path.basename(folder)}
 
 
+TAKEOUT_INDEX_SCHEMA = 1
+
+
+def write_takeout_index(target, output):
+    """Store matching evidence in a small, local-only file after the 50 GB export is removed."""
+    os.makedirs(os.path.dirname(output) or '.', exist_ok=True)
+    temporary = output + '.part'
+    open_file = gzip.open if output.lower().endswith('.gz') else open
+    saved, unavailable = 0, 0
+    with open_file(temporary, 'wt', encoding='utf-8') as fh:
+        fh.write(json.dumps({
+            'type': 'moyeora-takeout-index',
+            'schemaVersion': TAKEOUT_INDEX_SCHEMA,
+            'createdAt': datetime.now(timezone.utc).isoformat(),
+        }, ensure_ascii=False) + '\n')
+        for item in from_takeout(target):
+            value = next((h for h in (hash_file(path) for path in item['paths']) if h), None)
+            if value is None:
+                unavailable += 1
+                continue
+            fh.write(json.dumps({
+                'hash': value,
+                'names': item['names'],
+                'date': item['date'].isoformat() if item.get('date') else None,
+                'label': item.get('label') or '',
+                'geo': list(item['geo']) if item.get('geo') else None,
+                'album': item.get('album') or '',
+            }, ensure_ascii=False, separators=(',', ':')) + '\n')
+            saved += 1
+    os.replace(temporary, output)
+    try:
+        os.chmod(output, 0o600)
+    except OSError:
+        pass
+    print(f'재사용 가능한 Takeout 인덱스 {saved}건을 만들었습니다: {output}')
+    if unavailable:
+        print(f'이미지를 열 수 없어 인덱스에서 건너뛴 항목: {unavailable}건')
+
+
+def from_takeout_index(path):
+    """Read a compact index written by write_takeout_index; original image bytes are not needed."""
+    open_file = gzip.open if path.lower().endswith('.gz') else open
+    with open_file(path, 'rt', encoding='utf-8') as fh:
+        try:
+            header = json.loads(next(fh))
+        except (StopIteration, ValueError):
+            raise ValueError('비어 있거나 손상된 Takeout 인덱스입니다.')
+        if (header.get('type') != 'moyeora-takeout-index'
+                or header.get('schemaVersion') != TAKEOUT_INDEX_SCHEMA):
+            raise ValueError('지원하지 않는 Takeout 인덱스 형식입니다.')
+        for line in fh:
+            try:
+                row = json.loads(line)
+                when = datetime.fromisoformat(row['date']).date() if row.get('date') else None
+                geo = _geo_pair(*row['geo']) if row.get('geo') else None
+                value = int(row['hash'])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if value <= 0:
+                continue
+            yield {
+                'names': [str(name) for name in row.get('names') or [] if name],
+                'paths': [],
+                'hash': value,
+                'date': when,
+                'label': str(row.get('label') or ''),
+                'geo': geo,
+                'album': str(row.get('album') or ''),
+            }
+
+
 # ---------- names ----------
 def name_mapper(labels, aliases):
     label_set = set(labels)
@@ -499,6 +571,9 @@ def main():
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument('--apple', action='store_true')
     src.add_argument('--takeout')
+    src.add_argument('--takeout-index', help='원본 없이 재대조할 수 있는 압축 Takeout 인덱스')
+    ap.add_argument('--export-takeout-index', metavar='PATH',
+                    help='--takeout 원본에서 이미지 없는 재대조 인덱스를 만든다')
     ap.add_argument('--alias', action='append', default=[], help='원본이름=우리태그')
     ap.add_argument('--accept-aliases', action='store_true', help='미리보기가 추천한 이름 짝을 모두 받아 저장하고 이번에 바로 쓴다')
     ap.add_argument('--forget-alias', action='append', default=[], help='저장해 둔 이름 짝 지우기 (원본이름)')
@@ -510,6 +585,11 @@ def main():
     args = ap.parse_args()
     if not re.fullmatch(r'[a-z0-9_-]{1,60}', args.calendar, re.I):
         sys.exit('calendar id 형식이 아닙니다')
+    if args.export_takeout_index:
+        if not args.takeout:
+            ap.error('--export-takeout-index 는 --takeout 과 함께 사용하세요.')
+        write_takeout_index(args.takeout, args.export_takeout_index)
+        return
 
     # Name pairs chosen before (this Mac only) apply automatically; --alias adds or overrides one.
     saved_aliases = load_aliases(args.calendar)
@@ -569,11 +649,12 @@ def main():
     # Materialise only compact JSON/paths descriptors, then decode originals in parallel. On a
     # 50 GB Takeout the old serial decoder spent close to an hour before it could even show a
     # dry-run result; image bytes remain local and are discarded as soon as their hash is made.
-    source = list(from_apple() if args.apple else from_takeout(args.takeout))
+    source = list(from_apple() if args.apple else
+                  (from_takeout(args.takeout) if args.takeout else from_takeout_index(args.takeout_index)))
     print(f'원본 메타데이터 {len(source)}건을 읽었습니다. 지각 해시를 병렬로 계산합니다.')
 
     def item_hash(item):
-        return next((value for value in (hash_file(path) for path in item['paths']) if value), None)
+        return item.get('hash') or next((value for value in (hash_file(path) for path in item['paths']) if value), None)
 
     plan, seen_src, no_image, hashed_src, closest_hist, ambiguous = {}, 0, 0, 0, {}, 0
     print('원본 사진과 비교하는 중...')
