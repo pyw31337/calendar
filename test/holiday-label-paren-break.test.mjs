@@ -28,3 +28,10 @@ test('split helper sizes by the longer half', async () => {
   assert.equal(mod.cornerLabelProps('대체공휴일(개천절)').style['--corner-chars'], '5');
   assert.deepEqual(mod.cornerLabelProps('추석 연휴'), {});
 });
+
+test('a holiday label next to the 모임확정 pill sits on the pill\'s vertical middle', () => {
+  const P = String.raw`\.bp-cal-days-grid \.bp-day-cell \.bp-day-head-row`;
+  assert.match(css, new RegExp(String.raw`@media \(min-width: 768px\) \{\s*html:has\(\.renewal-shell\.v2-design\) \.renewal-shell\.v2-design ${P} \{\s*align-items: center !important;`));
+  assert.match(css, new RegExp(String.raw`@media \(min-width: 480px\) and \(max-width: 767px\) \{\s*html:has\(\.renewal-shell\.v2-design\) \.renewal-shell\.v2-design ${P}:has\(> \.bp-day-meeting-pill\) \{\s*align-items: baseline !important;`));
+  assert.match(css, new RegExp(String.raw`${P}:has\(> \.bp-day-meeting-pill\) > \.bp-day-corner-label \{\s*min-height: 0 !important;`));
+});
