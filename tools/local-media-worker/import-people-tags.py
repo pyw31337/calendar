@@ -24,6 +24,7 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
     ... --apply
 """
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -106,6 +107,21 @@ def hamming(a, b):
 
 def hash_file(path):
     """path is a file path, or a callable returning an open binary file (a zip member)."""
+    cache_file = None
+    if isinstance(path, str):
+        try:
+            info = os.stat(path)
+            # Cache only the 64-bit derivative, keyed by the source path and the two fields that
+            # can change its pixels. An interrupted 50 GB import then resumes instead of decoding
+            # every HEIC again; no original image or Takeout metadata enters this cache.
+            key = hashlib.sha256(f'{path}\0{info.st_size}\0{info.st_mtime_ns}'.encode()).hexdigest()
+            cache_file = os.path.join(CACHE, 'source-' + key + '.hash')
+            if os.path.exists(cache_file):
+                value = int(open(cache_file).read() or 0)
+                if value:
+                    return value
+        except (OSError, ValueError):
+            cache_file = None
     try:
         source = path() if callable(path) else path
         with Image.open(source) as im:
@@ -113,7 +129,14 @@ def hash_file(path):
             # Phone cameras store the pixels sideways with an EXIF Orientation flag, while our copy
             # was re-encoded upright by the browser. Hash the photo the way it is shown: without
             # this a portrait phone photo never matched its own upload.
-            return dhash(ImageOps.exif_transpose(im))
+            upright = ImageOps.exif_transpose(im)
+            upright.thumbnail((256, 256))
+            value = dhash(upright)
+        if cache_file:
+            os.makedirs(CACHE, exist_ok=True)
+            with open(cache_file, 'w') as fh:
+                fh.write(str(value))
+        return value
     except Exception:
         return None
 
