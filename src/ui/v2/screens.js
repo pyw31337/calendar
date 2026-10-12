@@ -1136,7 +1136,7 @@ export function SettlementScreen(p) {
         searchLabel: '정산 검색',
         searchQuery: p.searchQuery || '',
         onSearchQuery: p.onSearchQuery,
-        searchPlaceholder: p.searchPlaceholder || '정산 항목, 날짜 또는 카테고리 검색',
+        searchPlaceholder: p.searchPlaceholder || '정산 내용, 날짜 또는 항목 검색',
       }
     : { onSearch: p.onSearch, searchLabel: '정산 검색' };
   const settlementHeaderExtra = headerExtra([
@@ -1265,7 +1265,7 @@ export function SettlementScreen(p) {
               'aria-pressed': p.activeTab === 'total',
               onClick: () => p.onTab(p.activeTab === 'total' ? 'daily' : 'total'),
             },
-            p.activeTab === 'total' ? '누적보기' : '월별보기'
+            p.activeTab === 'total' ? '누적' : '일자별'
           )
         ),
         h(

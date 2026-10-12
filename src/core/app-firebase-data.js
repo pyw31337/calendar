@@ -328,7 +328,7 @@ function validateCalendarShape(calendar) {
 	  if (activityLogs.length > 5000) return '활동 로그가 너무 많습니다.';
 	  if (polls.length > 100) return '투표 데이터가 너무 많습니다.';
 	  if (confirmedMeetings.length > 5000) return '확정 모임 데이터가 너무 많습니다.';
-	  if (expenseCategories.length > 24) return '지출 카테고리가 너무 많습니다.';
+	  if (expenseCategories.length > 24) return '지출 항목이 너무 많습니다.';
   if (deletedActivityLogIds.length > 5000) return '삭제된 활동 로그 이력이 너무 많습니다.';
   const participantIds = new Set();
   const activeNames = new Set();

@@ -1478,10 +1478,10 @@ export function AdminDashboard({ initialCalendars }) {
 	  };
 	  const handleRemoveExpenseCategory = categoryId => {
 	    const target = calExpenseCategories.find(c => c.id === categoryId);
-	    const nameText = target ? target.name : '카테고리';
+	    const nameText = target ? target.name : '항목';
 	    requestConfirm(
-	      '지출 카테고리 삭제',
-	      `"${nameText}" 지출 카테고리를 삭제하시겠습니까?`,
+	      '지출 항목 삭제',
+	      `"${nameText}" 지출 항목을 삭제하시겠습니까?`,
 	      () => {
 	        setCalExpenseCategories(prev => {
 	          const next = prev.filter(category => category.id !== categoryId);
@@ -1514,10 +1514,10 @@ export function AdminDashboard({ initialCalendars }) {
 	  };
 	  const handleRemovePlaceCategory = categoryId => {
 	    const target = calPlaceCategories.find(c => c.id === categoryId);
-	    const nameText = target ? target.name : '카테고리';
+	    const nameText = target ? target.name : '항목';
 	    requestConfirm(
-	      '장소 카테고리 삭제',
-	      `"${nameText}" 장소 카테고리를 삭제하시겠습니까?`,
+	      '장소 항목 삭제',
+	      `"${nameText}" 장소 항목을 삭제하시겠습니까?`,
 	      () => {
 	        setCalPlaceCategories(prev => {
 	          const next = prev.filter(category => category.id !== categoryId);
@@ -2943,7 +2943,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                type: "text",
 	                className: "form-input",
 	                style: { flex: 1, minWidth: 0 },
-	                placeholder: "새 지출 카테고리",
+	                placeholder: "새 지출 항목",
 	                value: newExpenseCategoryName,
 	                maxLength: 24,
 	                onChange: e => setNewExpenseCategoryName(e.target.value),
@@ -2970,7 +2970,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement(ColorSwatchPicker, {
 	                  value: category.color,
 	                  onChange: color => handleUpdateExpenseCategory(category.id, { color }),
-	                  title: "지출 카테고리 색상"
+	                  title: "지출 항목 색상"
 	                }),
 	                /*#__PURE__*/React.createElement("input", {
 	                  type: "text",
@@ -2983,8 +2983,8 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
-	                  title: "지출 카테고리 삭제",
-	                  "aria-label": "지출 카테고리 삭제",
+	                  title: "지출 항목 삭제",
+	                  "aria-label": "지출 항목 삭제",
 	                  style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
 	                  onClick: () => handleRemoveExpenseCategory(category.id)
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
@@ -3000,7 +3000,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                type: "text",
 	                className: "form-input",
 	                style: { flex: 1, minWidth: 0 },
-	                placeholder: "새 장소 카테고리",
+	                placeholder: "새 장소 항목",
 	                value: newPlaceCategoryName,
 	                maxLength: 24,
 	                onChange: e => setNewPlaceCategoryName(e.target.value),
@@ -3027,7 +3027,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement(ColorSwatchPicker, {
 	                  value: category.color,
 	                  onChange: color => handleUpdatePlaceCategory(category.id, { color }),
-	                  title: "장소 카테고리 색상"
+	                  title: "장소 항목 색상"
 	                }),
 	                /*#__PURE__*/React.createElement("input", {
 	                  type: "text",
@@ -3040,8 +3040,8 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
-	                  title: "장소 카테고리 삭제",
-	                  "aria-label": "장소 카테고리 삭제",
+	                  title: "장소 항목 삭제",
+	                  "aria-label": "장소 항목 삭제",
 	                  style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
 	                  onClick: () => handleRemovePlaceCategory(category.id)
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))

@@ -1674,7 +1674,7 @@ export function PlacesView({
         style: { display: 'flex', alignItems: 'center', padding: '6px 12px' }
       },
         /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-          title: "카테고리 선택",
+          title: "항목 선택",
           value: categoryFilter,
           options: [
             {

@@ -3011,7 +3011,7 @@ export function GlobalSearchModal({
   const categoryPicker = isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement("div", {
     className: "global-search-category-wrap"
   }, /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-    title: "검색 카테고리 선택",
+    title: "검색 항목 선택",
     value: activeTab,
     options: tabDefs.map(t => {
       const hasCount = (t.count || 0) >= 1;
