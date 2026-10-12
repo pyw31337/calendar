@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = 'eaf61235b3df615de80a237dce534fca95657053';
+const BUILD_SHA = '4c92f86bf996c1412fd70bc62e704f056eab2a22';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -195,7 +195,9 @@ async function fetchFreshDocument(req) {
   } catch (_) {
     try {
       const url = new URL(req.url);
-      const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)\/?$/);
+      // /app/<id>/ or one of its pages, /app/<id>/<page>/ (src/core/app-address.js). The page
+      // itself is read from this document's own path, so the fallback only needs the calendar.
+      const appPath = url.pathname.match(/^(.*)\/app\/([A-Za-z0-9_-]+)(?:\/[a-z]+)?\/?$/);
       if (appPath) {
         const fallback = new URL(`${appPath[1]}/`, url.origin);
         fallback.search = url.search;

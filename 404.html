@@ -43,6 +43,15 @@
         return;
       }
 
+      // An unknown page under a calendar (/calendar/app/<id>/<page>/ that this build does not
+      // publish): open that calendar instead of the site root. Only a deeper path redirects, so a
+      // missing /app/<id>/ itself still falls through below and can never loop.
+      var appMatch = path.match(/^(.*\/)app\/([A-Za-z0-9_-]+)\/.+$/);
+      if (appMatch) {
+        loc.replace(appMatch[1] + 'app/' + appMatch[2] + '/' + search + hash);
+        return;
+      }
+
       // Fallback for any other 404 on GitHub Pages
       var base = path.indexOf('/calendar/') !== -1 ? '/calendar/' : '/';
       loc.replace(base + search + hash);
