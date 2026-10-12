@@ -872,6 +872,9 @@
 .v2-design .bp-cal-weekdays { margin-bottom: 8px !important; }
 .v2-design .bp-cal-weekdays .bp-weekday-label { font-size: 0.78rem !important; font-weight: 800; }
 .v2-design .bp-cal-days-grid { row-gap: 7px !important; }
+/* Mouse drag of a dot/anniversary: the day cell itself is the drop target (Safari ignores a drop
+   over a child of the <button> cell). Toggled by setDragActive in ui-app-shell-v2.js. */
+.v2-design .bp-cal-days-grid.is-dnd-active .bp-day-cell > * { pointer-events: none; }
 .v2-design .bp-day-cell { gap: 6px; }
 .v2-design .bp-day-head-row { gap: 6px 6px; }
 .v2-design .bp-dot-row { gap: 4px; align-items: center; justify-content: center; }

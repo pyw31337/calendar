@@ -170,7 +170,10 @@ export function useCalendarMonthSwipe({ onMonthDelta, isInteractionLocked = () =
         },
         onPointerMove: event => moveGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
         onPointerUp: event => endGesture({ clientX: event.clientX, clientY: event.clientY }, event.pointerId),
-        onPointerCancel: cancelGesture
+        onPointerCancel: cancelGesture,
+        // Chrome sends pointercancel when any native drag starts (an <img>, selected text), Safari
+        // does not, and the swipe would then capture the pointer and end that drag without a drop.
+        onDragStartCapture: cancelGesture
       }
     : {
         onTouchStart: event => {

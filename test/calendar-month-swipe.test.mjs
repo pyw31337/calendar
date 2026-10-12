@@ -63,3 +63,14 @@ test('calendar month swipe preserves clicks on date cells and defers pointer cap
     'pointer capture must be released on gesture end or cancel'
   );
 });
+
+test('V2 calendar drag-to-move works in Safari and on touch, next to the month swipe', async () => {
+  const fs = await import('node:fs/promises');
+  const swipeSource = await fs.readFile(new URL('../src/ui/calendar-month-swipe.js', import.meta.url), 'utf8');
+  assert.match(swipeSource, /onDragStartCapture: cancelGesture/, 'any native drag cancels a swipe in progress');
+  const shellSource = await fs.readFile(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shellSource, /el\.closest\('\.bp-day-cell, \.day-cell'\)/, 'touch drop finds V2 cells (class bp-day-cell)');
+  assert.match(shellSource, /setDragActive\(event\.currentTarget, true\)/, 'mouse drag makes the cell itself the drop target');
+  const css = await fs.readFile(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
+  assert.match(css, /\.bp-cal-days-grid\.is-dnd-active \.bp-day-cell > \* \{ pointer-events: none; \}/, 'Safari drops nothing over a child of the <button> cell');
+});
