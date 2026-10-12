@@ -2761,6 +2761,14 @@ html:has(.renewal-shell.v2-design) .date-modal-memo-list .memo-card-hover {
   border-radius: var(--radius-md) !important;
   box-shadow: none !important;
 }
+
+/* A user-fixed memo is a persistent priority item, not merely a recent-activity card.
+ * Match the memo reference: one thin purple outline around the whole card instead of the
+ * ordinary neutral border / per-author left accent. */
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .memo-card-hover.is-pinned {
+  border: 1px solid var(--v2-accent, #7C3AED) !important;
+  border-left: 1px solid var(--v2-accent, #7C3AED) !important;
+}
 html:has(.renewal-shell.v2-design) .bp-sheet-handle::before,
 html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {
   content: "" !important;

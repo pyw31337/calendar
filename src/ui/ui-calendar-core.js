@@ -1917,6 +1917,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   return /*#__PURE__*/React.createElement("article", {
     id: `memo-${memo.id}`,
     "data-memo-id": memo.id,
+    "data-memo-pinned": memo.isPinned ? 'true' : undefined,
     onClick: (e) => {
       const t = e.target;
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
@@ -1935,7 +1936,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       transition: 'box-shadow 0.2s ease',
       boxSizing: 'border-box'
     },
-    className: "memo-card-hover v2-memo-card-contract"
+    // Keep the visual pinned state tied to the saved pin, not `effectivePinned`.
+    // The latter also covers the temporary "최근 활동" treatment and must not make an
+    // otherwise unpinned memo look permanently fixed.
+    className: "memo-card-hover v2-memo-card-contract" + (memo.isPinned ? " is-pinned" : "")
   },
     // The card also contains share, pin, link, image, and comment controls.  It therefore
     // cannot itself be a role=button without nesting interactive elements.  Keep a dedicated
