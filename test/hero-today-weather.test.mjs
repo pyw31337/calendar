@@ -74,6 +74,7 @@ test('Hero zone replaces redundant quick nav with TODAY schedule box and compact
   // Detailed forecast API & WeatherDetailModal
   assert.match(weatherJs, /export function fetchDetailedWeatherForecast/, 'app-weather exports fetchDetailedWeatherForecast');
   assert.match(destLateCss, /\.weather-detail-modal-container/, 'dest-chrome-late styles WeatherDetailModal');
+  assert.match(appShellJs, /bindUiComponentAliases\(React\)\.WeatherDetailModal/, 'HeroWeatherBox resolves WeatherDetailModal through deferred component aliases');
 
   // Weather is always visible under today box; today box exposes participant memos
   assert.match(appShellJs, /todayBox,\s*weatherElement/, 'HeroTodayOrWeather renders weatherElement under todayBox when todayBox exists');

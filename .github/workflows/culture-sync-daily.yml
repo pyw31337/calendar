@@ -30,13 +30,13 @@ jobs:
         run: node scripts/sync-culture-performances.mjs
       - name: Commit if changed
         run: |
-          if git diff --quiet -- 'public-vite/data/culture-*.json'; then
-            echo "No change in culture snapshots."
+          if git diff --quiet -- 'public-vite/data/culture-*.json' 'scripts/data/culture-poster-cache.json'; then
+            echo "No change in culture snapshots or poster cache."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- 'public-vite/data/culture-*.json'
+          git add -- 'public-vite/data/culture-*.json' 'scripts/data/culture-poster-cache.json'
           git commit -m "chore: daily culture performances/festivals/sports/movies snapshot sync"
           # main can move while the sync runs (a merged PR); only data files changed here, so a
           # rebase onto the new tip is conflict-free.

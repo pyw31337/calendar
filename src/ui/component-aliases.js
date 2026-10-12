@@ -104,7 +104,8 @@ export function bindUiComponentAliases(React) {
     'ChatParticipantSheet', 'AppSettingsModal', 'NotificationOnboardingModal', 'NotificationPermissionHelpModal',
     'ConfirmDialog', 'DateModal', 'SectionCountBadge', 'SectionToggleButton', 'SearchCategoryTabs',
     'SimpleBottomSheetPicker', 'PhotoGallery', 'SummaryList', 'MemoPreviewSection', 'ShareModal',
-    'WeatherBadge', 'WeatherLocationModal', 'MainSideMenu', 'UpdateAvailableBanner', 'ImageShareViewer',
+    'WeatherBadge', 'WeatherLocationModal', 'DailyWeatherIcon', 'WeatherDetailModal', 'WeatherLocationSettingModal',
+    'MainSideMenu', 'UpdateAvailableBanner', 'ImageShareViewer',
     'ImageThumbRemoveButton', 'InlineSearchBar', 'MemoShareModal', 'ChatGalleryModal', 'MemoView',
     'AnniversaryModal', 'SettlementSummaryModal', 'PollModal', 'PlaceMapView', 'PlacesView', 'HistoryView',
     'ContentView', 'PlaceRegisterModal'

@@ -627,7 +627,8 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
 
   const renderExpandedCard = (meeting, onClose, extraClass, open) => {
     const places = placesForDate(meeting.date);
-    const DailyWeatherIcon = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DailyWeatherIcon;
+    const DailyWeatherIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DailyWeatherIcon)
+      || bindUiComponentAliases(React).DailyWeatherIcon;
     const weatherCoords = open && DailyWeatherIcon ? weatherCoordsFor(meeting.date) : null;
     const placeName = places[0]
       ? String(places[0].name || places[0].alias || '').trim()
@@ -1702,7 +1703,13 @@ function HeroWeatherBox({ weatherLocation, onSelectDate, calendar, upcomingMeeti
     [resolveWeatherLocationForDate, selectedWeatherDate]
   );
 
-  const WeatherDetailModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal) || null;
+  React.useEffect(() => {
+    if (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal) return;
+    import('./ui-weather.js').catch(() => {});
+  }, []);
+
+  const WeatherDetailModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherDetailModal)
+    || bindUiComponentAliases(React).WeatherDetailModal;
 
   return React.createElement(React.Fragment, null,
     React.createElement('div', {

@@ -1689,14 +1689,14 @@ export function PlacesView({
                   "data-digits": isMulti ? "multi" : "single",
                   style: {
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    minWidth: '20px', height: '20px',
+                    minWidth: isMulti ? '28px' : '20px', height: '20px',
                     width: isMulti ? 'auto' : '20px',
                     aspectRatio: isMulti ? 'auto' : '1 / 1',
                     borderRadius: '9999px',
                     backgroundColor: searchedPlaces.length >= 1 ? 'var(--v2-primary, #2563EB)' : '#E2E8F0',
                     color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
                     fontSize: 'var(--font-size-sm)', fontWeight: 'bold',
-                    padding: isMulti ? '0 5.5px' : '0',
+                    padding: isMulti ? '0 7px' : '0',
                     marginLeft: '4px'
                   }
                 }, searchedPlaces.length);
@@ -1715,14 +1715,14 @@ export function PlacesView({
                     "data-digits": isMulti ? "multi" : "single",
                     style: {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      minWidth: '20px', height: '20px',
+                      minWidth: isMulti ? '28px' : '20px', height: '20px',
                       width: isMulti ? 'auto' : '20px',
                       aspectRatio: isMulti ? 'auto' : '1 / 1',
                       borderRadius: '9999px',
                       backgroundColor: cCount >= 1 ? (category.color || '#2563EB') : '#E2E8F0',
                       color: cCount >= 1 ? '#FFFFFF' : '#475569',
                       fontSize: 'var(--font-size-sm)', fontWeight: 'bold',
-                      padding: isMulti ? '0 5.5px' : '0',
+                      padding: isMulti ? '0 7px' : '0',
                       marginLeft: '4px'
                     }
                   }, cCount)

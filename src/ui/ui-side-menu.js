@@ -327,7 +327,8 @@ export function SharedAppNavBlock({
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "정산",
           settlementBadge && settlementBadge.text && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
+            className: `main-menu-badge ${String(settlementBadge.text).trim().length > 1 ? 'is-multi-digit' : 'is-single-digit'}`,
+            "data-digits": String(settlementBadge.text).trim().length > 1 ? "multi" : "single",
             style: { backgroundColor: settlementBadge.bgColor || "#64748B", color: "#FFFFFF", marginLeft: "4px" }
           }, settlementBadge.text)
         )

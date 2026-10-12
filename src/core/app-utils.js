@@ -675,17 +675,34 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     });
   }
 
+  function isDummyPhotoVisitNote(note) {
+    const clean = String(note || '').trim().replace(/^[\/\s,-]+|[\/\s,-]+$/g, '');
+    return clean === '사진' || /^사진\s*\d*장?$/i.test(clean);
+  }
+
+  function stripDummyPhotoVisitMemos(memoText) {
+    if (!memoText) return '';
+    let text = String(memoText);
+    const dummyVisitRegex = /(?:^|[\s\/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s\/\n]|$)/gi;
+    text = text.replace(dummyVisitRegex, ' ').replace(/\s+/g, ' ').trim();
+    return text.replace(/^\/\s*|\s*\/$/g, '').trim();
+  }
+
   // Structured per-date memo stack: unlike parseVisitEntriesFromMemo (which only parses when 2+
   // dates are present, since it exists purely to reformat run-on memo strings for display), this
   // always returns one entry per date so a place's very first memo entry is addressable too.
   // Blank notes are valid now because a date-only save still needs to preserve the visit date;
   // when the same date appears more than once, keep one representative entry and prefer the first
-  // non-empty note.
+  // non-empty note. Dummy '사진' notes (created when photos are attached, not actual visits) are
+  // excluded.
   function parsePlaceMemoEntries(memo) {
     const text = String(memo || '').trim();
     if (!text) return [];
     const dateMatches = getMemoDateMatches(text);
-    if (dateMatches.length === 0) return [{ date: '', note: text }];
+    if (dateMatches.length === 0) {
+      const cleanText = text.trim();
+      return (cleanText && !isDummyPhotoVisitNote(cleanText)) ? [{ date: '', note: cleanText }] : [];
+    }
     const entries = dateMatches.map((match, idx) => {
       const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
       const note = text.slice(match.index + match[0].length, segmentEnd)
@@ -698,6 +715,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     const datelessEntries = [];
     entries.forEach(entry => {
       const cleanNote = String(entry.note || '').trim();
+      if (isDummyPhotoVisitNote(cleanNote)) return;
       const dateKey = normalizePlaceDateForSort(entry.date) || '';
       if (!dateKey) {
         if (cleanNote) datelessEntries.push({ date: '', note: cleanNote });
@@ -1199,6 +1217,8 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     parseVisitEntriesFromMemo,
     reformatMemoIntoDateLines,
     sortVisitEntriesRecentFirst,
+    isDummyPhotoVisitNote,
+    stripDummyPhotoVisitMemos,
     parsePlaceMemoEntries,
     serializePlaceMemoEntries,
     toMemoDateFormat,

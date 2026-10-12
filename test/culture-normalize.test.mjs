@@ -14,6 +14,8 @@ import {
   parseDateRange,
   venuesMatch,
   isUsefulPosterUrl,
+  interparkPosterFromGoods,
+  isFallbackOrEmptyPoster,
   timeTicketPosterFromHtml,
   timeTicketPosterNeedsCanonical,
   timeTicketProductUrl
@@ -175,3 +177,21 @@ test('only a timeticket product whose image is missing or still on timeticket is
     image: 'https://ticketimage.interpark.com/poster.jpg'
   }), false);
 });
+
+test('interpark goods code extraction and poster resolution handles diverse URL and code formats', () => {
+  assert.equal(interparkPosterFromGoods('https://tickets.interpark.com/goods/26005759'), 'https://ticketimage.interpark.com/Play/image/large/26/26005759_p.gif');
+  assert.equal(interparkPosterFromGoods('https://tickets.interpark.com/goods/Y6001085'), 'https://ticketimage.interpark.com/Play/image/large/Y6/Y6001085_p.gif');
+  assert.equal(interparkPosterFromGoods('http://ticket.interpark.com/Goods/GoodsInfo.asp?GoodsCode=24001234'), 'https://ticketimage.interpark.com/Play/image/large/24/24001234_p.gif');
+  assert.equal(interparkPosterFromGoods('26005759'), 'https://ticketimage.interpark.com/Play/image/large/26/26005759_p.gif');
+  assert.equal(interparkPosterFromGoods('https://tickets.interpark.com/'), '');
+});
+
+test('isFallbackOrEmptyPoster catches fallbacks, placeholders, and corrupted URLs', () => {
+  assert.equal(isFallbackOrEmptyPoster(''), true);
+  assert.equal(isFallbackOrEmptyPoster('/images/fallbacks/tourism-template.svg'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://ticketimage.interpark.com/Play/image/large/ht/https_p.gif'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://example.com/images/default_poster.png'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://ticketimage.interpark.com/Play/image/large/26/26005759_p.gif'), false);
+  assert.equal(isFallbackOrEmptyPoster('https://pyw31337.github.io/culture/images/posters/remote-cache/kopis/perf_123.webp'), false);
+});
+

@@ -3119,7 +3119,8 @@ select.form-select {
 }
 .section-count-badge:is([data-digits="multi"], .is-multi-digit) {
   width: auto;
-  padding: 0 5.5px;
+  min-width: 28px;
+  padding: 0 7px;
   aspect-ratio: auto;
 }
 .sync-status-chip {

@@ -81,8 +81,12 @@ test('CSS enforces 1:1 circle for single-digit and capsule (9999px) for multi-di
     'Single digit count badges must have 1:1 aspect-ratio for perfect circle'
   );
   assert.ok(
-    destChrome.includes('padding: 0 5.5px !important;'),
+    destChrome.includes('padding: 0 7px !important;'),
     'Multi-digit count badges must have horizontal padding for capsule expansion'
+  );
+  assert.ok(
+    destChrome.includes('min-width: calc(var(--v2-badge-h, 20px) + 8px) !important;'),
+    'Multi-digit count badges must expand wider than single-digit circles to form a distinct capsule'
   );
 
   // Verify responsive-audit.css no longer forces fixed width or flex on section-count-badge
@@ -112,4 +116,43 @@ test('CSS enforces 1:1 circle for single-digit and capsule (9999px) for multi-di
     appCss.includes('.region-filter-chip-count:is([data-digits="single"]'),
     'app.css must provide single-digit circle rule for region-filter-chip-count'
   );
+});
+
+test('SearchCategoryTabs sets 1:1 circle for single-digit (1-9) and capsule for multi-digit (10+)', async () => {
+  globalThis.window.React.useRef = (v) => ({ current: v });
+  globalThis.window.React.useEffect = () => {};
+  const { SearchCategoryTabs } = await import('../src/ui/ui-summary-gallery.js');
+  const tree = SearchCategoryTabs({
+    activeKey: 'all',
+    onSelect: () => {},
+    countBadgeClassName: 'section-count-badge',
+    tabs: [
+      { key: 'all', label: '전체', count: 67, color: '#7C2FE5' },
+      { key: 'food', label: '식당', count: 10, color: '#EA580C' },
+      { key: 'cafe', label: '카페', count: 2, color: '#8B5CF6' },
+      { key: 'etc', label: '기타', count: 9, color: '#64748B' }
+    ]
+  });
+  const buttons = tree.props.children;
+  const allBadge = buttons[0].props.children[1];
+  const foodBadge = buttons[1].props.children[1];
+  const cafeBadge = buttons[2].props.children[1];
+  const etcBadge = buttons[3].props.children[1];
+
+  assert.equal(allBadge.props['data-digits'], 'multi');
+  assert.ok(allBadge.props.className.includes('is-multi-digit'));
+  assert.equal(allBadge.props.style.minWidth, '28px');
+  assert.equal(allBadge.props.style.padding, '0 7px');
+
+  assert.equal(foodBadge.props['data-digits'], 'multi');
+  assert.ok(foodBadge.props.className.includes('is-multi-digit'));
+
+  assert.equal(cafeBadge.props['data-digits'], 'single');
+  assert.ok(cafeBadge.props.className.includes('is-single-digit'));
+  assert.equal(cafeBadge.props.style.width, '20px');
+  assert.equal(cafeBadge.props.style.height, '20px');
+  assert.equal(cafeBadge.props.style.aspectRatio, '1 / 1');
+
+  assert.equal(etcBadge.props['data-digits'], 'single');
+  assert.ok(etcBadge.props.className.includes('is-single-digit'));
 });

@@ -342,6 +342,38 @@ export function compactItem(item) {
   return out;
 }
 
+function resolveNormalizedPoster(raw) {
+  const posterSources = Array.isArray(raw.posterSourceUrls) ? raw.posterSourceUrls : [];
+  const synopsis = Array.isArray(raw.synopsisImages) ? raw.synopsisImages : [];
+  const stills = Array.isArray(raw.stillImages) ? raw.stillImages : [];
+  const candidates = [
+    raw.image,
+    raw.backupPoster,
+    raw.posterUrl,
+    raw.poster,
+    ...posterSources,
+    ...synopsis,
+    ...stills
+  ];
+
+  for (const c of candidates) {
+    const resolved = resolveImageUrl(c);
+    if (resolved && !isFallbackOrEmptyPoster(resolved)) {
+      return resolved;
+    }
+  }
+
+  // Interpark direct recovery if link contains a goodsCode
+  const interparkUrl = interparkPosterFromGoods(raw.link || raw.website);
+  if (interparkUrl && !isFallbackOrEmptyPoster(interparkUrl)) return interparkUrl;
+
+  const fallbackCandidate = resolveImageUrl(raw.image || raw.backupPoster || raw.posterUrl || raw.poster);
+  if (fallbackCandidate && !isFallbackOrEmptyPoster(fallbackCandidate)) {
+    return fallbackCandidate;
+  }
+  return '';
+}
+
 export function normalizeItem(raw) {
   const movie = raw.genre === 'movie';
   const openRun = !movie && isOpenRunDate(raw.date);
@@ -375,7 +407,7 @@ export function normalizeItem(raw) {
       lat: typeof raw.lat === 'number' && Number.isFinite(raw.lat) ? raw.lat : null,
       lng: typeof raw.lng === 'number' && Number.isFinite(raw.lng) ? raw.lng : null,
       genre: raw.genre || '',
-      image: resolveImageUrl(raw.image || raw.backupPoster || raw.posterUrl || raw.poster),
+      image: resolveNormalizedPoster(raw),
       link: String(raw.link).trim(),
       price: cleanInlineText(raw.price),
       contact: cleanInlineText(raw.contact),
@@ -461,6 +493,54 @@ function resolvePosterUrl(raw, pageUrl) {
 
 export function isUsefulPosterUrl(url) {
   return /^https?:\/\//i.test(String(url || '')) && !POSTER_ASSET_SKIP.test(String(url));
+}
+
+export function isFallbackOrEmptyPoster(url) {
+  if (!url) return true;
+  const s = String(url).trim();
+  return !s
+    || /fallbacks\/|\.svg$/i.test(s)
+    || /placeholder|default[-_ ]?poster|no[-_ ]?image|no[-_ ]?img|no_poster|empty[-_ ]?image|blank\.gif|none\.png/i.test(s)
+    || /https_p\.gif|\/large\/ht\//i.test(s);
+}
+
+export function extractInterparkGoodsCode(goodsCodeOrLink) {
+  const str = String(goodsCodeOrLink || '').trim();
+  if (!str) return '';
+  const match = str.match(/(?:\/goods\/|[?&]goodscode=)([A-Za-z0-9]{6,12})(?=[/?&#\s]|$)/i);
+  if (match) return match[1];
+  const pure = str.match(/^[A-Za-z0-9]{6,12}$/);
+  if (pure && !/^(https?|goods|ticket|search|default|images?)$/i.test(pure[0])) return pure[0];
+  return '';
+}
+
+export function interparkPosterFromGoods(goodsCodeOrLink) {
+  const code = extractInterparkGoodsCode(goodsCodeOrLink);
+  if (!code) return '';
+  const prefix = code.slice(0, 2);
+  return `https://ticketimage.interpark.com/Play/image/large/${prefix}/${code}_p.gif`;
+}
+
+export function culturePortalPosterFromHtml(html, pageUrl = 'https://www.mcst.go.kr/') {
+  const text = String(html || '');
+  const base = String(pageUrl || 'https://www.mcst.go.kr/');
+  const metas = text.match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of metas) {
+    const property = metaAttribute(tag, 'property') || metaAttribute(tag, 'name');
+    if (!/^og:image$/i.test(property)) continue;
+    const url = resolvePosterUrl(metaAttribute(tag, 'content'), base);
+    if (isUsefulPosterUrl(url)) return url;
+  }
+  const images = text.match(/<img\b[^>]*>/gi) || [];
+  for (const tag of images) {
+    const raw = metaAttribute(tag, 'src') || metaAttribute(tag, 'data-src');
+    if (!raw || /logo|icon|share|footer|btn|arrow|wa_mark/i.test(raw)) continue;
+    if (raw.includes('/attachFiles/') || raw.includes('/upload/') || raw.includes('/poster/') || raw.includes('/monthServ/')) {
+      const url = resolvePosterUrl(raw, base);
+      if (isUsefulPosterUrl(url)) return url;
+    }
+  }
+  return '';
 }
 
 // Read a TimeTicket product document. Prefer og:image (the only poster in the

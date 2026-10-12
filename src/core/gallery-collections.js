@@ -179,6 +179,110 @@ export function resolveIndexedGalleryPhotos(indexedPhotos, {
     });
 }
 
+export function normalizeGalleryUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
+    parsed.protocol = 'https:';
+    parsed.hostname = parsed.hostname.toLowerCase();
+    let pathname = parsed.pathname || '';
+    if (pathname.length > 1 && pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1);
+    }
+    parsed.pathname = pathname;
+    if (parsed.search === '?') parsed.search = '';
+    if (parsed.hash === '#') parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
+export function extractUrlLabels(text, urlList = []) {
+  const map = new Map();
+  if (!text || !urlList || urlList.length === 0) return map;
+
+  const occurrences = [];
+  for (const url of urlList) {
+    if (!url) continue;
+    let searchFrom = 0;
+    while (true) {
+      const idx = text.indexOf(url, searchFrom);
+      if (idx === -1) break;
+      occurrences.push({ url, start: idx, end: idx + url.length });
+      searchFrom = idx + url.length;
+    }
+  }
+  occurrences.sort((a, b) => a.start - b.start);
+  if (occurrences.length === 0) return map;
+
+  const consumedChunks = new Set();
+
+  for (let i = 0; i < occurrences.length; i++) {
+    const cur = occurrences[i];
+    const prevEnd = i === 0 ? 0 : occurrences[i - 1].end;
+    const nextStart = i === occurrences.length - 1 ? text.length : occurrences[i + 1].start;
+
+    const chunkAfter = text.slice(cur.end, nextStart).trim();
+    const canUseBefore = !consumedChunks.has(i - 1);
+    const chunkBefore = canUseBefore ? text.slice(prevEnd, cur.start).trim() : '';
+
+    let label = '';
+
+    // 1. Bracket strictly right after URL: e.g. "https://... [잎새사랑]"
+    const bracketAfter = chunkAfter.match(/^\[([^\]]+)\]/);
+    if (bracketAfter) {
+      label = `[${bracketAfter[1].trim()}]`;
+      consumedChunks.add(i);
+    }
+
+    // 2. Bracket strictly right before URL: e.g. "[맛집A] https://..."
+    if (!label && chunkBefore) {
+      const bracketBefore = chunkBefore.match(/\[([^\]]+)\]\s*$/);
+      if (bracketBefore) {
+        label = `[${bracketBefore[1].trim()}]`;
+      }
+    }
+
+    // 3. Short prefix followed by bracket after URL (e.g. "https://... 16시30분 [안성휴게소]")
+    if (!label && chunkAfter) {
+      const anyBracket = chunkAfter.match(/\[([^\]]+)\]/);
+      if (anyBracket && chunkAfter.indexOf(anyBracket[0]) < 25) {
+        const prefix = chunkAfter.slice(0, chunkAfter.indexOf(anyBracket[0])).trim();
+        label = prefix ? `${prefix} [${anyBracket[1].trim()}]` : `[${anyBracket[1].trim()}]`;
+        consumedChunks.add(i);
+      } else {
+        const firstPhrase = chunkAfter.split(/(?:---|---|\n|[.!?]\s)/)[0].trim();
+        if (firstPhrase && firstPhrase.length <= 40) {
+          label = firstPhrase;
+          consumedChunks.add(i);
+        }
+      }
+    }
+
+    // 4. Short prefix before URL (e.g. "1. 성심당 본점 https://...")
+    if (!label && chunkBefore) {
+      const cleanBefore = chunkBefore.replace(/^[-*•\d.)\s]+/, '').trim();
+      const lastPhrase = cleanBefore.split(/(?:---|---|\n|[.!?]\s)/).pop().trim();
+      if (lastPhrase && lastPhrase.length <= 40) {
+        label = lastPhrase;
+      }
+    }
+
+    if (!label && occurrences.length === 1) {
+      const clean = text.replace(cur.url, '').replace(/\s+/g, ' ').trim();
+      if (clean) label = clean.length > 60 ? `${clean.slice(0, 60)}...` : clean;
+    }
+
+    if (!map.has(cur.url) && label) {
+      map.set(cur.url, label);
+    }
+  }
+
+  return map;
+}
+
 /** Stable, list-unique key for a 링크 row: one card per (source, owner, url). */
 export function galleryLinkKey(item) {
   return `link:${item?.source || ''}:${item?.messageId || ''}:${item?.url || ''}`;
@@ -201,34 +305,50 @@ export function buildGalleryLinks({
   const seen = new Set();
   const pushFrom = (body, makeItem) => {
     let firstUrlSeen = false;
-    (extractUrls(body) || []).forEach(info => {
-      if (!info?.url || seen.has(info.url) || !isExternalServiceUrl(info.url)) return;
+    const rawInfos = extractUrls(body) || [];
+    const validUrls = [];
+    rawInfos.forEach(info => {
+      if (info?.url && isExternalServiceUrl(info.url)) {
+        validUrls.push(info.url);
+      }
+    });
+    const labelMap = extractUrlLabels(body, validUrls);
+
+    rawInfos.forEach(info => {
+      if (!info?.url || !isExternalServiceUrl(info.url)) return;
+      const normKey = normalizeGalleryUrl(info.url);
+      if (seen.has(normKey) || seen.has(info.url)) return;
+      seen.add(normKey);
       seen.add(info.url);
+      const contextTitle = labelMap.get(info.url) || '';
       // Only the owner's first URL reuses its cached linkPreview (the cache is keyed to it).
-      list.push(makeItem(info.url, !firstUrlSeen));
+      list.push(makeItem(info.url, !firstUrlSeen, contextTitle));
       firstUrlSeen = true;
     });
   };
   (Array.isArray(messages) ? messages : []).forEach(msg => {
     if (!msg?.text) return;
-    pushFrom(msg.text, (url, first) => ({
+    pushFrom(msg.text, (url, first, contextTitle) => ({
       url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text,
+      contextTitle,
       linkPreview: first ? msg.linkPreview : null, source: 'chat'
     }));
   });
   (Array.isArray(memos) ? memos : []).forEach(memo => {
     const body = memo?.text || memo?.content || memo?.body || '';
     if (!body || isTombstone(memo)) return;
-    pushFrom(body, (url, first) => ({
+    pushFrom(body, (url, first, contextTitle) => ({
       url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '',
+      contextTitle,
       text: body, linkPreview: first ? (memo.linkPreview || null) : null, source: 'memo'
     }));
   });
   (Array.isArray(meetings) ? meetings : []).forEach(meeting => {
     const body = [meeting?.note, meeting?.memo, meeting?.description, meeting?.text].filter(Boolean).join('\n');
     if (!body) return;
-    pushFrom(body, url => ({
+    pushFrom(body, (url, _first, contextTitle) => ({
       url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
+      contextTitle,
       messageId: `meeting:${meeting.date || ''}`, text: body, source: 'meeting',
       title: meeting.date ? `${meeting.date} 일정` : '일정'
     }));

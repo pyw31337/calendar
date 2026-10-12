@@ -291,6 +291,7 @@ export function DailyWeatherIcon({ date, lat, lon, locationName, className, size
   const ahead = date ? daysAheadOf(date) : NaN;
   const inRange = hasCoords && Number.isFinite(ahead) && ahead >= 0 && ahead <= DAILY_FORECAST_MAX_DAYS;
   const [forecast, setForecast] = React.useState(null);
+  const [detailOpen, setDetailOpen] = React.useState(false);
 
   React.useEffect(() => {
     setForecast(null);
@@ -307,15 +308,41 @@ export function DailyWeatherIcon({ date, lat, lon, locationName, className, size
   const minT = forecast.min != null ? Math.round(forecast.min) : null;
   const place = locationName ? `${locationName} ` : '';
   const range = maxT != null && minT != null ? ` 최고 ${maxT}° / 최저 ${minT}°` : '';
-  const label = `${place}예보${range}`;
-  return React.createElement('span', {
-    className: className || 'daily-weather-icon',
-    title: label,
-    'aria-label': label,
-    role: 'img',
-  },
-    getWeatherIcon(forecast.code, size),
-    maxT != null ? React.createElement('span', { className: 'daily-weather-temp', 'aria-hidden': 'true' }, `${maxT}°`) : null
+  const label = `${place}예보${range} - 일기예보 상세 보기`;
+  return React.createElement(React.Fragment, null,
+    React.createElement('span', {
+      className: className || 'daily-weather-icon',
+      title: label,
+      'aria-label': label,
+      role: 'button',
+      tabIndex: 0,
+      style: { cursor: 'pointer' },
+      onClick: (e) => {
+        e.stopPropagation();
+        setDetailOpen(true);
+      },
+      onKeyDown: (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          setDetailOpen(true);
+        }
+      }
+    },
+      getWeatherIcon(forecast.code, size),
+      maxT != null ? React.createElement('span', { className: 'daily-weather-temp', 'aria-hidden': 'true' }, `${maxT}°`) : null
+    ),
+    detailOpen && React.createElement(WeatherDetailModal, {
+      dateStr: date,
+      weatherLocation: {
+        lat: latNum,
+        lon: lonNum,
+        name: locationName || '모임 장소',
+        isMeetingPlace: Boolean(locationName),
+        needsReverseGeocode: true
+      },
+      onClose: () => setDetailOpen(false)
+    })
   );
 }
 

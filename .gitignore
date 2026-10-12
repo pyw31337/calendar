@@ -29,8 +29,8 @@ ops-backups/
 *.png
 !history/*.png
 !icons/*.png
-cron.log
-scripts/data/
+scripts/data/*
+!scripts/data/culture-poster-cache.json
 
 # Firestore emulator logs
 firestore-debug.log

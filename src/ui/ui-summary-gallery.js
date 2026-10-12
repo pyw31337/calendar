@@ -40,10 +40,8 @@ const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso
 
 const PLACE_UNCLASSIFIED_KEY = '__unclassified__';
 const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
-// Archive routes can contain thousands of photos. Keeping the gallery interactive matters more
-// than inserting every thumbnail in one synchronous React commit, so grids reveal a bounded
-// first slice and let people ask for the next slice. This caps DOM/layout/image-observer work.
-const PAGE_RENDER_SIZE = 40;
+// Archive routes can contain thousands of photos. Same 100-item page size as 갤러리 (GALLERY_PAGE_SIZE in ui-chat-gallery.js).
+const PAGE_RENDER_SIZE = 100;
 const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
 
 // Gallery's existing number-window calculation is the single pagination rule. Archive and
@@ -100,8 +98,8 @@ function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
   const page = paginateGalleryItems(list, currentPage, ARCHIVE_GRID_INITIAL_COUNT);
   const visible = page.items;
 
-  // Progressive 2-stage chunk rendering: paint first 16 immediately, then the rest on next animation frame
-  const INITIAL_CHUNK = 16;
+  // Progressive 2-stage chunk rendering: paint first 24 immediately, then the rest on next animation frame
+  const INITIAL_CHUNK = 24;
   const [renderedCount, setRenderedCount] = React.useState(() => Math.min(visible.length, INITIAL_CHUNK));
   React.useEffect(() => {
     setRenderedCount(Math.min(visible.length, INITIAL_CHUNK));
@@ -118,7 +116,7 @@ function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
     const nextPageStart = currentPage * ARCHIVE_GRID_INITIAL_COUNT;
     const nextPageItems = list.slice(nextPageStart, nextPageStart + ARCHIVE_GRID_INITIAL_COUNT);
     const prefetch = () => {
-      nextPageItems.slice(0, 16).forEach(p => {
+      nextPageItems.slice(0, 32).forEach(p => {
         const url = selectImageVariant({
           surface: 'grid',
           uploadSource: p?.uploadSource || p?.source,
@@ -412,6 +410,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
   }, list.map(tab => {
     const count = Number(tab.count || 0);
     const isActive = activeKey === tab.key;
+    const isMulti = count > 9;
     return /*#__PURE__*/React.createElement("button", {
       key: tab.key,
       type: "button",
@@ -432,22 +431,26 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
         ...tabTextStyle
       }
     }, tab.label, count > 0 && /*#__PURE__*/React.createElement("span", {
-        className: `underline-tabs-count${countBadgeClassName ? ` ${countBadgeClassName}` : ''}`,
+        className: `underline-tabs-count ${countBadgeClassName || ''} ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`.trim(),
+        "data-digits": isMulti ? "multi" : "single",
         style: {
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           verticalAlign: 'middle',
           lineHeight: 1,
-          minWidth: '20px',
-          height: '18px',
-          borderRadius: 'var(--radius-full)',
+          height: '20px',
+          minWidth: isMulti ? '28px' : '20px',
+          width: isMulti ? 'auto' : '20px',
+          aspectRatio: isMulti ? 'auto' : '1 / 1',
+          borderRadius: '9999px',
           backgroundColor: tab.color || tab.badgeColor || '#2563EB',
           color: '#FFFFFF',
           fontSize: 'var(--font-size-xs)',
           fontWeight: 'bold',
-          padding: '0 6px',
+          padding: isMulti ? '0 7px' : '0',
           boxSizing: 'border-box',
+          flexShrink: 0,
           ...countBadgeStyle
         }
       }, count));
@@ -5052,11 +5055,18 @@ function culturePosterUrl(item) {
     item.thumbnailUrl,
     photo && (photo.thumbUrl || photo.url || photo.imageUrl || photo.image)
   ];
+  let fallbackCandidate = '';
   for (const value of candidates) {
     const url = String(value || '').trim();
-    if (url && url !== 'undefined' && url !== 'null') return url;
+    if (!url || url === 'undefined' || url === 'null') continue;
+    if (/https_p\.gif|\/large\/ht\//i.test(url)) continue;
+    if (/fallbacks\/|\.svg$/i.test(url) || /placeholder|default[-_ ]?poster|no[-_ ]?image/i.test(url)) {
+      if (!fallbackCandidate) fallbackCandidate = url;
+      continue;
+    }
+    return url;
   }
-  return '';
+  return fallbackCandidate;
 }
 
 function mergeCultureItemPreferPoster(base, overlay) {
@@ -6587,9 +6597,9 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                   if (img) img.style.display = 'none';
                   return;
                 }
-                const next = [item.imageUrl, item.thumbUrl, item.image]
+                const next = [item.backupPoster, item.posterUrl, item.imageUrl, item.thumbUrl, item.image, item.poster]
                   .map(value => String(value || '').trim())
-                  .find(value => value && value !== img.src);
+                  .find(value => value && value !== img.src && !/https_p\.gif|\/large\/ht\//i.test(value));
                 if (next) {
                   img.dataset.posterFallback = '1';
                   img.src = next;
@@ -6808,8 +6818,22 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           },
             /*#__PURE__*/React.createElement("img", {
               src: culturePosterUrl(selected), alt: selected.title, loading: 'lazy',
-              style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
-              onError: e => { e.currentTarget.style.display = 'none'; }
+              onError: e => {
+                const img = e.currentTarget;
+                if (!img || img.dataset.posterFallback === '1') {
+                  if (img) img.style.display = 'none';
+                  return;
+                }
+                const next = [selected.backupPoster, selected.posterUrl, selected.imageUrl, selected.thumbUrl, selected.image, selected.poster]
+                  .map(v => String(v || '').trim())
+                  .find(v => v && v !== img.src && !/https_p\.gif|\/large\/ht\//i.test(v));
+                if (next) {
+                  img.dataset.posterFallback = '1';
+                  img.src = next;
+                  return;
+                }
+                img.style.display = 'none';
+              }
             }),
             (anniversaryCategory === 'movie' || selected.genre === 'movie') && /*#__PURE__*/React.createElement("span", {
               'aria-hidden': 'true', style: {

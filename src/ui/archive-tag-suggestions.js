@@ -327,7 +327,10 @@ export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoD
       if (!byDate.size) return null;
       const dates = Array.from(byDate.keys()).sort();
       const latest = [...known, ...dates].sort().pop();
-      const memoAdd = dates.map(date => `${date.slice(2, 4)}.${date.slice(5, 7)}.${date.slice(8, 10)} 사진`).join(' ');
+      const memoAdd = dates.map(date => `${date.slice(2, 4)}.${date.slice(5, 7)}.${date.slice(8, 10)}`).join(' ');
+      const cleanedExistingMemo = String(place.memo || '')
+        .replace(/(?:^|[\s\/\n])\s*(?:\d{4}[.-]|\d{2}[.-])?\d{2}[.-]\d{2}(?:\s*\([^)]*\))?\s*\/?\s*사진\s*\d*장?(?=[\s\/\n]|$)/gi, ' ')
+        .replace(/\s+/g, ' ').trim();
       return {
         id: `visit:${place.id || placeTagToken(place)}`,
         place,
@@ -335,7 +338,7 @@ export function buildPlaceVisitSuggestions({ places = [], photos = [], getPhotoD
         photoCount: dates.reduce((n, d) => n + byDate.get(d), 0),
         next: {
           ...place,
-          memo: [String(place.memo || '').trim(), memoAdd].filter(Boolean).join(' ').slice(0, 2000),
+          memo: [cleanedExistingMemo, memoAdd].filter(Boolean).join(' ').slice(0, 2000),
           visitStatus: 'visited',
           visitDate: latest,
         },

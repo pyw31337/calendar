@@ -434,17 +434,19 @@
 
 /* Single digit (0~9): exact 1:1 square circle */
 .renewal-shell.v2-design .section-count-badge:not(.is-multi-digit):not([data-digits="multi"]) {
-  width: var(--v2-badge-min-height, 20px);
-  padding: 0;
-  aspect-ratio: 1 / 1;
+  width: var(--v2-badge-min-height, 20px) !important;
+  min-width: var(--v2-badge-min-height, 20px) !important;
+  padding: 0 !important;
+  aspect-ratio: 1 / 1 !important;
 }
 
 /* Multi-digit (10+): expands to a smooth capsule/pill (never an ellipse) */
 .renewal-shell.v2-design .section-count-badge.is-multi-digit,
 .renewal-shell.v2-design .section-count-badge[data-digits="multi"] {
   width: auto !important;
-  padding: 0 5.5px !important;
-  aspect-ratio: auto;
+  min-width: calc(var(--v2-badge-min-height, 20px) + 8px) !important;
+  padding: 0 7px !important;
+  aspect-ratio: auto !important;
   flex: 0 0 auto;
 }
 

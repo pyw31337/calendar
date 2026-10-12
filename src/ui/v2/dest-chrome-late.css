@@ -1018,8 +1018,8 @@ html:has(.renewal-shell.v2-design) :is(
   .region-filter-chip-count
 ):is([data-digits="multi"], .is-multi-digit) {
   width: auto !important;
-  min-width: var(--v2-badge-h, 20px) !important;
-  padding: 0 5.5px !important;
+  min-width: calc(var(--v2-badge-h, 20px) + 8px) !important;
+  padding: 0 7px !important;
   aspect-ratio: auto !important;
   flex: 0 0 auto !important;
   border-radius: 9999px !important;

@@ -23,7 +23,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compactItem, isVisible, mergeDuplicates, normalizeItem, timeTicketPosterFromHtml, timeTicketPosterNeedsCanonical, timeTicketProductUrl } from './lib/culture-normalize.mjs';
+import {
+  compactItem,
+  culturePortalPosterFromHtml,
+  interparkPosterFromGoods,
+  isFallbackOrEmptyPoster,
+  isVisible,
+  mergeDuplicates,
+  normalizeItem,
+  timeTicketPosterFromHtml,
+  timeTicketPosterNeedsCanonical,
+  timeTicketProductUrl
+} from './lib/culture-normalize.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_URL = 'https://pyw31337.github.io/culture/data/performances.json';
@@ -58,30 +69,76 @@ const FEEDS = [
 ];
 
 
-function isFallbackPoster(url) {
-  return !url || /fallbacks\/movie\.(svg|png|jpg)$/i.test(String(url));
+const POSTER_CACHE_FILE = path.resolve(__dirname, 'data/culture-poster-cache.json');
+const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
+const FETCH_HEADERS = {
+  'user-agent': BROWSER_UA,
+  'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+};
+
+let posterCache = {};
+try {
+  if (fs.existsSync(POSTER_CACHE_FILE)) {
+    posterCache = JSON.parse(fs.readFileSync(POSTER_CACHE_FILE, 'utf8'));
+    // Purge corrupted/fallback cache entries (such as https_p.gif or fallback svgs)
+    for (const key of Object.keys(posterCache)) {
+      if (isFallbackOrEmptyPoster(posterCache[key])) {
+        delete posterCache[key];
+      }
+    }
+  }
+} catch (e) {
+  posterCache = {};
 }
 
-// Culture Flow may legitimately have no poster yet for a newly announced title. Naver's movie
-// search result exposes a small poster thumbnail even in that case; cache that URL in our static
-// snapshot so runtime users never have to scrape a search engine or pay for another API call.
-async function enrichMovieFromNaver(item) {
-  if (!item || item.genre !== 'movie' || !isFallbackPoster(item.image)) return item;
+function savePosterCache() {
   try {
-    const response = await fetch(`https://search.naver.com/search.naver?query=${encodeURIComponent(`${item.title} 영화`)}`, {
-      headers: { 'user-agent': 'Mozilla/5.0 (compatible; CalendarContentSync/1.0)' },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!response.ok) return item;
-    const html = await response.text();
-    const posterCandidates = [...html.matchAll(/https?:[^"'\\ ]+(?:jpg|jpeg|png|webp)/gi)]
-      .map(match => match[0].replaceAll('\\u0026', '&'))
-      .filter(url => /movie\.phinf|imgmovie/i.test(url));
-    const poster = posterCandidates.find(url => /type=o|size=\d+x\d+/i.test(url)) || posterCandidates[0] || '';
-    if (poster) item.image = poster;
-    if (!item.ageRating || /미정|정보없음|정보 없음/i.test(item.ageRating)) {
-      const rating = html.match(/(전체관람가|12세이상관람가|15세이상관람가|청소년관람불가)/)?.[1];
-      if (rating) item.ageRating = rating;
+    fs.mkdirSync(path.dirname(POSTER_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(POSTER_CACHE_FILE, `${JSON.stringify(posterCache, null, 2)}\n`);
+  } catch (e) {
+    console.warn('[sync-culture-performances] failed to save poster cache:', e.message);
+  }
+}
+
+function getCachedPoster(item) {
+  if (!item) return '';
+  const cached = posterCache[item.id] || posterCache[item.link] || posterCache[`title:${item.title}`] || '';
+  return isFallbackOrEmptyPoster(cached) ? '' : cached;
+}
+
+function setCachedPoster(item, posterUrl) {
+  if (!item || !posterUrl || isFallbackOrEmptyPoster(posterUrl)) return;
+  if (item.id) posterCache[item.id] = posterUrl;
+  if (item.link) posterCache[item.link] = posterUrl;
+  if (item.title) posterCache[`title:${item.title}`] = posterUrl;
+}
+
+async function enrichMovieFromNaver(item) {
+  if (!item || item.genre !== 'movie' || !isFallbackOrEmptyPoster(item.image)) return item;
+  try {
+    const clean = item.title.replace(/[[\]()【】〈〉《》「」『』]/g, ' ').replace(/\s+/g, ' ').trim();
+    const queries = [`${clean} 영화`, clean];
+    for (const q of queries) {
+      const response = await fetch(`https://search.naver.com/search.naver?query=${encodeURIComponent(q)}`, {
+        headers: FETCH_HEADERS,
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) continue;
+      const html = await response.text();
+      const posterCandidates = [...html.matchAll(/https?:[^"'\\ ]+(?:jpg|jpeg|png|webp)/gi)]
+        .map(match => match[0].replaceAll('\\u0026', '&'))
+        .filter(url => /movie\.phinf|imgmovie/i.test(url) && !isFallbackOrEmptyPoster(url));
+      const poster = posterCandidates.find(url => /type=o|size=\d+x\d+/i.test(url)) || posterCandidates[0] || '';
+      if (poster) {
+        item.image = poster;
+        setCachedPoster(item, poster);
+        if (!item.ageRating || /미정|정보없음|정보 없음/i.test(item.ageRating)) {
+          const rating = html.match(/(전체관람가|12세이상관람가|15세이상관람가|청소년관람불가)/)?.[1];
+          if (rating) item.ageRating = rating;
+        }
+        break;
+      }
     }
   } catch (error) {
     console.warn(`[sync-culture-performances] movie enrichment skipped for ${item.title}: ${error.message}`);
@@ -89,6 +146,91 @@ async function enrichMovieFromNaver(item) {
   return item;
 }
 
+async function enrichFromOpenGraph(item) {
+  if (!item || !isFallbackOrEmptyPoster(item.image)) return item;
+  const link = String(item.link || item.website || '').trim();
+  if (!link || !/^https?:\/\//i.test(link) || /search\.naver\.com|search\.daum\.net/i.test(link)) return item;
+  try {
+    const response = await fetch(link, {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return item;
+    const html = await response.text();
+    const ogMatch = html.match(/<meta\b[^>]*property=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta\b[^>]*content=["']([^"']+)["'][^>]*property=["'](?:og:image|twitter:image)["']/i);
+    if (ogMatch && ogMatch[1]) {
+      const candidate = ogMatch[1].trim();
+      let resolved = candidate;
+      if (!/^https?:\/\//i.test(resolved)) {
+        try { resolved = new URL(resolved, link).href; } catch { resolved = ''; }
+      }
+      if (resolved && !isFallbackOrEmptyPoster(resolved)) {
+        item.image = resolved;
+        setCachedPoster(item, resolved);
+        return item;
+      }
+    }
+  } catch (error) {
+    // silently skip network/page errors
+  }
+  return item;
+}
+
+async function enrichPerformanceFromSearch(item) {
+  if (!item || !isFallbackOrEmptyPoster(item.image)) return item;
+  try {
+    const cleanTitle = item.title.replace(/[[\]()【】〈〉《》「」『』]/g, ' ').replace(/\s+/g, ' ').trim();
+    const queries = [
+      `${cleanTitle} ${item.venue || ''}`.trim(),
+      `${cleanTitle} 포스터`.trim(),
+      `${cleanTitle} ${item.genre || '공연'}`.trim()
+    ];
+
+    // Try Naver Search
+    for (const query of queries) {
+      if (!isFallbackOrEmptyPoster(item.image)) break;
+      const response = await fetch(`https://search.naver.com/search.naver?query=${encodeURIComponent(query)}`, {
+        headers: FETCH_HEADERS,
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) continue;
+      const html = await response.text();
+      const candidates = [...html.matchAll(/https?:\/\/[^\s"'<>\\]+?(?:search\.pstatic\.net|phinf)[^\s"'<>\\]+?(?:jpg|jpeg|png|webp)/gi)]
+        .map(m => m[0].replaceAll('\\u0026', '&'))
+        .filter(url => !/favicon|logo|icon|profile|avatar|comment/i.test(url) && !isFallbackOrEmptyPoster(url));
+      const poster = candidates.find(url => /type=o|size=\d+x\d+|common/i.test(url)) || candidates[0] || '';
+      if (poster) {
+        item.image = poster;
+        setCachedPoster(item, poster);
+        return item;
+      }
+    }
+
+    // Secondary fallback: Daum Image Search
+    if (isFallbackOrEmptyPoster(item.image)) {
+      const daumResponse = await fetch(`https://search.daum.net/search?w=img&q=${encodeURIComponent(`${cleanTitle} 포스터`)}`, {
+        headers: FETCH_HEADERS,
+        signal: AbortSignal.timeout(10000)
+      });
+      if (daumResponse.ok) {
+        const daumHtml = await daumResponse.text();
+        const daumCandidates = [...daumHtml.matchAll(/https?:\/\/[^\s"'<>\\]+?(?:daumcdn\.net|kakaocdn\.net)[^\s"'<>\\]+?(?:jpg|jpeg|png|webp)/gi)]
+          .map(m => m[0].replaceAll('\\u0026', '&'))
+          .filter(url => !/thumb|favicon|logo|icon|profile/i.test(url) && !isFallbackOrEmptyPoster(url));
+        const daumPoster = daumCandidates[0] || '';
+        if (daumPoster) {
+          item.image = daumPoster;
+          setCachedPoster(item, daumPoster);
+          return item;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`[sync-culture-performances] search enrichment skipped for ${item.title}: ${error.message}`);
+  }
+  return item;
+}
 
 async function mapPool(items, limit, worker) {
   const queue = items.slice();
@@ -98,34 +240,99 @@ async function mapPool(items, limit, worker) {
   await Promise.all(runners);
 }
 
-// Culture Flow keeps the list-API thumbnail. That file 404s once TimeTicket
-// replaces the poster; the product page's og:image is the file that still loads.
-// A failed fetch leaves the previous URL in place — we do not invent one.
-async function enrichTimeTicketPosters(items) {
-  const targets = items.filter(timeTicketPosterNeedsCanonical);
-  if (!targets.length) return;
-  let refreshed = 0;
-  let failed = 0;
-  await mapPool(targets, 6, async item => {
-    const pageUrl = timeTicketProductUrl(item);
-    try {
-      const response = await fetch(pageUrl, {
-        headers: { 'user-agent': 'Mozilla/5.0 (compatible; CalendarContentSync/1.0)' },
-        signal: AbortSignal.timeout(12000)
-      });
-      if (!response.ok) { failed++; return; }
-      const poster = timeTicketPosterFromHtml(await response.text(), pageUrl);
-      if (!poster) { failed++; return; }
-      if (poster !== item.image) {
-        item.image = poster;
-        refreshed++;
-      }
-    } catch (error) {
-      failed++;
-      console.warn(`[sync-culture-performances] timeticket poster skipped for ${item.title}: ${error.message}`);
+async function enrichCulturePortalPoster(item) {
+  if (!item || !isFallbackOrEmptyPoster(item.image)) return item;
+  const link = String(item.link || item.website || '').trim();
+  if (!link || (!link.includes('mcst.go.kr') && !link.includes('culture.go.kr'))) return item;
+  try {
+    const response = await fetch(link, {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return item;
+    const poster = culturePortalPosterFromHtml(await response.text(), link);
+    if (poster && !isFallbackOrEmptyPoster(poster)) {
+      item.image = poster;
+      setCachedPoster(item, poster);
     }
-  });
-  console.log(`[sync-culture-performances] timeticket posters: refreshed ${refreshed}, unchanged ${targets.length - refreshed - failed}, failed ${failed}`);
+  } catch (error) {
+    console.warn(`[sync-culture-performances] mcst poster skipped for ${item.title}: ${error.message}`);
+  }
+  return item;
+}
+
+async function enrichTimeTicketPoster(item) {
+  const pageUrl = timeTicketProductUrl(item);
+  if (!pageUrl) return item;
+  try {
+    const response = await fetch(pageUrl, {
+      headers: FETCH_HEADERS,
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!response.ok) return item;
+    const poster = timeTicketPosterFromHtml(await response.text(), pageUrl);
+    if (poster && !isFallbackOrEmptyPoster(poster)) {
+      item.image = poster;
+      setCachedPoster(item, poster);
+    }
+  } catch (error) {
+    console.warn(`[sync-culture-performances] timeticket poster skipped for ${item.title}: ${error.message}`);
+  }
+  return item;
+}
+
+async function enrichAllFeedPosters(items, label) {
+  let fromCache = 0;
+  let fromInterpark = 0;
+  let remoteRefreshed = 0;
+
+  // Pass 1: Synchronous cache & deterministic Interpark recovery
+  for (const item of items) {
+    if (!isFallbackOrEmptyPoster(item.image)) {
+      setCachedPoster(item, item.image);
+      continue;
+    }
+    const cached = getCachedPoster(item);
+    if (cached && !isFallbackOrEmptyPoster(cached)) {
+      item.image = cached;
+      fromCache++;
+      continue;
+    }
+    const interpark = interparkPosterFromGoods(item.link || item.website);
+    if (interpark && !isFallbackOrEmptyPoster(interpark)) {
+      item.image = interpark;
+      setCachedPoster(item, interpark);
+      fromInterpark++;
+      continue;
+    }
+  }
+
+  // Pass 2: Asynchronous network recovery for unresolved items
+  const unresolved = items.filter(it => isFallbackOrEmptyPoster(it.image));
+  if (unresolved.length > 0) {
+    console.log(`[sync-culture-performances] ${label}: recovering ${unresolved.length} unresolved poster(s) via source scrapers & search...`);
+    await mapPool(unresolved, 6, async item => {
+      const prev = item.image;
+      if (item.genre === 'movie') {
+        await enrichMovieFromNaver(item);
+      } else if (item.source === 'timeticket' || timeTicketProductUrl(item)) {
+        await enrichTimeTicketPoster(item);
+      } else if (item.link && (item.link.includes('mcst.go.kr') || item.link.includes('culture.go.kr'))) {
+        await enrichCulturePortalPoster(item);
+      }
+      if (isFallbackOrEmptyPoster(item.image)) {
+        await enrichFromOpenGraph(item);
+      }
+      if (isFallbackOrEmptyPoster(item.image)) {
+        await enrichPerformanceFromSearch(item);
+      }
+      if (item.image !== prev && !isFallbackOrEmptyPoster(item.image)) {
+        remoteRefreshed++;
+      }
+    });
+  }
+
+  console.log(`[sync-culture-performances] ${label} posters: cached ${fromCache}, interpark ${fromInterpark}, remote refreshed ${remoteRefreshed}, remaining unresolved: ${items.filter(it => isFallbackOrEmptyPoster(it.image)).length}`);
 }
 
 function writeFeedIfHealthy(outputPath, items, label) {
@@ -210,12 +417,10 @@ async function main() {
       normalized = result.items;
       if (result.mergedCount > 0) console.log(`[sync-culture-performances] ${feed.label}: merged ${result.mergedCount} duplicate listing(s)`);
     }
-    if (feed.label === 'movies') {
-      for (const item of normalized) await enrichMovieFromNaver(item);
-    }
-    if (feed.label === 'performances') await enrichTimeTicketPosters(normalized);
+    await enrichAllFeedPosters(normalized, feed.label);
     writeFeedIfHealthy(path.resolve(DATA_DIR, feed.file), normalized, feed.label);
   }
+  savePosterCache();
 }
 
 await main();

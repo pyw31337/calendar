@@ -5,7 +5,8 @@ import { readFile } from 'node:fs/promises';
 globalThis.window = globalThis.window || {};
 const { getPhotoCommentIdentity, createPhotoCommentIdentityResolver } = await import('../src/core/app-domain-helpers.js');
 const {
-  buildGalleryLinks, buildGalleryKeyIndex, createGalleryOwnerLookup, resolveIndexedGalleryPhotos, withUniqueGalleryKeys
+  buildGalleryLinks, buildGalleryKeyIndex, createGalleryOwnerLookup, resolveIndexedGalleryPhotos, withUniqueGalleryKeys,
+  normalizeGalleryUrl, extractUrlLabels
 } = await import('../src/core/gallery-collections.js');
 
 const extractUrls = text => (String(text).match(/https?:\/\/\S+/g) || []).map(url => ({ url }));
@@ -99,3 +100,33 @@ test('the gallery page mounts each tab separately and keys links/files uniquely'
   assert.doesNotMatch(source, /\.findIndex\(entry => getPhotoKey\(entry\) === photoKey\)/, 'no per-thumbnail list scan');
   assert.doesNotMatch(source, /\(memos \|\| \[\]\)\.find\(row => row && row\.id === messageId\)/, 'no per-photo memo scan');
 });
+
+test('normalizeGalleryUrl unifies protocol, case and trailing slash to prevent duplicates', () => {
+  assert.equal(normalizeGalleryUrl('http://naver.me/G0DXnH2O/'), 'https://naver.me/G0DXnH2O');
+  assert.equal(normalizeGalleryUrl('https://NAVER.ME/G0DXnH2O'), 'https://naver.me/G0DXnH2O');
+  assert.equal(normalizeGalleryUrl('https://naver.me/G0DXnH2O'), 'https://naver.me/G0DXnH2O');
+});
+
+test('extractUrlLabels extracts specific bracket/line labels for multiple URLs in one message', () => {
+  const sample = '13시30분 [김천식당] https://naver.me/1 [잎새사랑 / 막국수] https://naver.me/2 [능이손칼국수] https://naver.me/3 16시30분 [안성휴게소]';
+  const urls = ['https://naver.me/1', 'https://naver.me/2', 'https://naver.me/3'];
+  const map = extractUrlLabels(sample, urls);
+  assert.equal(map.get('https://naver.me/1'), '[잎새사랑 / 막국수]');
+  assert.equal(map.get('https://naver.me/2'), '[능이손칼국수]');
+  assert.equal(map.get('https://naver.me/3'), '16시30분 [안성휴게소]');
+});
+
+test('buildGalleryLinks deduplicates http vs https and assigns contextTitle', () => {
+  const links = buildGalleryLinks({
+    ...linkDeps,
+    messages: [{
+      id: 'm1',
+      timestamp: 10,
+      text: '점심 [맛집A] http://naver.me/xyz/ 저녁 [맛집B] https://naver.me/xyz'
+    }]
+  });
+  // http://naver.me/xyz/ and https://naver.me/xyz are the same target URL, so only 1 item
+  assert.equal(links.length, 1);
+  assert.equal(links[0].contextTitle, '[맛집A]');
+});
+

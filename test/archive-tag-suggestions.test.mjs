@@ -122,7 +122,7 @@ test('place visits come from tagged photo dates the place memo does not have yet
   assert.equal(visits.length, 1);
   assert.deepEqual(visits[0].dates, ['2026-09-26']);
   assert.equal(visits[0].photoCount, 2);
-  assert.equal(visits[0].next.memo, '26.09.13 바이킹 26.09.26 사진');
+  assert.equal(visits[0].next.memo, '26.09.13 바이킹 26.09.26');
   assert.equal(visits[0].next.visitStatus, 'visited');
   assert.equal(visits[0].next.visitDate, '2026-09-26');
 });

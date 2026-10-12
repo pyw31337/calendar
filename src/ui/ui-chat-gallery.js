@@ -207,7 +207,8 @@ function GalleryLinkCard({ item, searchQuery = '' }) {
   // the "영상 바로보기" toggle -- TikTok's façade just opens a new tab instead of playing on this
   // page, which read as the button lying/glitching.
   const isVideoMedia = !!(mediaInfo && mediaInfo.playsInline);
-  const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
+  const cleanBody = item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  const fallbackTitle = item.title || item.contextTitle || (cleanBody.length > 70 ? `${cleanBody.slice(0, 70)}...` : cleanBody);
 
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1196,11 +1197,12 @@ export function ChatGalleryModal({
     const qNoHash = q.replace(/^#/, '');
     return sharedLinks.filter(item => {
       const matchText = (item.text || '').toLowerCase().includes(q) || (item.text || '').toLowerCase().includes(qNoHash);
+      const matchContextTitle = (item.contextTitle || '').toLowerCase().includes(q) || (item.contextTitle || '').toLowerCase().includes(qNoHash);
       const matchUrl = (item.url || '').toLowerCase().includes(q) || (item.url || '').toLowerCase().includes(qNoHash);
       const matchItemTitle = (item.title || '').toLowerCase().includes(q) || (item.title || '').toLowerCase().includes(qNoHash);
       const matchTitle = (item.linkPreview?.title || '').toLowerCase().includes(q) || (item.linkPreview?.title || '').toLowerCase().includes(qNoHash);
       const matchDesc = (item.linkPreview?.description || '').toLowerCase().includes(q) || (item.linkPreview?.description || '').toLowerCase().includes(qNoHash);
-      return matchText || matchUrl || matchItemTitle || matchTitle || matchDesc;
+      return matchText || matchContextTitle || matchUrl || matchItemTitle || matchTitle || matchDesc;
     });
   }, [sharedLinks, searchQuery]);
 

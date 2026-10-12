@@ -682,9 +682,9 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
           style: {
             fontSize: 'var(--font-size-xs)',
             fontWeight: 800,
-            padding: isMulti ? '0 5.5px' : '0',
+            padding: isMulti ? '0 7px' : '0',
             width: isMulti ? 'auto' : '18px',
-            minWidth: '18px',
+            minWidth: isMulti ? '26px' : '18px',
             height: '18px',
             aspectRatio: isMulti ? 'auto' : '1 / 1',
             borderRadius: '9999px',
