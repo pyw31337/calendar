@@ -20,10 +20,14 @@ const DEFAULT_PROJECT_ID = 'metro-live-2918e';
 const DEFAULT_MAX_PER_RUN = 80;
 const DEFAULT_CONCURRENCY = 4;
 const MAX_DOWNLOAD_BYTES = 35 * 1024 * 1024;
+const MAX_VIDEO_DOWNLOAD_BYTES = 120 * 1024 * 1024;
 const DEFAULT_TOKEN_SERVICE = 'Moyeora Media Analysis Worker';
 const MAX_CONSECUTIVE_ASSET_FAILURES = 3;
 const NETWORK_TIMEOUT_MS = 30 * 1000;
 const IDLE_HEARTBEAT_MS = 12 * 60 * 60 * 1000;
+const VIDEO_EXTENSIONS = new Set(['.3gp', '.avi', '.m4v', '.mkv', '.mov', '.mp4', '.webm']);
+const FFMPEG = process.env.MOYEORA_FFMPEG || '/opt/homebrew/bin/ffmpeg';
+const FFPROBE = process.env.MOYEORA_FFPROBE || '/opt/homebrew/bin/ffprobe';
 
 function kstDateStamp(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -250,25 +254,70 @@ async function inspectPhoto(photo, tempRoot, visionBinary) {
   const candidates = [photo.full, photo.imageUrl, photo.thumb, photo.thumbUrl]
     .map(value => String(value || '').trim()).filter(Boolean);
   const isGif = value => /\.gif(?:$|[?#])/i.test(value);
-  const url = candidates.find(value => !isGif(value)) || candidates[0] || '';
+  const hasVideoExtension = value => {
+    try { return VIDEO_EXTENSIONS.has(extname(new URL(value).pathname).toLowerCase()); }
+    catch { return false; }
+  };
+  const isVideo = /video/i.test(String(photo.mimeType || photo.contentType || photo.mediaType || ''))
+    || candidates.some(hasVideoExtension);
+  // A photo index normally has a still thumbnail too. Prefer the actual video when it is
+  // present; analysing its middle frames beats treating its poster image as the whole clip.
+  const url = isVideo
+    ? (candidates.find(hasVideoExtension) || candidates[0] || '')
+    : (candidates.find(value => !isGif(value)) || candidates[0] || '');
   if (!/^https:\/\//.test(url)) throw new Error('Missing Firebase Storage URL');
   const { response, bytes } = await timedRequest(url, {}, 'Photo download', async response => {
     if (!response.ok) return { response, bytes: Buffer.alloc(0) };
     const declared = Number(response.headers.get('content-length') || 0);
-    if (declared > MAX_DOWNLOAD_BYTES) throw new Error('Image exceeds local analysis limit');
+    if (declared > (isVideo ? MAX_VIDEO_DOWNLOAD_BYTES : MAX_DOWNLOAD_BYTES)) throw new Error(`${isVideo ? 'Video' : 'Image'} exceeds local analysis limit`);
     return { response, bytes: Buffer.from(await response.arrayBuffer()) };
   });
   if (!response.ok) throw new Error(`Image download failed: ${response.status}`);
-  if (bytes.length > MAX_DOWNLOAD_BYTES) throw new Error('Image exceeds local analysis limit');
+  if (bytes.length > (isVideo ? MAX_VIDEO_DOWNLOAD_BYTES : MAX_DOWNLOAD_BYTES)) throw new Error(`${isVideo ? 'Video' : 'Image'} exceeds local analysis limit`);
   const extension = extname(new URL(url).pathname) || '.jpg';
   const filename = join(tempRoot, `${String(photo.assetKey || 'photo').replace(/[^A-Za-z0-9_-]/g, '_')}${extension}`);
   await writeFile(filename, bytes);
   try {
     const command = visionBinary || '/usr/bin/xcrun';
-    const commandArgs = visionBinary ? [filename] : ['swift', VISION_SCRIPT, filename];
-    const insight = JSON.parse(await shell(command, commandArgs));
-    const lookHash = await lookHashOfFile(filename);
-    return lookHash ? { ...insight, lookHash } : insight;
+    const vision = async path => JSON.parse(await shell(command, visionBinary ? [path] : ['swift', VISION_SCRIPT, path]));
+    if (!isVideo) {
+      const insight = await vision(filename);
+      const lookHash = await lookHashOfFile(filename);
+      return lookHash ? { ...insight, lookHash } : insight;
+    }
+    // Pull three spread-out stills instead of trusting the first frame (often a black fade or
+    // title card). Frames are local, temporary JPEGs and are deleted with the source download.
+    const duration = Number((await shell(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nokey=1:noprint_wrappers=1', filename])).trim());
+    if (!Number.isFinite(duration) || duration <= 0) throw new Error('Video duration is unavailable');
+    const moments = [...new Set([0.15, 0.5, 0.85].map(part => Math.max(0, Math.min(duration - 0.05, duration * part))))];
+    const frames = [];
+    for (const [index, moment] of moments.entries()) {
+      const frame = join(tempRoot, `${String(photo.assetKey || 'video').replace(/[^A-Za-z0-9_-]/g, '_')}-${index}.jpg`);
+      await shell(FFMPEG, ['-v', 'error', '-ss', moment.toFixed(3), '-i', filename, '-frames:v', '1', '-q:v', '3', '-y', frame]);
+      frames.push({ frame, insight: await vision(frame) });
+    }
+    const labelScores = new Map();
+    const ocrText = new Set();
+    const sceneTags = new Set();
+    frames.forEach(({ insight }) => {
+      (insight.labels || []).forEach(label => {
+        const name = String(label?.name || '').trim();
+        if (name) labelScores.set(name, Math.max(labelScores.get(name) || 0, Number(label.confidence) || 0));
+      });
+      (insight.ocrText || []).forEach(value => { if (String(value || '').trim()) ocrText.add(String(value).trim()); });
+      (insight.suggestedTags || []).forEach(value => { if (String(value || '').trim()) sceneTags.add(String(value).trim()); });
+    });
+    const middle = frames[Math.floor(frames.length / 2)]?.frame;
+    const lookHash = middle ? await lookHashOfFile(middle) : '';
+    return {
+      labels: [...labelScores].map(([name, confidence]) => ({ name, confidence })).sort((a, b) => b.confidence - a.confidence).slice(0, 16),
+      ocrText: [...ocrText].slice(0, 12),
+      suggestedTags: [...sceneTags].slice(0, 12),
+      faceCount: Math.max(0, ...frames.map(({ insight }) => Number(insight.faceCount) || 0)),
+      mediaKind: 'video',
+      analyzedFrames: frames.length,
+      ...(lookHash ? { lookHash } : {})
+    };
   } finally {
     await rm(filename, { force: true });
   }

@@ -7,7 +7,12 @@ const MAX_TAGS = 20;
 const MAX_TEXT = 640;
 const MAX_OCR_LINES = 12;
 const MAX_LABELS = 16;
-const EVIDENCE_SOURCES = new Set(['existing-tag', 'capture-date', 'meeting-date', 'gps-place', 'ocr-person', 'vision-label', 'learned-feedback']);
+const EVIDENCE_SOURCES = new Set([
+  'existing-tag', 'capture-date', 'meeting-date', 'gps-place', 'ocr-person', 'vision-label', 'learned-feedback',
+  // Google Takeout fields are read locally from the user's export.  They are distinct from
+  // model guesses, so the review policy can allow only these explicit metadata sources in bulk.
+  'takeout-person', 'takeout-capture-date', 'takeout-gps'
+]);
 
 function tagEvidenceList(value) {
   return (Array.isArray(value) ? value : []).slice(0, 40).map(entry => ({
@@ -77,6 +82,8 @@ function sanitizeAnalysisItem(item = {}, now = Date.now()) {
     // Existing person/place tags are recognition results, not new recommendations.  Retain
     // their compact, non-image evidence so the client will not ask the family to add them again.
     recognizedEvidence: tagEvidenceList(item.recognizedEvidence),
+    // A candidate remains visible to the reviewer but is not a recommendation mutation target.
+    candidateEvidence: tagEvidenceList(item.candidateEvidence),
     people,
     places,
     meetings,

@@ -1,4 +1,5 @@
 import { getReservedSettlementItemKeys } from './settlement-card-selection.js';
+import { getAnalysisCandidateTags, getAnalysisSuggestedTags } from './ai-media-review.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -173,7 +174,10 @@ export function buildAiOperationsInbox({ calendar = {}, today, now = Date.now(),
 
   const strongSuggestions = (Array.isArray(mediaAnalysis) ? mediaAnalysis : [])
     .filter(item => item && !item.review && item.status === 'suggested')
-    .filter(item => Number(item.analysisVersion) >= 5 ? item.suggestedTags?.length : item.suggestedTags?.length || item.people?.length || item.places?.length || item.meetings?.length);
+    .filter(item => {
+      const candidates = getAnalysisCandidateTags(item);
+      return getAnalysisSuggestedTags(item).length || candidates.people.length || candidates.places.length || candidates.meetings.length;
+    });
   if (strongSuggestions.length) {
     tasks.push(asTask({
       id: 'media-analysis-review',

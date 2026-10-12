@@ -6,7 +6,7 @@ import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry, pa
 import { classifyGalleryItem, dedupeGalleryFiles, galleryFileViewModel } from '../core/gallery-item-kind.js';
 import { getPhotoTagCompleteness } from '../core/photo-tag-completeness.js';
 import { hasEquivalentPhotoTag } from '../core/photo-tag-identity.js';
-import { getAnalysisSuggestedTags, getMediaAnalysisReview, getSafeMediaAutoApplyCandidates, normalizeAnalysisTagList, prepareAnalysisTags } from '../core/ai-media-review.js';
+import { getAnalysisCandidateTags, getAnalysisSuggestedTags, getMediaAnalysisReview, getSafeMediaAutoApplyCandidates, normalizeAnalysisTagList, prepareAnalysisTags } from '../core/ai-media-review.js';
 import { persistMediaAnalysisReview } from '../core/media-analysis-review-save.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
@@ -3308,6 +3308,10 @@ export function ChatGalleryModal({
           const isSaving = analysisSavingAssetKey === item.assetKey;
           const isEditing = analysisAction.assetKey === item.assetKey && analysisAction.mode === 'edit';
           const suggestedTags = getAnalysisSuggestedTags(item).filter(tag => !photo || !hasEquivalentPhotoTag(tag, photo, calendar));
+          const candidateTags = getAnalysisCandidateTags(item);
+          const candidatePeople = candidateTags.people.filter(tag => !photo || !hasEquivalentPhotoTag(tag, photo, calendar));
+          const candidatePlaces = candidateTags.places.filter(tag => !photo || !hasEquivalentPhotoTag(tag, photo, calendar));
+          const candidateMeetings = candidateTags.meetings.filter(tag => !photo || !hasEquivalentPhotoTag(tag, photo, calendar));
           const suggestedDate = getSuggestedDateTag(photo, item);
 
           return /*#__PURE__*/React.createElement('article', {
@@ -3553,11 +3557,14 @@ export function ChatGalleryModal({
               /*#__PURE__*/React.createElement('div', {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }
               },
-                renderChips((item.suggestedTags || []).filter(tag => suggestedTags.includes(tag)), 'accent'),
-                renderChips((item.people || []).filter(tag => suggestedTags.includes(tag)), 'people'),
-                renderChips((item.places || []).filter(tag => suggestedTags.includes(tag)), 'places'),
-                renderChips((item.meetings || []).filter(tag => suggestedTags.includes(tag)), 'meetings'),
-                suggestedTags.length === 0 && /*#__PURE__*/React.createElement('span', {
+                renderChips(suggestedTags, 'accent'),
+                (candidatePeople.length || candidatePlaces.length || candidateMeetings.length) && /*#__PURE__*/React.createElement('span', {
+                  style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)', fontWeight: 700 }
+                }, '검토 후보:'),
+                renderChips(candidatePeople, 'people'),
+                renderChips(candidatePlaces, 'places'),
+                renderChips(candidateMeetings, 'meetings'),
+                suggestedTags.length === 0 && !candidatePeople.length && !candidatePlaces.length && !candidateMeetings.length && /*#__PURE__*/React.createElement('span', {
                   style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs, 12px)' }
                 }, '추천 태그 없음')
               ),
@@ -3749,8 +3756,8 @@ export function ChatGalleryModal({
                                 }
                               }, `+ #${name}`);
                             }),
-                            /* AI suggestions */
-                            suggestedTags.map(tag => /*#__PURE__*/React.createElement('button', {
+                            /* Direct metadata suggestions and separately-labelled manual candidates. */
+                            [...suggestedTags, ...candidatePeople, ...candidatePlaces, ...candidateMeetings].map(tag => /*#__PURE__*/React.createElement('button', {
                               key: `ai-${tag}`,
                               type: 'button',
                               onClick: () => appendTagToDraft(tag),

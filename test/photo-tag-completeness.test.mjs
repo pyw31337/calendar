@@ -61,7 +61,7 @@ test('existing aliases suppress redundant full-name recommendations in both work
   assert.equal(hasEquivalentPhotoTag('박영우', photo, calendar), true);
   assert.equal(hasEquivalentPhotoTag('속리산숲체험휴양마을', photo, calendar), true);
   const analysis = classifyPhoto(photo, { suggestedTags: ['박영우', '속리산숲체험휴양마을', '공원'] }, calendar);
-  assert.deepEqual(analysis.suggestedTags, ['공원']);
+  assert.deepEqual(analysis.suggestedTags, []);
   assert.ok(analysis.people.includes('영우'));
   assert.ok(analysis.places.includes('광명시'));
 });
@@ -85,7 +85,7 @@ test('ambiguous given names and shared aliases remain person tags without suppre
   assert.equal(hasEquivalentPhotoTag('박영우', { tags: 'YoungPark' }, sharedNames), true);
   assert.equal(hasEquivalentPhotoTag('박영우', { tags: '영우사진' }, { participants: [sharedNames.participants[0]] }), true);
   assert.deepEqual(classifyPhoto({ tags: '261006 영우 광명시' }, { suggestedTags: ['박영우', '김영우'] }, sharedNames).suggestedTags,
-    ['박영우', '김영우'], 'worker preserves recommendations that ambiguous tags cannot resolve');
+    [], 'scene labels never become recommendations even when they resemble participant labels');
 });
 
 test('parent relationship suffixes never imply identity with the named child', () => {
