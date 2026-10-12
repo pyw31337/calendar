@@ -2,6 +2,8 @@
  * Date modal (schedule popup) (P4-14)
  */
 
+import { showUndoableToast } from '../core/undo-toast.js';
+import { snapshotAttendance, snapshotExpenses, snapshotPlaces, revertAttendanceSave, revertExpenseSave, revertPlaceSave, revertOrder } from '../core/app-undo-actions.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
@@ -695,12 +697,13 @@ export function DateModal({
         sourcePlaceId: editingLinkedPlaceId ? '' : (selectedPlace.mergeTargetId || selectedPlace.id || '')
       };
 
+      const placesBefore = snapshotPlaces();
       const ok = await Promise.resolve(onSavePlace(newPlaceData));
       if (ok === false) {
         showToast(editingLinkedPlaceId ? '장소 수정에 실패했습니다.' : '장소 추가에 실패했습니다.', 'error');
         return;
       }
-      showToast(editingLinkedPlaceId ? '장소가 수정되었습니다.' : '장소가 추가되었습니다.', 'success');
+      showUndoableToast(showToast, editingLinkedPlaceId ? '장소가 수정되었습니다.' : '장소가 추가되었습니다.', () => revertPlaceSave(placesBefore));
       setSelectedPlace(null);
       setPlaceMemo('');
       setIsPlaceMemoWrapped(false);
@@ -811,11 +814,12 @@ export function DateModal({
     }
     setIsSubmitting(true);
     const cleanNote = sanitizeText(note, 500);
+    const attendanceBefore = snapshotAttendance(dateStr);
     const ok = await onSave(dateStr, participantId, cleanNote);
     setIsSubmitting(false);
     if (ok !== false) {
       const wasEdit = dateEntries.some(en => en.participantId === participantId);
-      showToast(wasEdit ? '참석 정보가 수정되었습니다.' : '참석이 추가되었습니다.', 'success');
+      showUndoableToast(showToast, wasEdit ? '참석 정보가 수정되었습니다.' : '참석이 추가되었습니다.', () => revertAttendanceSave(dateStr, attendanceBefore));
       setParticipantId('');
       setNote('');
       setHasInteracted(false);
@@ -1591,6 +1595,7 @@ export function DateModal({
     setIsSavingExpense(true);
     try {
       const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
+      const expensesBefore = snapshotExpenses(dateStr);
       const ok = await onSaveExpense(dateStr, {
         id: editingExpenseId || undefined,
         label,
@@ -1600,7 +1605,7 @@ export function DateModal({
         isSelfPay: expenseIsIncome ? false : expenseIsSelfPay
       });
       if (ok !== false) {
-        showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
+        showUndoableToast(showToast, editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', () => revertExpenseSave(dateStr, expensesBefore));
         setEditingExpenseId(null);
         setExpenseLabelInput('');
         setExpenseAmountInput('');
@@ -1778,9 +1783,10 @@ export function DateModal({
     if (sourceId && targetId && sourceId !== targetId) {
       setIsSavingExpense(true);
       try {
+        const previousIds = expenses.map(exp => exp.id);
         const ok = await moveExpense(sourceId, targetId);
         if (ok === false) showToast('순서 변경에 실패했습니다.', 'error');
-        else showToast('순서가 변경되었습니다.', 'success');
+        else showUndoableToast(showToast, '순서가 변경되었습니다.', () => revertOrder('expenses', dateStr, previousIds));
       } finally {
         setIsSavingExpense(false);
       }
@@ -1933,9 +1939,10 @@ export function DateModal({
     if (sourceId && targetId && sourceId !== targetId) {
       setIsReorderingAttendance(true);
       try {
+        const previousIds = dateEntries.map(entry => entry.participantId);
         const ok = await moveAttendee(sourceId, targetId);
         if (ok === false) showToast('순서 변경에 실패했습니다.', 'error');
-        else showToast('순서가 변경되었습니다.', 'success');
+        else showUndoableToast(showToast, '순서가 변경되었습니다.', () => revertOrder('attendance', dateStr, previousIds));
       } finally {
         setIsReorderingAttendance(false);
       }
@@ -2050,9 +2057,10 @@ export function DateModal({
     setDraggingPlaceId('');
     setDragOverPlaceId('');
     if (sourceId && targetId && sourceId !== targetId) {
+      const previousIds = registeredPlaces.map(place => place.id);
       const ok = await movePlace(sourceId, targetId);
       if (ok === false) showToast('장소 순서 변경에 실패했습니다.', 'error');
-      else showToast('장소 순서가 변경되었습니다.', 'success');
+      else showUndoableToast(showToast, '장소 순서가 변경되었습니다.', () => revertOrder('places', dateStr, previousIds));
     }
   };
   placeDragHandlersRef.current.onCancel = () => {

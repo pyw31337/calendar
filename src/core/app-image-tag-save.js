@@ -1,3 +1,4 @@
+import { showUndoableToast } from './undo-toast.js';
 import { saveBulkPhotoTagsRemote } from './bulk-photo-tags.js';
 import { archivePhotosShareIdentity } from './archive-photo-edits.js';
 
@@ -211,6 +212,7 @@ export function createImageTagSaveHandler(context) {
       if (!entry || targetIndex < 0 || targetIndex >= urls.length) return sourceMissing();
       const tags = cleanTagText(tagsText);
       const previousDoc = { ...memo, id: memoId };
+      const previousTagText = (Array.isArray(memo.imageTags) ? memo.imageTags[targetIndex] : '') || '';
       const imageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
       while (imageTags.length < urls.length) imageTags.push('');
       imageTags[targetIndex] = tags;
@@ -234,7 +236,9 @@ export function createImageTagSaveHandler(context) {
         const saved = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore(patch), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
         if (!saved?.success || saved?.queued) throw new Error('Memo image tags update failed');
         markPersisted(docKey, nextDoc);
-        if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
+        if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) {
+          showUndoableToast(showToast, '태그 저장완료', async () => (await handleSaveImageTags(memoId, requestedIndex, previousTagText, { ...meta, silent: true })) !== false);
+        }
         // Awaited inside the lane so the next edit of this memo cannot interleave with it.
         await writeThroughCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '', memoId, source: 'memo' }, tags);
         return true;
@@ -271,7 +275,8 @@ export function createImageTagSaveHandler(context) {
     const targetIndex = direct ? requestedIndex : resolveMessagePhotoImageIndex(message, requestedIndex, { ...meta, imageIndex: requestedIndex, imageUrl: meta.imageUrl || meta.full || '' });
     const entry = direct ? null : entries.find(item => item.imageIndex === targetIndex);
     if (!direct && !entry) return sourceMissing();
-    const previousTokens = tokenList(direct ? getDirectMediaTagsForUrl(message, meta.directMediaUrl) : entry.tags);
+    const previousTagText = String((direct ? getDirectMediaTagsForUrl(message, meta.directMediaUrl) : entry.tags) || '');
+    const previousTokens = tokenList(previousTagText);
     const nextTokens = tokenList(tagsText);
     const tags = cleanTagText(tagsText);
     const previousDoc = { ...message, id: messageId };
@@ -317,7 +322,9 @@ export function createImageTagSaveHandler(context) {
         writeActivityLogsToFirestore(activeCalId, logs).catch(err => console.warn('Image tag activity log write skipped:', err));
       }
       markPersisted(docKey, nextDoc);
-      if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) showToast('태그 저장완료', 'success');
+      if (isCurrentDoc(docKey, nextDoc) && !meta?.silent) {
+        showUndoableToast(showToast, '태그 저장완료', async () => (await handleSaveImageTags(messageId, requestedIndex, previousTagText, { ...meta, silent: true })) !== false);
+      }
       // Copies first, then the date-album links, one after the other: both rewrite meeting
       // albums, and running them side by side let the second write put back the first one's
       // old tags (the audit found album copies stuck on the previous date tag).

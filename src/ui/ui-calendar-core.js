@@ -1,6 +1,7 @@
 import { shortParticipantName } from './v2/view-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { routeSearchParams } from '../core/app-address.js';
+import { showUndoableToast } from '../core/undo-toast.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { useCalendarMonthSwipe } from './calendar-month-swipe.js';
 import { LikeButton } from './like-button.js';
@@ -1747,15 +1748,22 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
 
+  // Latest thread + writer for 되돌리기, which can run after this card re-rendered.
+  const commentsRef = React.useRef(comments);
+  commentsRef.current = comments;
+  const onCommentsChangeRef = React.useRef(onCommentsChange);
+  onCommentsChangeRef.current = onCommentsChange;
   const handleSaveComment = async (e) => {
     e.stopPropagation();
     const text = commentText.trim();
     if (!text || !commentParticipantId || isSavingComment) return;
     const now = Date.now();
     const wasEditing = !!editingCommentId;
+    const commentBefore = wasEditing ? (comments.find(c => c.id === editingCommentId) || null) : null;
+    const savedCommentId = editingCommentId || `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`;
     const nextComments = editingCommentId
       ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
-      : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
+      : [...comments, { id: savedCommentId, participantId: commentParticipantId, text, createdAt: now }];
     setIsSavingComment(true);
     try {
       const saved = await Promise.resolve(onCommentsChange(nextComments));
@@ -1765,9 +1773,16 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       setEditingCommentId(null);
       // Keep composer open + focused so mobile keyboard stays for the next comment.
       setIsCommentComposerOpen(true);
-      if (typeof showToast === 'function') {
-        showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
-      }
+      showUndoableToast(showToast, wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', async () => {
+        const latest = commentsRef.current || [];
+        if (!latest.some(c => c.id === savedCommentId)) return false;
+        const reverted = commentBefore
+          ? latest.map(c => c.id === savedCommentId ? { ...c, text: commentBefore.text, participantId: commentBefore.participantId, updatedAt: Date.now() } : c)
+          : latest.filter(c => c.id !== savedCommentId);
+        const ok = await Promise.resolve(onCommentsChangeRef.current(reverted));
+        if (ok === false) return false;
+        return commentBefore ? '댓글 수정을 되돌렸습니다' : '댓글 등록을 되돌렸습니다';
+      });
       refocusComposerField(commentInputRef);
     } finally {
       setIsSavingComment(false);
