@@ -8127,6 +8127,24 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .b
     min-height: calc(1.15em * 2) !important;
   }
 }
+/* A holiday next to the 모임확정 pill (개천절 + 모임확정) sits on the pill's vertical middle, not
+   on its top edge. PC/tablet: center the row. 480–767px: the label's two-line reserve above would
+   leave its one-line text at the top of a pill-high box, so in a row with the pill (which already
+   gives the row its height) drop the reserve and line the two texts up on their baseline. Phones
+   (<480px) always put the pill on its own line below the label. */
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row {
+    align-items: center !important;
+  }
+}
+@media (min-width: 480px) and (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row:has(> .bp-day-meeting-pill) {
+    align-items: baseline !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-cal-days-grid .bp-day-cell .bp-day-head-row:has(> .bp-day-meeting-pill) > .bp-day-corner-label {
+    min-height: 0 !important;
+  }
+}
 /* "대체공휴일(개천절)": the label renders two unbreakable halves with a <wbr> between them
    (ui-app-shell-v2.js withBreakBeforeParen), so every browser breaks only before "(" and never
    inside a half. On phones the 7-column cell (~43px at 320, ~52px at 390) is narrower than
