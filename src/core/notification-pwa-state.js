@@ -1,3 +1,4 @@
+import { showUndoableToast } from './undo-toast.js';
 import {
   describePushSubscribeFailure,
   ensureChatNotificationPermission,
@@ -96,7 +97,7 @@ export function useNotificationPwaState({
     if (!isNotificationSupported()) {
       showToast('알림 미지원 브라우저', 'error');
       openNotificationHelp();
-      return;
+      return false;
     }
 
     const currentParticipantId = () => (
@@ -113,7 +114,7 @@ export function useNotificationPwaState({
           showToast(capability.reason === 'ios-not-installed'
             ? 'iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.'
             : '이 환경에서는 채팅알림을 받을 수 없습니다.', 'error', 6000);
-          return;
+          return false;
         }
       }
       setMainChatNotifyEnabled(next);
@@ -130,19 +131,20 @@ export function useNotificationPwaState({
           if (result.reason === 'permission-not-granted') openNotificationHelp();
           else showToast(`알림 설정 실패 (${describePushSubscribeFailure(result.reason)})`, 'error', 5000);
           console.warn('Main chat notification subscribe failed:', result.reason);
-          return;
+          return false;
         }
       } else {
         await unsubscribeUserFromPush(activeCalId);
       }
-      showToast(next ? '알림이 켜졌습니다.' : '알림이 꺼졌습니다.', 'success');
-      return;
+      // 되돌리기 flips it back through the latest toggle (its state already includes this change).
+      showUndoableToast(showToast, next ? '알림이 켜졌습니다.' : '알림이 꺼졌습니다.', async () => ((await toggleNotificationsRef.current?.()) ? (next ? '알림을 다시 껐습니다.' : '알림을 다시 켰습니다.') : false));
+      return true;
     }
 
     if (Notification.permission === 'denied') {
       openNotificationHelp();
       showToast('브라우저 설정에서 알림 허용 필요', 'error', 6000);
-      return;
+      return false;
     }
 
     const permission = await ensureChatNotificationPermission();
@@ -150,7 +152,7 @@ export function useNotificationPwaState({
     if (permission !== 'granted') {
       openNotificationHelp();
       showToast('알림 권한을 허용해야 알림을 받을 수 있습니다.', 'error', 6000);
-      return;
+      return false;
     }
     const capability = await probeNotificationCapability();
     if (!capability.ok) {
@@ -159,7 +161,7 @@ export function useNotificationPwaState({
       showToast(capability.reason === 'ios-not-installed'
         ? 'iOS는 홈 화면에 추가한 앱에서만 알림을 받을 수 있습니다.'
         : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
-      return;
+      return false;
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
     setMainChatNotifyEnabled(true);
@@ -174,11 +176,14 @@ export function useNotificationPwaState({
       if (subscribeResult.reason === 'permission-not-granted') openNotificationHelp();
       else showToast(`알림 설정 실패 (${describePushSubscribeFailure(subscribeResult.reason)})`, 'error', 5000);
       console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
-      return;
+      return false;
     }
-    showToast('알림이 켜졌습니다.', 'success');
+    showUndoableToast(showToast, '알림이 켜졌습니다.', async () => ((await toggleNotificationsRef.current?.()) ? '알림을 다시 껐습니다.' : false));
     if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+    return true;
   }, [activeCalId, getChatDeliveryOptions, getCurrentParticipantId, mainChatNotifyEnabled, openNotificationHelp, showToast]);
+  const toggleNotificationsRef = React.useRef(null);
+  toggleNotificationsRef.current = handleMainToggleNotifications;
 
   return {
     mainNotifPermission,

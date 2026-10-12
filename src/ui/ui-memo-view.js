@@ -2,6 +2,7 @@
  * Memo view page (P4-15)
  */
 
+import { showUndoableToast } from '../core/undo-toast.js';
 import { enqueueWriteOperation } from '../core/app-write-queue.js';
 import { useParticipantSync } from '../core/current-participant.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
@@ -224,6 +225,9 @@ function enqueueMemoMediaSave(...args) {
 }
 export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2, onRegisterMenuActions = null, editorOnly = false, initialEditingMemo = null, onEditorClosed = null }) {
   const React = window.React;
+  // Latest memos for 되돌리기: refuse to undo when someone changed the memo meanwhile.
+  const memosRef = React.useRef(memos);
+  memosRef.current = memos;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
@@ -841,7 +845,17 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       }
 
       newDraftAutosave.clear(memoDraftKey(calendarId, 'new'));
-      showToast('메모가 저장되었습니다.', 'success');
+      showUndoableToast(showToast, '메모가 저장되었습니다.', async () => {
+        const latest = (memosRef.current || []).find(m => m && m.id === memoId);
+        if (latest && ((Array.isArray(latest.comments) && latest.comments.length) || (latest.updatedAt || 0) > stamp)) return false;
+        if (typeof onDeleteMemo === 'function') onDeleteMemo(memoId);
+        const removed = await writeMemoDocument('memos', calendarId, memoId, null, 'delete', '메모 저장 되돌리기');
+        if (!removed?.success) {
+          if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
+          return false;
+        }
+        return '메모 저장을 되돌렸습니다.';
+      });
       
       // Reset composer
       setNewTitle('');
@@ -975,7 +989,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       }
 
       editDraftAutosave.clear(editDraftKey);
-      showToast('메모가 수정되었습니다.', 'success');
+      const memoBeforeEdit = JSON.parse(JSON.stringify(editingMemo));
+      showUndoableToast(showToast, '메모가 수정되었습니다.', async () => {
+        const latest = (memosRef.current || []).find(m => m && m.id === memoBeforeEdit.id);
+        if (latest && (latest.updatedAt || 0) > stamp) return false;
+        // Put back only the fields this edit wrote; a field the edit added is cleared again.
+        const previousFields = {};
+        Object.keys(memoData).forEach(key => {
+          const before = memoBeforeEdit[key];
+          previousFields[key] = before !== undefined ? before : (Array.isArray(memoData[key]) ? [] : null);
+        });
+        const restorePatch = buildMemoEditPatch({ ...previousFields, updatedAt: Date.now() });
+        if (typeof onUpsertMemo === 'function') onUpsertMemo({ ...(latest || memoBeforeEdit), ...restorePatch, id: memoBeforeEdit.id });
+        const restored = await writeMemoDocument('memos', calendarId, memoBeforeEdit.id, sanitizeMemoForFirestore(restorePatch), 'update', '메모 수정 되돌리기');
+        return restored?.success ? '메모 수정을 되돌렸습니다.' : false;
+      });
       closeMemoEditor();
     } catch (err) {
       console.error('Failed to update memo:', err);

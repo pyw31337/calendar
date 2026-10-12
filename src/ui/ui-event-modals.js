@@ -2,6 +2,8 @@
  * Anniversary / Settlement / Poll modals (P4-18)
  */
 
+import { showUndoableToast } from '../core/undo-toast.js';
+import { snapshotSettlementCards, revertSettlementCardSave } from '../core/app-undo-actions.js';
 import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
 import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core/gallery-data.js';
 import { isCultureLinkedAnniversary } from '../core/app-anniversary-dates.js';
@@ -572,7 +574,19 @@ export function AnniversaryModal({
       // connection is stuck (blocked/throttled WebChannel, seen on some browsers/networks) can
       // keep serving that stale cache indefinitely, surviving even a full page reload.
       if (typeof onAnniversarySaved === 'function') onAnniversarySaved(annData);
-      showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
+      const annBeforeSave = oldAnn ? JSON.parse(JSON.stringify(oldAnn)) : null;
+      showUndoableToast(showToast, editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', async () => {
+        if (annBeforeSave) {
+          const restored = await writeSharedCollection('anniversaries', calendarId, anniversaryId, annBeforeSave, 'set', '기념일 수정 되돌리기');
+          if (!restored?.success) return false;
+          if (typeof onAnniversarySaved === 'function') onAnniversarySaved(annBeforeSave);
+          return '기념일 수정을 되돌렸습니다.';
+        }
+        const removed = await writeSharedCollection('anniversaries', calendarId, anniversaryId, null, 'delete', '기념일 등록 되돌리기');
+        if (!removed?.success) return false;
+        if (typeof onAnniversaryDeleted === 'function') onAnniversaryDeleted(anniversaryId);
+        return '기념일 등록을 되돌렸습니다.';
+      });
 
       // Reset form
       setNewTitle('');
@@ -2240,9 +2254,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     };
     setIsSavingSettlementCard(true);
     try {
+      const cardsBefore = snapshotSettlementCards();
       const saved = typeof onSave === 'function' ? await onSave(newCard) : false;
       if (saved === false) throw new Error('Settlement card save rejected');
-      if (showToast) showToast(isEditing ? `'${title}' 정산 정보가 수정되었습니다!` : `'${title}' 정산 카드가 생성되었습니다!`, 'success');
+      showUndoableToast(showToast, isEditing ? `'${title}' 정산 정보가 수정되었습니다!` : `'${title}' 정산 카드가 생성되었습니다!`, () => revertSettlementCardSave(cardsBefore));
       if (onClose) onClose();
     } catch (error) {
       console.error('Failed to save settlement card:', error);
@@ -4506,10 +4521,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         calendar.settlementCards.unshift(newCard);
         result = true;
       }
-      if (result !== false) {
-        setIsCreateSettlementOpen(false);
-        if (showToast) showToast(`'${newCard.title}' 정산 카드가 생성되었습니다!`, 'success');
-      }
+      // The modal itself shows the 생성 toast (with 되돌리기) once this resolves.
+      if (result !== false) setIsCreateSettlementOpen(false);
       return result;
     },
     showToast: showToast,

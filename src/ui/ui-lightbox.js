@@ -2,6 +2,7 @@
  * Lightbox + LightboxInfoPanel (P4-3).
  */
 
+import { showUndoableToast } from '../core/undo-toast.js';
 import { resolveLightboxPhotoOrigin } from './lightbox-photo-origin.js';
 import { useParticipantSync } from '../core/current-participant.js';
 import { readAppVvHeight, readAppVvWidth, subscribeAppVvRemeasure } from '../core/app-vv-measure.js';
@@ -150,14 +151,26 @@ function CommentThread({ comments: commentsProp = [], actions, calendar, showToa
     setCommentText('');
     setEditingCommentId(null);
     refocusComposerField(commentInputRef);
-    if (typeof showToast === 'function') {
-      showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
-    }
+    // The toast is optimistic too; its 되돌리기 waits for the save to settle, then reverses
+    // just this comment (soft-delete the new one, or put the previous text back).
+    let settleSave;
+    const saveSettled = new Promise(resolve => { settleSave = resolve; });
+    const commentBefore = editingTarget ? { ...editingTarget } : null;
+    showUndoableToast(showToast, wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', async () => {
+      const result = await saveSettled;
+      if (!result) return false;
+      if (commentBefore) {
+        return (await actions.edit(commentBefore, { text: commentBefore.text, participantId: commentBefore.participantId })) ? '댓글 수정을 되돌렸습니다' : false;
+      }
+      return (await actions.remove(result)) ? '댓글 등록을 되돌렸습니다' : false;
+    });
     setIsSavingComment(true);
     try {
+      const added = wasEditing ? null : await actions.add({ text, participantId: commentParticipantId });
       const saved = wasEditing
         ? (editingTarget ? await actions.edit(editingTarget, { text, participantId: commentParticipantId }) : false)
-        : Boolean(await actions.add({ text, participantId: commentParticipantId }));
+        : Boolean(added);
+      settleSave(saved ? (added || true) : null);
       if (!saved) {
         setOptimisticComments(null);
         setCommentText(text);
@@ -173,6 +186,7 @@ function CommentThread({ comments: commentsProp = [], actions, calendar, showToa
       console.error('Lightbox comment save failed:', err);
       if (typeof showToast === 'function') showToast('댓글 저장 실패', 'error');
     } finally {
+      settleSave(null);
       setIsSavingComment(false);
     }
   };

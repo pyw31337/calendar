@@ -125,8 +125,9 @@ test('memo editor wires autosave, V2 restore prompt and the draft-kept close war
   const view = await readFile(new URL('../src/ui/ui-memo-view.js', import.meta.url), 'utf8');
   assert.match(view, /useModalDirtyGuard\(\s*closeMemoEditor,\s*onRequestConfirm,\s*MEMO_DRAFT_CLOSE_MESSAGE/);
   assert.match(view, /active: !!editingMemo && editDraftCheckedKey === editDraftKey && !editDraftOffer/, 'autosave waits for the restore check');
-  assert.match(view, /editDraftAutosave\.clear\(editDraftKey\);\s*showToast\('메모가 수정되었습니다\.'/);
-  assert.match(view, /newDraftAutosave\.clear\(memoDraftKey\(calendarId, 'new'\)\);\s*showToast\('메모가 저장되었습니다\.'/);
+  // The draft is cleared first, then the confirmation toast (with 되돌리기, core/undo-toast.js).
+  assert.match(view, /editDraftAutosave\.clear\(editDraftKey\);[\s\S]{0,120}showUndoableToast\(showToast, '메모가 수정되었습니다\.'/);
+  assert.match(view, /newDraftAutosave\.clear\(memoDraftKey\(calendarId, 'new'\)\);\s*showUndoableToast\(showToast, '메모가 저장되었습니다\.'/);
   assert.match(view, /MemoDraftRestorePrompt, \{ draft: editDraftOffer/);
   assert.match(view, /MemoDraftRestorePrompt, \{ draft: newDraftOffer/);
   const ui = await readFile(new URL('../src/ui/memo-draft-ui.js', import.meta.url), 'utf8');

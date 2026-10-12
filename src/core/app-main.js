@@ -203,6 +203,7 @@ import {
 import { getInitialAppView, buildAppViewUrl, buildMonthUrl } from './app-routing-state.js';
 import { calendarSwitchAddress, pushAppPage, readSharedContentFromHash, routeSearchParams } from './app-address.js';
 import { useNotificationOpen } from './use-notification-open.js';
+import { showAnniversaryUndo } from './app-undo-actions.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
 import { useBrowserUiCompatibility } from './app-browser-ui-state.js';
@@ -1041,13 +1042,10 @@ function CalendarApp() {
     }
     window.history.pushState({}, '', buildAppViewUrl(window.location, view, currentMonthDate));
   };
-  const syncCurrentMonthInUrl = nextDate => {
-    const nextUrl = buildMonthUrl(window.location, nextDate);
-    if (nextUrl) window.history.replaceState({}, '', nextUrl);
-  };
   const setCurrentMonthAndSync = nextDate => {
     setCurrentMonthDate(nextDate);
-    syncCurrentMonthInUrl(nextDate);
+    const nextUrl = buildMonthUrl(window.location, nextDate);
+    if (nextUrl) window.history.replaceState({}, '', nextUrl);
   };
   const restoreActiveCalendarFromCache = React.useCallback(() => {
     if (!isAllowedCalendarId(activeCalId)) return false;
@@ -1589,7 +1587,7 @@ function CalendarApp() {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, annData, 'set', '문화공연 캘린더 등록');
       if (!saved?.success) throw new Error('Culture event anniversary save failed');
       handleAnniversarySaved(annData);
-      showToast('캘린더에 등록되었습니다.', 'success');
+      showAnniversaryUndo('캘린더에 등록되었습니다.', anniversaryId, null);
       // Best-effort, non-blocking: also register the venue as a 장소 so it shows up on the
       // 장소 tab/map without the user having to search and add it themselves. Never lets a
       // place-search failure affect the anniversary registration that already succeeded above.
@@ -1629,11 +1627,12 @@ function CalendarApp() {
   };
   const handleUnregisterCultureEvent = async (anniversaryId) => {
     if (!activeCal?.id || !anniversaryId) return;
+    const removedAnn = (anniversaries || []).find(a => a && a.id === anniversaryId);
     try {
       const deleted = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, null, 'delete', '문화공연 캘린더 등록 취소');
       if (!deleted?.success) throw new Error('Culture event anniversary delete failed');
       handleAnniversaryDeleted(anniversaryId);
-      showToast('등록이 취소되었습니다.', 'success');
+      showAnniversaryUndo('등록이 취소되었습니다.', anniversaryId, removedAnn ? JSON.parse(JSON.stringify(removedAnn)) : undefined, 'set');
     } catch (err) {
       console.error('Failed to unregister culture event anniversary:', err);
       showToast('취소 실패', 'error');
@@ -1743,7 +1742,7 @@ function CalendarApp() {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에서 사진 제거');
       if (!saved?.success) throw new Error('remove photo from travel memory failed');
       handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
-      showToast('추억에서 제거했습니다.', 'success');
+      showAnniversaryUndo('추억에서 제거했습니다.', anniversaryId, { excludedMemoryPhotoKeys: existing });
       return true;
     } catch (err) {
       console.error('Failed to remove photo from travel memory:', err);
@@ -1766,7 +1765,7 @@ function CalendarApp() {
       if (!saved?.success) throw new Error('remove photos from travel memory failed');
       handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
       const shown = Number.isFinite(photoCount) && photoCount > 0 ? photoCount : null;
-      showToast(shown ? `사진 ${shown}장을 추억에서 제외했습니다.` : '선택한 사진을 추억에서 제외했습니다.', 'success');
+      showAnniversaryUndo(shown ? `사진 ${shown}장을 추억에서 제외했습니다.` : '선택한 사진을 추억에서 제외했습니다.', anniversaryId, { excludedMemoryPhotoKeys: existing });
       return true;
     } catch (err) {
       console.error('Failed to bulk-remove photos from travel memory:', err);
@@ -1784,7 +1783,7 @@ function CalendarApp() {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { hiddenFromMemories: true }, 'update', '추억 목록에서 숨김');
       if (!saved?.success) throw new Error('hide memory group failed');
       handleAnniversarySaved({ id: anniversaryId, hiddenFromMemories: true });
-      showToast('추억 목록에서 삭제했습니다.', 'success');
+      showAnniversaryUndo('추억 목록에서 삭제했습니다.', anniversaryId, { hiddenFromMemories: false });
       return true;
     } catch (err) {
       console.error('Failed to hide memory group:', err);
@@ -1800,7 +1799,7 @@ function CalendarApp() {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { hiddenFromMemories: false }, 'update', '추억 목록에 추가');
       if (!saved?.success) throw new Error('restore memory group failed');
       handleAnniversarySaved({ id: anniversaryId, hiddenFromMemories: false });
-      showToast('추억 목록에 추가했습니다.', 'success');
+      showAnniversaryUndo('추억 목록에 추가했습니다.', anniversaryId, { hiddenFromMemories: true });
       return true;
     } catch (err) {
       console.error('Failed to restore memory group:', err);
@@ -1822,7 +1821,7 @@ function CalendarApp() {
       if (!saved?.success) throw new Error('add photos back to travel memory failed');
       handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
       const shown = Number.isFinite(photoCount) && photoCount > 0 ? photoCount : null;
-      showToast(shown ? `사진 ${shown}장을 추억에 다시 추가했습니다.` : '선택한 사진을 추억에 다시 추가했습니다.', 'success');
+      showAnniversaryUndo(shown ? `사진 ${shown}장을 추억에 다시 추가했습니다.` : '선택한 사진을 추억에 다시 추가했습니다.', anniversaryId, { excludedMemoryPhotoKeys: existing });
       return true;
     } catch (err) {
       console.error('Failed to add photos back to travel memory:', err);
@@ -3813,7 +3812,7 @@ function CalendarApp() {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, annData, 'set', '기념일 사진 태그 저장');
       if (!saved?.success) throw new Error('Anniversary photo tags update failed');
       handleAnniversarySaved(annData);
-      showToast('태그 저장완료', 'success');
+      showAnniversaryUndo('태그 저장완료', anniversaryId, { photos });
       return true;
     } catch (err) {
       console.error('Anniversary photo tag save failed:', err);
@@ -4082,7 +4081,7 @@ function CalendarApp() {
           );
           if (!saved?.success) throw new Error('Culture-linked anniversary move failed');
           handleAnniversarySaved({ ...current, ...patch });
-          showToast('기념일 날짜를 옮겼습니다.', 'success');
+          showAnniversaryUndo('기념일 날짜를 옮겼습니다.', anniversaryId, { type: current.type || 'once', date: current.date ?? null, isLunar: !!current.isLunar, isLeap: !!current.isLeap });
         } catch (err) {
           console.error('Failed to move culture-linked anniversary:', err);
           showToast('기념일 날짜 이동 실패', 'error');
@@ -5230,6 +5229,8 @@ function CalendarApp() {
   // WP-01: V2 is the only shell (see ui-app-shell-v2.js).
   // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
   window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
+  // 되돌리기 (app-undo-actions.js) may run after its screen closed: reach this render's handlers.
+  window.__gatherUndoDeps = { getActiveCalendar: () => activeCalRef.current || activeCal, getConfirmedMeetings, getCalendarPlaces, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleSavePlace, handleDeletePlace, handleReorderPlaces, getCalendarSettlementCards, handleSaveSettlementCard, handleDeleteSettlementCard, showToast, writeCollectionDocumentWithFallback, handleAnniversarySaved, handleAnniversaryDeleted };
   const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, selectColorTheme, activeColorThemeId, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: (needed) => setMemosLimit(prev => {
     const floor = Number(needed);
     if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));

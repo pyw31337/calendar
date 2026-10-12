@@ -1,3 +1,5 @@
+import { showUndoableToast } from '../core/undo-toast.js';
+import { snapshotPlaces, revertPlaceSave } from '../core/app-undo-actions.js';
 import { readAppVvHeight, subscribeAppVvRemeasure } from '../core/app-vv-measure.js';
 /**
  * Places map + places view (P4-10)
@@ -1327,6 +1329,7 @@ export function PlacesView({
     const text = editingMemoEntryText.trim();
     if (!text) return;
     const nextMemo = upsertPlaceMemoEntry(place.memo || '', entry.date, text);
+    const placesBefore = snapshotPlaces();
     const ok = await Promise.resolve(onSavePlace({
       id: place.id, name: place.name, alias: place.alias || '',
       address: place.address || '', lat: place.lat, lng: place.lng,
@@ -1335,7 +1338,7 @@ export function PlacesView({
       visitDate: place.visitDate || ''
     }));
     if (ok !== false) {
-      showToast('메모가 수정되었습니다.', 'success');
+      showUndoableToast(showToast, '메모가 수정되었습니다.', () => revertPlaceSave(placesBefore));
       setEditingMemoEntryKey(null);
       setEditingMemoEntryText('');
     } else {
