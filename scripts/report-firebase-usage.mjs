@@ -4,8 +4,10 @@
  * Firestore reads/writes/deletes per day, Storage bytes stored and sent, Cloud Functions
  * executions per function. Used to pick cost work by measurement instead of guesses
  * (docs/firebase-cost-control.md). Needs the service account (Deploy Firebase backend workflow).
+ * The busiest read day (or PEAK_DAY, a day label as printed in readsPerDay) is also broken down
+ * per hour (KST), with the functions that ran in each hour, so a one-day spike can be traced.
  *
- *   [DAYS=7] node scripts/report-firebase-usage.mjs
+ *   [DAYS=7] [PEAK_DAY=2026-10-09] node scripts/report-firebase-usage.mjs
  */
 import { createRequire } from 'node:module';
 
@@ -23,12 +25,12 @@ const client = await auth.getClient();
 const end = new Date(Math.floor(Date.now() / DAY) * DAY);
 const start = new Date(end.getTime() - DAYS * DAY);
 
-async function series(metric, { groupBy = [], reducer = 'REDUCE_SUM', aligner = 'ALIGN_SUM', resourceType = '' } = {}) {
+async function series(metric, { groupBy = [], reducer = 'REDUCE_SUM', aligner = 'ALIGN_SUM', resourceType = '', from = start, to = end, period = DAY } = {}) {
   const params = new URLSearchParams({
     filter: `metric.type="${metric}"${resourceType ? ` AND resource.type="${resourceType}"` : ''}`,
-    'interval.startTime': start.toISOString(),
-    'interval.endTime': end.toISOString(),
-    'aggregation.alignmentPeriod': `${DAY / 1000}s`,
+    'interval.startTime': from.toISOString(),
+    'interval.endTime': to.toISOString(),
+    'aggregation.alignmentPeriod': `${period / 1000}s`,
     'aggregation.perSeriesAligner': aligner,
     'aggregation.crossSeriesReducer': reducer,
   });
@@ -85,11 +87,60 @@ const storedLatest = stored[0]?.error ? { error: stored[0].error } : Object.from
 const sentMB = totals(sent, 'bucket_name');
 Object.keys(sentMB).forEach(key => { if (typeof sentMB[key] === 'number') sentMB[key] = `${Math.round(sentMB[key] / 1048576)} MB`; });
 
+// A day label is the end of its bucket (readsPerDay "2026-10-09" counts 10-08 00:00..24:00 UTC).
+const readDays = perDay(reads);
+const peakLabel = /^\d{4}-\d{2}-\d{2}$/.test(String(process.env.PEAK_DAY || ''))
+  ? process.env.PEAK_DAY
+  : (readDays.error ? '' : (Object.entries(readDays).sort((a, b) => b[1] - a[1])[0] || [''])[0]);
+let peakDay = null;
+if (peakLabel) {
+  const HOUR = 60 * 60 * 1000;
+  const to = new Date(`${peakLabel}T00:00:00Z`);
+  const from = new Date(to.getTime() - DAY);
+  const kstHour = point => {
+    const at = new Date(new Date(point.interval?.startTime || point.interval?.endTime).getTime() + 9 * HOUR);
+    return `${at.toISOString().slice(5, 10)} ${at.toISOString().slice(11, 13)}시`;
+  };
+  const [hourReads, hourExec] = await Promise.all([
+    series('firestore.googleapis.com/document/read_count', { groupBy: ['metric.label.type'], from, to, period: HOUR }),
+    series('cloudfunctions.googleapis.com/function/execution_count', { groupBy: ['resource.label.function_name', 'resource.label.region'], from, to, period: HOUR }),
+  ]);
+  const readsPerHour = {};
+  if (!hourReads[0]?.error) {
+    hourReads.forEach(item => (item.points || []).forEach(point => {
+      const key = kstHour(point);
+      readsPerHour[key] = (readsPerHour[key] || 0) + valueOf(point);
+    }));
+  }
+  const functionsPerHour = {};
+  if (!hourExec[0]?.error) {
+    hourExec.forEach(item => (item.points || []).forEach(point => {
+      const count = valueOf(point);
+      if (!count) return;
+      const key = kstHour(point);
+      functionsPerHour[key] = functionsPerHour[key] || {};
+      functionsPerHour[key][item.resource?.labels?.function_name || 'unknown'] = count;
+    }));
+  }
+  const hours = Object.keys(readsPerHour).sort();
+  peakDay = {
+    day: peakLabel,
+    windowUtc: { start: from.toISOString(), end: to.toISOString() },
+    readsPerHourKst: hourReads[0]?.error ? { error: hourReads[0].error } : Object.fromEntries(hours.map(hour => [hour, readsPerHour[hour]])),
+    // Only hours with real read traffic, busiest first, so the log stays short.
+    functionsInBusiestHoursKst: Object.fromEntries([...hours]
+      .sort((a, b) => readsPerHour[b] - readsPerHour[a])
+      .slice(0, 6)
+      .map(hour => [hour, { reads: readsPerHour[hour], functions: functionsPerHour[hour] || {} }])),
+  };
+}
+
 console.log(JSON.stringify({
   project: PROJECT,
   window: { start: start.toISOString(), end: end.toISOString(), days: DAYS },
   freeTierPerDay: FREE,
-  firestore: { readsPerDay: perDay(reads), writesPerDay: perDay(writes), deletesPerDay: perDay(deletes), readsByType: totals(readsByType, 'type') },
+  firestore: { readsPerDay: readDays, writesPerDay: perDay(writes), deletesPerDay: perDay(deletes), readsByType: totals(readsByType, 'type') },
   storage: { storedNow: storedLatest, sentInWindow: sentMB },
   functions: { executionsInWindow: Object.fromEntries(Object.entries(execByFunction).sort((a, b) => b[1] - a[1]).slice(0, 40)) },
+  peakDay,
 }, null, 2));
