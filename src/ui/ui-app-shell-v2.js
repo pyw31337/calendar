@@ -924,9 +924,21 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     };
   }, [isTouchDragging]);
 
+  // While a dot or anniversary is dragged with the mouse, only the day cells themselves take
+  // pointer input: Safari drops nothing when the cursor ends over a child of the <button> cell
+  // (a dot row, the 모임확정 pill). Applied after dragstart -- changing styles inside dragstart
+  // itself can cancel the drag in Chrome.
+  const setDragActive = (source, active) => {
+    const grid = source && typeof source.closest === 'function' ? source.closest('.bp-cal-days-grid') : null;
+    if (!grid) return;
+    if (active) setTimeout(() => grid.classList.add('is-dnd-active'), 0);
+    else grid.classList.remove('is-dnd-active');
+  };
+
   const findDayCellDateAt = (x, y) => {
     const el = typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
-    const cell = el && typeof el.closest === 'function' ? el.closest('.day-cell') : null;
+    // V2 cells are rendered through bentoClass, so their class is bp-day-cell.
+    const cell = el && typeof el.closest === 'function' ? el.closest('.bp-day-cell, .day-cell') : null;
     return cell ? cell.dataset.dateStr || null : null;
   };
 
@@ -1309,6 +1321,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           onDragOver: event => { event.preventDefault(); },
           onDrop: event => {
             event.preventDefault();
+            setDragActive(event.currentTarget, false);
             try {
               const rawData = event.dataTransfer.getData('text/plain');
               if (!rawData) return;
@@ -1350,7 +1363,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                 key: p.id,
                 className: bentoClass('p-dot'),
                 'data-author-name': p.name,
-                style: { background: p.color || 'var(--brand)' },
+                // touch-action none: after the long-press, moving the finger drags the dot
+                // instead of scrolling the page (touch-action is fixed when the touch starts).
+                style: { background: p.color || 'var(--brand)', touchAction: 'none' },
                 title: entry.note ? `${p.name}: ${entry.note}` : p.name,
                 draggable: true,
                 onDragStart: event => {
@@ -1359,7 +1374,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                     entryReferId: entry.id, sourceDate: dateStr,
                     participantId: entry.participantId, participantName: p.name,
                   }));
+                  setDragActive(event.currentTarget, true);
                 },
+                onDragEnd: event => setDragActive(event.currentTarget, false),
                 onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, entry, p, dateStr); },
                 onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
                 onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
@@ -1385,7 +1402,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                   event.dataTransfer.setData('text/plain', JSON.stringify({
                     kind: 'anniversary', anniversaryId: ann.id, sourceDate: dateStr, title,
                   }));
+                  setDragActive(event.currentTarget, true);
                 } : undefined,
+                onDragEnd: isMovableCultureAnniversary ? event => setDragActive(event.currentTarget, false) : undefined,
                 onTouchStart: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleAnniversaryTouchStart(event, ann, dateStr, paint.color); } : undefined,
                 onTouchMove: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchMove(event); } : undefined,
                 onTouchEnd: isMovableCultureAnniversary ? event => { event.stopPropagation(); handleBadgeTouchEnd(event); } : undefined,
