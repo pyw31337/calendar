@@ -34,8 +34,15 @@ export function prepareAnalysisTags(photo, requested, { decision = 'applied', or
 }
 
 export function getAnalysisSuggestedTags(item) {
-  // New workers separate already-classified people/places from NEW recommendations.
-  if (Number(item?.analysisVersion) >= 5 && Array.isArray(item?.suggestedTags)) return normalizeAnalysisTagList(item.suggestedTags);
+  const stored = normalizeAnalysisTagList(item?.suggestedTags);
+  const evidence = Array.isArray(item?.tagEvidence) ? item.tagEvidence : [];
+  // Version 5 mixed broad Vision labels into `suggestedTags`.  Do not keep surfacing those old
+  // labels merely because the row has not been reprocessed yet: every safe legacy suggestion
+  // must have a non-scene evidence record. Version 6 workers keep that separation at source.
+  if (Number(item?.analysisVersion) >= 6 && Array.isArray(item?.suggestedTags)) return stored;
+  if (Number(item?.analysisVersion) >= 5 && Array.isArray(item?.suggestedTags)) {
+    return stored.filter(tag => evidence.some(entry => entry?.tag === tag && entry?.source !== 'vision-label'));
+  }
   return normalizeAnalysisTagList([
     ...(Array.isArray(item?.suggestedTags) ? item.suggestedTags : []),
     ...(Array.isArray(item?.people) ? item.people : []),
@@ -44,13 +51,24 @@ export function getAnalysisSuggestedTags(item) {
   ]);
 }
 
+export function getAnalysisCandidateTags(item) {
+  const suggested = new Set(getAnalysisSuggestedTags(item));
+  const byKind = value => normalizeAnalysisTagList(value).filter(tag => !suggested.has(tag));
+  return {
+    people: byKind(item?.people),
+    places: byKind(item?.places),
+    meetings: byKind(item?.meetings)
+  };
+}
+
 // A scene classifier's score is NOT a probability that an inferred person, venue or event is
 // correct. Only direct metadata may qualify a tag for the explicit bulk-review convenience.
 // Even a GPS-nearest venue can be wrong in a mall; it stays a manual suggestion.
-const DIRECT_SOURCES = new Set(['existing-tag', 'capture-date']);
+const DIRECT_SOURCES = new Set(['existing-tag', 'capture-date', 'takeout-person', 'takeout-capture-date']);
 
 export function getMediaAnalysisReview(item, { photo } = {}) {
   const suggestedTags = getAnalysisSuggestedTags(item);
+  const candidates = getAnalysisCandidateTags(item);
   const evidence = Array.isArray(item?.tagEvidence) ? item.tagEvidence : [];
   const recognized = Array.isArray(item?.recognizedEvidence) ? item.recognizedEvidence : [];
   const reasons = [];
@@ -67,9 +85,9 @@ export function getMediaAnalysisReview(item, { photo } = {}) {
       && (entry.source !== 'existing-tag' || !photo || normalizeAnalysisTagList(photo.tags).includes(tag))
   ));
   const manualTags = suggestedTags.filter(tag => !eligibleTags.includes(tag));
-  if (manualTags.length) reasons.push('인물·장소·일정·장면 추정은 직접 검토가 필요합니다.');
+  if (manualTags.length || candidates.people.length || candidates.places.length || candidates.meetings.length) reasons.push('인물·장소·일정 후보는 사진을 확인한 뒤 선택해 주세요.');
   return {
-    suggestedTags, eligibleTags, manualTags, reasons,
+    suggestedTags, eligibleTags, manualTags, candidateTags: candidates, reasons,
     canBulkApply: Boolean(item?.assetKey && !item.review && item.status === 'suggested'
       && suggestedTags.length && !manualTags.length && !stale)
   };

@@ -3,15 +3,15 @@ import { prepareAnalysisTags } from '../src/core/ai-media-review.js';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { classifyPhoto, captureDateKey } from '../tools/local-media-worker/analysis-evidence.mjs';
-import { getMediaAnalysisReview } from '../src/core/ai-media-review.js';
+import { getAnalysisCandidateTags, getAnalysisSuggestedTags, getMediaAnalysisReview } from '../src/core/ai-media-review.js';
 import { persistMediaAnalysisReview } from '../src/core/media-analysis-review-save.js';
 const require = createRequire(import.meta.url);
 const { sanitizeAnalysisItem } = require('../functions/media-analysis.js');
 const calendar = { participants: [{ name: '영우' }, { name: '탈퇴', removedAt: 1 }], confirmedMeeting: [{ date: '2026-10-06', note: '가족여행' }] };
 
-test('upload time is not capture time and a scene does not learn identities', () => {
+test('upload time is not capture time and a scene label never becomes a tag recommendation', () => {
   const result = classifyPhoto({ timestamp: Date.parse('2026-10-06T12:00:00Z') }, { suggestedTags: ['음식'], labels: [{ name: 'food', confidence: .99 }] }, calendar, ['영우', '서울', '261006']);
-  assert.deepEqual(result.suggestedTags, ['음식']);
+  assert.deepEqual(result.suggestedTags, ['영우', '서울', '261006']);
   assert.deepEqual(result.meetings, []);
   assert.equal(getMediaAnalysisReview({ ...result, assetKey: 'asset:v1:a', status: 'suggested' }).canBulkApply, false);
 });
@@ -20,7 +20,8 @@ test('OCR exact tokens are manual evidence; substrings and removed participants 
   assert.deepEqual(classifyPhoto({}, { ocrText: ['영우동 탈퇴'] }, calendar).people, []);
   const result = classifyPhoto({}, { ocrText: ['영우'] }, calendar);
   assert.deepEqual(result.people, ['영우']);
-  assert.equal(result.tagEvidence[0].source, 'ocr-person');
+  assert.deepEqual(result.tagEvidence, []);
+  assert.deepEqual(result.candidateEvidence, [{ tag: '영우', source: 'ocr-person', confidence: 0.8 }]);
   assert.equal(getMediaAnalysisReview({ ...result, assetKey: 'asset:v1:a', status: 'suggested', confidence: .999 }).canBulkApply, false);
 });
 
@@ -41,7 +42,8 @@ test('GPS-nearest venues are not certain; multiple candidates and missing coordi
   assert.deepEqual(classifyPhoto({ latitude: 37, longitude: 127 }, {}, { places }).places, []);
   assert.deepEqual(classifyPhoto({ latitude: null, longitude: null }, {}, { places: [{ name: '없는장소', lat: null, lng: null }] }).places, []);
   const result = classifyPhoto({ latitude: 37, longitude: 127 }, {}, { places: [places[0]] });
-  assert.equal(result.tagEvidence[0].source, 'gps-place');
+  assert.deepEqual(result.tagEvidence, []);
+  assert.deepEqual(result.candidateEvidence, [{ tag: '공원', source: 'gps-place', confidence: 0.8 }]);
   assert.equal(getMediaAnalysisReview({ ...result, assetKey: 'asset:v1:a', status: 'suggested' }).canBulkApply, false);
 });
 
@@ -72,6 +74,25 @@ test('legacy/NaN evidence cannot bypass the policy and server drops unknown evid
     { tag: '261006', source: 'capture-date', confidence: NaN }
   ] });
   assert.deepEqual(result.tagEvidence, [{ tag: '261006', source: 'capture-date', confidence: 0 }]);
+});
+
+test('old Vision-only rows disappear from recommendations while direct Takeout facts remain bulk-safe', () => {
+  assert.deepEqual(getAnalysisSuggestedTags({ analysisVersion: 5, suggestedTags: ['음식'], tagEvidence: [
+    { tag: '음식', source: 'vision-label', confidence: 0.99 }
+  ] }), []);
+  const takeout = {
+    analysisVersion: 6, assetKey: 'asset:v1:a', status: 'suggested', sourceUpdatedAt: 10,
+    suggestedTags: ['영우', '261006'], people: ['영우'], places: ['숲체험장'],
+    tagEvidence: [
+      { tag: '영우', source: 'takeout-person', confidence: 1 },
+      { tag: '261006', source: 'takeout-capture-date', confidence: 1 }
+    ],
+    candidateEvidence: [{ tag: '숲체험장', source: 'takeout-gps', confidence: 1 }]
+  };
+  assert.deepEqual(getAnalysisCandidateTags(takeout), { people: [], places: ['숲체험장'], meetings: [] });
+  assert.equal(getMediaAnalysisReview(takeout).canBulkApply, true);
+  const stored = sanitizeAnalysisItem(takeout);
+  assert.deepEqual(stored.candidateEvidence, takeout.candidateEvidence);
 });
 
 test('failed tag writes never persist reviews, partial audit failures remain retryable', async () => {

@@ -20,10 +20,18 @@ const DEFAULT_PROJECT_ID = 'metro-live-2918e';
 const DEFAULT_MAX_PER_RUN = 80;
 const DEFAULT_CONCURRENCY = 4;
 const MAX_DOWNLOAD_BYTES = 35 * 1024 * 1024;
+const MAX_VIDEO_DOWNLOAD_BYTES = 120 * 1024 * 1024;
 const DEFAULT_TOKEN_SERVICE = 'Moyeora Media Analysis Worker';
 const MAX_CONSECUTIVE_ASSET_FAILURES = 3;
 const NETWORK_TIMEOUT_MS = 30 * 1000;
 const IDLE_HEARTBEAT_MS = 12 * 60 * 60 * 1000;
+const VIDEO_EXTENSIONS = new Set(['.3gp', '.avi', '.m4v', '.mkv', '.mov', '.mp4', '.webm']);
+const FFMPEG = process.env.MOYEORA_FFMPEG || '/opt/homebrew/bin/ffmpeg';
+const FFPROBE = process.env.MOYEORA_FFPROBE || '/opt/homebrew/bin/ffprobe';
+// Bump when the meaning of review metadata changes. A durable state cursor is normally a
+// performance win; this marker intentionally starts one controlled full pass after a policy
+// change so old noisy rows are replaced without a human having to find and reset local state.
+const ANALYSIS_POLICY_VERSION = 6;
 
 function kstDateStamp(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -34,7 +42,7 @@ function kstDateStamp(date = new Date()) {
 }
 
 function parseArgs(argv) {
-  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, concurrency: DEFAULT_CONCURRENCY, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false };
+  const args = { calendar: '', project: DEFAULT_PROJECT_ID, state: '', output: '', endpoint: '', max: DEFAULT_MAX_PER_RUN, concurrency: DEFAULT_CONCURRENCY, tokenService: DEFAULT_TOKEN_SERVICE, tokenAccount: '', visionBinary: '', force: false, rebuild: false };
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     if (key === '--calendar') args.calendar = argv[++index] || '';
@@ -48,6 +56,9 @@ function parseArgs(argv) {
     else if (key === '--token-account') args.tokenAccount = argv[++index] || '';
     else if (key === '--vision-bin') args.visionBinary = argv[++index] || '';
     else if (key === '--force') args.force = true;
+    // Start at the first canonical row again after an inference-policy upgrade. This is not a
+    // tag mutation; it only replaces the bounded review metadata for live asset keys.
+    else if (key === '--rebuild') { args.force = true; args.rebuild = true; }
   }
   return args;
 }
@@ -250,25 +261,70 @@ async function inspectPhoto(photo, tempRoot, visionBinary) {
   const candidates = [photo.full, photo.imageUrl, photo.thumb, photo.thumbUrl]
     .map(value => String(value || '').trim()).filter(Boolean);
   const isGif = value => /\.gif(?:$|[?#])/i.test(value);
-  const url = candidates.find(value => !isGif(value)) || candidates[0] || '';
+  const hasVideoExtension = value => {
+    try { return VIDEO_EXTENSIONS.has(extname(new URL(value).pathname).toLowerCase()); }
+    catch { return false; }
+  };
+  const isVideo = /video/i.test(String(photo.mimeType || photo.contentType || photo.mediaType || ''))
+    || candidates.some(hasVideoExtension);
+  // A photo index normally has a still thumbnail too. Prefer the actual video when it is
+  // present; analysing its middle frames beats treating its poster image as the whole clip.
+  const url = isVideo
+    ? (candidates.find(hasVideoExtension) || candidates[0] || '')
+    : (candidates.find(value => !isGif(value)) || candidates[0] || '');
   if (!/^https:\/\//.test(url)) throw new Error('Missing Firebase Storage URL');
   const { response, bytes } = await timedRequest(url, {}, 'Photo download', async response => {
     if (!response.ok) return { response, bytes: Buffer.alloc(0) };
     const declared = Number(response.headers.get('content-length') || 0);
-    if (declared > MAX_DOWNLOAD_BYTES) throw new Error('Image exceeds local analysis limit');
+    if (declared > (isVideo ? MAX_VIDEO_DOWNLOAD_BYTES : MAX_DOWNLOAD_BYTES)) throw new Error(`${isVideo ? 'Video' : 'Image'} exceeds local analysis limit`);
     return { response, bytes: Buffer.from(await response.arrayBuffer()) };
   });
   if (!response.ok) throw new Error(`Image download failed: ${response.status}`);
-  if (bytes.length > MAX_DOWNLOAD_BYTES) throw new Error('Image exceeds local analysis limit');
+  if (bytes.length > (isVideo ? MAX_VIDEO_DOWNLOAD_BYTES : MAX_DOWNLOAD_BYTES)) throw new Error(`${isVideo ? 'Video' : 'Image'} exceeds local analysis limit`);
   const extension = extname(new URL(url).pathname) || '.jpg';
   const filename = join(tempRoot, `${String(photo.assetKey || 'photo').replace(/[^A-Za-z0-9_-]/g, '_')}${extension}`);
   await writeFile(filename, bytes);
   try {
     const command = visionBinary || '/usr/bin/xcrun';
-    const commandArgs = visionBinary ? [filename] : ['swift', VISION_SCRIPT, filename];
-    const insight = JSON.parse(await shell(command, commandArgs));
-    const lookHash = await lookHashOfFile(filename);
-    return lookHash ? { ...insight, lookHash } : insight;
+    const vision = async path => JSON.parse(await shell(command, visionBinary ? [path] : ['swift', VISION_SCRIPT, path]));
+    if (!isVideo) {
+      const insight = await vision(filename);
+      const lookHash = await lookHashOfFile(filename);
+      return lookHash ? { ...insight, lookHash } : insight;
+    }
+    // Pull three spread-out stills instead of trusting the first frame (often a black fade or
+    // title card). Frames are local, temporary JPEGs and are deleted with the source download.
+    const duration = Number((await shell(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nokey=1:noprint_wrappers=1', filename])).trim());
+    if (!Number.isFinite(duration) || duration <= 0) throw new Error('Video duration is unavailable');
+    const moments = [...new Set([0.15, 0.5, 0.85].map(part => Math.max(0, Math.min(duration - 0.05, duration * part))))];
+    const frames = [];
+    for (const [index, moment] of moments.entries()) {
+      const frame = join(tempRoot, `${String(photo.assetKey || 'video').replace(/[^A-Za-z0-9_-]/g, '_')}-${index}.jpg`);
+      await shell(FFMPEG, ['-v', 'error', '-ss', moment.toFixed(3), '-i', filename, '-frames:v', '1', '-q:v', '3', '-y', frame]);
+      frames.push({ frame, insight: await vision(frame) });
+    }
+    const labelScores = new Map();
+    const ocrText = new Set();
+    const sceneTags = new Set();
+    frames.forEach(({ insight }) => {
+      (insight.labels || []).forEach(label => {
+        const name = String(label?.name || '').trim();
+        if (name) labelScores.set(name, Math.max(labelScores.get(name) || 0, Number(label.confidence) || 0));
+      });
+      (insight.ocrText || []).forEach(value => { if (String(value || '').trim()) ocrText.add(String(value).trim()); });
+      (insight.suggestedTags || []).forEach(value => { if (String(value || '').trim()) sceneTags.add(String(value).trim()); });
+    });
+    const middle = frames[Math.floor(frames.length / 2)]?.frame;
+    const lookHash = middle ? await lookHashOfFile(middle) : '';
+    return {
+      labels: [...labelScores].map(([name, confidence]) => ({ name, confidence })).sort((a, b) => b.confidence - a.confidence).slice(0, 16),
+      ocrText: [...ocrText].slice(0, 12),
+      suggestedTags: [...sceneTags].slice(0, 12),
+      faceCount: Math.max(0, ...frames.map(({ insight }) => Number(insight.faceCount) || 0)),
+      mediaKind: 'video',
+      analyzedFrames: frames.length,
+      ...(lookHash ? { lookHash } : {})
+    };
   } finally {
     await rm(filename, { force: true });
   }
@@ -283,7 +339,7 @@ async function upload(args, token, runId, items, window, { status = 'completed',
       calendarId: args.calendar,
       runId,
       workerId: 'macos-vision-m2',
-      workerVersion: '5',
+      workerVersion: '6',
       window,
       status,
       error,
@@ -302,7 +358,9 @@ async function main() {
   const statePath = resolve(args.state);
   const outputPath = resolve(args.output);
   const state = await readJson(statePath, { schemaVersion: 1, calendars: {} });
-  const current = state.calendars?.[args.calendar] || {};
+  const stored = state.calendars?.[args.calendar] || {};
+  const rebuilding = args.rebuild || Number(stored.analysisPolicyVersion || 0) !== ANALYSIS_POLICY_VERSION;
+  const current = rebuilding ? {} : stored;
   const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService, args.tokenAccount)]);
   const now = Date.now();
   const runId = `macos_${args.calendar}_${kstDateStamp(new Date(now))}`;
@@ -402,6 +460,7 @@ async function main() {
         : (last ? { updatedAt: Number(last.data.updatedAt) || 0, name: last.name } : current.cursor || null),
       failures: nextFailures,
       lookHashes,
+      analysisPolicyVersion: ANALYSIS_POLICY_VERSION,
       lastRunAt: now,
       lastIdleHeartbeatAt: now
     }
@@ -416,6 +475,7 @@ async function main() {
     uploaded: result.accepted || 0,
     failures,
     retrying: mustRetrySamePage,
+    rebuilding,
     hasMore: pageMayHaveMore,
     summary: result.summary || {}
   };

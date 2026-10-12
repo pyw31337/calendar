@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""인물 이름 가져오기: 맥 '사진' 앱 또는 구글 테이크아웃에 이미 붙여 둔 이름을 우리 사진 태그로 옮긴다.
+"""검증된 원본 메타데이터 가져오기: 맥 '사진' 또는 구글 테이크아웃의 인물·촬영일·GPS를 우리 사진에 옮긴다.
 
 docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하지 않는다 -- 사진 앱/구글포토가
 이미 가진 "이 사진에 누가 있다"는 이름 목록만 읽는다. 사진·얼굴 데이터는 이 맥 밖으로 나가지 않고,
-서버에는 사진 키 + 이름 태그만 올라간다(기존 태그는 유지, 중복 없이 추가).
+서버에는 사진 키 + 명시 인물/촬영일/좌표만 올라간다(기존 태그는 유지, 중복 없이 추가).
 
 우리 사진은 업로드 때 WebP/JPEG로 다시 압축돼 파일명·EXIF가 원본과 다르다. 그래서 작은 썸네일끼리
 지각 해시(dHash 64bit)로 같은 사진을 찾는다. 날짜가 같은 사진끼리 먼저 비교해 오탐을 줄인다.
@@ -24,6 +24,7 @@ docs/photo-auto-tagging-plan.md 구현안 A / A′. 얼굴을 새로 인식하�
     ... --apply
 """
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -51,7 +52,7 @@ COMMAND = f'https://asia-northeast3-{PROJECT}.cloudfunctions.net/mediaCommand'
 CACHE = os.path.expanduser('~/Library/Caches/moyeora-people-import')
 MAX_TAGS = 20
 SAME_DAY_DISTANCE = 8     # of 64 bits; thumbnails of the same shot land well under this
-ANY_DAY_DISTANCE = 4      # stricter when the dates do not agree (or one side has none)
+ANY_DAY_DISTANCE = 2      # no date agreement: accept only an almost exact duplicate
 
 
 # ---------- Firestore REST (read) ----------
@@ -106,6 +107,21 @@ def hamming(a, b):
 
 def hash_file(path):
     """path is a file path, or a callable returning an open binary file (a zip member)."""
+    cache_file = None
+    if isinstance(path, str):
+        try:
+            info = os.stat(path)
+            # Cache only the 64-bit derivative, keyed by the source path and the two fields that
+            # can change its pixels. An interrupted 50 GB import then resumes instead of decoding
+            # every HEIC again; no original image or Takeout metadata enters this cache.
+            key = hashlib.sha256(f'{path}\0{info.st_size}\0{info.st_mtime_ns}'.encode()).hexdigest()
+            cache_file = os.path.join(CACHE, 'source-' + key + '.hash')
+            if os.path.exists(cache_file):
+                value = int(open(cache_file).read() or 0)
+                if value:
+                    return value
+        except (OSError, ValueError):
+            cache_file = None
     try:
         source = path() if callable(path) else path
         with Image.open(source) as im:
@@ -113,7 +129,14 @@ def hash_file(path):
             # Phone cameras store the pixels sideways with an EXIF Orientation flag, while our copy
             # was re-encoded upright by the browser. Hash the photo the way it is shown: without
             # this a portrait phone photo never matched its own upload.
-            return dhash(ImageOps.exif_transpose(im))
+            upright = ImageOps.exif_transpose(im)
+            upright.thumbnail((256, 256))
+            value = dhash(upright)
+        if cache_file:
+            os.makedirs(CACHE, exist_ok=True)
+            with open(cache_file, 'w') as fh:
+                fh.write(str(value))
+        return value
     except Exception:
         return None
 
@@ -222,12 +245,16 @@ def from_takeout(target):
             continue
         if not isinstance(meta, dict):
             continue
+        if meta.get('trashed') is True:
+            continue
         names = [p.get('name') for p in (meta.get('people') or []) if isinstance(p, dict) and p.get('name')]
         title = meta.get('title')
         geo_data = meta.get('geoData') or {}
         geo_exif = meta.get('geoDataExif') or {}
         geo = _geo_pair(geo_data.get('latitude'), geo_data.get('longitude')) or _geo_pair(geo_exif.get('latitude'), geo_exif.get('longitude'))
-        if (not names and not geo) or not title:
+        ts = (meta.get('photoTakenTime') or {}).get('timestamp') or (meta.get('creationTime') or {}).get('timestamp')
+        when = (datetime.utcfromtimestamp(int(ts)) + timedelta(hours=9)).date() if ts else None
+        if (not names and not geo and not when) or not title:
             continue
         folder = os.path.dirname(key)
         image = entries.get(os.path.join(folder, title)) if folder else entries.get(title)
@@ -239,9 +266,10 @@ def from_takeout(target):
             image = entries.get(os.path.join(folder, stem) if folder else stem)
         if not image:
             continue
-        ts = (meta.get('photoTakenTime') or {}).get('timestamp')
-        when = (datetime.utcfromtimestamp(int(ts)) + timedelta(hours=9)).date() if ts else None
-        yield {'names': names, 'paths': [opener(image)], 'date': when, 'label': title, 'geo': geo}
+        yield {'names': names, 'paths': [opener(image)], 'date': when, 'label': title, 'geo': geo,
+               # Folder context is diagnostic only. It is deliberately not turned into a tag:
+               # Takeout has dated/system albums whose names are not calendar facts.
+               'album': os.path.basename(folder)}
 
 
 # ---------- names ----------
@@ -295,12 +323,47 @@ def main():
             if i % 100 == 0 or i == len(rows):
                 print(f'  {i}/{len(rows)}', flush=True)
     ours = [(r, h, date_tokens(r.get('tags'))) for r, h in zip(rows, hashes) if h]
+    # Comparing every Takeout original with every calendar thumbnail turns 38k originals into
+    # tens of millions of Python hash comparisons. Date is an independent source fact, so use
+    # it to form the candidate set first; keep untagged calendar photos in the set so the
+    # importer can still repair their missing date. The no-date fallback stays intentionally
+    # strict (ANY_DAY_DISTANCE) and is only used when the source lacks a camera date.
+    ours_by_date = {}
+    undated_ours = []
+    for entry in ours:
+        if entry[2]:
+            for date in entry[2]:
+                ours_by_date.setdefault(date, []).append(entry)
+        else:
+            undated_ours.append(entry)
+
+    def candidate_rows(source_date):
+        if not source_date:
+            return ours
+        dated = []
+        for offset in (-1, 0, 1):
+            dated.extend(ours_by_date.get(source_date + timedelta(days=offset), []))
+        # A photo without a current date tag can only match at the almost-exact threshold below.
+        # Deduplicate burst photos that happen to have both adjacent date labels.
+        seen = set()
+        return [entry for entry in dated + undated_ours
+                if not (entry[0]['id'] in seen or seen.add(entry[0]['id']))]
     print(f'우리 사진 {len(ours)}장 해시 완료')
 
-    source = from_apple() if args.apple else from_takeout(args.takeout)
-    unknown, plan, seen_src, no_image, hashed_src, closest_hist = {}, {}, 0, 0, 0, {}
+    # Materialise only compact JSON/paths descriptors, then decode originals in parallel. On a
+    # 50 GB Takeout the old serial decoder spent close to an hour before it could even show a
+    # dry-run result; image bytes remain local and are discarded as soon as their hash is made.
+    source = list(from_apple() if args.apple else from_takeout(args.takeout))
+    print(f'원본 메타데이터 {len(source)}건을 읽었습니다. 지각 해시를 병렬로 계산합니다.')
+
+    def item_hash(item):
+        return next((value for value in (hash_file(path) for path in item['paths']) if value), None)
+
+    unknown, plan, seen_src, no_image, hashed_src, closest_hist, ambiguous = {}, {}, 0, 0, 0, {}, 0
     print('원본 사진과 비교하는 중...')
-    for item in source:
+    with ThreadPoolExecutor(8) as pool:
+      hashed_source = pool.map(item_hash, source)
+      for item, h in zip(source, hashed_source):
         seen_src += 1
         if seen_src % 200 == 0:
             print(f'  {seen_src}장 확인', flush=True)
@@ -312,29 +375,42 @@ def main():
             else:
                 unknown[n] = unknown.get(n, 0) + 1
         geo = item.get('geo') if args.places else None
-        if not mapped and not geo:
+        if not mapped and not geo and not item.get('date'):
             continue
-        h = next((x for x in (hash_file(p) for p in item['paths']) if x), None)
         if not h:
             no_image += 1
             continue
         hashed_src += 1
-        best = None
+        matches = []
         closest = 64
-        for row, rh, dates in ours:
-            limit = SAME_DAY_DISTANCE if (item['date'] and any(abs((item['date'] - d).days) <= 1 for d in dates)) else ANY_DAY_DISTANCE
+        for row, rh, dates in candidate_rows(item['date']):
+            same_day = item['date'] and any(abs((item['date'] - d).days) <= 1 for d in dates)
+            limit = SAME_DAY_DISTANCE if same_day else ANY_DAY_DISTANCE
             dist = hamming(h, rh)
             closest = min(closest, dist)
-            if dist <= limit and (best is None or dist < best[1]):
-                best = (row, dist)
+            if dist <= limit:
+                matches.append((row, dist, bool(same_day)))
         # Diagnostics: how close the nearest of our photos came, so a 0-match run says why.
         bucket = '0-4' if closest <= 4 else '5-8' if closest <= 8 else '9-12' if closest <= 12 else '13-16' if closest <= 16 else '17+'
         closest_hist[bucket] = closest_hist.get(bucket, 0) + 1
-        if not best:
+        if not matches:
             continue
-        row = best[0]
-        entry = plan.setdefault(row['id'], {'row': row, 'names': [], 'geo': None})
+        matches.sort(key=lambda entry: (entry[1], not entry[2], entry[0]['id']))
+        # A hash collision or near-identical burst must not assign a person's name/GPS to an
+        # arbitrary sibling. Require a clearly better best match; duplicated images can be
+        # handled manually after the importer shows them.
+        if len(matches) > 1 and matches[1][1] <= matches[0][1] + 1:
+            ambiguous += 1
+            continue
+        row = matches[0][0]
+        entry = plan.setdefault(row['id'], {'row': row, 'names': [], 'dates': [], 'geo': None})
         entry['names'].extend(x for x in mapped if x not in entry['names'])
+        if item.get('date') and not entry['dates']:
+            entry['dates'].append(item['date'])
+        elif item.get('date') and entry['dates'][0] != item['date']:
+            # The same visual hash associated with two source dates is not a date fact. Keep
+            # names/GPS reviewable, but never create competing calendar-day tags from it.
+            entry['dateConflict'] = True
         if geo and not entry['geo']:
             entry['geo'] = geo
 
@@ -343,6 +419,10 @@ def main():
         row = entry['row']
         current = [t for t in re.split(r'[\s,#]+', row.get('tags') or '') if t]
         add = [n for n in entry['names'] if n not in current]
+        # A Takeout camera date is a direct metadata fact. Never add a second date when the
+        # calendar already has one, even if its spelling is the long YYYYMMDD variant.
+        if not entry.get('dateConflict') and not date_tokens(row.get('tags')):
+            add.extend(date.strftime('%y%m%d') for date in entry['dates'] if date.strftime('%y%m%d') not in current)
         if not add:
             continue
         tags = ' '.join((current + add)[:MAX_TAGS])
@@ -367,7 +447,9 @@ def main():
         if owners:
             geo_changes.append({'assetKey': key, 'geo': entry['geo'], 'owners': owners})
 
-    print(f'\n원본 사진 {seen_src}장 중 이름 있는 사진을 우리 사진 {len(plan)}장과 연결, 새 인물 태그가 붙을 사진 {len(changes)}장')
+    print(f'\n원본 사진 {seen_src}장 중 검증 메타데이터를 우리 사진 {len(plan)}장과 연결, 새 인물/촬영일 태그가 붙을 사진 {len(changes)}장')
+    if ambiguous:
+        print(f'가까운 일치가 둘 이상이라 안전하게 건너뛴 사진 {ambiguous}장')
     if args.places:
         print(f'위치가 없던 우리 사진 {len(geo_changes)}장에 원본의 촬영 위치를 넣습니다 (장소 태그는 서버가 위치로 붙임)')
     print(f'비교에 쓴 원본 사진 {hashed_src}장, 이 맥에 이미지가 없어 건너뛴 사진 {no_image}장')
@@ -414,7 +496,7 @@ def main():
             res = json.load(r)
         if res.get('ok') is not False:
             applied += len(chunk)
-    print(f'\n{applied}장에 인물 태그를 붙였습니다.')
+    print(f'\n{applied}장에 검증된 인물/촬영일 태그를 붙였습니다.')
 
 
 if __name__ == '__main__':
