@@ -1575,11 +1575,11 @@ export function PlacesView({
           title: "장소 메뉴",
           "aria-label": "장소 메뉴 열기",
           style: PAGE_HEADER_ICON_BTN_STYLE
-        }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "☰")
       )
     ),
     /* Slide-down search input bar (shared InlineSearchBar) */
-    isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
       value: listSearchQuery,
       placeholder: "등록된 장소명 또는 주소 검색...",
       onChange: e => {
@@ -1705,10 +1705,13 @@ export function PlacesView({
             ...categories.map(category => {
               const cCount = countsByCategory[category.id] || 0;
               const isMulti = cCount > 9;
+              const PlaceCategoryOptionLabel = __comp.PlaceCategoryOptionLabel || __deps.PlaceCategoryOptionLabel;
               return {
                 value: category.id,
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
-                  /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category, size: 18 }),
+                  PlaceCategoryOptionLabel
+                    ? /*#__PURE__*/React.createElement(PlaceCategoryOptionLabel, { category, size: 18 })
+                    : category.name,
                   " ",
                   /*#__PURE__*/React.createElement("span", {
                     className: `section-count-badge ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,

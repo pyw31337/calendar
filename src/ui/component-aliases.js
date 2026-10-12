@@ -7,17 +7,22 @@
  */
 
 const iconNames = [
-  'MenuIcon', 'NotepadTextIcon', 'ChatSectionIcon', 'LinkIcon', 'MessageCommentIcon', 'PencilIcon',
-  'BuildingIcon', 'BackArrowIcon', 'SunIcon', 'CloudIcon', 'MistIcon', 'CloudRainIcon',
-  'SnowflakeIcon', 'CloudLightningIcon', 'SettingsIcon', 'MapCogIcon', 'GiftIcon', 'MoonStarsIcon',
-  'TextResizeIcon', 'BellIcon', 'SearchIcon', 'CalendarCheckIcon', 'LockIcon', 'LogoutIcon',
-  'RefreshIcon', 'AdminFilledMenuIcon', 'EmojiPickerIcon', 'ExternalLinkIcon', 'WalletIcon',
-  'CoinIcon', 'BanknoteArrowUpIcon', 'BanknoteArrowDownIcon', 'PiggyBankIcon', 'ChartBarIcon',
-  'ChartPieIcon', 'CalendarCogIcon', 'CalendarSearchIcon', 'TrophyIcon', 'PodiumIcon',
-  'CloudDataConnectionIcon', 'LogIcon', 'HourglassIcon', 'AlertTriangleIcon', 'ShieldCheckIcon',
-  'KakaoTalkIcon', 'CalendarExportIcon', 'GalleryIcon', 'PollSectionIcon', 'LineHeightIcon',
-  'MegaphoneIcon', 'SmallXIcon', 'PlaceSectionIcon', 'ThreeLinesIcon', 'PlaceCategoryMarkerIcon',
-  'CctvIcon', 'DicesIcon'
+  'PhotoCommentCountBadge', 'KakaoTalkIcon', 'MenuIcon', 'CakeIcon', 'BalloonIcon', 'ConfettiIcon',
+  'TicketsPlaneIcon', 'FolderClockIcon', 'CalendarIcon', 'LocateFixedIcon', 'MapPinIcon',
+  'MessageCircleMoreIcon', 'CookingPotIcon', 'BaseballIcon', 'BasketballIcon', 'VolleyballIcon',
+  'SoccerBallIcon', 'HandballIcon', 'ClapperboardIcon', 'NotepadTextIcon', 'ChatSectionIcon',
+  'KeyboardIcon', 'DatabaseIcon', 'LinkIcon', 'MessageCommentIcon', 'PencilIcon', 'PlusIcon',
+  'ReplyIcon', 'BuildingIcon', 'BackArrowIcon', 'ChevronIcon', 'PlayIcon', 'SunIcon', 'CloudIcon',
+  'MistIcon', 'CloudRainIcon', 'SnowflakeIcon', 'CloudLightningIcon', 'SettingsIcon', 'MapCogIcon',
+  'GiftIcon', 'MoonStarsIcon', 'TextResizeIcon', 'BellIcon', 'SearchIcon', 'CalendarCheckIcon',
+  'LockIcon', 'LogoutIcon', 'RefreshIcon', 'AdminFilledMenuIcon', 'EmojiPickerIcon',
+  'ExternalLinkIcon', 'ShareIcon', 'WalletIcon', 'CoinIcon', 'BanknoteArrowUpIcon',
+  'BanknoteArrowDownIcon', 'PiggyBankIcon', 'ChartBarIcon', 'ChartPieIcon', 'CalendarCogIcon',
+  'CalendarSearchIcon', 'TrophyIcon', 'PodiumIcon', 'CloudDataConnectionIcon', 'LogIcon',
+  'HourglassIcon', 'AlertTriangleIcon', 'ShieldCheckIcon', 'CalendarUpIcon', 'CalendarExportIcon',
+  'GalleryIcon', 'PollSectionIcon', 'LineHeightIcon', 'MegaphoneIcon', 'SmallXIcon', 'TrashIcon',
+  'ImageDownIcon', 'PlaceSectionIcon', 'MemoSectionIcon', 'ThreeLinesIcon',
+  'PlaceCategoryMarkerIcon', 'PlaceCategoryOptionLabel', 'CctvIcon', 'DicesIcon'
 ];
 
 const loadersByComponent = new Map();
@@ -36,7 +41,7 @@ register(['UpdateAvailableBanner', 'ImageShareViewer', 'ImageThumbRemoveButton',
 register(['PlaceRegisterModal'], () => import('./ui-place-register.js'));
 register(['DirectChatMediaText', 'DeadlineDateTimePicker', 'PlacesSection', 'ImageUrlModal'], () => import('./ui-remaining.js'));
 register(['SharedContentPreviewModal', 'SectionCountBadge', 'SectionToggleButton', 'SearchCategoryTabs', 'SimpleBottomSheetPicker', 'ParticipantBackdrop', 'PhotoGallery', 'MemoPreviewSection', 'SummaryList', 'HistoryView', 'ContentView', 'CulturePerformancesTab', 'ContentRegisterModal', 'RegionFilterBackdrop'], () => import('./ui-summary-gallery.js'));
-register(['ResizableModalContainer', 'AutoGrowTextarea', 'FormAddEditActionButtons', 'SegmentedToggle', 'ItemEditDeleteActions', 'GamifiedConfirmButtonContent', 'LinkPreviewCard', 'LinkPreviewProgressOverlay', 'AdminLoginGate', 'DonutChart', 'ColorSwatchPicker', 'StickyVideoBox', 'PollVoterSheet', 'OperationProgressOverlay', 'ToggleSwitch', 'Footer', 'MemoTagInputRow', 'ClickToPlayVideoCard', 'UnderlineTabs'], () => import('./ui-shared.js'));
+register(['ResizableModalContainer', 'AutoGrowTextarea', 'FormAddEditActionButtons', 'SegmentedToggle', 'ItemEditDeleteActions', 'GamifiedConfirmButtonContent', 'LinkPreviewCard', 'LinkPreviewProgressOverlay', 'AdminLoginGate', 'DonutChart', 'ColorSwatchPicker', 'StickyVideoBox', 'PollVoterSheet', 'ParticipantSelectSheet', 'OperationProgressOverlay', 'ToggleSwitch', 'Footer', 'MemoTagInputRow', 'ClickToPlayVideoCard', 'UnderlineTabs'], () => import('./ui-shared.js'));
 register(['CalendarGrid', 'CommentsSection', 'MemoCard', 'PollList', 'GlobalSearchModal', 'EditMessageModal'], () => import('./ui-calendar-core.js'));
 register(['ChatParticipantSheet', 'NotificationPermissionHelpModal'], () => import('./ui-chat-sheets.js'));
 register(['ChatRoomView', 'ChatGalleryModal'], () => typeof window.__gatherLoadChatUi === 'function'
@@ -90,26 +95,7 @@ const aliasCache = new WeakMap();
 export function bindUiComponentAliases(React) {
   const cached = aliasCache.get(React);
   if (cached) return cached;
-  const names = [
-    ...iconNames,
-    'ResizableModalContainer', 'AutoGrowTextarea', 'FormAddEditActionButtons', 'SegmentedToggle',
-    'ItemEditDeleteActions', 'GamifiedConfirmButtonContent', 'LinkPreviewCard', 'LinkPreviewProgressOverlay',
-    'AdminLoginGate', 'DonutChart', 'ColorSwatchPicker', 'StickyVideoBox', 'PollVoterSheet',
-    'OperationProgressOverlay', 'ToggleSwitch', 'Footer', 'SearchResultLogRow', 'TikTokEmbedWidget',
-    'UrlCapsuleBadge', 'ParticipantPickerButton', 'DateCapsuleBadge', 'CapsuleTextBadge', 'AdminDashboard',
-    'AdminModal', 'AdminUnifiedSearchResultsView', 'AdminCreateCalendarModal', 'AdminRestorePhraseModal',
-    'AdminUnifiedSearchModal', 'CalendarGrid', 'CommentsSection', 'MemoCard', 'PollList', 'GlobalSearchModal',
-    'EditMessageModal', 'DirectChatMediaText', 'DeadlineDateTimePicker', 'PlacesSection', 'ImageUrlModal',
-    'ImageUploadOverlay', 'ImageProcessingOverlay', 'EmojiPickerSheet', 'Lightbox', 'ChatRoomView',
-    'ChatParticipantSheet', 'AppSettingsModal', 'NotificationOnboardingModal', 'NotificationPermissionHelpModal',
-    'ConfirmDialog', 'DateModal', 'SectionCountBadge', 'SectionToggleButton', 'SearchCategoryTabs',
-    'SimpleBottomSheetPicker', 'PhotoGallery', 'SummaryList', 'MemoPreviewSection', 'ShareModal',
-    'WeatherBadge', 'WeatherLocationModal', 'DailyWeatherIcon', 'WeatherDetailModal', 'WeatherLocationSettingModal',
-    'MainSideMenu', 'UpdateAvailableBanner', 'ImageShareViewer',
-    'ImageThumbRemoveButton', 'InlineSearchBar', 'MemoShareModal', 'ChatGalleryModal', 'MemoView',
-    'AnniversaryModal', 'SettlementSummaryModal', 'PollModal', 'PlaceMapView', 'PlacesView', 'HistoryView',
-    'ContentView', 'PlaceRegisterModal'
-  ];
+  const names = [...loadersByComponent.keys()];
   const aliases = {};
   names.forEach(name => { aliases[name] = deferredAlias(React, name); });
   aliases.UnderlineTabs = deferredAlias(React, 'UnderlineTabs', () => currentComponent('UnderlineTabs') || window.GATHER_APP_UTILS?.UnderlineTabs);

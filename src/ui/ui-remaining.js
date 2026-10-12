@@ -514,7 +514,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
               fontSize: 'var(--font-size-md)',
               fontWeight: 800
             }
-          }, /*#__PURE__*/React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlayIcon, { size: 14 }), '미니플레이어(PIP) 재생 중'));
+          }, /*#__PURE__*/React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } }, (__comp.PlayIcon || __deps.PlayIcon) ? /*#__PURE__*/React.createElement(__comp.PlayIcon || __deps.PlayIcon, { size: 14 }) : '▶', '미니플레이어(PIP) 재생 중'));
         }
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',
@@ -557,6 +557,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const CalendarSearchIcon = __comp.CalendarSearchIcon || __deps.CalendarSearchIcon;
+  const ChevronIcon = __comp.ChevronIcon || __deps.ChevronIcon;
 
   const [isOpen, setIsOpen] = React.useState(false);
   const now = new Date();
@@ -662,7 +663,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
       onClick: openPicker
     },
       /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
-      (dateOnly || rangeMode) && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
+      (dateOnly || rangeMode) && (CalendarSearchIcon ? /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 }) : '📅')
     ),
     (() => {
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
@@ -683,9 +684,9 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
         ),
         /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-body' },
           /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' } },
-            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' }, onClick: () => setPYear(y => y - 1) }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'left' })),
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' }, onClick: () => setPYear(y => y - 1) }, ChevronIcon ? /*#__PURE__*/React.createElement(ChevronIcon, { size: 15, direction: 'left' }) : '◀'),
             /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, fontSize: '1rem', minWidth: '60px', textAlign: 'center' } }, `${pYear}년`),
-            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' }, onClick: () => setPYear(y => y + 1) }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'right' }))
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' }, onClick: () => setPYear(y => y + 1) }, ChevronIcon ? /*#__PURE__*/React.createElement(ChevronIcon, { size: 15, direction: 'right' }) : '▶')
           ),
           /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } },
             DEADLINE_PICKER_MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement('button', {

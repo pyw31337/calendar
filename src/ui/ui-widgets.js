@@ -277,6 +277,7 @@ export function shortParticipantName(name) {
 export function ParticipantPickerButton({ participant, onClick, placeholder = '작성자 선택' }) {
   const React = window.React;
   const label = shortParticipantName(participant?.name) || placeholder;
+  const ChevronIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChevronIcon) || (window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.ChevronIcon);
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -299,7 +300,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, label, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 14, direction: 'down' }));
+  }, label, ChevronIcon ? /*#__PURE__*/React.createElement(ChevronIcon, { size: 14, direction: 'down' }) : '▾');
 }
 
 // The single shared "참여자 뱃지" -- a solid pill showing a participant's name on their own color,

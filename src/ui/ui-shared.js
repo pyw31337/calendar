@@ -1641,7 +1641,11 @@ export function ParticipantSelectSheet({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
+  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop || (({ participant, name, dotSize = 10, style }) => /*#__PURE__*/React.createElement("span", {
+    style: Object.assign({ display: 'inline-flex', alignItems: 'center', gap: '10px', fontWeight: 700 }, style)
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { width: dotSize, height: dotSize, borderRadius: '50%', backgroundColor: (participant && participant.color) || '#64748B', flexShrink: 0 }
+  }), name || (participant && participant.name) || ''));
 
   const list = participants || getActiveParticipants(calendar);
   // Bottom-sheet rule: portal to document.body so a `position: fixed` sheet never gets trapped
@@ -1670,7 +1674,7 @@ export function ParticipantSelectSheet({
     type: "button",
     onClick: onClose,
     style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, null))), /*#__PURE__*/React.createElement("div", {
+  }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, null) : '✕')), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
   }, list.map(participant => {
     const selected = Boolean(isOptionSelected(participant.id));

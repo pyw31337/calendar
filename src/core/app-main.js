@@ -377,7 +377,7 @@ function App() {
       /*#__PURE__*/React.createElement(AdminDashboard, { initialCalendars })
     );
   }
-  const SharedContentPreviewModal = (window.GATHER_UI_COMPONENTS || {}).SharedContentPreviewModal;
+  const SharedContentPreviewModal = (window.GATHER_UI_COMPONENTS || {}).SharedContentPreviewModal || uiWrapperAliases.SharedContentPreviewModal;
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement(CalendarApp, null),
     sharedContentItem && SharedContentPreviewModal && /*#__PURE__*/React.createElement(SharedContentPreviewModal, {
@@ -5352,7 +5352,7 @@ const FOOTER_FAMILY_LINKS = [
 // on mobile, a single copyright-left/FAMILY LINK-right row on desktop.
 
 function bindGatherUiDeps() {
-  window.GATHER_UI_DEPS = Object.assign({}, window.GATHER_UI_DEPS || {}, {
+  window.GATHER_UI_DEPS = Object.assign({}, uiWrapperAliases, window.GATHER_UI_DEPS || {}, {
     verifyAdminPasswordRemote: typeof verifyAdminPasswordRemote === 'function' ? verifyAdminPasswordRemote : null,
     rebuildCalendarToTimestamp: typeof rebuildCalendarToTimestamp === 'function' ? rebuildCalendarToTimestamp : null,
     copyTextToClipboard: typeof copyTextToClipboard === 'function' ? copyTextToClipboard : null,
@@ -5442,8 +5442,8 @@ function bindGatherUiDeps() {
     SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
     CreateSettlementModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal) || CreateSettlementModal,
-    MemoTagInputRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoTagInputRow) || null,
-    ClickToPlayVideoCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ClickToPlayVideoCard) || null,
+    MemoTagInputRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoTagInputRow) || uiWrapperAliases.MemoTagInputRow || null,
+    ClickToPlayVideoCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ClickToPlayVideoCard) || uiWrapperAliases.ClickToPlayVideoCard || null,
     getCalendarSettlementCards,
     getPlaceKakaoRouteUrl,
     getPlaceNaverRouteUrl,
