@@ -301,3 +301,83 @@ export const snapshotAttendance = dateStr => snapshotRecords(latestAttendance(da
 export const snapshotExpenses = dateStr => snapshotRecords(latestExpenses(dateStr));
 export const snapshotPlaces = () => snapshotRecords(latestPlaces());
 export const snapshotSettlementCards = () => snapshotRecords(latestSettlementCards());
+
+/**
+ * 되돌리기 for one document a screen just wrote whole ('set'): 컨텐츠 등록/수정, 문화공연 메모.
+ * `previous` is the document before the save (null: the save created it, so 되돌리기 removes
+ * it). `current()` reads the latest copy; when it no longer equals `saved` someone changed it
+ * again, and 되돌리기 refuses rather than overwrite that. `after(previous)` updates the screen.
+ */
+export function showDocumentUndo(message, { calendarId, collection, docId, previous, saved, current, after, label = '되돌리기' }) {
+  const savedClone = clone(saved);
+  const previousClone = clone(previous);
+  const undo = calendarId && collection && docId ? async () => {
+    const deps = live();
+    if (typeof deps.writeCollectionDocumentWithFallback !== 'function') return false;
+    if (typeof current === 'function' && savedClone && stable(current() ?? null) !== stable(savedClone)) return false;
+    const result = previousClone
+      ? await deps.writeCollectionDocumentWithFallback(collection, calendarId, docId, previousClone, 'set', label)
+      : await deps.writeCollectionDocumentWithFallback(collection, calendarId, docId, null, 'delete', label);
+    if (!result?.success) return false;
+    if (typeof after === 'function') await after(previousClone);
+    return true;
+  } : null;
+  showUndoableToast(live().showToast, message, undo);
+}
+
+/**
+ * 갤러리 사진 추가 / 사진 붙여넣기 되돌리기: remove the message documents that action created.
+ * Only those records go -- the photo files stay, exactly like deleting the message (another
+ * record may show the same original, and a re-upload reuses it).
+ */
+export async function revertCreatedMessages(calendarId, messageIds) {
+  const deps = live();
+  const ids = (Array.isArray(messageIds) ? messageIds : []).filter(Boolean);
+  if (!calendarId || !ids.length || typeof deps.writeCollectionDocumentWithFallback !== 'function') return false;
+  for (const id of ids) {
+    const removed = await deps.writeCollectionDocumentWithFallback('messages', calendarId, id, null, 'delete', '사진 추가 되돌리기');
+    if (!removed) return false;
+    deps.removeLocalChatMessage?.(id);
+    await deps.unlinkMeetingPhotoReferences?.(id, null);
+  }
+  return true;
+}
+
+/** One participant's entries on these dates, just before a 반복 일정 save (null = none). */
+export function snapshotAvailabilityFor(participantId, dates) {
+  const cal = live().getActiveCalendar?.();
+  const list = Array.isArray(cal?.availabilities) ? cal.availabilities : [];
+  const out = new Map();
+  (Array.isArray(dates) ? dates : []).forEach(date => {
+    const entry = list.find(item => item && item.date === date && item.participantId === participantId && isLive(item));
+    out.set(date, entry ? clone(entry) : null);
+  });
+  return { calendarId: cal?.id || '', participantId, entries: out };
+}
+
+/**
+ * 반복 일정 되돌리기, in one save: dates the save created go back to empty, dates it overwrote get
+ * their earlier note. A date whose entry no longer holds the note this save wrote (`writtenNote`)
+ * changed again since and is left alone, so nobody else's newer change is lost.
+ */
+export async function revertBulkAvailability(snapshot, writtenNote) {
+  const deps = live();
+  const calendars = deps.getCalendars?.() || [];
+  const latest = calendars.find(cal => cal && cal.id === snapshot?.calendarId);
+  if (!latest || typeof deps.updateCalendars !== 'function' || !snapshot.entries?.size) return false;
+  const now = Date.now();
+  let changed = 0;
+  const availabilities = (latest.availabilities || []).map(entry => {
+    if (!entry || entry.participantId !== snapshot.participantId || !snapshot.entries.has(entry.date)) return entry;
+    if (!isLive(entry) || String(entry.note || '') !== String(writtenNote || '')) return entry;
+    const before = snapshot.entries.get(entry.date);
+    changed += 1;
+    return before
+      ? { ...entry, note: before.note || '', updatedAt: now, deletedAt: null }
+      : { ...entry, updatedAt: now, deletedAt: now };
+  });
+  if (!changed) return false;
+  const restored = { ...latest, availabilities, updatedAt: now, revision: (latest.revision || 0) + 1 };
+  const next = calendars.map(cal => (cal && cal.id === latest.id ? restored : cal));
+  return (await deps.updateCalendars(next, null, null, latest.id, 'availability', [])) !== false;
+}

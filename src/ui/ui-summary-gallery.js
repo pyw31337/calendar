@@ -11,7 +11,9 @@ import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { applyPhotoTagOperation, buildBulkPhotoTagChanges, joinPhotoTagTokens, mergeDuplicatePhotosRemote } from '../core/bulk-photo-tags.js';
 import { buildDuplicateSuggestions, buildFaceSuggestions, buildPlaceVisitSuggestions, buildSimilarPhotoSuggestions, buildTagSuggestions } from './archive-tag-suggestions.js';
-import { fetchFaceSuggestions, fetchSimilarPhotoGroups, rejectFaceSuggestions } from '../core/media-analysis-feed.js';
+import { fetchFaceSuggestions, fetchSimilarPhotoGroups, rejectFaceSuggestions, restoreFaceSuggestions } from '../core/media-analysis-feed.js';
+import { showUndoableToast } from '../core/undo-toast.js';
+import { snapshotPlaces, revertPlaceSave } from '../core/app-undo-actions.js';
 import { chooseDedupWinner, findDuplicatePhotoGroups } from '../core/gallery-dedup.js';
 import { ArchiveTagSuggestions } from './archive-tag-suggestions-view.js';
 import {
@@ -2245,16 +2247,10 @@ export function HistoryView({
       showToast?.('선택한 사진에 이미 해당 태그가 지정되어 있습니다.', 'info');
       return;
     }
-    publishArchiveTags(changes);
     setPeopleSelectedKeys(new Set());
-    try {
-      const result = await save(changes);
-      if (!result?.ok) throw new Error('태그 저장 실패');
-      showToast?.(`사진 ${changes.length}장에 태그를 적용했습니다.`, 'success');
-    } catch (err) {
-      rollbackArchiveTags(changes);
-      showToast?.(String(err?.message || '사진 태그 일괄 저장에 실패했습니다.'), 'error');
-    }
+    await saveArchiveTagsWithUndo(save, changes, `사진 ${changes.length}장에 태그를 적용했습니다.`, {
+      undoneMessage: '태그 적용을 되돌렸습니다.', failMessage: '사진 태그 일괄 저장에 실패했습니다.'
+    });
   };
 
   // 제외 (never a delete): 분류 필요 → 인물아님 mark; a person → that person's tag comes off.
@@ -2291,8 +2287,8 @@ export function HistoryView({
       setIsPeopleBulkDeleting(false);
     }
   };
-  // One bulk tag save with an undo toast (인물 제외 and 장소 분류에서 제거 share it).
-  const saveArchiveTagsWithUndo = async (save, changes, doneMessage) => {
+  // One bulk tag save with an undo toast (인물 태그 적용·제외 and 장소 분류에서 제거 share it).
+  const saveArchiveTagsWithUndo = async (save, changes, doneMessage, { undoneMessage = '제외를 되돌렸습니다.', failMessage = '분류에서 빼지 못했습니다.' } = {}) => {
     publishArchiveTags(changes);
     try {
       const result = await save(changes);
@@ -2303,13 +2299,13 @@ export function HistoryView({
         void Promise.resolve(save(undoChanges))
           .then(undoResult => {
             if (!undoResult?.ok) rollbackArchiveTags(undoChanges);
-            showToast?.(undoResult?.ok ? '제외를 되돌렸습니다.' : '제외를 되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
+            showToast?.(undoResult?.ok ? undoneMessage : '되돌리지 못했습니다.', undoResult?.ok ? 'success' : 'error');
           })
-          .catch(() => { rollbackArchiveTags(undoChanges); showToast?.('제외를 되돌리지 못했습니다.', 'error'); });
+          .catch(() => { rollbackArchiveTags(undoChanges); showToast?.('되돌리지 못했습니다.', 'error'); });
       }, null, '되돌리기');
     } catch (err) {
       rollbackArchiveTags(changes);
-      showToast?.(String(err?.message || '분류에서 빼지 못했습니다.'), 'error');
+      showToast?.(String(err?.message || failMessage), 'error');
     }
   };
 
@@ -2375,13 +2371,27 @@ export function HistoryView({
     : []), [historyTab, historyPhotoEntries, faceItems, personTagChips]);
   const rejectFaces = async (photos, name) => {
     const assetKeys = photos.map(faceSuggestionKey).filter(Boolean);
+    const calendarId = calendar?.id;
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
     try {
-      await rejectFaceSuggestions({ calendarId: calendar?.id, projectId: String(window.__gatherFirebaseConfig?.projectId || '').trim(), name, assetKeys });
-      const rejected = new Set(assetKeys);
-      setFaceItems(items => items.map(item => (rejected.has(item.assetKey)
+      // The suggestions as they were (name + score), for 되돌리기.
+      const wanted = new Set(assetKeys);
+      const before = faceItems.filter(item => wanted.has(item.assetKey)).map(item => ({
+        assetKey: item.assetKey,
+        score: (item.facePeople || []).find(entry => entry && entry.name === name)?.score ?? null
+      }));
+      await rejectFaceSuggestions({ calendarId, projectId, name, assetKeys });
+      setFaceItems(items => items.map(item => (wanted.has(item.assetKey)
         ? { ...item, faceRejected: [...(item.faceRejected || []), name] }
         : item)));
-      showToast?.(`사진 ${assetKeys.length}장은 ${name} 님 추천에서 뺐어요.`, 'success');
+      showUndoableToast(showToast, `사진 ${assetKeys.length}장은 ${name} 님 추천에서 뺐어요.`, async () => {
+        await restoreFaceSuggestions({ calendarId, projectId, name, items: before });
+        const back = new Map(before.map(entry => [entry.assetKey, entry.score]));
+        setFaceItems(items => items.map(item => (back.has(item.assetKey)
+          ? { ...item, faceRejected: (item.faceRejected || []).filter(rejected => rejected !== name) }
+          : item)));
+        return '추천을 되돌렸습니다.';
+      });
       return true;
     } catch (error) {
       showToast?.('저장하지 못했어요. 잠시 후 다시 시도해 주세요.', 'error');
@@ -2413,9 +2423,10 @@ export function HistoryView({
     : []), [historyTab, historyPhotoEntries, calendar, onSavePlace, todayStr]);
   const applyPlaceVisit = async visit => {
     try {
+      const placesBefore = snapshotPlaces();
       const ok = await Promise.resolve(onSavePlace(visit.next));
       if (ok === false) throw new Error('save');
-      showToast?.(`${visit.place.alias || visit.place.name} 방문 기록 ${visit.dates.length}건을 추가했어요.`, 'success');
+      showUndoableToast(showToast, `${visit.place.alias || visit.place.name} 방문 기록 ${visit.dates.length}건을 추가했어요.`, () => revertPlaceSave(placesBefore));
       return true;
     } catch (_) {
       showToast?.('방문 기록을 저장하지 못했습니다.', 'error');

@@ -3148,6 +3148,13 @@ exports.recordFaceFeedback = seoulFunctions().runWith({
     res.status(400).json({ ok: false, message: 'Invalid face feedback' });
     return;
   }
+  // restore (되돌리기 of a rejection): the name comes off faceRejected and its suggestion, with the
+  // score the photo had, goes back. Scores are positional with the request's assetKeys.
+  const restore = req.body?.restore === true;
+  const scoreOf = new Map((Array.isArray(req.body?.assetKeys) ? req.body.assetKeys : []).map((key, index) => {
+    const score = Number(Array.isArray(req.body?.scores) ? req.body.scores[index] : NaN);
+    return [String(key), Number.isFinite(score) && score >= 0 && score <= 1 ? Math.round(score * 1000) / 1000 : null];
+  }));
   if (!(await checkProxyRateLimit('faceFeedback', req.ip, 60 * 1000, 30))) {
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
@@ -3163,12 +3170,11 @@ exports.recordFaceFeedback = seoulFunctions().runWith({
     snaps.forEach((snap, index) => {
       if (!snap.exists) return;
       const facePeople = (snap.data()?.facePeople || []).filter(entry => faceName(entry?.name) !== name);
-      batch.set(refs[index], {
-        faceRejected: FieldValue.arrayUnion(name),
-        facePeople,
-        faceSuggested: facePeople.length > 0,
-        faceRejectedAt: now
-      }, { merge: true });
+      const score = scoreOf.get(assetKeys[index]);
+      if (restore && score != null) facePeople.push({ name, score });
+      batch.set(refs[index], restore
+        ? { faceRejected: FieldValue.arrayRemove(name), facePeople, faceSuggested: facePeople.length > 0 }
+        : { faceRejected: FieldValue.arrayUnion(name), facePeople, faceSuggested: facePeople.length > 0, faceRejectedAt: now }, { merge: true });
       updated += 1;
     });
     if (updated) await batch.commit();

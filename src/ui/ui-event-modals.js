@@ -3,7 +3,7 @@
  */
 
 import { showUndoableToast } from '../core/undo-toast.js';
-import { snapshotSettlementCards, revertSettlementCardSave } from '../core/app-undo-actions.js';
+import { snapshotSettlementCards, revertSettlementCardSave, snapshotAvailabilityFor, revertBulkAvailability } from '../core/app-undo-actions.js';
 import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
 import { preserveAnniversaryCurationFields, paginateGalleryItems } from '../core/gallery-data.js';
 import { isCultureLinkedAnniversary } from '../core/app-anniversary-dates.js';
@@ -753,13 +753,18 @@ export function AnniversaryModal({
         setIsBulkSubmitting(true);
         try {
           const participantId = bulkParticipantId || BULK_NO_PARTICIPANT_ID;
-          const successCount = await onBulkRegister(participantId, dates, bulkNote);
+          const beforeEntries = snapshotAvailabilityFor(participantId, dates);
+          // { count, note } once saved, false otherwise (the toast used to read "true개").
+          const registered = await onBulkRegister(participantId, dates, bulkNote);
+          if (!registered) throw new Error('Bulk register save failed');
+          const successCount = Number(registered.count) || dates.length;
           // Persist a listable repeat rule so 목록 can show/edit the pattern later.
           const stamp = Date.now();
           const anniversaryId = (editingId && String(editingId).startsWith('repeat_'))
             ? editingId
             : ('repeat_' + stamp + '_' + Math.random().toString(36).slice(2, 8));
           const prev = (anniversaries || []).find(a => a && a.id === anniversaryId);
+          const ruleBefore = prev ? JSON.parse(JSON.stringify(prev)) : null;
           const annData = {
             id: anniversaryId,
             calendarId: calendar.id,
@@ -775,16 +780,32 @@ export function AnniversaryModal({
             createdAt: (prev && prev.createdAt) || stamp,
             updatedAt: stamp
           };
+          let ruleSaved = false;
           try {
             const saved = await writeSharedCollection('anniversaries', calendar.id, anniversaryId, annData, 'set', '반복 일정 규칙 저장');
-            if (saved?.success && typeof onAnniversarySaved === 'function') onAnniversarySaved(annData);
+            ruleSaved = Boolean(saved?.success);
+            if (ruleSaved && typeof onAnniversarySaved === 'function') onAnniversarySaved(annData);
           } catch (ruleErr) {
             console.error('Repeat rule save error:', ruleErr);
           }
           const toastMsg = capped
             ? `${successCount}개의 반복 일정이 등록되었습니다. (상한 ${maxLimit}개 적용)`
             : `${successCount}개의 반복 일정이 등록되었습니다.`;
-          showToast(toastMsg, capped ? 'info' : 'success');
+          const ruleCalendarId = calendar.id;
+          // 되돌리기: the dates go back to how they were (one save) and the repeat rule to its
+          // earlier version, or away when this registration created it.
+          showUndoableToast(showToast, toastMsg, async () => {
+            if (!(await revertBulkAvailability(beforeEntries, registered.note ?? bulkNote))) return false;
+            if (!ruleSaved) return '반복 일정 등록을 되돌렸습니다.';
+            const ruleBack = ruleBefore
+              ? await writeSharedCollection('anniversaries', ruleCalendarId, anniversaryId, ruleBefore, 'set', '반복 일정 규칙 되돌리기')
+              : await writeSharedCollection('anniversaries', ruleCalendarId, anniversaryId, null, 'delete', '반복 일정 규칙 되돌리기');
+            if (ruleBack?.success) {
+              if (ruleBefore && typeof onAnniversarySaved === 'function') onAnniversarySaved(ruleBefore);
+              if (!ruleBefore && typeof onAnniversaryDeleted === 'function') onAnniversaryDeleted(anniversaryId);
+            }
+            return '반복 일정 등록을 되돌렸습니다.';
+          }, { type: capped ? 'info' : 'success', duration: 9000 });
           setBulkNote('');
           setBulkWeeks([]);
           setBulkWeekdays([]);
