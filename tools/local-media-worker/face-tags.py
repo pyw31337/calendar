@@ -9,6 +9,8 @@
   "아니에요"를 누르면, 그 사진에는 그 이름을 다시 추천하지 않는다.
 - 배우는 대상은 캘린더 참석자와 인물 탭에 추가한 인물 태그(customPersonTags)다. "박서준"은 "서준" 태그도
   같은 사람으로 본다. 얼굴이 하나뿐이고 인물 태그도 하나뿐인 사진이 기본 학습 자료다.
+- import-people-tags.py --apply 로 구글 테이크아웃/애플 사진과 맞춘 사진은 그쪽이 확인한 인물 목록을 쓴다
+  (가족이 단 태그보다 얼굴 기준으로 정확하다). 그 목록은 이 맥에만 있다.
 
     source ~/.venvs/photos/bin/activate
     pip install opencv-python-headless numpy pillow     # 한 번만
@@ -319,6 +321,21 @@ def self_check(gallery):
     return right, wrong, unknown
 
 
+def learning_people(photo_people, verified, variants):
+    """Who is in each photo for learning: the people Google/Apple verified on it (import-people-tags.py)
+    when every one of them is a person we learn, else the photo's own person tags. The second set is
+    what a suggestion must not repeat (tagged or verified); the third, the photos that used a verified list."""
+    learn_from, known, trusted = {}, {}, set()
+    for asset, tagged in photo_people.items():
+        names = verified.get(asset) or []
+        checked = people_in(' '.join(names), variants) if names else set()
+        if names and len(checked) == len(set(names)):
+            trusted.add(asset)
+        learn_from[asset] = checked if asset in trusted else tagged
+        known[asset] = tagged | checked
+    return learn_from, known, trusted
+
+
 def suggest(gallery, photo_faces, photo_people):
     out = {}
     for asset, features in photo_faces.items():
@@ -476,12 +493,17 @@ def run_calendar(calendar, args, config, people_import, engine, db):
     scan_photos(db, engine, calendar, rows, args.max_new, args.quiet)
     photo_faces = load_faces(db, calendar, {r['id'] for r in rows})
     photo_people = {r['id']: people_in(r.get('tags'), variants) for r in rows}
-    gallery, sample_counts = learn(photo_faces, photo_people)
-    suggestions = suggest(gallery, photo_faces, photo_people)
+    verified = people_import.load_verified_people(calendar) if hasattr(people_import, 'load_verified_people') else {}
+    learn_from, known_people, trusted = learning_people(photo_people, verified, variants)
+    gallery, sample_counts = learn(photo_faces, learn_from)
+    suggestions = suggest(gallery, photo_faces, known_people)
 
     if not args.quiet:
         face_total = sum(len(v) for v in photo_faces.values())
         print(f'\n사진 {len(rows)}장에서 얼굴 {face_total}개를 찾았습니다.')
+        checked = len(trusted & set(photo_faces))
+        if checked:
+            print(f'구글/애플이 인물을 확인한 사진 {checked}장은 그 인물 목록으로 배웁니다 (import-people-tags.py --apply).')
         print('인물 태그로 배운 사람 (배운 얼굴 수):')
         print('  ' + ', '.join(f'{spelling.get(l, l)} {len(f)}' for l, f in sorted(gallery.items(), key=lambda x: -len(x[1]))) if gallery else '  (아직 없음)')
         short = [f'{spelling.get(l, l)} {n}' for l, n in sample_counts.items() if l not in gallery]
