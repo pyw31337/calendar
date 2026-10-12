@@ -203,7 +203,8 @@ import {
 import { getInitialAppView, buildAppViewUrl, buildMonthUrl } from './app-routing-state.js';
 import { calendarSwitchAddress, pushAppPage, readSharedContentFromHash, routeSearchParams } from './app-address.js';
 import { useNotificationOpen } from './use-notification-open.js';
-import { showAnniversaryUndo, showMeetingConfirmUndo, showAttendanceMoveUndo, showCalendarSaveToast, restoreDeletedPlaces } from './app-undo-actions.js';
+import { showAnniversaryUndo, showMeetingConfirmUndo, showAttendanceMoveUndo, showCalendarSaveToast, restoreDeletedPlaces, showDocumentUndo, revertCreatedMessages } from './app-undo-actions.js';
+import { showUndoableToast } from './undo-toast.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
 import { useBrowserUiCompatibility } from './app-browser-ui-state.js';
@@ -1677,7 +1678,18 @@ function CalendarApp() {
           await pushSingleCloudCalendar({ ...activeCal, updatedAt: stamp, revision: (activeCal.revision || 0) + 1 }, stamp, 4, null, 'settings', [activityLog]);
         }
       }
-      showToast(existingMemo ? '메모가 수정되었습니다.' : '메모에 등록되었습니다.', 'success');
+      // 되돌리기: the memo as it was (or gone) and the linked anniversary's earlier memo text.
+      showDocumentUndo(existingMemo ? '메모가 수정되었습니다.' : '메모에 등록되었습니다.', {
+        calendarId: activeCal.id, collection: 'memos', docId: memoData.id, label: '문화공연 메모 되돌리기',
+        previous: existingMemo ? sanitizeMemoForFirestore(existingMemo) : null,
+        after: async back => {
+          setMemos(prev => [...(back ? [{ ...existingMemo }] : []), ...(Array.isArray(prev) ? prev.filter(m => m && m.id !== memoData.id) : [])]);
+          if (!linkedAnn?.id) return;
+          const annBack = { id: linkedAnn.id, memo: linkedAnn.memo || '', updatedAt: Date.now() };
+          const reverted = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, linkedAnn.id, annBack, 'update', '문화공연 연동 메모 되돌리기');
+          if (reverted?.success) handleAnniversarySaved({ ...linkedAnn, ...annBack });
+        }
+      });
       return true;
     } catch (err) {
       console.error('Failed to save culture event memo:', err);
@@ -1927,6 +1939,7 @@ function CalendarApp() {
       if (normalizedItem.endDate) normalizedItem.endDate = normalizeDateString(normalizedItem.endDate) || normalizedItem.endDate;
       if (normalizedItem.releaseDate) normalizedItem.releaseDate = normalizeDateString(normalizedItem.releaseDate) || normalizedItem.releaseDate;
       if (normalizedItem.startDate) normalizedItem.dateLabel = formatDateWithDayName(normalizedItem.startDate) + (normalizedItem.endDate && normalizedItem.endDate !== normalizedItem.startDate ? ` ~ ${formatDateWithDayName(normalizedItem.endDate)}` : '');
+      const previousItem = (customCultureItems || []).find(x => x && x.id === normalizedItem.id) || null;
       const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, normalizedItem, 'set', '컨텐츠 등록');
       if (!saved?.success) throw new Error('Custom culture item save failed');
       setCustomCultureItems(prev => {
@@ -1934,7 +1947,11 @@ function CalendarApp() {
         list.unshift(normalizedItem);
         return list;
       });
-      showToast('컨텐츠가 등록되었습니다.', 'success');
+      showDocumentUndo(previousItem ? '컨텐츠가 수정되었습니다.' : '컨텐츠가 등록되었습니다.', {
+        calendarId: activeCal.id, collection: 'customCultureItems', docId: normalizedItem.id, previous: previousItem, saved: normalizedItem, label: '컨텐츠 등록 되돌리기',
+        current: () => (window.__gatherUndoDeps?.getCustomCultureItems?.() || []).find(x => x && x.id === normalizedItem.id),
+        after: back => setCustomCultureItems(prev => [...(back ? [back] : []), ...(Array.isArray(prev) ? prev.filter(x => x && x.id !== normalizedItem.id) : [])])
+      });
       return true;
     } catch (err) {
       console.error('Failed to save custom culture item:', err);
@@ -2997,6 +3014,7 @@ function CalendarApp() {
       const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
       let anyQueued = false;
+      const createdIds = [];
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
         // Keep gallery GPS in the first durable write for the same iOS lifecycle reason as chat.
@@ -3038,6 +3056,7 @@ function CalendarApp() {
         // from this same chatMessages state, and waiting on the realtime listener alone left a
         // freshly-pasted/uploaded photo invisible in the grid until a manual reload.
         if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+        if (sent.id) createdIds.push(sent.id);
       }
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '갤러리 업로드 완료' });
       // See handleDeleteChatMessagePhoto's comment on `.queued` -- a queued write hasn't actually
@@ -3046,7 +3065,8 @@ function CalendarApp() {
       if (anyQueued) {
         showToast('네트워크가 불안정하여 업로드를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
       } else {
-        showToast('갤러리에 사진이 추가되었습니다.', 'success');
+        const uploadCalId = activeCal.id;
+        showUndoableToast(showToast, '갤러리에 사진이 추가되었습니다.', () => revertCreatedMessages(uploadCalId, createdIds), { doneMessage: '사진 추가를 되돌렸습니다.' });
       }
       compressed.forEach(img => revokeCompressedObjectUrls(img));
       forgetPreprocessedImages(files);
@@ -3211,7 +3231,8 @@ function CalendarApp() {
       const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
       if (!sent) throw new Error('Gather photo paste save failed');
       if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
-      showToast(sent.queued ? '네트워크가 불안정하여 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.' : '사진을 붙여넣었습니다.', sent.queued ? 'info' : 'success');
+      if (sent.queued) showToast('네트워크가 불안정하여 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info');
+      else showUndoableToast(showToast, '사진을 붙여넣었습니다.', sent.id ? () => revertCreatedMessages(activeCal.id, [sent.id]) : null, { doneMessage: '붙여넣기를 되돌렸습니다.' });
       return sent.queued ? 'queued' : true;
     } catch (err) {
       console.error('handlePasteGatherPhoto failed:', err);
@@ -3235,6 +3256,7 @@ function CalendarApp() {
     const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
     const baseTs = Date.now();
     let anyQueued = false;
+    const pastedIds = [];
     try {
       for (let i = 0; i < list.length; i++) {
         const cleanUrl = String(list[i].url).trim();
@@ -3256,11 +3278,11 @@ function CalendarApp() {
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 일괄 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gather photos paste save failed at index ${i}`);
         if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+        if (sent.id) pastedIds.push(sent.id);
         if (sent.queued) anyQueued = true;
       }
-      showToast(anyQueued
-        ? '네트워크가 불안정하여 일부를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
-        : `사진 ${list.length}장을 붙여넣었습니다.`, anyQueued ? 'info' : 'success');
+      if (anyQueued) showToast('네트워크가 불안정하여 일부를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info');
+      else showUndoableToast(showToast, `사진 ${list.length}장을 붙여넣었습니다.`, () => revertCreatedMessages(activeCal.id, pastedIds), { doneMessage: '붙여넣기를 되돌렸습니다.' });
       return true;
     } catch (err) {
       console.error('handlePasteGatherPhotos failed:', err);
@@ -4135,7 +4157,10 @@ function CalendarApp() {
       activityLogs: activityLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...activityLogs] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, `${validDates.length}건 일괄 등록완료`, 'success', updatedCal.id, 'availability', activityLogs);
+    // No toast here: the 반복 일정 screen shows one with 되돌리기 (revertBulkAvailability needs
+    // the note exactly as stored).
+    return updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', activityLogs)
+      .then(ok => (ok ? { count: validDates.length, note: cleanNote } : false));
   };
   const handleDeleteAvailability = async (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5225,7 +5250,7 @@ function CalendarApp() {
   // V2 home memo composer shares the persisted writer with the memo page; legacy rendering does not read this adapter.
   window.__gatherV2MemoCommentsChange = handleMemoCommentsChangeFromMemoPreview;
   // 되돌리기 (app-undo-actions.js) may run after its screen closed: reach this render's handlers.
-  window.__gatherUndoDeps = { getActiveCalendar: () => activeCalRef.current || activeCal, getCalendars: () => calendarsRef.current, updateCalendars, setPlacesSubcollection, getConfirmedMeetings, getCalendarPlaces, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleSavePlace, handleDeletePlace, handleReorderPlaces, getCalendarSettlementCards, handleSaveSettlementCard, handleDeleteSettlementCard, handleConfirmMeeting, showToast, writeCollectionDocumentWithFallback, handleAnniversarySaved, handleAnniversaryDeleted };
+  window.__gatherUndoDeps = { getActiveCalendar: () => activeCalRef.current || activeCal, getCalendars: () => calendarsRef.current, updateCalendars, setPlacesSubcollection, getConfirmedMeetings, getCalendarPlaces, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleSavePlace, handleDeletePlace, handleReorderPlaces, getCalendarSettlementCards, handleSaveSettlementCard, handleDeleteSettlementCard, handleConfirmMeeting, showToast, writeCollectionDocumentWithFallback, handleAnniversarySaved, handleAnniversaryDeleted, removeLocalChatMessage, unlinkMeetingPhotoReferences, getCustomCultureItems: () => customCultureItems };
   const renewalShellEl = renderRenewalShellIfEnabled(activeCalId, activeCalLoaded ? activeCal : null, { showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted, isDarkTheme, setActiveLightbox, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled, notifyChannels, setNotifyChannelsState, handleMainToggleNotifications, handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId, setCloudReloadToken, calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin, recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability, handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice, selectColorTheme, activeColorThemeId, chatMessages, memos, globalSearchInitialQuery, focusChatMessage, openNotificationHelp }, { activeCal, currentMonthDate, setCurrentMonthAndSync, anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability, displayChatMessages, memos, customCultureItems, handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace, handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote }, { activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages, chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting, chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget, setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage, handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice, isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId, isChatShareOpen, setIsChatShareOpen }, { activeCal, canUseSettlement, showToast, showConfirmDialog, handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard, editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen }, { activeCal, handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo, customCultureItems, handleSaveCustomCultureItem, galleryChatMessages, galleryMemos, showToast, showConfirmDialog, handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles, handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos, activeLightbox, setActiveLightbox, handleDeletePhoto, handleBulkDeletePhotos, photoCommentCounts, galleryPhotoIndex, hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages, hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications, syncStatus, isGalleryShareOpen, setIsGalleryShareOpen, isHistoryShareOpen, setIsHistoryShareOpen, handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag, anniversaries, historyMemosSnapshot, handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, handleReplacePhoto, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery, handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory, handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory, handleFetchMeetingPhotoIndex, handleSavePlace, handleDeletePlace, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isPlacesShareOpen, setIsPlacesShareOpen, memos, totalMemoCount, onLoadMoreMemos: (needed) => setMemosLimit(prev => {
     const floor = Number(needed);
     if (Number.isFinite(floor) && floor > 0) return Math.max(prev, Math.ceil(floor));

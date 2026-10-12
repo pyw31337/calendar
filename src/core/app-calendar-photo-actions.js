@@ -26,6 +26,7 @@ import { findImageSlotByAsset, removeAssetFromMeetings, replaceAssetInMeetings }
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { movePhotoComments } from './photo-comment-items.js';
 import { deletePhotoAssetRemote } from './bulk-photo-tags.js';
+import { showUndoableToast } from './undo-toast.js';
 
 export function createCalendarPhotoActions({
   activeCalId, showToast, showUndoableDeleteToast, showRetryableUploadToast, setSelectedDate,
@@ -176,7 +177,8 @@ export function createCalendarPhotoActions({
   };
 
   const handleReplaceMeetingPhoto = async (dateStr, photoId, file, imageUrl, options = {}) => {
-    if (!activeCal || !file) return false;
+    const restoring = options.restoreAsset || null;
+    if (!activeCal || (!file && !restoring)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
     if (meetingIndex < 0) {
@@ -198,10 +200,10 @@ export function createCalendarPhotoActions({
     ));
     if (!targetPhoto) return false;
     const targetDate = meeting.date || dateStr;
-    const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
-    if (!compressed.length) { setChatUploadProgress(null); return false; }
+    const compressed = restoring ? [] : await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
+    if (!restoring && !compressed.length) { setChatUploadProgress(null); return false; }
     try {
-      const [resolved] = await resolveChatImageBatch(activeCal.id, compressed, progress => {
+      const [resolved] = restoring ? [restoring] : await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
       }, { profile: 'grid' });
       if (!resolved) throw new Error('Replacement upload returned no result');
@@ -210,20 +212,28 @@ export function createCalendarPhotoActions({
       const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
         ? { ...m, photos: existingPhotos.map(photo => (photo === targetPhoto || (photoId && photoMatchesIdentity(photo, photoId))) ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
         : m);
-      const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '사진 교체완료');
-      if (ok) {
-        // A meeting-only photo can also be referenced by a chat, memo, or another meeting.
-        // Never delete its Storage objects optimistically: that was able to leave a live
-        // photoIndex row pointing at a 404 thumbnail. The shared guard reads both the local
-        // graph and the server index before removing an unreferenced asset.
-        await deleteAssetFilesIfUnreferenced(
-          { imageUrl: prevImageUrl, thumbUrl: prevThumbUrl },
-          { excludeMeetingDates: [targetDate] }
-        );
+      const ok = await commitConfirmedMeetings(nextConfirmedMeetings, null);
+      if (!ok) return false;
+      // A meeting-only photo can also be referenced by a chat, memo, or another meeting.
+      // Never delete its Storage objects optimistically: that was able to leave a live
+      // photoIndex row pointing at a 404 thumbnail. The shared guard reads both the local
+      // graph and the server index before removing an unreferenced asset. The replaced file
+      // also waits for the 되돌리기 toast to close.
+      const removeReplacedFile = () => deleteAssetFilesIfUnreferenced(
+        { imageUrl: prevImageUrl, thumbUrl: prevThumbUrl },
+        { excludeMeetingDates: [targetDate] }
+      );
+      if (restoring) {
+        await removeReplacedFile();
+        return resolved.imageUrl;
       }
-      return ok ? resolved.imageUrl : false;
+      showUndoableToast(showToast, '사진 교체완료', async () => (await handleReplaceMeetingPhoto(targetDate, targetPhoto.id || photoId, null, resolved.imageUrl, {
+        restoreAsset: { imageUrl: prevImageUrl, thumbUrl: prevThumbUrl }
+      })) !== false, { onExpire: removeReplacedFile, doneMessage: '사진 교체를 되돌렸습니다.' });
+      return resolved.imageUrl;
     } catch (err) {
       console.error('handleReplaceMeetingPhoto failed:', err);
+      if (restoring) return false;
       showRetryableUploadToast('사진 교체 실패', () => handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl, options), 5000);
       return false;
     } finally {
@@ -585,8 +595,11 @@ export function createCalendarPhotoActions({
     }
   };
 
-  const handleReplaceChatMessagePhoto = async (messageId, imageIndex, file) => {
-    if (!messageId || !Number.isInteger(imageIndex) || !file) return false;
+  // options.restoreAsset ({ imageUrl, thumbUrl, fingerprint }): 사진 교체 되돌리기 -- put that
+  // already-stored file back in the slot instead of uploading one.
+  const handleReplaceChatMessagePhoto = async (messageId, imageIndex, file, options = {}) => {
+    const restoring = options.restoreAsset || null;
+    if (!messageId || !Number.isInteger(imageIndex) || (!file && !restoring)) return false;
     const localMessage = await findChatMessageById(messageId);
     const localTarget = localMessage ? getMessageImageEntries(localMessage).find(entry => entry.imageIndex === imageIndex) : null;
     const sourceMessage = await readFreshChatMessage(messageId);
@@ -605,10 +618,11 @@ export function createCalendarPhotoActions({
     const entries = getMessageImageEntries(sourceMessage);
     const target = entries.find(entry => entry.imageIndex === imageIndex);
     if (!target) return false;
-    const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
-    if (!compressed.length) { setChatUploadProgress(null); return false; }
+    const replacedFingerprint = (Array.isArray(sourceMessage.imageFingerprints) && sourceMessage.imageFingerprints[imageIndex]) || '';
+    const compressed = restoring ? [] : await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
+    if (!restoring && !compressed.length) { setChatUploadProgress(null); return false; }
     try {
-      const [resolved] = await resolveChatImageBatch(activeCalId, compressed, progress => {
+      const [resolved] = restoring ? [restoring] : await resolveChatImageBatch(activeCalId, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
       }, { profile: isChatImageUpload({ uploadSource: sourceMessage.uploadSource, channel: 'message' }) ? 'chat' : 'grid' });
       if (!resolved) throw new Error('Replacement upload returned no result');
@@ -673,16 +687,23 @@ export function createCalendarPhotoActions({
           console.warn('handleReplaceChatMessagePhoto comments not moved:', commentErr);
         }
       }
-      if (meetingsMoved) {
-        await deleteAssetFilesIfUnreferenced(oldAsset, {
-          excludeMessageId: messageId,
-          excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date)
-        });
+      // The replaced file stays until the 되돌리기 toast closes (되돌리기 puts it back); a
+      // 되돌리기 itself removes the replacement file right away when nothing else shows it.
+      const removeReplacedFile = meetingsMoved ? () => deleteAssetFilesIfUnreferenced(oldAsset, {
+        excludeMessageId: messageId,
+        excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date)
+      }) : null;
+      if (restoring) {
+        if (removeReplacedFile) await removeReplacedFile();
+        return resolved.imageUrl;
       }
-      showToast('사진 교체완료', 'success');
+      showUndoableToast(showToast, '사진 교체완료', async () => (await handleReplaceChatMessagePhoto(messageId, imageIndex, null, {
+        restoreAsset: { imageUrl: target.full, thumbUrl: target.thumb, fingerprint: replacedFingerprint }
+      })) !== false, { onExpire: removeReplacedFile, doneMessage: '사진 교체를 되돌렸습니다.' });
       return resolved.imageUrl;
     } catch (err) {
       console.error('handleReplaceChatMessagePhoto failed:', err);
+      if (restoring) return false;
       showRetryableUploadToast('사진 교체 실패', () => handleReplaceChatMessagePhoto(messageId, imageIndex, file), 5000);
       return false;
     } finally {
@@ -779,8 +800,9 @@ export function createCalendarPhotoActions({
     }
   };
 
-  const handleReplaceMemoPhoto = async (memoId, imageIndex, file) => {
-    if (!memoId || !Number.isInteger(imageIndex) || !file) return false;
+  const handleReplaceMemoPhoto = async (memoId, imageIndex, file, options = {}) => {
+    const restoring = options.restoreAsset || null;
+    if (!memoId || !Number.isInteger(imageIndex) || (!file && !restoring)) return false;
     const memo = await findMemoById(memoId);
     if (!memo) {
       showToast('교체 대상 이미지를 찾지 못했습니다.', 'error', 4000);
@@ -789,10 +811,12 @@ export function createCalendarPhotoActions({
     const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
     const thumbs = Array.isArray(memo.thumbUrls) ? memo.thumbUrls : (memo.thumbUrl ? [memo.thumbUrl] : []);
     if (!urls[imageIndex]) return false;
-    const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
-    if (!compressed.length) { setChatUploadProgress(null); return false; }
+    const replacedFingerprint = (Array.isArray(memo.imageFingerprints) && memo.imageFingerprints[imageIndex]) || '';
+    const replacedTags = String((Array.isArray(memo.imageTags) && memo.imageTags[imageIndex]) || '');
+    const compressed = restoring ? [] : await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
+    if (!restoring && !compressed.length) { setChatUploadProgress(null); return false; }
     try {
-      const [resolved] = await resolveChatImageBatch(activeCalId, compressed, progress => {
+      const [resolved] = restoring ? [restoring] : await resolveChatImageBatch(activeCalId, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
       }, { profile: 'grid' });
       if (!resolved) throw new Error('Replacement upload returned no result');
@@ -803,8 +827,11 @@ export function createCalendarPhotoActions({
       const nextImageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
       while (nextImageTags.length < nextUrls.length) nextImageTags.push('');
       // A replacement is a new asset, not a renamed old one. Never carry the removed photo's
-      // people/place tags across to it.
-      nextImageTags[imageIndex] = '';
+      // people/place tags across to it (되돌리기 brings the old photo back with its own tags).
+      nextImageTags[imageIndex] = restoring ? String(restoring.tags || '') : '';
+      const seededMemoTagMap = { ...(memo.imageTagMap && typeof memo.imageTagMap === 'object' && !Array.isArray(memo.imageTagMap) ? memo.imageTagMap : {}) };
+      const restoredKey = restoring ? canonicalPhotoAssetKey({ full: resolved.imageUrl, thumb: resolved.thumbUrl }) : '';
+      if (restoredKey && restoring.tags) seededMemoTagMap[restoredKey] = String(restoring.tags);
       const nextImageTagMap = reconcileMessageImageTagMap({
         ...memo,
         id: memoId,
@@ -814,7 +841,7 @@ export function createCalendarPhotoActions({
         imageTags: nextImageTags,
         imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
         thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
-      }, memo.imageTagMap);
+      }, seededMemoTagMap);
       const data = sanitizeMemoForFirestore({
         imageUrls: nextUrls,
         thumbUrls: nextThumbs,
@@ -827,14 +854,21 @@ export function createCalendarPhotoActions({
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 교체');
       if (!updated) throw new Error('Memo photo replace failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
-      await deleteAssetFilesIfUnreferenced(
+      const removeReplacedFile = () => deleteAssetFilesIfUnreferenced(
         { imageUrl: removedUrl, thumbUrl: removedThumb },
         { excludeMemoId: memoId }
       );
-      showToast('사진 교체완료', 'success');
+      if (restoring) {
+        await removeReplacedFile();
+        return resolved.imageUrl;
+      }
+      showUndoableToast(showToast, '사진 교체완료', async () => (await handleReplaceMemoPhoto(memoId, imageIndex, null, {
+        restoreAsset: { imageUrl: removedUrl, thumbUrl: removedThumb, fingerprint: replacedFingerprint, tags: replacedTags }
+      })) !== false, { onExpire: removeReplacedFile, doneMessage: '사진 교체를 되돌렸습니다.' });
       return resolved.imageUrl;
     } catch (err) {
       console.error('handleReplaceMemoPhoto failed:', err);
+      if (restoring) return false;
       showRetryableUploadToast('사진 교체 실패', () => handleReplaceMemoPhoto(memoId, imageIndex, file), 5000);
       return false;
     } finally {

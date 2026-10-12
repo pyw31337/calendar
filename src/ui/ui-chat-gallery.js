@@ -51,6 +51,25 @@ function createAnalysisTagChange(item, photo, finalTags) {
   };
 }
 
+// 되돌리기 for AI 추천 태그 적용: each photo gets its tags from before the apply back. The index row
+// follows the saved photo a moment later, so it may still read either value; a photo whose tags
+// are neither (someone else changed them since) is left as it is.
+async function revertAnalysisTagChanges({ changes, saveBulk, calendarId, projectId }) {
+  const reverse = [];
+  for (const change of changes) {
+    const photo = await fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: change.assetKey }).catch(() => null);
+    const now = photo ? normalizeAnalysisTagList(photo.tags || '').join(' ') : null;
+    if (now !== change.tags && now !== change.beforeTags) continue;
+    reverse.push({ ...change, beforeTags: change.tags, tags: change.beforeTags, photo: { ...change.photo, tags: change.tags } });
+  }
+  if (!reverse.length) return false;
+  const result = await saveBulk(reverse);
+  if (!result?.ok) return false;
+  return reverse.length === changes.length
+    ? '태그 적용을 되돌렸습니다.'
+    : `사진 ${reverse.length}장의 태그를 되돌렸습니다. 나머지는 그사이 바뀌어 그대로 두었습니다.`;
+}
+
 function getSuggestedDateTag(photo, item) {
   // Receipt/upload time is not the camera's capture date.
   return (item?.tagEvidence || []).find(entry => entry.source === 'capture-date'
@@ -694,13 +713,16 @@ export function ChatGalleryModal({
       if (!isCurrent()) return;
       const finalTags = prepareAnalysisTags(photo, requestedTags, { decision, originalTags, calendar });
       const changed = finalTags.join(' ') !== normalizeAnalysisTagList(photo?.tags || '').join(' ');
+      const tagChange = createAnalysisTagChange(item, photo, finalTags);
       await persistMediaAnalysisReview({ changed, saveTags: async () => {
-        return saveBulk([createAnalysisTagChange(item, photo, finalTags)]);
+        return saveBulk([tagChange]);
       }, saveReview: () => saveAnalysisReview(item, decision, finalTags, requestedTags.filter(tag => finalTags.includes(tag))) });
       if (!isCurrent()) return;
       setAnalysisPhotoCache(previous => ({ ...previous, [item.assetKey]: { ...photo, tags: finalTags.join(' ') } }));
       setAnalysisAction({ assetKey: '', mode: '', draft: '' });
-      if (!silent) showToast(changed ? '태그와 검토 기록을 저장했습니다.' : '이미 적용된 태그를 확인하고 검토 기록을 저장했습니다.', 'success');
+      // The review stays as an audit record; 되돌리기 takes back the tags it applied.
+      if (!silent) showUndoableToast(showToast, changed ? '태그와 검토 기록을 저장했습니다.' : '이미 적용된 태그를 확인하고 검토 기록을 저장했습니다.',
+        changed ? () => revertAnalysisTagChanges({ changes: [tagChange], saveBulk, calendarId, projectId }) : null);
     } catch (error) {
       if (isCurrent()) throw error;
     } finally {
@@ -802,7 +824,10 @@ export function ChatGalleryModal({
       const message = failedAssetCount
         ? `사진 태그 ${resolved.length}장을 반영했습니다. 분석 기록 ${failedAssetCount}건은 다시 시도해 주세요.`
         : `검증된 사진 추천 ${resolved.length}장에만 태그를 적용했습니다.`;
-      showToast(message, failures.length ? 'error' : 'success');
+      const appliedChanges = changed.map(record => record.change);
+      showUndoableToast(showToast, message, appliedChanges.length
+        ? () => revertAnalysisTagChanges({ changes: appliedChanges, saveBulk, calendarId, projectId })
+        : null, { type: failures.length ? 'error' : 'success', duration: 9000 });
     } catch (error) {
       console.error('AI batch tag apply failed:', error);
       if (isCurrent()) showToast(String(error?.message || 'AI 추천 태그 일괄 저장에 실패했습니다.'), 'error');

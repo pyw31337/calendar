@@ -163,6 +163,27 @@ export async function fetchMediaAnalysisWorkerStates({ calendarId, projectId, fo
 }
 
 /** "아니에요": this person is not in these photos; never suggest them for these photos again. */
+// 되돌리기 for rejectFaceSuggestions: the same endpoint with `restore` puts each photo's suggestion
+// (name + its score) back and takes the name off faceRejected.
+export async function restoreFaceSuggestions({ calendarId, projectId, name, items = [] } = {}) {
+  const list = (Array.isArray(items) ? items : []).filter(item => item && item.assetKey);
+  if (!calendarId || !projectId || !name || !list.length) return 0;
+  let updated = 0;
+  for (let start = 0; start < list.length; start += 60) {
+    const chunk = list.slice(start, start + 60);
+    const response = await fetch(`https://asia-northeast3-${encodeURIComponent(projectId)}.cloudfunctions.net/recordFaceFeedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ calendarId, name, restore: true, assetKeys: chunk.map(item => item.assetKey), scores: chunk.map(item => item.score) })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) throw new Error(payload?.message || `얼굴 추천 되돌리기 실패 (${response.status})`);
+    updated += Number(payload.updated) || 0;
+  }
+  cache.delete(`faces:${projectId}:${calendarId}`);
+  return updated;
+}
+
 export async function rejectFaceSuggestions({ calendarId, projectId, name, assetKeys = [] } = {}) {
   const keys = Array.from(new Set((Array.isArray(assetKeys) ? assetKeys : []).filter(Boolean)));
   if (!calendarId || !projectId || !name || !keys.length) return 0;

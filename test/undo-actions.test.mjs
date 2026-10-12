@@ -269,3 +269,106 @@ test('갤러리 링크·파일 일괄 삭제: 되돌리기 re-creates removed me
   assert.equal(await files.undo(), true);
   assert.deepEqual(messages.get('m3').fileAttachments.map(f => f.id), ['f1', 'f2', 'f3'], 'the removed file returns in place; a file added since stays');
 });
+
+test('onExpire runs only when the toast closed without 되돌리기', async () => {
+  const calls = [];
+  const toasts = [];
+  const showToast = (message, type, duration, onAction, onExpire) => toasts.push({ message, onAction, onExpire });
+  showUndoableToast(showToast, '사진 교체완료', async () => { calls.push('undo'); return true; }, { onExpire: () => calls.push('expire') });
+  await toasts[0].onExpire();
+  assert.deepEqual(calls, ['expire'], 'closed by itself: the replaced file can go');
+  showUndoableToast(showToast, '사진 교체완료', async () => { calls.push('undo'); return true; }, { onExpire: () => calls.push('expire') });
+  await toasts[1].onAction();
+  await toasts[1].onExpire?.();
+  assert.deepEqual(calls, ['expire', 'undo'], 'after 되돌리기 the replaced file is still needed, so no expire');
+});
+
+test('컨텐츠·메모 문서 되돌리기: a new document goes away, an edited one is written back, a changed one is left', async () => {
+  const { calls } = fakeApp({ calendar: { id: 'demo' } });
+  const toasts = [];
+  window.__gatherUndoDeps.showToast = (message, type, duration, onAction) => toasts.push({ message, onAction });
+  const after = [];
+  undo.showDocumentUndo('컨텐츠가 등록되었습니다.', { calendarId: 'demo', collection: 'customCultureItems', docId: 'c1', previous: null, saved: { id: 'c1', title: 'A' }, current: () => ({ id: 'c1', title: 'A' }), after: back => after.push(back) });
+  await toasts[0].onAction();
+  assert.deepEqual(calls.at(-1), ['write', 'customCultureItems', 'demo', 'c1', null, 'delete', '되돌리기']);
+  assert.deepEqual(after, [null]);
+  undo.showDocumentUndo('컨텐츠가 수정되었습니다.', { calendarId: 'demo', collection: 'customCultureItems', docId: 'c1', previous: { id: 'c1', title: 'old' }, saved: { id: 'c1', title: 'A' }, current: () => ({ title: 'A', id: 'c1' }) });
+  await toasts[2].onAction();
+  assert.deepEqual(calls.at(-1).slice(0, 6), ['write', 'customCultureItems', 'demo', 'c1', { id: 'c1', title: 'old' }, 'set']);
+  const writes = calls.length;
+  undo.showDocumentUndo('컨텐츠가 수정되었습니다.', { calendarId: 'demo', collection: 'customCultureItems', docId: 'c1', previous: { id: 'c1', title: 'old' }, saved: { id: 'c1', title: 'A' }, current: () => ({ id: 'c1', title: 'someone else' }) });
+  await toasts[4].onAction();
+  assert.equal(calls.length, writes, 'changed again since: nothing is overwritten');
+  assert.equal(toasts[5].message, '되돌리지 못했습니다.');
+});
+
+test('갤러리 사진 추가·붙여넣기 되돌리기 removes only the created messages (files stay)', async () => {
+  const { calls } = fakeApp({ calendar: { id: 'demo' } });
+  window.__gatherUndoDeps.removeLocalChatMessage = id => calls.push(['removeLocal', id]);
+  window.__gatherUndoDeps.unlinkMeetingPhotoReferences = async (id, index) => calls.push(['unlink', id, index]);
+  assert.equal(await undo.revertCreatedMessages('demo', ['m1', 'm2']), true);
+  assert.deepEqual(calls, [
+    ['write', 'messages', 'demo', 'm1', null, 'delete', '사진 추가 되돌리기'], ['removeLocal', 'm1'], ['unlink', 'm1', null],
+    ['write', 'messages', 'demo', 'm2', null, 'delete', '사진 추가 되돌리기'], ['removeLocal', 'm2'], ['unlink', 'm2', null],
+  ]);
+  assert.equal(await undo.revertCreatedMessages('demo', []), false);
+});
+
+test('반복 일정 되돌리기: created dates are cleared, overwritten ones get their note back, re-edited ones stay', async () => {
+  const calendar = { id: 'demo', revision: 3, availabilities: [
+    { date: '2026-10-01', participantId: 'p1', note: '원래', updatedAt: 1 },
+    { date: '2026-10-08', participantId: 'p1', note: '다른 사람이 고침', updatedAt: 1 },
+    { date: '2026-10-15', participantId: 'p2', note: '다른 참여자', updatedAt: 1 },
+  ] };
+  const { state } = fakeApp({ calendar });
+  const saves = [];
+  window.__gatherUndoDeps.getCalendars = () => [state.calendar];
+  window.__gatherUndoDeps.updateCalendars = async (next, toast, type, calId, mode) => { saves.push({ next, toast, calId, mode }); return true; };
+  const before = undo.snapshotAvailabilityFor('p1', ['2026-10-01', '2026-10-08', '2026-10-15']);
+  assert.equal(before.entries.get('2026-10-01').note, '원래');
+  assert.equal(before.entries.get('2026-10-15'), null);
+  // The bulk save wrote '수영' on all three dates; then someone changed 10/08 again.
+  state.calendar.availabilities = [
+    { date: '2026-10-01', participantId: 'p1', note: '수영', updatedAt: 5 },
+    { date: '2026-10-08', participantId: 'p1', note: '다시 고침', updatedAt: 6 },
+    { date: '2026-10-15', participantId: 'p2', note: '다른 참여자', updatedAt: 1 },
+    { date: '2026-10-15', participantId: 'p1', note: '수영', updatedAt: 5 },
+  ];
+  before.entries.set('2026-10-08', null);
+  assert.equal(await undo.revertBulkAvailability(before, '수영'), true);
+  assert.equal(saves.length, 1, 'one save for every date');
+  assert.equal(saves[0].mode, 'availability');
+  const by = (date, pid) => saves[0].next[0].availabilities.find(e => e.date === date && e.participantId === pid);
+  assert.equal(by('2026-10-01', 'p1').note, '원래');
+  assert.equal(by('2026-10-01', 'p1').deletedAt, null);
+  assert.ok(by('2026-10-15', 'p1').deletedAt, 'created by the bulk save: cleared');
+  assert.equal(by('2026-10-08', 'p1').note, '다시 고침', 're-edited since: kept');
+  assert.equal(by('2026-10-15', 'p2').note, '다른 참여자', 'another participant is never touched');
+});
+
+test('the remaining success toasts offer 되돌리기 (컨텐츠, 갤러리 추가, 붙여넣기, 사진 교체, AI 태그, 반복 일정, 보관함)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = file => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+  const main = read('core/app-main.js');
+  assert.match(main, /showDocumentUndo\(previousItem \? '컨텐츠가 수정되었습니다\.' : '컨텐츠가 등록되었습니다\.'/);
+  assert.match(main, /showDocumentUndo\(existingMemo \? '메모가 수정되었습니다\.' : '메모에 등록되었습니다\.'/);
+  assert.match(main, /showUndoableToast\(showToast, '갤러리에 사진이 추가되었습니다\.', \(\) => revertCreatedMessages\(/);
+  assert.match(main, /showUndoableToast\(showToast, '사진을 붙여넣었습니다\.'/);
+  assert.match(main, /showUndoableToast\(showToast, `사진 \$\{list\.length\}장을 붙여넣었습니다\.`/);
+  const photo = read('core/app-calendar-photo-actions.js');
+  assert.equal((photo.match(/showUndoableToast\(showToast, '사진 교체완료'/g) || []).length, 3, 'chat, memo and meeting photo replace');
+  assert.equal((photo.match(/onExpire: removeReplacedFile/g) || []).length, 3, 'the replaced file waits for the toast');
+  assert.doesNotMatch(photo, /showToast\('사진 교체완료', 'success'\)/);
+  const gallery = read('ui/ui-chat-gallery.js');
+  assert.match(gallery, /revertAnalysisTagChanges\(\{ changes: \[tagChange\]/);
+  assert.match(gallery, /revertAnalysisTagChanges\(\{ changes: appliedChanges/);
+  const events = read('ui/ui-event-modals.js');
+  assert.match(events, /revertBulkAvailability\(beforeEntries/);
+  assert.doesNotMatch(events, /const successCount = await onBulkRegister/, 'the toast no longer reads "true개"');
+  const archive = read('ui/ui-summary-gallery.js');
+  assert.match(archive, /saveArchiveTagsWithUndo\(save, changes, `사진 \$\{changes\.length\}장에 태그를 적용했습니다\.`/);
+  assert.match(archive, /restoreFaceSuggestions\(\{ calendarId, projectId, name, items: before \}\)/);
+  assert.match(archive, /\(\) => revertPlaceSave\(placesBefore\)/);
+  const functionsIndex = readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
+  assert.match(functionsIndex, /faceRejected: FieldValue\.arrayRemove\(name\)/, 'the face feedback endpoint can put a suggestion back');
+});

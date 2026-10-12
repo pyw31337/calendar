@@ -9,19 +9,23 @@
  */
 export const UNDO_TOAST_MS = 6000;
 
+// `onExpire` runs once the toast closed without 되돌리기 (e.g. deleting a file the change
+// replaced, which 되돌리기 still needs until then); never after 되돌리기 was pressed.
 export function showUndoableToast(showToast, message, undo, {
   duration = UNDO_TOAST_MS,
   doneMessage = '되돌렸습니다.',
   failMessage = '되돌리지 못했습니다.',
   extraActions = [],
   type = 'success',
+  onExpire = null,
 } = {}) {
   if (typeof showToast !== 'function') return;
   if (typeof undo !== 'function') {
-    showToast(message, type, extraActions.length ? duration : 3000, null, null, undefined, extraActions);
+    showToast(message, type, extraActions.length ? duration : 3000, null, onExpire, undefined, extraActions);
     return;
   }
   let used = false;
+  const expire = typeof onExpire === 'function' ? () => (used ? undefined : onExpire()) : null;
   showToast(message, type, duration, async () => {
     if (used) return;
     used = true;
@@ -33,5 +37,5 @@ export function showUndoableToast(showToast, message, undo, {
       console.error('undo failed:', error);
       showToast(failMessage, 'error', 4000);
     }
-  }, null, '되돌리기', extraActions);
+  }, expire, '되돌리기', extraActions);
 }
