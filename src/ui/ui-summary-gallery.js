@@ -4122,6 +4122,12 @@ export function ContentView({
   const [focusTitle, setFocusTitle] = React.useState(() => {
     try { return localStorage.getItem('gather_content_focus_title') || ''; } catch (_) { return ''; }
   });
+  const [focusFallback, setFocusFallback] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem('gather_content_focus_fallback');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  });
   // The page may already be open when a date popup asks for an item (ui-app-shell-v2.js
   // onFocusCultureSource): pick the request up from the same storage keys.
   React.useEffect(() => {
@@ -4131,18 +4137,21 @@ export function ContentView({
         if (VALID_CONTENT_TABS.includes(tab)) setContentTab(tab);
         setFocusItemId(localStorage.getItem('gather_content_focus_item_id') || null);
         setFocusTitle(localStorage.getItem('gather_content_focus_title') || '');
+        const rawFallback = localStorage.getItem('gather_content_focus_fallback');
+        setFocusFallback(rawFallback ? JSON.parse(rawFallback) : null);
       } catch (_) { /* best-effort */ }
     };
     window.addEventListener('gather-content-focus', onFocusRequest);
     return () => window.removeEventListener('gather-content-focus', onFocusRequest);
   }, []);
   React.useEffect(() => {
-    if (!focusItemId && !focusTitle) return;
+    if (!focusItemId && !focusTitle && !focusFallback) return;
     try {
       localStorage.removeItem('gather_content_focus_item_id');
       localStorage.removeItem('gather_content_focus_title');
+      localStorage.removeItem('gather_content_focus_fallback');
     } catch (_) { /* best-effort */ }
-  }, [focusItemId, focusTitle]);
+  }, [focusItemId, focusTitle, focusFallback]);
   // 컨텐츠 메뉴를 다시 누르면 항상 지역축제 탭부터 보이도록.
   const handleContentChangeView = (view) => {
     if (view === 'content') changeContentTab('festival');
@@ -4605,7 +4614,7 @@ export function ContentView({
         calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo,
         regionSelections, onItemsLoaded: setRegionFilterItems,
         chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-        gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor,
+        gridCols, focusItemId, focusTitle, focusFallback, searchQuery, onEditContent: openContentEditor,
         topToolbar: v2Embed ? regionBadgesOnly : null,
         ...cfg
       }) : null;
@@ -6080,7 +6089,7 @@ function buildQuickMemoPlaceholder(item) {
   return '메모를 입력하세요';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '', topToolbar = null }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', focusFallback = null, searchQuery = '', topToolbar = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -6377,21 +6386,51 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 있어(예: 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 기념일은 cultureSourceId가 오늘자
   // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않게 될 수 있다 -- 이때도 같은 제목의
   // 항목이 오늘자 스냅샷에 그대로 있다면 그거라도 열어 주는 게, 아무것도 안 열리는 것보다 낫다.
+  // 컨텐츠 포커스 이동(좋아요 탭, 통합검색, 기념일 팝업 등) 시 해당 항목을 최상단/중앙으로 스크롤하고
+  // 보라색 테두리 포커스를 표시한다.
   const focusAttemptedRef = React.useRef('');
   React.useEffect(() => {
-    const focusKey = `${focusItemId || ''}|${focusTitle || ''}`;
-    if ((!focusItemId && !focusTitle) || focusAttemptedRef.current === focusKey || mergedItems === null) return;
+    const focusKey = `${focusItemId || ''}|${focusTitle || ''}|${focusFallback?.id || ''}`;
+    if ((!focusItemId && !focusTitle && !focusFallback) || focusAttemptedRef.current === focusKey || mergedItems === null) return;
     focusAttemptedRef.current = focusKey;
+    setCategoryFilter('');
+    setEventStatusFilter('');
+    setContentPage(1);
     const match = mergedItems.find(i => i && i.id === focusItemId)
-      || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null);
-    if (match) {
-      setSelected(match);
-      setTimeout(() => {
-        const el = document.querySelector(`[data-content-id="${String(match.id).replace(/"/g, '')}"]`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 80);
-    }
-  }, [focusItemId, focusTitle, mergedItems]);
+      || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null)
+      || focusFallback;
+    if (!match) return;
+    let attempts = 0;
+    const scrollToTarget = () => {
+      const targetId = String(match.id || focusItemId || '').replace(/"/g, '');
+      const el = (targetId && document.querySelector(`[data-content-id="${targetId}"]`))
+        || document.querySelector('.culture-poster-card.is-focused, .culture-poster-card-open.search-result-focus');
+      if (!el) {
+        if (attempts < 12) {
+          attempts++;
+          setTimeout(scrollToTarget, 50);
+        }
+        return;
+      }
+      const grid = el.closest('.culture-items-grid');
+      if (grid && grid.scrollHeight > grid.clientHeight + 4) {
+        const gridRect = grid.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const relativeTop = elRect.top - gridRect.top + grid.scrollTop;
+        const targetTop = Math.max(0, relativeTop - 16);
+        if (typeof grid.scrollTo === 'function') {
+          grid.scrollTo({ top: targetTop, behavior: 'smooth' });
+        } else {
+          grid.scrollTop = targetTop;
+        }
+      }
+      if (typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+    const timer = setTimeout(scrollToTarget, 60);
+    return () => clearTimeout(timer);
+  }, [focusItemId, focusTitle, focusFallback, mergedItems]);
 
   if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
@@ -6399,7 +6438,26 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     }, "불러오는 중...");
   }
 
-  if (mergedItems.length === 0) {
+  const resolvedFallbackItem = React.useMemo(() => {
+    if (!focusFallback || typeof focusFallback !== 'object') return null;
+    const fbKind = String(focusFallback.kind || '').toLowerCase();
+    const tabMatchesKind = !fbKind
+      || (anniversaryCategory === 'festival' && fbKind === 'festival')
+      || (anniversaryCategory === 'event' && (fbKind === 'performance' || fbKind === 'event' || fbKind === 'culture'))
+      || (anniversaryCategory === 'sports' && fbKind === 'sports')
+      || (anniversaryCategory === 'movie' && (fbKind === 'movie' || fbKind === 'movies'));
+    if (!tabMatchesKind) return null;
+    const img = focusFallback.image || focusFallback.posterUrl || focusFallback.thumbUrl || '';
+    return {
+      ...focusFallback,
+      id: focusFallback.id || focusItemId || `focus_${anniversaryCategory}`,
+      title: focusFallback.title || focusTitle || '',
+      image: img,
+      posterUrl: focusFallback.posterUrl || img,
+    };
+  }, [focusFallback, anniversaryCategory, focusItemId, focusTitle]);
+
+  if (mergedItems.length === 0 && !resolvedFallbackItem) {
     return /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
     }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
@@ -6420,6 +6478,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   }
   const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
 
+  const focusedItem = (focusItemId || focusTitle || resolvedFallbackItem)
+    ? (regionFilteredItems.find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
+      || (mergedItems || []).find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
+      || resolvedFallbackItem
+      || null)
+    : null;
+
   const renderEmptyGrid = (msg, chips = null) => /*#__PURE__*/React.createElement("div", {
     className: "culture-items-grid is-cols-1",
     style: { flex: 1, overflowY: 'auto', padding: contentPaddingTop ? `${contentPaddingTop}px 16px 96px` : undefined, alignContent: 'start' }
@@ -6431,7 +6496,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     }, msg)
   );
 
-  if (regionFilteredItems.length === 0) {
+  if (regionFilteredItems.length === 0 && !focusedItem) {
     return renderEmptyGrid("선택한 지역에 해당하는 항목이 없습니다.");
   }
 
@@ -6442,7 +6507,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     ? regionFilteredItems.filter(item => cultureItemMatchesSearch(item, searchNeedle))
     : regionFilteredItems;
 
-  if (searchFilteredItems.length === 0) {
+  if (searchFilteredItems.length === 0 && !focusedItem) {
     return renderEmptyGrid("검색 결과가 없습니다.");
   }
 
@@ -6515,15 +6580,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     ? ReactDOM.createPortal(categoryChipRow, chipRowSlot)
     : null;
 
-  if (filteredItems.length === 0) {
+  if (filteredItems.length === 0 && !focusedItem) {
     return renderEmptyGrid("선택한 항목에 해당하는 내용이 없습니다.", renderedCategoryChipRow);
   }
 
-  const focusedItem = (focusItemId || focusTitle)
-    ? (filteredItems.find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
-      || (mergedItems || []).find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
-      || null)
-    : null;
   const pagedItems = paginateGalleryItems(filteredItems, contentPage, PAGE_RENDER_SIZE);
   const visibleItems = (() => {
     const sliced = pagedItems.items;
@@ -6610,10 +6670,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           ? 'ongoing'
           : (anniversaryCategory === 'event' && posterBadge?.text === '이번주' ? 'thisWeek' : '');
         const isFilterableEventBadge = !!eventStatusKey;
-        const isFocusedItem = (focusItemId && item.id === focusItemId) || (focusTitle && String(item.title || '').trim() === String(focusTitle || '').trim());
+        const isFocusedItem = Boolean(
+          (focusItemId && item.id === focusItemId)
+          || (focusTitle && String(item.title || '').trim() === String(focusTitle || '').trim())
+          || (focusedItem && item.id === focusedItem.id)
+        );
         return /*#__PURE__*/React.createElement("div", {
           key: item.id,
-          className: "culture-poster-card",
+          className: ['culture-poster-card', isFocusedItem ? 'is-focused' : ''].filter(Boolean).join(' '),
           style: { position: 'relative', minWidth: 0, height: '100%' }
         }, /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -6641,8 +6705,17 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
               onError: e => {
                 const img = e.currentTarget;
-                if (!img || img.dataset.posterFallback === '1') {
-                  if (img) img.style.display = 'none';
+                if (!img) return;
+                if (img.dataset.localMirrorTried !== '1') {
+                  const m = String(img.src || '').match(/\/images\/posters\/(festivals|performances|movies|sports)\/([^/?#]+)$/i);
+                  if (m && /^https?:\/\//i.test(String(img.src || ''))) {
+                    img.dataset.localMirrorTried = '1';
+                    img.src = `${CULTURE_DATA_BASE}images/posters/${m[1]}/${m[2]}`;
+                    return;
+                  }
+                }
+                if (img.dataset.posterFallback === '1') {
+                  img.style.display = 'none';
                   return;
                 }
                 const next = [item.backupPoster, item.posterUrl, item.imageUrl, item.thumbUrl, item.image, item.poster]
@@ -6870,11 +6943,18 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
               onError: e => {
                 const img = e.currentTarget;
-                if (!img || img.dataset.posterFallback === '1') {
-                  if (img) {
-                    img.style.display = 'none';
-                    if (img.parentElement) img.parentElement.style.display = 'none';
+                if (!img) return;
+                if (img.dataset.localMirrorTried !== '1') {
+                  const m = String(img.src || '').match(/\/images\/posters\/(festivals|performances|movies|sports)\/([^/?#]+)$/i);
+                  if (m && /^https?:\/\//i.test(String(img.src || ''))) {
+                    img.dataset.localMirrorTried = '1';
+                    img.src = `${CULTURE_DATA_BASE}images/posters/${m[1]}/${m[2]}`;
+                    return;
                   }
+                }
+                if (img.dataset.posterFallback === '1') {
+                  img.style.display = 'none';
+                  if (img.parentElement) img.parentElement.style.display = 'none';
                   return;
                 }
                 const next = [selected.backupPoster, selected.posterUrl, selected.imageUrl, selected.thumbUrl, selected.image, selected.poster]

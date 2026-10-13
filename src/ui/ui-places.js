@@ -1485,12 +1485,48 @@ export function PlacesView({
   // in app-main.js) carries the id of the place that was clicked -- focus it the same way a
   // click on its own list row or map marker would, then clear the request so it doesn't
   // re-trigger on an unrelated re-render.
+  const applyPendingPlaceFocus = React.useCallback((explicitId, explicitTitle) => {
+    let targetId = explicitId || '';
+    let targetTitle = explicitTitle || '';
+    try {
+      if (!targetId) targetId = localStorage.getItem('gather_places_focus_id') || '';
+      if (!targetTitle) targetTitle = localStorage.getItem('gather_places_focus_title') || '';
+    } catch (_) { /* ignore */ }
+    if (!targetId && !targetTitle) return false;
+    const allPlaces = getCalendarPlaces(calendar) || [];
+    const normTitle = String(targetTitle || '').trim();
+    const target = (targetId && allPlaces.find(p => p && String(p.id) === String(targetId)))
+      || (normTitle && allPlaces.find(p => p && (String(p.alias || '').trim() === normTitle || String(p.name || '').trim() === normTitle)))
+      || null;
+    if (!target) return false;
+    try {
+      localStorage.removeItem('gather_places_focus_id');
+      localStorage.removeItem('gather_places_focus_title');
+    } catch (_) { /* ignore */ }
+    setCategoryFilter('all');
+    setVisitFilter('all');
+    setListSearchQuery('');
+    handleSelectPlaceOnMap(target);
+    return true;
+  }, [calendar]);
+
   React.useEffect(() => {
-    if (!placesInitialFocusId) return;
-    const target = (getCalendarPlaces(calendar) || []).find(p => p.id === placesInitialFocusId);
-    if (target) handleSelectPlaceOnMap(target);
-    if (typeof setPlacesInitialFocusId === 'function') setPlacesInitialFocusId(null);
-  }, [placesInitialFocusId, setPlacesInitialFocusId]);
+    if (placesInitialFocusId) {
+      applyPendingPlaceFocus(placesInitialFocusId, '');
+      if (typeof setPlacesInitialFocusId === 'function') setPlacesInitialFocusId(null);
+      return;
+    }
+    applyPendingPlaceFocus('', '');
+  }, [placesInitialFocusId, setPlacesInitialFocusId, applyPendingPlaceFocus]);
+
+  React.useEffect(() => {
+    const onFocusReq = (ev) => {
+      const detail = (ev && ev.detail) || {};
+      applyPendingPlaceFocus(detail.id || '', detail.title || '');
+    };
+    window.addEventListener('gather-places-focus', onFocusReq);
+    return () => window.removeEventListener('gather-places-focus', onFocusReq);
+  }, [applyPendingPlaceFocus]);
 
   // Scroll list container whenever focusPlace updates and DOM is rendered
   React.useEffect(() => {
@@ -1504,23 +1540,41 @@ export function PlacesView({
       const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(targetId)) : String(targetId).replace(/"/g, '');
       const row = container.querySelector('[data-place-id="' + safeId + '"]');
       if (!row) {
-        if (attempts < 10) {
+        if (attempts < 12) {
           attempts++;
-          setTimeout(tryScroll, 40);
+          setTimeout(tryScroll, 45);
         }
         return;
       }
 
-      // Exact pixel position inside scroll container
-      const containerRect = container.getBoundingClientRect();
-      const rowRect = row.getBoundingClientRect();
-      const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-      // Target top leaves a comfortable 12px top margin inside the list container so top border & tags are 100% visible
-      const targetTop = Math.max(0, relativeTop - 12);
-      const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      const finalTop = Math.min(maxTop, targetTop);
+      if (container.scrollHeight > container.clientHeight + 4) {
+        const containerRect = container.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+        const targetTop = Math.max(0, relativeTop - 12);
+        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+        const finalTop = Math.min(maxTop, targetTop);
+        animateListScrollTo(container, finalTop, 220);
+        return;
+      }
 
-      animateListScrollTo(container, finalTop, 220);
+      const outerScroller = row.closest('.v2-places-legacy, .v2-dest-body, .places-view-container');
+      if (outerScroller && outerScroller.scrollHeight > outerScroller.clientHeight + 4) {
+        const scrollerRect = outerScroller.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        const relativeTop = rowRect.top - scrollerRect.top + outerScroller.scrollTop;
+        const targetTop = Math.max(0, relativeTop - Math.max(16, Math.round((outerScroller.clientHeight - rowRect.height) * 0.25)));
+        if (typeof outerScroller.scrollTo === 'function') {
+          outerScroller.scrollTo({ top: targetTop, behavior: 'smooth' });
+        } else {
+          outerScroller.scrollTop = targetTop;
+        }
+        return;
+      }
+
+      if (typeof row.scrollIntoView === 'function') {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     };
 
     const timer = setTimeout(tryScroll, 30);
@@ -1537,6 +1591,7 @@ export function PlacesView({
   // 정렬해서 방문 예정일이 먼 미래인 장소가 최근에 등록한 장소보다 위로 올라가는 등, "최근
   // 등록/수정 순"이라는 사용자 기대와 다르게 보였다.
   const sortedPlaces = [...places].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+
   
   // Feeds the "전체 N" badge and countsByCategory below -- both need to move together with
   // visitFilter (전체/방문/예정), not just listSearchQuery, or clicking 방문/예정 changes which

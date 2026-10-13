@@ -422,13 +422,35 @@ async function main() {
       normalized.push(item);
     }
     if (skipped > 0) console.log(`[sync-culture-performances] ${feed.label}: skipped ${skipped} item(s) missing title/date/link or with a repeated id`);
+    const outputPath = path.resolve(DATA_DIR, feed.file);
+    if (feed.dedupe && fs.existsSync(outputPath)) {
+      try {
+        const prevSnapshot = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+        const prevItems = Array.isArray(prevSnapshot?.items) ? prevSnapshot.items : [];
+        let carriedOver = 0;
+        for (const prev of prevItems) {
+          if (!prev || !prev.id || !prev.title || seenIds.has(prev.id)) continue;
+          const startDate = prev.startDate || '';
+          const endDate = prev.endDate || startDate || '';
+          if (!feed.keepHistorical && !isVisible(endDate, startDate, todayIso, { openEnded: Boolean(prev.openEnded) })) continue;
+          seenIds.add(prev.id);
+          normalized.push(prev);
+          carriedOver++;
+        }
+        if (carriedOver > 0) {
+          console.log(`[sync-culture-performances] ${feed.label}: carried over ${carriedOver} still-visible item(s) from previous snapshot`);
+        }
+      } catch (err) {
+        console.warn(`[sync-culture-performances] ${feed.label}: failed to read previous snapshot for carry-over: ${err.message}`);
+      }
+    }
     if (feed.dedupe) {
       const result = mergeDuplicates(normalized);
       normalized = result.items;
       if (result.mergedCount > 0) console.log(`[sync-culture-performances] ${feed.label}: merged ${result.mergedCount} duplicate listing(s)`);
     }
     await enrichAllFeedPosters(normalized, feed.label);
-    writeFeedIfHealthy(path.resolve(DATA_DIR, feed.file), normalized, feed.label);
+    writeFeedIfHealthy(outputPath, normalized, feed.label);
   }
   savePosterCache();
 }

@@ -693,7 +693,51 @@ export function MemoScreen(p) {
       || new URLSearchParams(window.location.search).get('memo')
       || ''
     : '';
-  const focusedMemoId = p.focusedMemo?.id || focusIdFromLocation;
+  const [storedMemoFocus, setStoredMemoFocus] = window.React.useState(() => {
+    try {
+      const id = localStorage.getItem('gather_memo_focus_id') || '';
+      const title = localStorage.getItem('gather_memo_focus_title') || '';
+      if (id || title) {
+        localStorage.removeItem('gather_memo_focus_id');
+        localStorage.removeItem('gather_memo_focus_title');
+      }
+      return { id, title };
+    } catch (_) {
+      return { id: '', title: '' };
+    }
+  });
+  window.React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onMemoFocus = () => {
+      try {
+        const id = localStorage.getItem('gather_memo_focus_id') || '';
+        const title = localStorage.getItem('gather_memo_focus_title') || '';
+        if (id || title) {
+          localStorage.removeItem('gather_memo_focus_id');
+          localStorage.removeItem('gather_memo_focus_title');
+          setStoredMemoFocus({ id, title });
+        }
+      } catch (_) { /* ignore */ }
+    };
+    window.addEventListener('gather-memo-focus', onMemoFocus);
+    return () => window.removeEventListener('gather-memo-focus', onMemoFocus);
+  }, []);
+  const rawFocusedMemoId = p.focusedMemo?.id || focusIdFromLocation || storedMemoFocus.id;
+  const rawFocusedMemoTitle = storedMemoFocus.title || '';
+  const resolvedFocusedMemo = window.React.useMemo(() => {
+    const rows = Array.isArray(p.memos) ? p.memos.filter(Boolean) : [];
+    if (rawFocusedMemoId) {
+      const byId = rows.find(m => m && String(m.id) === String(rawFocusedMemoId)) || (p.focusedMemo && String(p.focusedMemo.id) === String(rawFocusedMemoId) ? p.focusedMemo : null);
+      if (byId) return byId;
+    }
+    if (rawFocusedMemoTitle) {
+      const needle = String(rawFocusedMemoTitle).trim();
+      const byTitle = rows.find(m => m && (String(m.title || '').trim() === needle || String(m.text || m.content || '').split('\n')[0].trim() === needle));
+      if (byTitle) return byTitle;
+    }
+    return p.focusedMemo || null;
+  }, [p.memos, p.focusedMemo, rawFocusedMemoId, rawFocusedMemoTitle]);
+  const focusedMemoId = resolvedFocusedMemo?.id || rawFocusedMemoId;
   const [memoPage, setMemoPage] = window.React.useState(1);
   const memoFilterKey = `${p.searchQuery || ''}\n${p.selectedTag || ''}`;
   window.React.useEffect(() => { setMemoPage(1); }, [memoFilterKey]);
@@ -706,15 +750,24 @@ export function MemoScreen(p) {
   const visibleMemos = window.React.useMemo(() => {
     const rows = Array.isArray(p.memos) ? p.memos.filter(Boolean) : [];
     const filtering = String(p.searchQuery || '').trim() || p.selectedTag;
-    const withFocus = filtering || !p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)
+    const focusObj = resolvedFocusedMemo || p.focusedMemo;
+    const withFocus = filtering || !focusObj?.id || rows.some(memo => memo?.id === focusObj.id)
       ? rows
-      : [p.focusedMemo, ...rows];
+      : [focusObj, ...rows];
     // Pin-on memos stay above every other card, including search results.
     const pinned = [];
     const rest = [];
     withFocus.forEach(memo => (memo?.isPinned ? pinned : rest).push(memo));
-    return [...pinned, ...rest];
-  }, [p.memos, p.focusedMemo, p.searchQuery, p.selectedTag]);
+    const ordered = [...pinned, ...rest];
+    if (!filtering && focusedMemoId) {
+      const targetIdx = ordered.findIndex(memo => memo && String(memo.id) === String(focusedMemoId));
+      if (targetIdx > 0) {
+        const [targetMemo] = ordered.splice(targetIdx, 1);
+        return [targetMemo, ...ordered];
+      }
+    }
+    return ordered;
+  }, [p.memos, p.focusedMemo, resolvedFocusedMemo, focusedMemoId, p.searchQuery, p.selectedTag]);
   const memoFiltering = Boolean(String(p.searchQuery || '').trim() || p.selectedTag);
   const countedMemos = typeof p.totalMemoCount === 'number' && p.totalMemoCount >= 0 ? p.totalMemoCount : null;
   const memoTotal = memoFiltering || !p.hasMoreMemos
@@ -756,10 +809,19 @@ export function MemoScreen(p) {
       const target = [...document.querySelectorAll('[data-v2-memo-id], [data-memo-id]')]
         .find(element => element.getAttribute('data-v2-memo-id') === String(focusedMemoId) || element.getAttribute('data-memo-id') === String(focusedMemoId) || element.id === 'memo-' + String(focusedMemoId));
       if (target) {
-        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
         target.classList.add('v2-memo-card-is-focused');
         const inner = target.querySelector('.v2-memo-card-contract');
         if (inner) inner.classList.add('v2-memo-card-is-focused');
+        const scroller = target.closest('.v2-memo-body, .v2-dest-body');
+        if (scroller && scroller.scrollHeight > scroller.clientHeight + 4) {
+          const sRect = scroller.getBoundingClientRect();
+          const tRect = target.getBoundingClientRect();
+          const relTop = tRect.top - sRect.top + scroller.scrollTop;
+          const centeredTop = Math.max(0, relTop - Math.max(24, (scroller.clientHeight - tRect.height) / 3));
+          scroller.scrollTo({ top: centeredTop, behavior: 'smooth' });
+        } else {
+          target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
         return true;
       }
       return false;

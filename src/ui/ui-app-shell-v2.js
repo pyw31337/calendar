@@ -2504,7 +2504,14 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           key: place.id || i,
           place,
           calendar: calendarContext?.calendar,
-          onOpen: () => onChangeView?.('places'),
+          onOpen: () => {
+            try {
+              if (place?.id) localStorage.setItem('gather_places_focus_id', String(place.id));
+              if (place?.alias || place?.name) localStorage.setItem('gather_places_focus_title', String(place.alias || place.name));
+            } catch (_) { /* ignore */ }
+            onChangeView?.('places');
+            try { window.dispatchEvent(new CustomEvent('gather-places-focus')); } catch (_) { /* ignore */ }
+          },
         }))
       }) : (calendarContext?.isLoading
         ? React.createElement(HomeLoadingRows, { label: '최근 장소 불러오는 중' })
@@ -4234,6 +4241,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const searchExtra = {
     onOpenMemo: (memoId) => {
       const id = typeof memoId === 'string' ? memoId : memoId?.id;
+      try {
+        if (id) localStorage.setItem('gather_memo_focus_id', String(id));
+      } catch (_) { /* ignore */ }
       const list = recordsContext?.memoProps?.memos || [];
       const memo = id ? list.find(m => m.id === id) : null;
       if (memo) {
@@ -4248,6 +4258,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         return;
       }
       onChangeView('memo');
+      try { window.dispatchEvent(new CustomEvent('gather-memo-focus')); } catch (_) { /* ignore */ }
     },
     onSelectDate: (d, focus) => {
       // From 통합검색 the date sheet opens over the search page (it has its own Back marker), so
@@ -4260,10 +4271,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     onOpenChatMessage: onOpenChatMessageFromMore,
     onOpenImage: onOpenImageFromMore,
     onOpenPlaces: (placeId) => {
+      try {
+        if (placeId) localStorage.setItem('gather_places_focus_id', String(placeId));
+      } catch (_) { /* ignore */ }
       if (placeId && typeof recordsContext?.placesProps?.setPlacesInitialFocusId === 'function') {
         recordsContext.placesProps.setPlacesInitialFocusId(placeId);
       }
       onChangeView('places');
+      try { window.dispatchEvent(new CustomEvent('gather-places-focus')); } catch (_) { /* ignore */ }
     },
     onOpenContent: (item) => {
       const tab = item?.contentTab || 'festival';
@@ -4271,8 +4286,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         if (item?.id) localStorage.setItem('gather_content_focus_item_id', String(item.id));
         if (item?.title) localStorage.setItem('gather_content_focus_title', String(item.title));
         localStorage.setItem('gather_content_tab', tab);
+        if (item && (item.id || item.title)) {
+          localStorage.setItem('gather_content_focus_fallback', JSON.stringify(item));
+        }
       } catch (_) { /* ignore */ }
       onChangeView('content');
+      try { window.dispatchEvent(new CustomEvent('gather-content-focus')); } catch (_) { /* ignore */ }
     },
   };
 

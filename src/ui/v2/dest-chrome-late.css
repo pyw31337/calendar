@@ -2532,11 +2532,14 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .global-search-count-badge
 }
 
 /* --------------------------------------------------------------------------
- * Search-result focus: the item the user just picked from 통합검색.
+ * Search-result & navigation focus: the item the user just picked from 통합검색 / 좋아요 / 홈.
  * -------------------------------------------------------------------------- */
 html:has(.renewal-shell.v2-design) .search-result-focus,
 html:has(.renewal-shell.v2-design) .chat-search-focused-bubble:not([data-v2-memo-id]):not(.v2-memo-card-wrap),
-html:has(.renewal-shell.v2-design) .place-card-row.is-focused {
+html:has(.renewal-shell.v2-design) .place-card-row.is-focused,
+html:has(.renewal-shell.v2-design) .v2-design .v2-places .places-list-body .place-card-row.is-focused,
+html:has(.renewal-shell.v2-design) .culture-poster-card.is-focused,
+html:has(.renewal-shell.v2-design) .v2-design .v2-content .culture-items-grid > .culture-poster-card.is-focused {
   border: 2px solid var(--v2-accent, var(--a-brand, #7C2FE5)) !important;
   background: rgb(var(--a-brand-rgb, 124 47 229) / 0.14) !important;
   box-shadow: 0 0 0 4px rgb(var(--a-brand-rgb, 124 47 229) / 0.18) !important;
@@ -2556,7 +2559,7 @@ html:has(.renewal-shell.v2-design) .renewal-shell .place-card-row.is-focused:has
   animation: none !important;
 }
 
-/* Memo focus: no outer rectangle border, no multi-layer borders, clean 1px solid border on the card itself */
+/* Memo focus: no outer rectangle border, no multi-layer borders, clean purple focus border on the card itself */
 html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.v2-memo-card-is-focused,
 html:has(.renewal-shell.v2-design) .v2-memo-card-wrap.chat-search-focused-bubble,
 html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused,
@@ -2579,10 +2582,12 @@ html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble 
 html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
 html:has(.renewal-shell.v2-design) .chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
 html:has(.renewal-shell.v2-design) [data-v2-memo-id].v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
-html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)) {
-  border: 1px solid var(--brand, #7C3AED) !important;
+html:has(.renewal-shell.v2-design) [data-v2-memo-id].chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap.v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap.chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)) {
+  border: 2px solid var(--v2-accent, var(--a-brand, #7C2FE5)) !important;
   background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 0 4px rgb(var(--a-brand-rgb, 124 47 229) / 0.18) !important;
   border-radius: 14px !important;
 }
 

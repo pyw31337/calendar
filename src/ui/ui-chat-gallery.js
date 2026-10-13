@@ -2903,12 +2903,52 @@ export function ChatGalleryModal({
   // cards that reopen the original (link/file open directly, the rest switch to their screen).
   const LIKE_DESTINATION = { memo: 'memo', place: 'places', content: 'content', memory: 'archive', person: 'archive', meeting: 'archive' };
   const openLikedItem = like => {
+    if (!like) return;
     if ((like.kind === 'link' || like.kind === 'file') && like.url) {
       window.open(like.url, '_blank', 'noopener,noreferrer');
       return;
     }
+    try {
+      if (like.kind === 'memo') {
+        const memoId = String(like.target?.memoId || like.ref || '').trim();
+        if (memoId) {
+          localStorage.setItem('gather_memo_focus_id', memoId);
+          if (like.title) localStorage.setItem('gather_memo_focus_title', String(like.title));
+          const url = new URL(window.location.href);
+          url.searchParams.set('memoFocus', memoId);
+          window.history.replaceState(window.history.state, '', url);
+        }
+      } else if (like.kind === 'place') {
+        const placeId = String(like.target?.placeId || like.ref || '').trim();
+        if (placeId) localStorage.setItem('gather_places_focus_id', placeId);
+        if (like.title) localStorage.setItem('gather_places_focus_title', String(like.title));
+      } else if (like.kind === 'content') {
+        const contentId = String(like.target?.contentId || like.ref || '').trim();
+        const catMap = { festival: 'festival', event: 'culture', performance: 'culture', culture: 'culture', sports: 'sports', movie: 'movies', movies: 'movies' };
+        const rawCat = String(like.target?.category || '').trim();
+        const tab = catMap[rawCat] || (/^fest_/i.test(contentId) ? 'festival' : (/^perf_/i.test(contentId) ? 'culture' : (/^movie_/i.test(contentId) ? 'movies' : 'festival')));
+        if (contentId) localStorage.setItem('gather_content_focus_item_id', contentId);
+        if (like.title) localStorage.setItem('gather_content_focus_title', String(like.title));
+        localStorage.setItem('gather_content_tab', tab);
+        localStorage.setItem('gather_content_focus_fallback', JSON.stringify({
+          id: contentId || `liked_${Date.now()}`,
+          title: like.title || '',
+          dateLabel: like.subtitle || '',
+          image: like.thumb || '',
+          thumbUrl: like.thumb || '',
+          url: like.url || '',
+          link: like.url || '',
+          kind: tab === 'festival' ? 'festival' : (tab === 'movies' ? 'movie' : (tab === 'sports' ? 'sports' : 'performance'))
+        }));
+      }
+    } catch (_) { /* ignore */ }
     const view = LIKE_DESTINATION[like.kind];
     if (view && typeof onChangeView === 'function') onChangeView(view);
+    try {
+      if (like.kind === 'memo') window.dispatchEvent(new CustomEvent('gather-memo-focus'));
+      else if (like.kind === 'place') window.dispatchEvent(new CustomEvent('gather-places-focus'));
+      else if (like.kind === 'content') window.dispatchEvent(new CustomEvent('gather-content-focus'));
+    } catch (_) { /* ignore */ }
   };
   const likeParticipants = Array.isArray(calendar?.participants) ? calendar.participants : [];
   const likerNames = like => (like.likerIds || [])
@@ -2980,6 +3020,20 @@ export function ChatGalleryModal({
           },
             like.thumb && /*#__PURE__*/React.createElement("img", {
               src: like.thumb, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer',
+              onError: e => {
+                const img = e.currentTarget;
+                if (!img) return;
+                if (!img.dataset.localFallback) {
+                  const m = String(img.src || '').match(/\/images\/posters\/(festivals|performances|movies|sports)\/([^/?#]+)$/i);
+                  if (m) {
+                    const base = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
+                    img.dataset.localFallback = '1';
+                    img.src = `${base}images/posters/${m[1]}/${m[2]}`;
+                    return;
+                  }
+                }
+                img.style.display = 'none';
+              },
               style: { width: '52px', height: '52px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }
             }),
             /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },

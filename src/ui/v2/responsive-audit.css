@@ -74,9 +74,9 @@
 .v2-design .v2-memo .chat-search-focused-bubble .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
 .v2-design .v2-memo .v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)),
 .v2-design .v2-home-memo-module .v2-memo-card-is-focused .v2-memo-card-contract:not(:has(.chat-search-focused-bubble)) {
-  border: 1px solid var(--brand, #7C3AED) !important;
+  border: 2px solid var(--v2-accent, var(--a-brand, #7C2FE5)) !important;
   background: var(--brand-soft, var(--a-brand-soft, #F3EEFF)) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 0 4px rgb(var(--a-brand-rgb, 124 47 229) / 0.18) !important;
   border-radius: 14px !important;
 }
 
