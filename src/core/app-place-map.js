@@ -233,7 +233,11 @@ function panMapToFitMarkerPopup(map, marker, opts) {
     const maxShiftY = mapRect.height * 0.35;
     dy = Math.max(-maxShiftY, Math.min(maxShiftY, dy));
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-      map.panBy([dx, dy], { animate: opts && opts.animate !== false });
+      map.panBy([dx, dy], {
+        animate: opts && opts.animate !== false,
+        duration: 0.28,
+        easeLinearity: 0.15
+      });
     }
   };
   requestAnimationFrame(() => requestAnimationFrame(tryPan));
@@ -258,7 +262,11 @@ function centerMapOnMarkerAndPopup(map, marker, opts) {
     const dx = unionCenterX - mapCenterX;
     const dy = unionCenterY - mapCenterY;
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-      map.panBy([dx, dy], { animate: opts && opts.animate !== false });
+      map.panBy([dx, dy], {
+        animate: opts && opts.animate !== false,
+        duration: 0.32,
+        easeLinearity: 0.15
+      });
     }
   };
   requestAnimationFrame(() => requestAnimationFrame(tryCenter));

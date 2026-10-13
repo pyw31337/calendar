@@ -280,6 +280,18 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           zoomControl: true,
           attributionControl: true,
           touchZoom: true,
+          bounceAtZoomLimits: false,
+          worldCopyJump: false,
+          inertia: true,
+          inertiaDeceleration: 2200,
+          inertiaMaxSpeed: 1800,
+          easeLinearity: 0.15,
+          zoomAnimation: true,
+          zoomAnimationThreshold: 8,
+          fadeAnimation: true,
+          markerZoomAnimation: true,
+          wheelDebounceTime: 24,
+          wheelPxPerZoomLevel: 76,
           dragging: true,
           doubleClickZoom: true,
           boxZoom: false,
@@ -298,6 +310,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       const addOpenStreetMapLayer = () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         maxNativeZoom: 19,
+        keepBuffer: 4,
+        updateWhenIdle: false,
+        updateWhenZooming: false,
         className: 'places-map-raster-fallback',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
@@ -330,8 +345,31 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
               className: 'places-map-vector-basemap',
               attribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
               interactive: false,
-              padding: 0.08
-            }).addTo(map);
+              updateInterval: 8,
+              padding: 0.16
+            });
+            // Keep the WebGL canvas in 1:1 frame lockstep with Leaflet's DOM pane during pan and
+            // pinch-zoom: jumpTo() normally queues a next-frame repaint while L.DomUtil.setPosition
+            // moves the container in the current frame, causing a 1-frame rubber-band lag.
+            const origTransformGL = monoVectorLayer._transformGL;
+            if (typeof origTransformGL === 'function') {
+              monoVectorLayer._transformGL = function (gl) {
+                origTransformGL.call(this, gl);
+                if (gl && typeof gl.redraw === 'function') {
+                  try { gl.redraw(); } catch (_) {}
+                }
+              };
+            }
+            const origPinchZoom = monoVectorLayer._pinchZoom;
+            if (typeof origPinchZoom === 'function') {
+              monoVectorLayer._pinchZoom = function (e) {
+                origPinchZoom.call(this, e);
+                if (this._glMap && typeof this._glMap.redraw === 'function') {
+                  try { this._glMap.redraw(); } catch (_) {}
+                }
+              };
+            }
+            monoVectorLayer.addTo(map);
             const vectorMap = monoVectorLayer.getMaplibreMap();
             if (!vectorMap) throw new Error('MapLibre map was not created');
             let vectorReady = false;
@@ -776,14 +814,21 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     const performFocus = () => {
       if (!mapRef.current) return;
       const map = mapRef.current;
-      const zoom = 16;
-      map.setView(marker.getLatLng(), zoom, { animate: false });
+      const zoom = Math.max(typeof map.getZoom === 'function' ? map.getZoom() : 16, 16);
+      try { marker.openPopup(); } catch (e) {}
+      let targetLatLng = marker.getLatLng();
+      try {
+        const popup = marker.getPopup && marker.getPopup();
+        const popupEl = popup && popup.getElement && popup.getElement();
+        const popupHeight = popupEl ? popupEl.offsetHeight : 0;
+        if (popupHeight > 0 && typeof map.project === 'function' && typeof map.unproject === 'function') {
+          const markerPoint = map.project(targetLatLng, zoom);
+          targetLatLng = map.unproject(markerPoint.subtract([0, Math.round(popupHeight * 0.45)]), zoom);
+        }
+      } catch (_) {}
+      map.setView(targetLatLng, zoom, { animate: true, duration: 0.34, easeLinearity: 0.15 });
       requestAnimationFrame(() => {
         try { marker.openPopup(); } catch (e) {}
-        // Re-center on the marker+popup as one combined block (not just the marker's own
-        // point) once the popup has actually rendered and its real size is known -- a plain
-        // marker-centered setView above would leave the popup, which opens upward from the
-        // pin, pushed off toward one edge instead of the whole pin+bubble sitting mid-screen.
         centerMapOnMarkerAndPopup(map, marker, { animate: true });
       });
     };
@@ -801,22 +846,28 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 
   // Container size changes (the section's collapse/expand aspect-ratio toggle & window resize)
   // fire size changes. Leaflet's internal tile grid goes stale unless invalidateSize() is called.
+  const lastContainerSizeRef = React.useRef({ w: 0, h: 0 });
   React.useEffect(() => {
-    const triggerInvalidate = () => {
-      if (mapRef.current) {
-        try { mapRef.current.invalidateSize({ animate: false }); } catch (e) {}
-      }
+    const triggerInvalidate = (force = false) => {
+      const el = containerRef.current;
+      const map = mapRef.current;
+      if (!el || !map) return;
+      const w = el.clientWidth || 0;
+      const h = el.clientHeight || 0;
+      if (!force && w === lastContainerSizeRef.current.w && h === lastContainerSizeRef.current.h) return;
+      lastContainerSizeRef.current = { w, h };
+      try { map.invalidateSize({ animate: false, pan: false }); } catch (e) {}
     };
-    triggerInvalidate();
-    const t1 = setTimeout(triggerInvalidate, 50);
-    const t2 = setTimeout(triggerInvalidate, 200);
-    const t3 = setTimeout(triggerInvalidate, 500);
-    const t4 = setTimeout(triggerInvalidate, 1000);
-    window.addEventListener('resize', triggerInvalidate);
+    triggerInvalidate(true);
+    const t1 = setTimeout(() => triggerInvalidate(false), 50);
+    const t2 = setTimeout(() => triggerInvalidate(false), 200);
+    const t3 = setTimeout(() => triggerInvalidate(false), 500);
+    const onWindowResize = () => triggerInvalidate(false);
+    window.addEventListener('resize', onWindowResize);
     let observer = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       observer = new ResizeObserver(() => {
-        triggerInvalidate();
+        triggerInvalidate(false);
       });
       observer.observe(containerRef.current);
     }
@@ -824,8 +875,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
-      clearTimeout(t4);
-      window.removeEventListener('resize', triggerInvalidate);
+      window.removeEventListener('resize', onWindowResize);
       if (observer) observer.disconnect();
     };
   }, [ready, resizeSignal]);

@@ -7222,6 +7222,9 @@ html:has(.renewal-shell.v2-design) :is(.leaflet-marker-icon, .place-map-marker, 
   animation: none !important;
   transition: none !important;
 }
+html:has(.renewal-shell.v2-design) .leaflet-cluster-anim :is(.leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster) {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease-out !important;
+}
 html:has(.renewal-shell.v2-design) :is(input, textarea, select):focus-visible {
   scale: 1.012;
   transition: scale 160ms var(--motion-ease-soft), border-color 160ms var(--motion-ease-soft), box-shadow 160ms var(--motion-ease-soft);

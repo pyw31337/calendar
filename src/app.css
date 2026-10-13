@@ -6068,6 +6068,17 @@ textarea.form-input {
   touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
 }
+.leaflet-map-pane,
+.leaflet-zoom-animated {
+  will-change: transform;
+}
+.leaflet-zoom-anim .leaflet-zoom-animated {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.leaflet-cluster-anim .leaflet-marker-icon,
+.leaflet-cluster-anim .leaflet-marker-shadow {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease-out !important;
+}
 .leaflet-tile-pane {
   filter: none;
   -webkit-filter: none;
@@ -6100,8 +6111,8 @@ textarea.form-input {
   -webkit-filter: grayscale(100%) invert(90%) contrast(62%) brightness(0.72) opacity(65%);
 }
 .places-map-vector-basemap {
-  filter: grayscale(100%) saturate(0%);
-  -webkit-filter: grayscale(100%) saturate(0%);
+  filter: none;
+  -webkit-filter: none;
 }
 
 
