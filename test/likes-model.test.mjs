@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { LIKE_KINDS, buildLikeDocument, groupLikesByKind, likeDocId, photoLikeItem } from '../src/core/likes-model.js';
+import { LIKE_KINDS, buildLikeDocument, groupLikesByKind, isExpiredContentLike, likeDocId, photoLikeItem } from '../src/core/likes-model.js';
 import { splitLikesForParticipant } from '../src/core/likes-model.js';
 
 test('like document ids are stable, kind-prefixed and match the rules pattern', async () => {
@@ -64,4 +64,28 @@ test('mine is only my likes; all merges everyone per liked thing with who liked 
   const { mine, all } = splitLikesForParticipant(likes, 'p1');
   assert.deepEqual(mine.map(l => l.id), ['1']);
   assert.deepEqual(all.map(l => [l.kind, l.likerIds]), [['place', []], ['photo', ['p2', 'p1']], ['memo', ['p2']]]);
+});
+
+test('ended content likes are excluded from splitLikesForParticipant and groupLikesByKind', () => {
+  const today = '2026-10-13';
+  const endedFestival = { id: 'c1', kind: 'content', ref: 'fest_busan', title: '부산국제록페스티벌', subtitle: '2026.10.02 (금) ~ 2026.10.04 (일)', participantId: 'p1', likedAt: 10 };
+  const ongoingFestival = { id: 'c2', kind: 'content', ref: 'fest_dmz', title: 'DMZ OPEN 페스티벌', subtitle: '2026.09.03 (목) ~ 2026.11.07 (토)', participantId: 'p1', likedAt: 9 };
+  const openRunPerf = { id: 'c3', kind: 'content', ref: 'perf_open', title: '오픈런 연극', subtitle: '2026.05.01 (금) ~ 오픈런', participantId: 'p1', likedAt: 8 };
+  const endedMovie = { id: 'c4', kind: 'content', ref: 'movie_old', title: '지난 영화', subtitle: '2026-08-01 개봉', target: { category: 'movie' }, participantId: 'p1', likedAt: 7 };
+  const memoLike = { id: 'm1', kind: 'memo', ref: 'memo_1', title: '메모', subtitle: '2026.01.01', participantId: 'p1', likedAt: 6 };
+
+  assert.equal(isExpiredContentLike(endedFestival, today), true);
+  assert.equal(isExpiredContentLike(ongoingFestival, today), false);
+  assert.equal(isExpiredContentLike(openRunPerf, today), false);
+  assert.equal(isExpiredContentLike(endedMovie, today), true);
+  assert.equal(isExpiredContentLike(memoLike, today), false);
+
+  const list = [endedFestival, ongoingFestival, openRunPerf, endedMovie, memoLike];
+  const { mine, all } = splitLikesForParticipant(list, 'p1', today);
+  assert.deepEqual(mine.map(l => l.id), ['c2', 'c3', 'm1']);
+  assert.deepEqual(all.map(l => l.id), ['c2', 'c3', 'm1']);
+
+  const groups = groupLikesByKind(list, today);
+  const contentGroup = groups.find(g => g.kind === 'content');
+  assert.deepEqual(contentGroup.items.map(l => l.id), ['c2', 'c3']);
 });

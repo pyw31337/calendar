@@ -4,7 +4,7 @@
  * app's standard writeCollectionDocumentWithFallback (SDK → REST → retry queue), scoped to
  * calendars/cal_{id}/likes like every other calendar subcollection.
  */
-import { LIKE_KINDS, buildLikeDocument, likeDocId, splitLikesForParticipant } from './likes-model.js';
+import { LIKE_KINDS, buildLikeDocument, isExpiredContentLike, likeDocId, splitLikesForParticipant } from './likes-model.js';
 import { subscribeParticipantChange, readCurrentParticipantId } from './current-participant.js';
 // app-firebase-data is loaded lazily: a static import from here (pulled in by UI modules that
 // the app shell itself imports) creates an evaluation cycle and broke boot.
@@ -25,7 +25,20 @@ function createLikesStore(calendarId) {
   // Optimistic toggles win over snapshots until the write settles, so a slow round trip never
   // flips the heart back and forth.
   const pending = new Map();
+  const prunedIds = new Set();
   let snapshot = { list: [], ready: false, version: 0 };
+
+  const pruneExpiredContentLikes = async (expiredDocIds) => {
+    const ids = (Array.isArray(expiredDocIds) ? expiredDocIds : []).filter(id => id && !prunedIds.has(id));
+    if (ids.length === 0) return;
+    ids.forEach(id => prunedIds.add(id));
+    try {
+      const { writeCollectionDocumentWithFallback } = await firebaseData();
+      for (const id of ids) {
+        await writeCollectionDocumentWithFallback('likes', calendarId, id, null, 'delete', '종료된 컨텐츠 좋아요 정리').catch(() => {});
+      }
+    } catch (_) { /* best-effort */ }
+  };
 
   const rebuild = () => {
     const merged = new Map(byId);
@@ -44,6 +57,7 @@ function createLikesStore(calendarId) {
     try {
       const { firebaseConfig, firestoreDocumentToJs } = await firebaseData();
       const next = new Map();
+      const expiredIds = [];
       let pageToken = '';
       do {
         const query = new URLSearchParams({ pageSize: '300' });
@@ -54,11 +68,17 @@ function createLikesStore(calendarId) {
         (payload.documents || []).forEach(doc => {
           const id = decodeURIComponent(String(doc.name || '').split('/').pop());
           const data = firestoreDocumentToJs(doc) || {};
-          if (LIKE_KINDS.includes(data.kind)) next.set(id, { ...data, id });
+          if (!LIKE_KINDS.includes(data.kind)) return;
+          if (isExpiredContentLike(data)) {
+            if (id) expiredIds.push(id);
+            return;
+          }
+          next.set(id, { ...data, id });
         });
         pageToken = payload.nextPageToken || '';
       } while (pageToken);
       if (!unsubscribe || !ready) { byId = next; ready = true; rebuild(); }
+      if (expiredIds.length > 0) void pruneExpiredContentLikes(expiredIds);
     } catch (_) {
       ready = true;
       rebuild();
@@ -73,13 +93,20 @@ function createLikesStore(calendarId) {
         unsubscribe = db.collection('calendars').doc(`cal_${calendarId}`).collection('likes')
           .onSnapshot(snap => {
             const next = new Map();
+            const expiredIds = [];
             snap.forEach(doc => {
               const data = doc.data() || {};
-              if (LIKE_KINDS.includes(data.kind)) next.set(doc.id, { ...data, id: doc.id });
+              if (!LIKE_KINDS.includes(data.kind)) return;
+              if (isExpiredContentLike(data)) {
+                if (doc.id) expiredIds.push(doc.id);
+                return;
+              }
+              next.set(doc.id, { ...data, id: doc.id });
             });
             byId = next;
             ready = true;
             rebuild();
+            if (expiredIds.length > 0) void pruneExpiredContentLikes(expiredIds);
           }, () => { void loadRest(); });
         return;
       } catch (_) {

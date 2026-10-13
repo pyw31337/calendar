@@ -17,12 +17,65 @@
  * `target` carries the few fields the 좋아요 tab needs to reopen the original.
  */
 
+import { todaySeoulDateKey, addDaysToDateKey } from './seoul-date.js';
+
 export const LIKE_KINDS = ['photo', 'memo', 'file', 'link', 'content', 'memory', 'person', 'place', 'meeting'];
 
 export const LIKE_KIND_LABELS = {
   photo: '사진', memo: '메모', file: '파일', link: '링크', content: '컨텐츠',
   memory: '추억', person: '인물', place: '장소', meeting: '모임'
 };
+
+function normalizeLikeYmd(raw) {
+  const m = String(raw || '').match(/\b(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/);
+  if (!m) return '';
+  return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+}
+
+function extractLikeSubtitleDates(text) {
+  const out = [];
+  const re = /\b(20\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/g;
+  let m;
+  while ((m = re.exec(String(text || ''))) !== null) {
+    out.push(`${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/**
+ * Returns true when a liked content item (festival / performance / sports / movie) has already
+ * ended as of `today` (Asia/Seoul YYYY-MM-DD), matching the Content tab's lifecycle visibility.
+ */
+export function isExpiredContentLike(like, today = todaySeoulDateKey()) {
+  if (!like || like.kind !== 'content') return false;
+  if (!today || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return false;
+  const subtitle = String(like.subtitle || '');
+  const target = (like.target && typeof like.target === 'object') ? like.target : {};
+  if (target.isOpenEnded === true || /오픈런|OPEN\s*RUN|상시/i.test(subtitle)) return false;
+
+  const targetEnd = normalizeLikeYmd(target.endDate);
+  const targetStart = normalizeLikeYmd(target.startDate || target.releaseDate);
+  const dates = extractLikeSubtitleDates(subtitle);
+
+  const category = String(target.category || '').toLowerCase();
+  const isMovie = category === 'movie' || category === 'movies'
+    || /개봉/.test(subtitle)
+    || /^movie_/i.test(String(like.ref || target.contentId || ''));
+
+  if (isMovie) {
+    const endDay = targetEnd || (dates.length >= 2 ? dates[dates.length - 1] : '');
+    if (endDay) return endDay < today;
+    const releaseDay = targetStart || (dates.length === 1 ? dates[0] : '');
+    if (!releaseDay) return false;
+    if (releaseDay > today) return false;
+    const windowEnd = addDaysToDateKey(releaseDay, 28);
+    return Boolean(windowEnd && windowEnd < today);
+  }
+
+  const endDay = targetEnd || (dates.length > 0 ? dates[dates.length - 1] : targetStart);
+  if (!endDay) return false;
+  return endDay < today;
+}
 
 // FNV-1a 32-bit, twice with different seeds → 16 hex chars. Only needs to be stable and
 // collision-resistant within one calendar's likes, not cryptographic.
@@ -80,8 +133,8 @@ export function buildLikeDocument(item, now = Date.now(), participantId = '') {
  * The 좋아요 tab lists: `mine` = this participant's likes; `all` = every participant's likes plus
  * the older shared ones, one entry per liked thing with who liked it (newest like first).
  */
-export function splitLikesForParticipant(likes, participantId) {
-  const list = Array.isArray(likes) ? likes : [];
+export function splitLikesForParticipant(likes, participantId, today = todaySeoulDateKey()) {
+  const list = (Array.isArray(likes) ? likes : []).filter(like => like && !isExpiredContentLike(like, today));
   const pid = String(participantId || '');
   const mine = pid ? list.filter(like => like && like.participantId === pid) : list.filter(like => like && !like.participantId);
   const merged = new Map();
@@ -96,10 +149,10 @@ export function splitLikesForParticipant(likes, participantId) {
 }
 
 /** Likes grouped for the 좋아요 tab: kinds in LIKE_KINDS order, newest first inside each. */
-export function groupLikesByKind(likes) {
+export function groupLikesByKind(likes, today = todaySeoulDateKey()) {
   const groups = new Map(LIKE_KINDS.map(kind => [kind, []]));
   (Array.isArray(likes) ? likes : []).forEach(like => {
-    if (like && groups.has(like.kind)) groups.get(like.kind).push(like);
+    if (like && groups.has(like.kind) && !isExpiredContentLike(like, today)) groups.get(like.kind).push(like);
   });
   return LIKE_KINDS
     .map(kind => ({

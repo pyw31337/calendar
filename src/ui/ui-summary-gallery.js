@@ -6822,7 +6822,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // 좋아요 takes the poster's top-right corner; the 캘린더 연동 mark moved to bottom-left.
             /*#__PURE__*/React.createElement(LikeButton, {
               as: 'span', variant: 'onMedia', className: 'at-right', calendarId: calendar?.id,
-              item: { kind: 'content', ref: String(item.id || item.title || ''), title: item.title || '', subtitle: posterDateText || '', thumb: posterUrl || '', url: item.url || item.link || '', target: { category: anniversaryCategory || '', contentId: item.id || '' } }
+              item: { kind: 'content', ref: String(item.id || item.title || ''), title: item.title || '', subtitle: posterDateText || '', thumb: posterUrl || '', url: item.url || item.link || '', target: { category: anniversaryCategory || '', contentId: item.id || '', startDate: item.startDate || item.releaseDate || '', endDate: item.endDate || '', isOpenEnded: Boolean(item.isOpenEnded) } }
             }),
             registered && /*#__PURE__*/React.createElement("div", {
               className: "culture-registered-badge",
