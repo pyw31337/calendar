@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectMotionLists, itemIdentity, isMotionItem, isNegativeControl, planListExits } from '../src/ui/v2/tiny-motion.js';
+import { collectMotionLists, itemIdentity, isMapMarkerElement, isMotionItem, isNegativeControl, playSpring, planListExits } from '../src/ui/v2/tiny-motion.js';
 
 function el(attrs = {}, text = '') {
   const attributes = new Map(Object.entries(attrs));
@@ -59,6 +59,18 @@ test('short delete labels are negative, long copy and plain buttons are not', ()
   assert.equal(isNegativeControl(save), false);
 });
 
+test('map markers and cluster icons are excluded from spring press scaling and negative shake', () => {
+  const marker = el({ role: 'button', className: 'leaflet-marker-icon place-map-marker leaflet-interactive', title: '삭제 장소 지도에서 보기' });
+  marker.animate = () => { throw new Error('map marker must not animate scale'); };
+  const cluster = el({ role: 'button', className: 'leaflet-marker-icon place-cluster-icon leaflet-interactive' });
+  cluster.animate = () => { throw new Error('cluster icon must not animate scale'); };
+  assert.equal(isMapMarkerElement(marker), true);
+  assert.equal(isMapMarkerElement(cluster), true);
+  assert.equal(isNegativeControl(marker), false);
+  assert.equal(playSpring(marker, { from: 1, to: 0.94 }), null);
+  assert.equal(playSpring(cluster, { from: 1, to: 0.94 }), null);
+});
+
 function motionNode(className, children = []) {
   const node = {
     nodeType: 1,
@@ -90,3 +102,4 @@ test('a list nested in an inserted page is still a motion list', () => {
   assert.deepEqual(lists, [grid]);
   assert.equal(collectMotionLists(card).length, 0);
 });
+

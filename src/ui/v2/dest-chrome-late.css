@@ -7203,13 +7203,24 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .inline-search-input {
   to { opacity: 1; scale: 1; }
 }
 
-html:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):not(:disabled) {
+html:has(.renewal-shell.v2-design) :is(button, [role="button"], [role="tab"]):not(:disabled):not(.leaflet-marker-icon):not(.place-map-marker):not(.place-cluster-icon):not(.marker-cluster) {
   transition: scale 130ms var(--motion-ease-out), translate 180ms var(--motion-ease-soft), background-color 160ms var(--motion-ease-soft), border-color 160ms var(--motion-ease-soft), color 160ms var(--motion-ease-soft), opacity 160ms var(--motion-ease-soft), box-shadow 160ms var(--motion-ease-soft);
 }
-html:has(.renewal-shell.v2-design):not([data-bp-spring="1"]) :is(button, [role="button"], [role="tab"]):not(.bp-btn-gamified-confirm):not(:disabled):active {
+html:has(.renewal-shell.v2-design):not([data-bp-spring="1"]) :is(button, [role="button"], [role="tab"]):not(.bp-btn-gamified-confirm):not(:disabled):not(.leaflet-marker-icon):not(.place-map-marker):not(.place-cluster-icon):not(.marker-cluster):active {
   scale: 0.94 !important;
   transition-duration: 70ms;
   transition-timing-function: var(--motion-ease-in);
+}
+html:has(.renewal-shell.v2-design) :is(.leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster),
+html:has(.renewal-shell.v2-design) :is(.leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster):hover,
+html:has(.renewal-shell.v2-design) :is(.leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster):active,
+html:has(.renewal-shell.v2-design) :is(.leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster):focus,
+html:has(.renewal-shell.v2-design) :is(.leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster).is-pressing {
+  scale: none !important;
+  translate: none !important;
+  rotate: none !important;
+  animation: none !important;
+  transition: none !important;
 }
 html:has(.renewal-shell.v2-design) :is(input, textarea, select):focus-visible {
   scale: 1.012;
@@ -7230,7 +7241,7 @@ html:has(.renewal-shell.v2-design) :is(.bp-hero-zone, .v2-dest-page, .modal-cont
     .content-thumb-delete-btn,
     .bp-attend-row-remove,
     .bp-lightbox-tag-remove
-  ):hover {
+  ):not(.leaflet-marker-icon):not(.place-map-marker):not(.place-cluster-icon):not(.marker-cluster):hover {
     animation: bp-no-shake 0.48s var(--motion-ease-in-out);
   }
   .v2-design :is(.bp-bento-card, .v2-memo-card-wrap, .places-list-body > article, .place-row, .summary-card, [role="tab"]):hover {
@@ -7281,7 +7292,7 @@ html:has(.renewal-shell.v2-design) .bp-motion-leave-host {
   pointer-events: none;
 }
 
-html:has(.renewal-shell.v2-design)[data-bp-spring="1"] :is(button, [role="button"], [role="tab"]) {
+html:has(.renewal-shell.v2-design)[data-bp-spring="1"] :is(button, [role="button"], [role="tab"]):not(.leaflet-marker-icon):not(.place-map-marker):not(.place-cluster-icon):not(.marker-cluster) {
   transition-property: translate, background-color, border-color, color, opacity, box-shadow;
 }
 html:has(.renewal-shell.v2-design)[data-bp-spring="1"] :is(

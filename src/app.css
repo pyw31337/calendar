@@ -1075,19 +1075,27 @@ summary.is-pressing,
 .leaflet-marker-icon,
 .leaflet-marker-icon:hover,
 .leaflet-marker-icon:active,
+.leaflet-marker-icon:focus,
 .leaflet-marker-icon.is-pressing,
 .marker-cluster,
 .marker-cluster:hover,
 .marker-cluster:active,
+.marker-cluster:focus,
 .marker-cluster.is-pressing,
 .place-cluster-icon,
 .place-cluster-icon:hover,
 .place-cluster-icon:active,
+.place-cluster-icon:focus,
 .place-cluster-icon.is-pressing,
 .place-map-marker,
 .place-map-marker:hover,
 .place-map-marker:active,
+.place-map-marker:focus,
 .place-map-marker.is-pressing {
+  scale: none !important;
+  translate: none !important;
+  rotate: none !important;
+  animation: none !important;
   opacity: 1 !important;
   filter: none !important;
   box-shadow: none !important;

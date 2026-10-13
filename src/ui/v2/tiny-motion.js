@@ -68,8 +68,22 @@ export function isMotionItem(parent, node) {
   return true;
 }
 
+export function isMapMarkerElement(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (
+    el.classList?.contains('leaflet-marker-icon') ||
+    el.classList?.contains('place-map-marker') ||
+    el.classList?.contains('place-cluster-icon') ||
+    el.classList?.contains('marker-cluster')
+  ) {
+    return true;
+  }
+  return !!(typeof el.closest === 'function' && el.closest('.leaflet-marker-pane, .leaflet-marker-icon, .place-map-marker, .place-cluster-icon, .marker-cluster'));
+}
+
 export function isNegativeControl(el) {
   if (!el || el.nodeType !== 1) return false;
+  if (isMapMarkerElement(el)) return false;
   const tag = String(el.tagName || '');
   if (tag !== 'BUTTON' && el.getAttribute?.('role') !== 'button') return false;
   const cls = typeof el.className === 'string' ? el.className : '';
@@ -144,7 +158,7 @@ export function readScale(el) {
 }
 
 export function playSpring(el, spec) {
-  if (!el || typeof el.animate !== 'function') return null;
+  if (!el || typeof el.animate !== 'function' || isMapMarkerElement(el)) return null;
   const prev = springRuns.get(el);
   if (prev) {
     try { prev.cancel(); } catch (_) {}
@@ -170,6 +184,7 @@ function pressTarget(node) {
   const button = node?.closest?.('button, [role="button"], [role="tab"]');
   if (!button || button.disabled || button.getAttribute?.('aria-disabled') === 'true') return null;
   if (button.classList?.contains('bp-btn-gamified-confirm')) return null;
+  if (isMapMarkerElement(button)) return null;
   return button;
 }
 
