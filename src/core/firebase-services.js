@@ -188,83 +188,78 @@ function recordUsage(kind, value = 1, detail = '') {
   // this bounded window. Records without uploadSource are accepted only by the legacy fallback.
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
-    const pageSize = Math.max(1, Math.min(400, Number(limit) || 60));
+    const target = Math.max(1, Math.min(400, Number(limit) || 60));
+    const pageSize = Math.min(400, Math.max(target, 40));
+    const maxPages = 6;
     const firebaseDb = getDb();
-    // Firestore's orderBy() silently excludes any document that is missing the field being
-    // ordered on -- not just sorts it oddly, drops it from the result set entirely, at any limit.
-    // A message doc that somehow ended up without a `timestamp` field (a bad write, an old
-    // migration, manual Firestore console edits) would then be invisible to every orderBy('timestamp')
-    // query forever, while a plain count() aggregation still counts it -- exactly the "count says
-    // there's chat, nothing ever loads" symptom. If the ordered query comes back empty, fall back to
-    // an unordered read (which has no such exclusion) and sort client-side, so those documents are
-    // still findable instead of being permanently invisible.
-    let orderedEmpty = false;
-    try {
-      if (firebaseDb) {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
-        const list = [];
-        snap.forEach(function (doc) {
-          const message = slimMessage({ id: doc.id, ...doc.data() });
-          if (isChatChannelMessage(message)) list.push(message);
-        });
-        if (list.length > 0) return list.reverse();
-        orderedEmpty = true;
-      }
-    } catch (err) {
-      console.warn('fetchRecentChatMessages sdk', err);
-    }
-    if (orderedEmpty && firebaseDb) {
+    if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
-        const list = [];
-        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
-        if (list.length > 0) {
-          list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
-          console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered fallback -- some docs are likely missing a timestamp field');
-          return list;
+        const collected = [];
+        let lastDoc = null;
+        for (let page = 0; page < maxPages && collected.length < target; page++) {
+          let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+            .orderBy('timestamp', 'desc').limit(pageSize);
+          if (lastDoc && typeof q.startAfter === 'function') q = q.startAfter(lastDoc);
+          const snap = await withSdkTimeout(q.get(), FIRESTORE_REST_TIMEOUT_MS);
+          if (!snap || snap.empty) break;
+          snap.forEach(function (doc) {
+            if (collected.length >= target) return;
+            const message = slimMessage({ id: doc.id, ...doc.data() });
+            if (isChatChannelMessage(message)) collected.push(message);
+          });
+          if (!Array.isArray(snap.docs) || snap.docs.length < pageSize || typeof q.startAfter !== 'function') break;
+          lastDoc = snap.docs[snap.docs.length - 1];
         }
+        return collected.reverse();
       } catch (err) {
-        console.warn('fetchRecentChatMessages unordered fallback', err);
+        console.warn('fetchRecentChatMessages sdk', err);
       }
     }
     try {
       const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
       const url = 'https://firestore.googleapis.com/v1/' + parent + ':runQuery';
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ structuredQuery: {
+      const collected = [];
+      let beforeTimestamp = null;
+      for (let page = 0; page < maxPages && collected.length < target; page++) {
+        const structuredQuery = {
           from: [{ collectionId: 'messages' }],
           orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
           limit: pageSize
-        } })
-      });
-      if (!res.ok) return [];
-      const data = await res.json();
-      const list = (Array.isArray(data) ? data : []).filter(function (row) { return row.document; }).map(function (row) {
-        const doc = row.document;
-        return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      }).filter(isChatChannelMessage);
-      if (list.length > 0) return list.reverse();
+        };
+        if (beforeTimestamp != null) {
+          structuredQuery.where = {
+            fieldFilter: {
+              field: { fieldPath: 'timestamp' },
+              op: 'LESS_THAN',
+              value: { integerValue: String(beforeTimestamp) }
+            }
+          };
+        }
+        const res = await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ structuredQuery: structuredQuery })
+        });
+        if (!res.ok) break;
+        const data = await res.json();
+        const rawDocs = (Array.isArray(data) ? data : [])
+          .filter(function (row) { return row && row.document && row.document.name; })
+          .map(function (row) {
+            const doc = row.document;
+            return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
+          });
+        if (rawDocs.length === 0) break;
+        for (let i = 0; i < rawDocs.length && collected.length < target; i++) {
+          if (isChatChannelMessage(rawDocs[i])) collected.push(rawDocs[i]);
+        }
+        if (rawDocs.length < pageSize) break;
+        const oldestTs = Number(rawDocs[rawDocs.length - 1] && rawDocs[rawDocs.length - 1].timestamp);
+        if (!Number.isFinite(oldestTs) || oldestTs <= 0 || oldestTs === beforeTimestamp) break;
+        beforeTimestamp = oldestTs;
+      }
+      return collected.reverse();
     } catch (err) {
       console.warn('fetchRecentChatMessages rest', err);
-    }
-    // Same unordered-fallback reasoning as the SDK path above, for when only REST is available.
-    try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?pageSize=' + pageSize;
-      const res = await fetchWithTimeout(url, { cache: 'no-store' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      const list = (data.documents || []).map(function (doc) {
-        return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      }).filter(isChatChannelMessage);
-      list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
-      if (list.length > 0) console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered REST fallback');
-      return list;
-    } catch (err) {
-      console.warn('fetchRecentChatMessages unordered rest fallback', err);
       return [];
     }
   }
@@ -996,66 +991,25 @@ function recordUsage(kind, value = 1, detail = '') {
     let innerUnsub = noop;
     const messagesRef = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages');
 
-    function sortedSnapshotFrom(docs) {
-      const sorted = docs.slice().sort(function (a, b) {
-        const ta = Number(a.data()[orderField]) || 0;
-        const tb = Number(b.data()[orderField]) || 0;
-        return direction === 'desc' ? tb - ta : ta - tb;
+    try {
+      let q = messagesRef;
+      if (where) q = q.where(where[0], where[1], where[2]);
+      q = q.orderBy(orderField, direction);
+      if (limitN) q = q.limit(limitN);
+      recordUsage('listeners', 1, `messages:${where ? where[2] : 'all'}`);
+      innerUnsub = q.onSnapshot(function (snap) {
+        if (stopped) return;
+        recordUsage('snapshots', 1, `messages:${where ? where[2] : 'all'}`);
+        recordUsage('documents', snap?.size || 0, `messages:${where ? where[2] : 'all'}`);
+        onSnapshot(snap);
+      }, function (err) {
+        console.warn('subscribeMessages ordered', err);
+        if (typeof onError === 'function') onError(err);
       });
-      const limited = limitN ? sorted.slice(0, limitN) : sorted;
-      return { forEach: function (fn) { limited.forEach(fn); } };
+    } catch (err) {
+      console.warn('subscribeMessages ordered attach', err);
+      if (typeof onError === 'function') onError(err);
     }
-
-    function attachUnordered() {
-      if (stopped) return;
-      try {
-        let q = messagesRef;
-        if (where) q = q.where(where[0], where[1], where[2]);
-        q = q.limit(limitN ? Math.max(limitN * 4, 200) : 200);
-        recordUsage('listeners', 1, `messages:${where ? where[2] : 'all'}`);
-        innerUnsub = q.onSnapshot(function (snap) {
-          if (stopped) return;
-          recordUsage('snapshots', 1, `messages:${where ? where[2] : 'all'}`);
-          recordUsage('documents', snap?.size || 0, `messages:${where ? where[2] : 'all'}`);
-          onSnapshot(sortedSnapshotFrom(snap.docs));
-        }, onError || noop);
-      } catch (err) {
-        console.warn('subscribeMessages unordered fallback', err);
-        if (typeof onError === 'function') onError(err);
-      }
-    }
-
-    function attachOrdered() {
-      let usedFallback = false;
-      try {
-        let q = messagesRef;
-        if (where) q = q.where(where[0], where[1], where[2]);
-        q = q.orderBy(orderField, direction);
-        if (limitN) q = q.limit(limitN);
-        recordUsage('listeners', 1, `messages:${where ? where[2] : 'all'}`);
-        innerUnsub = q.onSnapshot(function (snap) {
-          if (stopped) return;
-          recordUsage('snapshots', 1, `messages:${where ? where[2] : 'all'}`);
-          recordUsage('documents', snap?.size || 0, `messages:${where ? where[2] : 'all'}`);
-          if (snap.empty && !usedFallback) {
-            usedFallback = true;
-            const prevUnsub = innerUnsub;
-            attachUnordered();
-            if (typeof prevUnsub === 'function') prevUnsub();
-            return;
-          }
-          onSnapshot(snap);
-        }, function (err) {
-          console.warn('subscribeMessages ordered', err);
-          if (typeof onError === 'function') onError(err);
-        });
-      } catch (err) {
-        console.warn('subscribeMessages ordered attach', err);
-        if (typeof onError === 'function') onError(err);
-      }
-    }
-
-    attachOrdered();
 
     return function () {
       stopped = true;

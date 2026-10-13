@@ -72,4 +72,91 @@ test('ui-app-shell-v2 uses latestRows for chat messages and passes live calendar
     shellSource.includes('places: (Array.isArray(mergedCalendar?.places) && mergedCalendar.places.length > 0)'),
     'CalendarPane must forward places from mergedCalendar'
   );
+
+  // Verify side-nav chat personal badge uses isChatRenderableMessage with meetingPhotoMessageIds
+  assert.ok(
+    shellSource.includes('allChat.filter(msg => isChatRenderableMessage(msg, sideMeetingPhotoMessageIds))'),
+    'Side-nav personal badge must use isChatRenderableMessage so its lastChatMsg matches HomeActivitySummary'
+  );
+});
+
+test('fetchRecentChatMessages pages past meeting/gallery uploads in timestamp desc order and never falls back to unordered alphabetical docs', async () => {
+  const { GATHER_FIREBASE_SERVICES } = await import('../src/core/firebase-services.js');
+  const allDocs = [
+    // Old August messages with alphabetically-first IDs ('0...')
+    { id: '0L8c1ubElVYwmkJeDbHe', text: '저흰 오류2동', participantId: 'p_eunhye', timestamp: 1787271255747, uploadSource: 'chat' },
+    { id: '0QA8MzMww0cuqg2Vss4Q', text: '타요는 왜 1박이 안돼요????', participantId: 'p_eunhye', timestamp: 1787563790410, uploadSource: 'chat' },
+    // Recent October chat messages by 박영우
+    { id: 'chat_cw_1791704034607_0jwzij', text: 'ㅋㅋ', participantId: 'p_youngwoo', timestamp: 1791704034607, uploadSource: 'chat' },
+    { id: 'chat_cw_1791704065784_mdb37f', text: '송금완료~', participantId: 'p_youngwoo', timestamp: 1791704065784, uploadSource: 'chat' },
+    { id: 'chat_cw_1791704082426_do67d3', text: '차차 이어서 사진이랑 장소등록 하겄습니다~', participantId: 'p_youngwoo', timestamp: 1791704082426, uploadSource: 'chat' },
+    // 7 newest meeting photo uploads at the head of the collection
+    ...Array.from({ length: 7 }, (_, i) => ({
+      id: `meeting_cw_2026-10-10_${i}`,
+      text: '',
+      participantId: 'p_youngwoo',
+      timestamp: 1791759273490 + i * 1000,
+      uploadSource: 'meeting',
+    })),
+  ];
+
+  let unorderedCalled = false;
+  const makeQuery = (state = { ordered: false, afterDoc: null, limitN: 400 }) => ({
+    orderBy(field, dir) {
+      assert.equal(field, 'timestamp');
+      assert.equal(dir, 'desc');
+      return makeQuery({ ...state, ordered: true });
+    },
+    startAfter(doc) {
+      return makeQuery({ ...state, afterDoc: doc });
+    },
+    limit(n) {
+      return makeQuery({ ...state, limitN: n });
+    },
+    async get() {
+      if (!state.ordered) {
+        unorderedCalled = true;
+      }
+      const sorted = state.ordered
+        ? allDocs.slice().sort((a, b) => b.timestamp - a.timestamp)
+        : allDocs.slice().sort((a, b) => a.id.localeCompare(b.id));
+      let startIdx = 0;
+      if (state.afterDoc) {
+        const idx = sorted.findIndex(d => d.id === state.afterDoc.id);
+        startIdx = idx >= 0 ? idx + 1 : sorted.length;
+      }
+      const slice = sorted.slice(startIdx, startIdx + state.limitN);
+      const docs = slice.map(d => ({ id: d.id, data: () => ({ ...d }) }));
+      return {
+        empty: docs.length === 0,
+        size: docs.length,
+        docs,
+        forEach(fn) { docs.forEach(fn); },
+      };
+    },
+  });
+
+  globalThis.window = globalThis.window || {};
+  const prevDeps = globalThis.window.GATHER_FIREBASE_DEPS;
+  globalThis.window.GATHER_FIREBASE_DEPS = {
+    getDb: () => ({
+      collection: () => ({
+        doc: () => ({
+          collection: () => makeQuery(),
+        }),
+      }),
+    }),
+    slimMessageForClient: m => m,
+  };
+
+  try {
+    const recent = await GATHER_FIREBASE_SERVICES.fetchRecentChatMessages('cw', 3);
+    assert.equal(unorderedCalled, false, 'Must never fall back to an unordered alphabetical query');
+    assert.equal(recent.length, 3);
+    assert.equal(recent[recent.length - 1].id, 'chat_cw_1791704082426_do67d3', 'Newest chat message must be 박영우 latest message');
+    assert.equal(recent[recent.length - 1].text, '차차 이어서 사진이랑 장소등록 하겄습니다~');
+    assert.ok(!recent.some(m => m.id === '0QA8MzMww0cuqg2Vss4Q'), 'Old August message must not be returned in top 3');
+  } finally {
+    globalThis.window.GATHER_FIREBASE_DEPS = prevDeps;
+  }
 });

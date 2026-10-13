@@ -105,6 +105,10 @@ export function useChatMessageWindow({
   // in the chat room the window is max(chatLiveLimit, 60), so the 5 -> 20 widening above never
   // changes it, yet depending on chatLiveLimit tore the 60-message listener down and attached
   // an identical one ~0.7s after every chat entry (a second full read of the window).
+  const isChatChannelMessage = msg => {
+    const source = String(msg?.uploadSource || '').trim().toLowerCase();
+    return !source || source === 'chat' || source === 'meme';
+  };
   const liveChatLimit = activeView === 'chat'
     ? Math.max(chatLiveLimit, 60)
     : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_LIVE_MESSAGE_LIMIT;
@@ -139,6 +143,7 @@ export function useChatMessageWindow({
     // gallery/meeting uploads while retaining meme-keyboard messages.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
+    let channelBackfillInFlight = false;
     const unsubscribeChat = subscribeMessages(activeCalId, {
       orderBy: 'timestamp', direction: 'desc', limit: chatLimit
     }, snapshot => {
@@ -151,7 +156,35 @@ export function useChatMessageWindow({
           list.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
         });
         list.reverse();
-        setChatMessages(list);
+        const liveChatChannelCount = list.filter(isChatChannelMessage).length;
+        setChatMessages(prev => {
+          if (liveChatChannelCount >= CHAT_INITIAL_MESSAGE_LIMIT || !Array.isArray(prev) || prev.length === 0) {
+            return list;
+          }
+          const liveIds = new Set(list.map(m => m.id));
+          const oldestLiveTs = list.length > 0 ? (Number(list[0].timestamp) || 0) : Infinity;
+          const preservedOlderChat = prev
+            .filter(m => m && !liveIds.has(m.id) && isChatChannelMessage(m) && (Number(m.timestamp) || 0) < oldestLiveTs)
+            .slice(-chatLimit);
+          if (preservedOlderChat.length === 0) return list;
+          const merged = [...preservedOlderChat, ...list];
+          merged.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0) || String(a.id || '').localeCompare(String(b.id || '')));
+          return merged;
+        });
+        if (liveChatChannelCount < CHAT_INITIAL_MESSAGE_LIMIT && list.length >= chatLimit && !channelBackfillInFlight) {
+          channelBackfillInFlight = true;
+          fetchRecentChatMessages(activeCalId, chatLimit).then(backfill => {
+            if (!isMounted || !Array.isArray(backfill) || backfill.length === 0) return;
+            setChatMessages(prev => {
+              const byId = new Map();
+              (Array.isArray(prev) ? prev : []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
+              backfill.forEach(m => { if (m && m.id) byId.set(m.id, m); });
+              return Array.from(byId.values()).sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0) || String(a.id || '').localeCompare(String(b.id || '')));
+            });
+          }).catch(() => {}).finally(() => {
+            channelBackfillInFlight = false;
+          });
+        }
         invalidateGalleryItemCount(activeCalId);
 
         // Browser notification for a genuinely new incoming message from someone else --
@@ -226,7 +259,7 @@ export function useChatMessageWindow({
   // nothing else is read. Only a mismatch (a missed create/edit/delete at the head), a failed
   // probe, an `online` event, or FULL_RECONCILE_EVERY_MS since the last full pass (a backstop for
   // edits/deletes further down the window) re-reads the full window as before.
-  const watchdogLimit = activeView === 'chat' ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
+  const watchdogLimit = activeView === 'chat' ? Math.max(chatLiveLimit, 60) : liveChatLimit;
   const chatMessagesRef = React.useRef(chatMessages);
   chatMessagesRef.current = chatMessages;
   React.useEffect(() => {
@@ -254,9 +287,15 @@ export function useChatMessageWindow({
         if (!isMounted || !Array.isArray(fresh) || fresh.length === 0) return;
         const freshIds = new Set(fresh.map(m => m.id));
         const oldestFreshTimestamp = Number(fresh[0].timestamp) || 0;
+        const newestFreshTimestamp = Number(fresh[fresh.length - 1].timestamp) || oldestFreshTimestamp;
         setChatMessages(prev => {
-          const keepOlder = prev.filter(m => !freshIds.has(m.id) && (Number(m.timestamp) || 0) < oldestFreshTimestamp);
-          const merged = [...keepOlder, ...fresh];
+          const keepExisting = prev.filter(m => {
+            if (!m || freshIds.has(m.id)) return false;
+            if (!isChatChannelMessage(m)) return true;
+            const ts = Number(m.timestamp) || 0;
+            return ts < oldestFreshTimestamp || ts > newestFreshTimestamp;
+          });
+          const merged = [...keepExisting, ...fresh];
           merged.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0) || String(a.id || '').localeCompare(String(b.id || '')));
           return merged;
         });

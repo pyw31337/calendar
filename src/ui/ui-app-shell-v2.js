@@ -4413,19 +4413,26 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     return id === activeTab || dest.tab === activeTab;
   };
 
-  const allChat = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : (recordsContext?.mediaProps?.chatMessages || []);
-  // Match ChatRoomView's own visibleChatMessages filter (uploadSource meeting/gallery photos
-  // are stored as chat messages but never rendered in the chat transcript -- see docs section
-  // 3.5/3.9 "사진은 채팅 메시지와 이중 역할") -- otherwise this preview can pick a meeting/gallery
-  // photo as "last message" and show its uploader here while the chat screen itself is still
-  // showing an earlier, unrelated text message as the true last visible line.
+  const allChat = (Array.isArray(calendarContext?.displayChatMessages) && calendarContext.displayChatMessages.length > 0)
+    ? calendarContext.displayChatMessages
+    : (recordsContext?.mediaProps?.chatMessages || []);
+  const sideMeetingPhotoMessageIds = React.useMemo(
+    () => getMeetingOwnedPhotoMessageIds(calendarContext?.calendar || calendar),
+    [calendarContext?.calendar, calendar]
+  );
+  // Match HomeActivitySummary and ChatRoomView's exact visibleChatMessages filter so the side-nav
+  // personal badge and the home chat card always resolve to the exact same latest chat message.
   const visibleChat = React.useMemo(
-    () => allChat.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery'),
-    [allChat]
+    () => allChat.filter(msg => isChatRenderableMessage(msg, sideMeetingPhotoMessageIds)),
+    [allChat, sideMeetingPhotoMessageIds]
   );
   const recentChat = React.useMemo(() => latestRows(visibleChat), [visibleChat]);
   const lastChatMsg = recentChat[0];
-  const lastChatAuthor = lastChatMsg ? authorFor(lastChatMsg, calendar?.participants).name : '';
+  const participants = Array.isArray(calendarContext?.calendar?.participants) && calendarContext.calendar.participants.length > 0
+    ? calendarContext.calendar.participants
+    : (Array.isArray(calendar?.participants) ? calendar.participants : []);
+  const lastChatAuthorInfo = lastChatMsg ? authorFor(lastChatMsg, participants) : { name: '', color: '' };
+  const lastChatAuthor = lastChatAuthorInfo.name;
   const memoRows = recordsContext?.memoProps?.memos || [];
   const placeRows = recordsContext?.placesProps?.calendar?.places || [];
   const lastMemo = React.useMemo(() => latestRows(memoRows)[0], [memoRows]);
@@ -4439,9 +4446,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const nextConfirmedMeeting = getNextConfirmedMeeting(calendar, new Date(sideNavDayStamp));
   const calendarDdayBadge = nextConfirmedMeeting ? formatDDayLabel(nextConfirmedMeeting.date) : '';
   const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: settlementBalanceBadge?.text || '' };
-  const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
-  const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
-  const chatPillColor = chatAuthorPart?.color || '#EF4444';
+  const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.id === lastChatMsg?.authorId || p.name === lastChatAuthor));
+  const chatPillColor = chatAuthorPart?.color || lastChatAuthorInfo.color || '#EF4444';
 
   const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places' || activeTab === 'search';
   const cleanCalBadge = (value) => String(value || '')
@@ -4676,7 +4682,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement(MobileBottomNav, {
         activeTab,
         isSideNavOpen,
-        chatSender: lastChatMsg ? { color: chatAuthorPart?.color || '', name: lastChatAuthor } : null,
+        chatSender: lastChatMsg ? { color: chatPillColor, name: lastChatAuthor } : null,
         onSelectTab: (tabId) => {
           if (tabId === 'more') {
             setIsSideNavOpen(prev => !prev);

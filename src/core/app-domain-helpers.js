@@ -722,6 +722,15 @@ function sanitizeMemoForFirestore(memoData) {
 function slimMessageForClient(message) {
   if (!message || typeof message !== 'object') return message;
   const out = { ...message };
+  if (out.timestamp != null && typeof out.timestamp !== 'number') {
+    if (typeof out.timestamp.toMillis === 'function') out.timestamp = out.timestamp.toMillis();
+    else if (typeof out.timestamp.toDate === 'function') out.timestamp = out.timestamp.toDate().getTime();
+    else if (typeof out.timestamp.seconds === 'number') out.timestamp = out.timestamp.seconds * 1000;
+    else {
+      const n = Number(out.timestamp);
+      if (Number.isFinite(n)) out.timestamp = n;
+    }
+  }
   // NEVER drop imageUrl/thumbUrl/imageUrls/thumbUrls.
   // Legacy photos are often data:image base64 in Firestore (10KB–200KB+).
   // Stripping them on read hid photos while server data stayed intact.
