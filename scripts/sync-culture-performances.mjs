@@ -367,25 +367,36 @@ function writeFeedIfHealthy(outputPath, items, label) {
 
 async function main() {
   const todayIso = new Date().toISOString().slice(0, 10);
-
-  let response;
-  try {
-    response = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(20000) });
-  } catch (err) {
-    console.error(`[sync-culture-performances] fetch failed, keeping existing snapshots: ${err.message}`);
-    return;
-  }
-  if (!response.ok) {
-    console.error(`[sync-culture-performances] fetch returned ${response.status}, keeping existing snapshots`);
-    return;
-  }
+  const localSourceFile = process.env.CULTURE_SYNC_SOURCE_FILE || '';
 
   let all;
-  try {
-    all = await response.json();
-  } catch (err) {
-    console.error(`[sync-culture-performances] response was not valid JSON, keeping existing snapshots: ${err.message}`);
-    return;
+  if (localSourceFile && fs.existsSync(localSourceFile)) {
+    try {
+      all = JSON.parse(fs.readFileSync(localSourceFile, 'utf8'));
+      console.log(`[sync-culture-performances] loaded ${Array.isArray(all) ? all.length : 0} items from local file ${localSourceFile}`);
+    } catch (err) {
+      console.error(`[sync-culture-performances] failed to parse local file ${localSourceFile}: ${err.message}`);
+      return;
+    }
+  } else {
+    let response;
+    try {
+      response = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(20000) });
+    } catch (err) {
+      console.error(`[sync-culture-performances] fetch failed, keeping existing snapshots: ${err.message}`);
+      return;
+    }
+    if (!response.ok) {
+      console.error(`[sync-culture-performances] fetch returned ${response.status}, keeping existing snapshots`);
+      return;
+    }
+
+    try {
+      all = await response.json();
+    } catch (err) {
+      console.error(`[sync-culture-performances] response was not valid JSON, keeping existing snapshots: ${err.message}`);
+      return;
+    }
   }
   if (!Array.isArray(all)) {
     console.error('[sync-culture-performances] response was not an array, keeping existing snapshots');

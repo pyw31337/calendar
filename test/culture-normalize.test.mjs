@@ -216,4 +216,29 @@ test('resolveImageUrl decodes HTML entities and normalizeItem preserves backupPo
   });
   assert.equal(item.image, 'https://pyw31337.github.io/culture/images/posters/remote-cache/kopis/perf_1.webp');
   assert.equal(item.backupPoster, 'https://www.kopis.or.kr/upload/pfmPoster/PF_PF123456.jpg');
+  assert.equal(
+    resolveImageUrl('/culture/images/posters/remote-cache/timeticket/perf_test.webp'),
+    'https://pyw31337.github.io/culture/images/posters/remote-cache/timeticket/perf_test.webp'
+  );
+  assert.equal(isFallbackOrEmptyPoster('https://timeticket.co.kr/wys2/file_attach/2023/06/13/1686631618-67-0_wonbon_N_7_600x600_70_2.jpg'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://timeticket.co.kr/wys2/user_review/2026/02/15/1771124658-92-0_N_7_500x500_70_2.jpg'), true);
+  assert.equal(isFallbackOrEmptyPoster('https://timeticket.co.kr/upload/product/6000/6900/6925/6925-01-261012e2-700x700.jpg'), false);
+
+  const tt = normalizeItem({
+    id: 'perf_불편한_편의점2',
+    title: '불편한 편의점2',
+    date: '2026.10.03 (토) ~ 2026.10.31 (토)',
+    venue: '시작 30분 전부터 대학로 후암씨어터 매표소에서 티켓 배부 좌석배정 예매순',
+    address: '서울 종로구 대학로11길 23 (명륜4가) 3층 후암씨어터',
+    description: '장소안내 장소 후암씨어터 주소 서울 종로구 대학로11길 23\n\n불편한 편의점2 | 후암씨어터 | 2026.10.03 ~ 2026.10.31 | 지금 타임티켓에서 만나보세요.',
+    genre: 'play',
+    source: 'timeticket',
+    image: '/images/posters/remote-cache/timeticket/perf_불편한_편의점2_abc123.webp',
+    backupPoster: 'https://timeticket.co.kr/upload/product/6000/6900/6925/6925-01-261012e2-700x700.jpg',
+    link: 'https://timeticket.co.kr/product/6925'
+  }).item;
+  assert.equal(tt.venue, '후암씨어터');
+  assert.equal(tt.image, 'https://timeticket.co.kr/upload/product/6000/6900/6925/6925-01-261012e2-700x700.jpg');
+  assert.equal(tt.backupPoster, 'https://pyw31337.github.io/culture/images/posters/remote-cache/timeticket/perf_불편한_편의점2_abc123.webp');
 });
+

@@ -5042,6 +5042,31 @@ function filterCultureItemsByRegion(items, regionSelections, category) {
   }));
 }
 
+function sanitizeCultureVenueValue(venue, description) {
+  const raw = String(venue || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const stripped = raw
+    .replace(/\s+(?:주소|주차|좌석|문의)\s+.*$/u, '')
+    .replace(/\s*\/\s*총.*$/u, '')
+    .replace(/\s*총\s*\d+석.*$/u, '')
+    .trim();
+  const isCorrupted = !stripped
+    || stripped.length > 42
+    || /매표소에서|티켓\s*배부|예매하신|이용정보|유의사항|환불|취소|시작\s*\d+분|^및\s*시간|좌석배정|입장\s*가능/u.test(stripped);
+  if (isCorrupted && description) {
+    const compactDesc = String(description).replace(/\s+/g, ' ').trim();
+    const placeMatch = compactDesc.match(/장소안내\s+(?:장소|공연장)\s+(.+?)(?:\s+주소|\s+주차|\s+좌석|\s+문의|$)/);
+    const pipeMatch = compactDesc.match(/\|\s*([^|]{2,45}?)\s*\|\s*(?:20\d{2}[.\-/]|오픈런|OPEN\s*RUN)/i);
+    const recovered = String(placeMatch?.[1] || pipeMatch?.[1] || '')
+      .replace(/\s+(?:주소|주차|좌석|문의)\s+.*$/u, '')
+      .replace(/\s*\/\s*총.*$/u, '')
+      .replace(/\s*총\s*\d+석.*$/u, '')
+      .trim();
+    if (recovered && recovered.length <= 45) return recovered;
+  }
+  return stripped || raw;
+}
+
 function culturePosterUrl(item) {
   if (!item || typeof item !== 'object') return '';
   const photos = Array.isArray(item.photos) ? item.photos : [];
@@ -5052,14 +5077,20 @@ function culturePosterUrl(item) {
     item.imageUrl,
     item.posterUrl,
     item.poster,
+    item.backupPoster,
     item.thumbnailUrl,
     photo && (photo.thumbUrl || photo.url || photo.imageUrl || photo.image)
   ];
   let fallbackCandidate = '';
   for (const value of candidates) {
-    const url = String(value || '').replace(/&amp;/gi, '&').trim();
+    let url = String(value || '').replace(/&amp;/gi, '&').trim();
     if (!url || url === 'undefined' || url === 'null') continue;
-    if (/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(url)) continue;
+    if (url.startsWith('/culture/')) {
+      url = 'https://pyw31337.github.io' + url;
+    } else if (url.startsWith('/images/')) {
+      url = 'https://pyw31337.github.io/culture' + url;
+    }
+    if (/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net|timeticket\.co\.kr\/.*(?:_wonbon_|-255x357\.|\/user_review\/)/i.test(url)) continue;
     if (/fallbacks\/|\.svg$/i.test(url) || /placeholder|default[-_ ]?poster|no[-_ ]?image/i.test(url)) {
       if (!fallbackCandidate) fallbackCandidate = url;
       continue;
@@ -5080,6 +5111,9 @@ function mergeCultureItemPreferPoster(base, overlay) {
     if (value === '' || value === null || value === undefined) continue;
     if (Array.isArray(value) && value.length === 0 && Array.isArray(baseObj[key]) && baseObj[key].length > 0) continue;
     merged[key] = value;
+  }
+  if (merged.venue) {
+    merged.venue = sanitizeCultureVenueValue(merged.venue, merged.description);
   }
   if (poster) {
     merged.image = poster;
@@ -5808,6 +5842,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
             /*#__PURE__*/React.createElement("img", {
               src: image,
               alt: "미리보기",
+              referrerPolicy: "no-referrer",
               onError: e => { e.target.style.display = 'none'; },
               style: {
                 width: '100%',
@@ -6602,6 +6637,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             /*#__PURE__*/React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "포스터 없음"),
             posterUrl && /*#__PURE__*/React.createElement("img", {
               src: posterUrl, alt: item.title, loading: 'lazy', decoding: 'async',
+              referrerPolicy: 'no-referrer',
               style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
               onError: e => {
                 const img = e.currentTarget;
@@ -6611,7 +6647,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 }
                 const next = [item.backupPoster, item.posterUrl, item.imageUrl, item.thumbUrl, item.image, item.poster]
                   .map(value => String(value || '').replace(/&amp;/gi, '&').trim())
-                  .find(value => value && value !== img.src && !/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(value));
+                  .find(value => value && value !== img.src && !/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net|timeticket\.co\.kr\/.*(?:_wonbon_|-255x357\.|\/user_review\/)/i.test(value));
                 if (next) {
                   img.dataset.posterFallback = '1';
                   img.src = next;
@@ -6830,6 +6866,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           },
             /*#__PURE__*/React.createElement("img", {
               src: culturePosterUrl(selected), alt: selected.title, loading: 'lazy',
+              referrerPolicy: 'no-referrer',
               style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
               onError: e => {
                 const img = e.currentTarget;
@@ -6842,7 +6879,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 }
                 const next = [selected.backupPoster, selected.posterUrl, selected.imageUrl, selected.thumbUrl, selected.image, selected.poster]
                   .map(v => String(v || '').replace(/&amp;/gi, '&').trim())
-                  .find(v => v && v !== img.src && !/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(v));
+                  .find(v => v && v !== img.src && !/https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net|timeticket\.co\.kr\/.*(?:_wonbon_|-255x357\.|\/user_review\/)/i.test(v));
                 if (next) {
                   img.dataset.posterFallback = '1';
                   img.src = next;
@@ -7146,6 +7183,7 @@ function SharedContentPreviewModal({ item, onClose }) {
         }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
         culturePosterUrl(item) && /*#__PURE__*/React.createElement("img", {
           src: culturePosterUrl(item), alt: item.title, loading: 'lazy',
+          referrerPolicy: 'no-referrer',
           style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
           onError: e => { e.currentTarget.style.display = 'none'; }
         }),

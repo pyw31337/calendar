@@ -65,7 +65,8 @@ export function resolveImageUrl(raw) {
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
   if (value.startsWith('//')) return `https:${value}`;
-  return `${CULTURE_FLOW_ORIGIN}${value.startsWith('/') ? '' : '/'}${value}`;
+  const normalizedPath = value.replace(/^\/culture(?=\/)/i, '');
+  return `${CULTURE_FLOW_ORIGIN}${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
 }
 
 const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', hellip: '…' };
@@ -349,7 +350,8 @@ function resolveNormalizedPoster(raw) {
   const posterSources = Array.isArray(raw.posterSourceUrls) ? raw.posterSourceUrls : [];
   const synopsis = Array.isArray(raw.synopsisImages) ? raw.synopsisImages : [];
   const stills = Array.isArray(raw.stillImages) ? raw.stillImages : [];
-  const candidates = [
+  const isTimeTicket = raw.source === 'timeticket' || /timeticket\.co\.kr/i.test(String(raw.link || raw.website || ''));
+  const rawCandidates = [
     raw.image,
     raw.backupPoster,
     raw.posterUrl,
@@ -358,6 +360,12 @@ function resolveNormalizedPoster(raw) {
     ...synopsis,
     ...stills
   ];
+  const candidates = isTimeTicket
+    ? [
+        ...rawCandidates.filter(c => /^https?:\/\/(?:www\.)?timeticket\.co\.kr\/(?:upload\/product|wys2\/file_attach)/i.test(String(c || '').trim())),
+        ...rawCandidates
+      ]
+    : rawCandidates;
 
   for (const c of candidates) {
     const resolved = resolveImageUrl(c);
@@ -399,6 +407,30 @@ function resolveBackupPoster(raw, primaryImage) {
   return '';
 }
 
+export function sanitizeTimeTicketVenue(rawVenue, description = '') {
+  const raw = cleanInlineText(rawVenue);
+  const stripped = raw
+    .replace(/\s+(?:주소|주차|좌석|문의)\s+.*$/u, '')
+    .replace(/\s*\/\s*총.*$/u, '')
+    .replace(/\s*총\s*\d+석.*$/u, '')
+    .trim();
+  const isCorrupted = !stripped
+    || stripped.length > 42
+    || /매표소에서|티켓\s*배부|예매하신|이용정보|유의사항|환불|취소|시작\s*\d+분|^및\s*시간|좌석배정|입장\s*가능/u.test(stripped);
+  if (isCorrupted && description) {
+    const compactDesc = cleanInlineText(description);
+    const placeMatch = compactDesc.match(/장소안내\s+(?:장소|공연장)\s+(.+?)(?:\s+주소|\s+주차|\s+좌석|\s+문의|$)/);
+    const pipeMatch = compactDesc.match(/\|\s*([^|]{2,45}?)\s*\|\s*(?:20\d{2}[.\-/]|오픈런|OPEN\s*RUN)/i);
+    const recovered = cleanInlineText(placeMatch?.[1] || pipeMatch?.[1] || '')
+      .replace(/\s+(?:주소|주차|좌석|문의)\s+.*$/u, '')
+      .replace(/\s*\/\s*총.*$/u, '')
+      .replace(/\s*총\s*\d+석.*$/u, '')
+      .trim();
+    if (recovered && recovered.length <= 45) return recovered;
+  }
+  return stripped || raw;
+}
+
 export function normalizeItem(raw) {
   const movie = raw.genre === 'movie';
   const openRun = !movie && isOpenRunDate(raw.date);
@@ -411,7 +443,10 @@ export function normalizeItem(raw) {
   const normalizedEndDate = openEnded
     ? null
     : (movie ? (movieRanged ? endDate : movieTheatricalEnd(startDate)) : endDate);
-  const venue = cleanInlineText(raw.venue || raw.venueKey || '');
+  const isTimeTicket = raw.source === 'timeticket' || /timeticket\.co\.kr/i.test(String(raw.link || raw.website || ''));
+  const venue = isTimeTicket
+    ? sanitizeTimeTicketVenue(raw.venue || raw.venueKey || '', raw.description || raw.feesAndPrograms || '')
+    : cleanInlineText(raw.venue || raw.venueKey || '');
   const address = cleanAddress(raw.address);
   const cast = Array.isArray(raw.cast)
     ? raw.cast.map(name => cleanInlineText(name)).filter(Boolean).slice(0, 12)
@@ -468,7 +503,7 @@ export function normalizeItem(raw) {
 }
 
 const TIME_TICKET_HOST = /(^|\.)timeticket\.co\.kr$/i;
-const POSTER_ASSET_SKIP = /logo|icon|blank|loading|spacer|sprite|apple-touch|favicon|emoji|badge|daumcdn|kakao|\/map|tile|roadview/i;
+const POSTER_ASSET_SKIP = /logo|icon|blank|loading|spacer|sprite|apple-touch|favicon|emoji|badge|daumcdn|kakao|\/map|tile|roadview|_wonbon_|-255x357\.|\/user_review\//i;
 
 export function isTimeTicketHost(url) {
   try {
@@ -529,7 +564,7 @@ export function isFallbackOrEmptyPoster(url) {
   return !s
     || /fallbacks\/|\.svg$/i.test(s)
     || /placeholder|default[-_ ]?poster|no[-_ ]?image|no[-_ ]?img|no_poster|empty[-_ ]?image|blank\.gif|none\.png/i.test(s)
-    || /https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net/i.test(s);
+    || /https_p\.gif|\/large\/ht\/|culture\.go\.kr\/upload\/|blogpfthumb-phinf\.pstatic\.net|timeticket\.co\.kr\/.*(?:_wonbon_|-255x357\.|\/user_review\/)/i.test(s);
 }
 
 export function extractInterparkGoodsCode(goodsCodeOrLink) {
