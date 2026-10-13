@@ -785,12 +785,19 @@ export function MemoScreen(p) {
     if (memoPage > memoPageCount) setMemoPage(memoPageCount);
   }, [memoPage, memoPageCount]);
   window.React.useEffect(() => {
-    if (memoFiltering || typeof p.onLoadMoreMemos !== 'function') return undefined;
-    const needed = memoSafePage * MEMO_PAGE_SIZE;
-    if (visibleMemos.length >= needed || !p.hasMoreMemos) return undefined;
+    if (memoFiltering || typeof p.onLoadMoreMemos !== 'function' || !p.hasMoreMemos) return undefined;
+    const missingFocusedMemo = Boolean(
+      focusedMemoId
+      && !resolvedFocusedMemo
+      && !(p.focusedMemo && String(p.focusedMemo.id) === String(focusedMemoId))
+    );
+    const needed = missingFocusedMemo
+      ? Math.max(memoSafePage * MEMO_PAGE_SIZE, visibleMemos.length + MEMO_PAGE_SIZE * 2)
+      : memoSafePage * MEMO_PAGE_SIZE;
+    if (visibleMemos.length >= needed) return undefined;
     p.onLoadMoreMemos(needed);
     return undefined;
-  }, [memoFiltering, memoSafePage, visibleMemos.length, p.hasMoreMemos, p.onLoadMoreMemos]);
+  }, [memoFiltering, memoSafePage, visibleMemos.length, p.hasMoreMemos, p.onLoadMoreMemos, focusedMemoId, resolvedFocusedMemo, p.focusedMemo]);
   const memoPageScrollRef = window.React.useRef(false);
   window.React.useEffect(() => {
     if (!memoPageScrollRef.current) {

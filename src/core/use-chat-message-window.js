@@ -359,16 +359,40 @@ export function useChatMessageWindow({
     const prevHeight = container ? container.scrollHeight : 0;
     const prevTop = container ? container.scrollTop : 0;
     try {
-      const older = await fetchOlderChatMessages(activeCalId, beforeTs, CHAT_OLDER_PAGE_SIZE);
-      if (!older.length) {
+      const accumulated = [];
+      let cursorTs = beforeTs;
+      let reachedEnd = false;
+      const maxBatches = activeView === 'chat' ? 4 : 1;
+      for (let batchIdx = 0; batchIdx < maxBatches; batchIdx += 1) {
+        const page = await fetchOlderChatMessages(activeCalId, cursorTs, CHAT_OLDER_PAGE_SIZE);
+        if (!page.length) {
+          reachedEnd = true;
+          break;
+        }
+        accumulated.push(...page);
+        if (page.length < CHAT_OLDER_PAGE_SIZE) {
+          reachedEnd = true;
+          break;
+        }
+        if (activeView !== 'chat' || page.some(isChatChannelMessage)) {
+          break;
+        }
+        const nextOldest = page[0];
+        if (!nextOldest || !Number.isFinite(Number(nextOldest.timestamp)) || Number(nextOldest.timestamp) >= cursorTs) {
+          break;
+        }
+        cursorTs = Number(nextOldest.timestamp);
+      }
+      if (!accumulated.length) {
         setHasMoreOlderChat(false);
         return;
       }
-      if (older.length < CHAT_OLDER_PAGE_SIZE) setHasMoreOlderChat(false);
+      if (reachedEnd) setHasMoreOlderChat(false);
       setOlderChatMessages(prev => {
         const seen = new Set((prev || []).map(m => m.id));
         (chatMessages || []).forEach(m => { if (m && m.id) seen.add(m.id); });
-        const add = older.filter(m => m && m.id && !seen.has(m.id));
+        const add = accumulated.filter(m => m && m.id && !seen.has(m.id));
+        add.sort((a, b) => (Number(a?.timestamp) || 0) - (Number(b?.timestamp) || 0));
         return add.length ? [...add, ...(prev || [])] : prev;
       });
       requestAnimationFrame(() => {
@@ -380,7 +404,7 @@ export function useChatMessageWindow({
       loadingOlderChatRef.current = false;
       setLoadingOlderChat(false);
     }
-  }, [activeCalId, hasMoreOlderChat, allChatMessages, chatMessages, olderChatMessages]);
+  }, [activeCalId, activeView, hasMoreOlderChat, allChatMessages, chatMessages, olderChatMessages]);
 
   return {
     chatMessages,

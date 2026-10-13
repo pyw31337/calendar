@@ -1894,7 +1894,7 @@ function HeroTodayOrWeather({ calendar, upcomingMeetings, onSelectDate }) {
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, onOpenGalleryAnalysis, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenChatMessage, onOpenMemo, onOpenGalleryAnalysis, calendarName, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
   const todayStr = localTodaySeoul();
 
@@ -1971,6 +1971,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
       },
       onOpenDate,
       onChangeView,
+      onOpenChatMessage,
       onOpenGalleryAnalysis
     }),
     React.createElement('footer', { className: bentoClass('renewal-home-footer footer') },
@@ -2210,7 +2211,7 @@ function HomeLoadingRows({ label, count = 3, variant = 'row' }) {
 }
 
 
-function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
+function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpenChatMessage }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2327,11 +2328,18 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         label: '최근 채팅',
         renderPage: (m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
+        const openChatTarget = () => {
+          if (m?.id && typeof onOpenChatMessage === 'function') {
+            onOpenChatMessage(m.id);
+          } else {
+            onChangeView?.('chat');
+          }
+        };
         const goChat = event => {
           // Link cards, file cards, players and images inside the bubble keep their own tap.
           if (event?.target?.closest?.('a, button, video, audio, img, input, textarea, [data-stop-card-open], .chat-file-attachment-card')) return;
           event?.stopPropagation?.();
-          onChangeView?.('chat');
+          openChatTarget();
         };
         const renderBody = __deps.renderChatMessageBody || window.GATHER_APP_UTILS?.renderChatMessageBody;
         // The chat room's own body renderer: uploaded images, file previews, and link previews
@@ -2347,7 +2355,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           onClick: goChat,
           onKeyDown: event => {
             if (event.target !== event.currentTarget) return;
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onChangeView?.('chat'); }
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openChatTarget(); }
           },
         },
           React.createElement(NameColorPill, { name: displayName(m), color: displayColor(m) }),
@@ -4060,6 +4068,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     setActiveV2Lightbox(null);
     afterLightboxHistorySettles(() => {
       closeSharedDateModal();
+      try { localStorage.setItem('gather_memo_focus_id', String(id)); } catch (_) { /* ignore */ }
       const memo = liveJumpRef.current.memos.find(m => m && m.id === id);
       if (memo) {
         onOpenMemoFromHome(memo);
@@ -4067,10 +4076,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         // Not in the loaded page: the legacy helper fetches it by id into sharedMemo, which the
         // memo page shows (MemoScreen adds a focused memo outside the current page to the list).
         recordsContext?.memoProps?.onOpenMemo?.(id);
+        setActiveTab('memo');
         const url = new URL(window.location.href);
         url.searchParams.set('memoFocus', id);
         window.history.replaceState(window.history.state, '', url);
-        setActiveTab('memo');
+        try { window.dispatchEvent(new CustomEvent('gather-memo-focus')); } catch (_) { /* ignore */ }
       }
       focusWhenMounted(() => [...document.querySelectorAll('[data-v2-memo-id], [data-memo-id]')]
         .find(el => el.getAttribute('data-v2-memo-id') === String(id) || el.getAttribute('data-memo-id') === String(id) || el.id === 'memo-' + String(id)), { timeoutMs: 5000 });
@@ -4186,17 +4196,31 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // than a shared one: WP-07's date-modal lift (#617) isn't merged yet, so this avoids an
   // inter-PR ordering dependency; a later cleanup can fold it into the shared instance once that
   // lands.
+  const findMessageAcrossPools = (messageId) => {
+    if (!messageId) return null;
+    const pools = [
+      calendarContext?.displayChatMessages,
+      recordsContext?.mediaProps?.chatMessages,
+      chatContext?.chatRoomProps?.chatMessages,
+      moreContext?.chatMessages,
+    ];
+    for (const pool of pools) {
+      if (!Array.isArray(pool)) continue;
+      const found = pool.find(m => m && m.id === messageId);
+      if (found) return found;
+    }
+    return null;
+  };
   const [calendarSettingsDateModalDate, setCalendarSettingsDateModalDate] = React.useState(null);
   const calendarSettingsExtra = {
     onSelectDate: (d) => setCalendarSettingsDateModalDate(d),
     onOpenChatMessage: (messageId) => {
-      onChangeView('chat');
-      setTimeout(() => { if (typeof moreContext.focusChatMessage === 'function') moreContext.focusChatMessage(messageId); }, 350);
+      startChatJump(messageId);
     },
     onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
-      onChangeView('chat');
+      startChatJump(messageId);
       setTimeout(() => {
-        const msg = (moreContext.chatMessages || []).find(m => m.id === messageId);
+        const msg = findMessageAcrossPools(messageId);
         if (!msg) return;
         const directEntry = getMessageDirectMediaEntry(msg);
         const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
@@ -4221,13 +4245,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // dependency; a later cleanup can fold it into the shared instance once that lands.
   const [moreDateModalDate, setMoreDateModalDate] = React.useState(null);
   const onOpenChatMessageFromMore = (messageId) => {
-    onChangeView('chat');
-    setTimeout(() => { if (typeof moreContext.focusChatMessage === 'function') moreContext.focusChatMessage(messageId); }, 350);
+    startChatJump(messageId);
   };
   const onOpenImageFromMore = (messageId, imageIndex, directMediaUrl = '') => {
-    onChangeView('chat');
+    startChatJump(messageId);
     setTimeout(() => {
-      const msg = (moreContext.chatMessages || []).find(m => m.id === messageId);
+      const msg = findMessageAcrossPools(messageId);
       if (!msg) return;
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
@@ -4386,11 +4409,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const onOpenMemoFromHome = (memo) => {
     if (memo?.id) {
       setHomeFocusedMemo(memo);
+      try { localStorage.setItem('gather_memo_focus_id', String(memo.id)); } catch (_) { /* ignore */ }
+    }
+    setActiveTab('memo');
+    if (memo?.id) {
       const url = new URL(window.location.href);
       url.searchParams.set('memoFocus', memo.id);
       window.history.replaceState(window.history.state, '', url);
+      try { window.dispatchEvent(new CustomEvent('gather-memo-focus')); } catch (_) { /* ignore */ }
     }
-    setActiveTab('memo');
   };
 
   const selectSideItem = (id) => {
@@ -4654,7 +4681,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d, tab) => { setDateModalTab(['meeting', 'participant', 'settlement'].includes(tab) ? tab : null); setDateModalDate(d); }, onChangeView, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, onOpenGalleryAnalysis: () => { setInitialGalleryTab('analysis'); onChangeView('gallery'); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d, tab) => { setDateModalTab(['meeting', 'participant', 'settlement'].includes(tab) ? tab : null); setDateModalDate(d); }, onChangeView, onOpenChatMessage: startChatJump, onOpenMemo: memo => { if (memo?.id) setHomeFocusedMemo({ ...memo, _editOnHome: true }); }, onOpenGalleryAnalysis: () => { setInitialGalleryTab('analysis'); onChangeView('gallery'); }, calendarName, onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: closeSearch, initialQuery: searchQueryRef.current, initialCategory: searchCategoryRef.current, onCategoryChange: (key) => { searchCategoryRef.current = key || null; }, onQueryChange: (q) => { searchQueryRef.current = q || ''; } })
           : activeTab === 'chat'
