@@ -188,7 +188,11 @@ if (!/function invalidateGalleryItemCount\(calId\)/.test(firebaseData)
 // U10: the realtime listener (and its watchdog) moved into use-chat-message-window.js; the add/
 // delete paths stay in app-main. Count both, and require the realtime one in the hook.
 const chatWindow = readFileSync(join(ROOT, 'src/core/use-chat-message-window.js'), 'utf8');
-if (!/setChatMessages\(list\);\s*invalidateGalleryItemCount\(activeCalId\)/.test(chatWindow)
+const realtimeSubscriptionOffset = chatWindow.indexOf('subscribeMessages(activeCalId,');
+const realtimeInvalidationOffset = realtimeSubscriptionOffset < 0
+  ? -1
+  : chatWindow.indexOf('invalidateGalleryItemCount(activeCalId);', realtimeSubscriptionOffset);
+if (realtimeInvalidationOffset < 0
   || ((appMain + chatWindow).match(/invalidateGalleryItemCount\(activeCalId\)/g) || []).length < 3) {
   fail('gallery count cache must be invalidated for realtime, add, and delete message paths.');
 }

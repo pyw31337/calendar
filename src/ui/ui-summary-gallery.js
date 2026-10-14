@@ -6432,12 +6432,9 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     return () => clearTimeout(timer);
   }, [focusItemId, focusTitle, focusFallback, mergedItems]);
 
-  if (mergedItems === null) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-    }, "불러오는 중...");
-  }
-
+  // Hooks must run in the same order while the asynchronous feed is loading and after it has
+  // arrived.  Keeping this above the loading return prevents React #310 (an extra useMemo only
+  // on the second render) when a content tab first receives its snapshot.
   const resolvedFallbackItem = React.useMemo(() => {
     if (!focusFallback || typeof focusFallback !== 'object') return null;
     const fbKind = String(focusFallback.kind || '').toLowerCase();
@@ -6456,6 +6453,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       posterUrl: focusFallback.posterUrl || img,
     };
   }, [focusFallback, anniversaryCategory, focusItemId, focusTitle]);
+
+  if (mergedItems === null) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
+    }, "불러오는 중...");
+  }
 
   if (mergedItems.length === 0 && !resolvedFallbackItem) {
     return /*#__PURE__*/React.createElement("div", {
