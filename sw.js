@@ -322,7 +322,7 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  // data is the push payload url string (./?id=&view=chat&msg= / view=memo&memo=&comment=).
+  // data is the canonical app payload URL (./app/<calendar>/chat/?msg=... etc.).
   // Some browsers hand the same field back as { url }.
   const raw = event.notification && event.notification.data;
   const targetUrl = (raw && typeof raw === 'object' && raw.url) || (typeof raw === 'string' ? raw : '') || './';

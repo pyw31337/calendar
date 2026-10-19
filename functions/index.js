@@ -619,7 +619,11 @@ exports.onPhotoCommentItemWrite = seoulTriggerFunctions().runWith({ secrets: ['V
     await broadcastCalendarPush(calendarDocId, {
       title: `${author}의 사진 댓글`,
       body: String(after.text || '').slice(0, 120),
-      url: buildPushTargetUrl(calendarDocId, { view: 'gallery', img: after.assetKey || '' }),
+      url: buildPushTargetUrl(calendarDocId, {
+        view: 'gallery',
+        img: after.assetKey || '',
+        comment: context.params.commentId
+      }),
       tag: `photo-comment-${calendarDocId}-${context.params.commentId}`,
       renotify: false
     }, { skipParticipantId: after.participantId || null, channel: 'comment' });
@@ -1026,7 +1030,7 @@ exports.onConfirmedMeetingWrite = seoulTriggerFunctions().runWith({ secrets: ['V
     await broadcastCalendarPush(calendarDocId, {
       title: '모임 확정',
       body: dateLabel ? `${dateLabel} 모임이 확정되었습니다` : '모임이 확정되었습니다',
-      url: `./?id=${calendarDocId.replace('cal_', '')}`,
+      url: buildPushTargetUrl(calendarDocId, { date: dateLabel }),
       tag: `schedule-${calendarDocId}-${decision.tag}`,
       renotify: false
     }, { skipParticipantId: decision.skipParticipantId, channel: 'schedule' });
@@ -1054,7 +1058,7 @@ exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_
       await broadcastCalendarPush(calendarDocId, {
         title: poll.title ? `새 투표: ${poll.title}` : '새 투표',
         body: poll.title ? `${poll.title} 투표가 등록되었습니다` : '새 투표가 등록되었습니다',
-        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        url: buildPushTargetUrl(calendarDocId, { poll: poll.id }),
         tag: `poll-${calendarDocId}-${decision.tag}`,
         renotify: false
       }, { skipParticipantId: decision.skipParticipantId, channel: 'poll' });
@@ -1068,7 +1072,7 @@ exports.onCalendarDocWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_
       await broadcastCalendarPush(calendarDocId, {
         title: '정산 알림',
         body: decision.body,
-        url: `./?id=${calendarDocId.replace('cal_', '')}&tab=settlement`,
+        url: buildPushTargetUrl(calendarDocId, { view: 'settlement', settlement: decision.id }),
         tag: `settlement-${calendarDocId}-${decision.id}`,
         renotify: false
       }, { skipParticipantId: decision.skipParticipantId || null, channel: 'schedule' });
@@ -1119,7 +1123,7 @@ exports.sendAnniversaryReminders = functions.region(SEOUL_REGION).runWith({ secr
       promises.push(broadcastCalendarPush(calendarDocId, {
         title: '오늘의 기념일',
         body: `🎉 ${ann.title || '기념일'}`,
-        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        url: buildPushTargetUrl(calendarDocId, { date: todayKey }),
         tag: `anniversary-${calendarDocId}-${ann.id}`,
         renotify: false
       }, { channel: 'schedule' }));
@@ -1170,7 +1174,7 @@ exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secr
       promises.push(broadcastCalendarPush(calendarDocId, {
         title: '모임 알림',
         body: `내일(${dateLabel}) 확정 모임이 있습니다`,
-        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        url: buildPushTargetUrl(calendarDocId, { date: dateLabel }),
         tag: `schedule-eve-${calendarDocId}-${dateLabel}`
       }, { channel: 'schedule' }));
     }
@@ -1197,7 +1201,7 @@ exports.sendEveScheduleReminders = functions.region(SEOUL_REGION).runWith({ secr
       promises.push(broadcastCalendarPush(calendarDocId, {
         title: '일정 알림',
         body: `내일(${tomorrowKey}) ${title}`,
-        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        url: buildPushTargetUrl(calendarDocId, { date: tomorrowKey }),
         tag: `repeat-eve-${calendarDocId}-${ann.id}-${tomorrowKey}`
       }, { channel: 'schedule' }));
     }
@@ -1232,7 +1236,7 @@ exports.sendSettlementReminders = functions.region(SEOUL_REGION).runWith({ secre
       promises.push(broadcastCalendarPush(doc.id, {
         title: '정산 알림',
         body: reminder.body,
-        url: `./?id=${doc.id.replace('cal_', '')}&tab=settlement`,
+        url: buildPushTargetUrl(doc.id, { view: 'settlement', settlement: reminder.id }),
         tag: `settlement-unpaid-${doc.id}-${reminder.id}-day${reminder.days}`,
         renotify: false
       }, { channel: 'schedule' }));

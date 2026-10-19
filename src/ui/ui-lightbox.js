@@ -101,7 +101,7 @@ function generateClientThumbnail(img, maxDim = 640) {
 // CommentThread가 아예 없어 조용히 렌더링을 건너뛰었다 -- 라이트박스를 열어도 댓글 UI 자체가
 // 통째로 안 보이는 버그였다. Lightbox와 항상 같은 청크에 있도록 이 파일로 옮겨서 그 문제를
 // 원천적으로 없앴다.
-function CommentThread({ comments: commentsProp = [], actions, calendar, showToast, onRequestConfirm }) {
+function CommentThread({ comments: commentsProp = [], actions, calendar, showToast, onRequestConfirm, focusCommentId = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -133,6 +133,22 @@ function CommentThread({ comments: commentsProp = [], actions, calendar, showToa
   const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
   const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
   const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
+  const commentRowRefs = React.useRef(new Map());
+  // A notification may arrive before this thread's live Firestore subscription.
+  // Retry whenever the comments update so the exact target scrolls/highlights as
+  // soon as it is present instead of leaving the user at an unrelated photo.
+  React.useEffect(() => {
+    const targetId = String(focusCommentId || '').trim();
+    if (!targetId) return undefined;
+    setIsCommentsExpanded(true);
+    const frame = window.requestAnimationFrame(() => {
+      const row = commentRowRefs.current.get(targetId);
+      if (!row) return;
+      try { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) { row.scrollIntoView(); }
+      try { row.focus({ preventScroll: true }); } catch (_) { row.focus(); }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusCommentId, comments, isCommentsExpanded]);
 
   const handleSaveComment = async (e) => {
     if (e) e.stopPropagation();
@@ -270,12 +286,24 @@ function CommentThread({ comments: commentsProp = [], actions, calendar, showToa
       ),
       visibleComments.map((comment, commentIdx) => {
         const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+        const isFocusedComment = String(comment.id || '') === String(focusCommentId || '');
         return /*#__PURE__*/React.createElement("div", {
           key: comment.id,
+          ref: node => {
+            if (node) commentRowRefs.current.set(String(comment.id || ''), node);
+            else commentRowRefs.current.delete(String(comment.id || ''));
+          },
+          tabIndex: isFocusedComment ? -1 : undefined,
+          'data-comment-id': comment.id,
           onClick: e => e.stopPropagation(),
           style: {
             display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
-            borderTop: commentIdx > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none'
+            borderTop: commentIdx > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none',
+            borderRadius: '6px',
+            background: isFocusedComment ? 'rgba(139, 92, 246, 0.28)' : 'transparent',
+            outline: isFocusedComment ? '2px solid #A78BFA' : 'none',
+            outlineOffset: '2px',
+            transition: 'background-color 160ms ease, outline-color 160ms ease'
           }
         },
           /*#__PURE__*/React.createElement("span", {
@@ -712,7 +740,7 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onPhotoDeleted = null }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onPhotoDeleted = null, focusCommentId = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -1057,7 +1085,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       actions: photoCommentActions,
       calendar: calendar,
       showToast: showToast,
-      onRequestConfirm: onRequestConfirm
+      onRequestConfirm: onRequestConfirm,
+      focusCommentId
     }) : /*#__PURE__*/React.createElement("div", {
       style: { minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 'var(--font-size-sm)' }
     }, commentStatus === 'error' ? /*#__PURE__*/React.createElement("button", {
@@ -2318,6 +2347,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
+    ref: imgAreaRef,
     className: "lightbox-single-stage",
     style: {
       position: 'relative',
@@ -2326,7 +2356,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       justifyContent: 'center',
       width: '100%',
       maxWidth: '100%',
-      height: isDesktop ? (isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto') : `${mobileStageHeightPx}px`,
+      height: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`,
       maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`,
       touchAction: 'none',
       transition: 'height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)'

@@ -37,7 +37,9 @@ export function buildAppViewUrl(locationLike, view, currentMonthDate) {
     : (view === 'chat' && rawImg != null && /^\d+$/.test(rawImg) ? rawImg : null);
   const keepMemo = view === 'memo' ? params.get('memo') : null;
   const keepMemoFocus = view === 'memo' ? params.get('memoFocus') : null;
-  const keepComment = view === 'memo' ? params.get('comment') : null;
+  // A comment can belong to either a memo or a photo. Gallery notification
+  // targets need both its image asset key and the exact photo-comment id.
+  const keepComment = (view === 'memo' || view === 'gallery') ? params.get('comment') : null;
   ['id', 'cal', 'date', 'msg', 'img', 'memo', 'memoFocus', 'comment', 'place'].forEach(key => params.delete(key));
   if (keepId) params.set('id', keepId);
   if (keepMsg) params.set('msg', keepMsg);

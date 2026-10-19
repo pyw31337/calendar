@@ -137,17 +137,19 @@ function writeLocationState(tabId, subTabId, { push, state } = { push: true }) {
   // Only gallery/content/archive (records) keep ?sub=; memo/places are first-class tabs.
   if (tabId !== 'records' || !subTabId || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
   else url.searchParams.set('sub', subTabId);
-  // A home-card focus is meaningful only on the memo destination.  Do not let
+  // A home-card focus is meaningful only on the memo destination. Do not let
   // it follow the user into unrelated screens or a later fresh memo visit.
-  // Chat/memo notification targets (?msg=&comment=) stay only on their screen.
+  // Gallery comment notifications intentionally retain their asset and comment
+  // target until the gallery mounts its shared Lightbox.
+  const isGalleryDestination = tabId === 'records' && subTabId === 'media';
   if (tabId !== 'memo') {
     url.searchParams.delete('memoFocus');
     url.searchParams.delete('memo');
-    url.searchParams.delete('comment');
+    if (!isGalleryDestination) url.searchParams.delete('comment');
   }
   if (tabId !== 'chat') {
     url.searchParams.delete('msg');
-    url.searchParams.delete('img');
+    if (!isGalleryDestination) url.searchParams.delete('img');
   }
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
@@ -2743,7 +2745,7 @@ export function buildRenewalSettlementContext(calendar, deps) {
  * lazy-loaded chunk as `PollModal`/`AnniversaryModal` (`window.__gatherLoadEventUi`), so this
  * needs the same "wait for the chunk" step.
  */
-function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate, onOpenSideNav, onRegisterMenuActions }) {
+function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate, onOpenSideNav, onRegisterMenuActions, focusSettlementId = null }) {
   const React = window.React;
   const loaded = useLazyUi(
     'settlement',
@@ -2751,6 +2753,27 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
     () => window.__gatherLoadEventUi?.(),
     () => settlementContext.showToast?.('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
   );
+  const focusedSettlementRef = React.useRef('');
+  React.useEffect(() => {
+    const targetId = String(focusSettlementId || '').trim();
+    if (!loaded || !targetId || focusedSettlementRef.current === targetId) return undefined;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const card = Array.from(document.querySelectorAll('[data-settlement-card-id]'))
+          .find(element => element.dataset.settlementCardId === targetId);
+        if (!card) return;
+        focusedSettlementRef.current = targetId;
+        try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) { card.scrollIntoView(); }
+        try { card.focus({ preventScroll: true }); } catch (_) { card.focus(); }
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [focusSettlementId, loaded]);
   if (!loaded) return React.createElement(DestinationLoadingSurface, { shape: 'settlement' });
   const { SettlementSummaryModal, ShareModal, CreateSettlementModal } = bindUiComponentAliases(React);
   if (typeof SettlementSummaryModal !== 'function') {
@@ -2759,7 +2782,7 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
   return React.createElement(React.Fragment, null,
     React.createElement(SettlementSummaryModal, {
       ...settlementContext.summaryProps,
-      renderV2: (props) => renderSettlementScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
+      renderV2: (props) => renderSettlementScreen({ ...props, focusSettlementId, onMenu: onOpenSideNav || props.onMenu }),
       onBack: () => onChangeView('calendar'),
       onSelectDate: onOpenDate,
       onOpenShare: settlementContext.onOpenShare,
@@ -3801,6 +3824,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
+  const [routeRevision, setRouteRevision] = React.useState(0);
   // Local to the V2 shell because the V1 `changeView` listener is deliberately
   // bypassed here.  It preserves the exact home memo selected during the tab
   // handoff, even before the outer app has a chance to rebuild its contexts.
@@ -3963,6 +3987,62 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     },
   };
   const V2Lightbox = bindUiComponentAliases(React).Lightbox;
+
+  // Schedule/anniversary notifications use ?date=YYYY-MM-DD. CalendarApp's
+  // legacy DateModal sits outside this shell's render path, so consume the
+  // route here for both cold starts and notification clicks into an open tab.
+  const handledNotificationDateRef = React.useRef('');
+  React.useEffect(() => {
+    let date;
+    try { date = String(routeSearchParams(window.location).get('date') || '').trim(); } catch (_) { return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const dateObject = new Date(`${date}T12:00:00`);
+    if (Number.isNaN(dateObject.getTime()) || dateObject.toISOString().slice(0, 10) !== date) return;
+    const token = `${activeCalId || ''}:${window.location.pathname}:${window.location.search}`;
+    if (handledNotificationDateRef.current === token) return;
+    handledNotificationDateRef.current = token;
+    setActiveTabState(DEFAULT_TAB);
+    setRecordsSubTabState(DEFAULT_RECORDS_SUBTAB);
+    setDateModalTab(null);
+    setDateModalSearchFocus(null);
+    setDateModalDate(date);
+    if (typeof calendarContext?.setCurrentMonthAndSync === 'function') {
+      calendarContext.setCurrentMonthAndSync(dateObject);
+    }
+  }, [activeCalId, routeRevision, calendarContext?.setCurrentMonthAndSync]);
+
+  // A new-poll notification has no list page in the V2 information architecture.
+  // Open the existing poll detail modal for precisely that poll instead of merely
+  // landing the user on the calendar home with no indication of what changed.
+  const [notificationPoll, setNotificationPoll] = React.useState(null);
+  const handledNotificationPollRef = React.useRef('');
+  React.useEffect(() => {
+    let pollId = '';
+    try { pollId = String(routeSearchParams(window.location).get('poll') || '').trim(); } catch (_) { return undefined; }
+    if (!pollId) return undefined;
+    const poll = (calendarContext?.calendar?.polls || []).find(item => String(item?.id || '') === pollId);
+    if (!poll) return undefined;
+    const token = `${activeCalId || ''}:${window.location.pathname}:${window.location.search}`;
+    if (handledNotificationPollRef.current === token) return undefined;
+    let cancelled = false;
+    Promise.resolve(window.__gatherLoadEventUi?.())
+      .then(() => {
+        if (cancelled) return;
+        handledNotificationPollRef.current = token;
+        setActiveTabState(DEFAULT_TAB);
+        setRecordsSubTabState(DEFAULT_RECORDS_SUBTAB);
+        setNotificationPoll(poll);
+      })
+      .catch(error => {
+        console.error('Notification poll modal load failed:', error);
+        if (!cancelled) showToast?.('투표 상세를 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+      });
+    return () => { cancelled = true; };
+  }, [activeCalId, routeRevision, calendarContext?.calendar?.polls, showToast]);
+  let notificationSettlementId = null;
+  if (activeTab === 'settlement') {
+    try { notificationSettlementId = String(routeSearchParams(window.location).get('settlement') || '').trim() || null; } catch (_) { /* ignore */ }
+  }
 
   // Lightbox 출처 jumps. The lightbox props used to be CalendarApp's own handleJumpTo* helpers,
   // which switch CalendarApp's legacy `activeView` / open its legacy DateModal -- state this shell
@@ -4363,6 +4443,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       } catch (_) { /* ignore */ }
       setActiveTabState(nextTab);
       setRecordsSubTabState(nextSub);
+      setRouteRevision(value => value + 1);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -4691,7 +4772,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : activeTab === 'places'
           ? React.createElement(PlacesPane, { recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar('places') })
           : activeTab === 'settlement'
-          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('settlement') })
+          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('settlement'), focusSettlementId: notificationSettlementId })
           : activeTab === 'records'
           ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab), initialGalleryTab, onInitialGalleryTabConsumed: () => setInitialGalleryTab('photos') })
           : activeTab === 'more'
@@ -4724,6 +4805,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       openModal: openMoreModal, onClose: () => setOpenMoreModal(null),
       modalProps: v2MoreContext.modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra,
     }),
+    notificationPoll && bindUiComponentAliases(React).PollModal && React.createElement(bindUiComponentAliases(React).PollModal, {
+      calendar: v2CalendarContext.calendar,
+      poll: notificationPoll,
+      onSave: v2CalendarContext.pollModalProps?.onSave,
+      onClose: () => setNotificationPoll(null),
+      showToast: v2RecordsContext.showToast,
+      onRequestConfirm: v2CalendarContext.pollModalProps?.onRequestConfirm,
+    }),
     homeFocusedMemo?._editOnHome && React.createElement(MemoPane, {
       recordsContext: v2RecordsContext,
       editorOnly: true,
@@ -4734,6 +4823,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       urls: activeV2Lightbox.urls,
       index: activeV2Lightbox.index,
       meta: activeV2Lightbox.meta,
+      focusCommentId: activeV2Lightbox.focusCommentId,
       calendar: calendar || v2RecordsContext.calendar,
       onClose: () => setActiveV2Lightbox(null),
       onNavigate: index => setActiveV2Lightbox(current => current ? { ...current, index } : current),

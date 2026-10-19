@@ -392,12 +392,20 @@ test('gallery thumb resolver module is the single render-resolution path', async
   assert.doesNotMatch(shell, /e\.currentTarget\.style\.opacity = '0'/);
 });
 
-test('gallery photo-comment deep link keeps img assetKey', () => {
-  const gallery = buildAppViewUrl(location('?id=example&view=gallery&img=asset:v1:abc'), 'gallery');
+test('gallery photo-comment deep link keeps the asset and exact comment target', async () => {
+  const gallery = buildAppViewUrl(location('?id=example&view=gallery&img=asset:v1:abc&comment=comment_1'), 'gallery');
   const params = new URL(gallery, 'https://example.test').searchParams;
   assert.equal(params.get('tab'), 'records');
   assert.equal(params.get('sub'), 'media');
   assert.equal(params.get('img'), 'asset:v1:abc');
-  const chat = buildAppViewUrl(location('?id=example&view=gallery&img=asset:v1:abc'), 'chat');
+  assert.equal(params.get('comment'), 'comment_1');
+  const chat = buildAppViewUrl(location('?id=example&view=gallery&img=asset:v1:abc&comment=comment_1'), 'chat');
   assert.equal(new URL(chat, 'https://example.test').searchParams.get('img'), null);
+  assert.equal(new URL(chat, 'https://example.test').searchParams.get('comment'), null);
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shell, /isGalleryDestination/);
+  assert.match(shell, /if \(!isGalleryDestination\) url\.searchParams\.delete\('img'\)/);
+  const gallerySource = readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
+  assert.match(gallerySource, /focusCommentId: commentParam/);
 });

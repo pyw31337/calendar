@@ -105,19 +105,23 @@ function decideMemoNotification(before, after, context = {}) {
   };
 }
 
-// Same query the app already reads (?view=&msg=&memo=). A comment tap adds
-// the existing memo id plus that comment's id; it does not invent a channel.
+// Push clicks use the same short, opaque path that the app writes into the
+// address bar. The old `./?id=...&view=...` shape duplicated the calendar
+// identity and let the V2 shell re-canonicalize away a target before it mounted.
+// `./` resolves from the service worker's /calendar/ scope, so this is portable
+// between the deployed GitHub Pages app and local development.
 function buildPushTargetUrl(calendarDocId, query = {}) {
-  const id = String(calendarDocId || '').replace(/^cal_/, '');
+  const id = String(calendarDocId || '').replace(/^cal_/, '').trim();
+  const pageByView = { chat: 'chat', memo: 'memo', gallery: 'gallery', settlement: 'settlement' };
+  const page = pageByView[String(query.view || '').trim()] || '';
   const params = new URLSearchParams();
-  if (id) params.set('id', id);
-  if (query.view) params.set('view', String(query.view));
-  ['msg', 'img', 'memo', 'comment'].forEach(key => {
+  ['msg', 'img', 'memo', 'comment', 'date', 'poll', 'settlement'].forEach(key => {
     const value = query[key];
     if (value != null && String(value) !== '') params.set(key, String(value));
   });
   const qs = params.toString();
-  return qs ? `./?${qs}` : './';
+  const root = id ? `./app/${encodeURIComponent(id)}/${page ? `${page}/` : ''}` : './';
+  return qs ? `${root}?${qs}` : root;
 }
 
 function takeNotificationClaim(claims, key) {

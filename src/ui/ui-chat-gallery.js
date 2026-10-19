@@ -1119,19 +1119,37 @@ export function ChatGalleryModal({
   }, [sharedPhotos]);
   photoByAssetKeyRef.current = photoByAssetKey;
 
-  // Photo-comment push deep link: ?view=gallery&img=<assetKey> opens that photo's lightbox
-  // (comments render in the lightbox by default). Chat uses img as a numeric message index —
-  // only treat non-numeric / asset-like values here.
+  // Photo-comment push deep link: ?view=gallery&img=<assetKey>&comment=<commentId>
+  // opens the exact photo and hands the comment identity through to the Lightbox.
+  // Keep URL data in React state too: a notification click into an already-open
+  // tab is a popstate event, not a gallery remount.
+  const readGalleryDeepLinkTarget = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        img: String(params.get('img') || '').trim(),
+        comment: String(params.get('comment') || '').trim()
+      };
+    } catch (_) { return { img: '', comment: '' }; }
+  };
+  const [galleryDeepLinkTarget, setGalleryDeepLinkTarget] = React.useState(readGalleryDeepLinkTarget);
+  React.useEffect(() => {
+    const onPopState = () => setGalleryDeepLinkTarget(readGalleryDeepLinkTarget());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // Chat uses img as a numeric message index — only treat non-numeric /
+  // asset-like values here.
   const galleryDeepLinkHandledRef = React.useRef('');
   React.useEffect(() => {
     if (typeof setActiveLightbox !== 'function') return undefined;
     if (!Array.isArray(sharedPhotos) || sharedPhotos.length === 0) return undefined;
-    let imgParam = '';
-    try {
-      imgParam = String(new URLSearchParams(window.location.search).get('img') || '').trim();
-    } catch (_) { return undefined; }
+    const imgParam = galleryDeepLinkTarget.img;
+    const commentParam = galleryDeepLinkTarget.comment;
     if (!imgParam || /^\d+$/.test(imgParam)) return undefined;
-    if (galleryDeepLinkHandledRef.current === imgParam) return undefined;
+    const targetKey = `${imgParam}\u0000${commentParam}`;
+    if (galleryDeepLinkHandledRef.current === targetKey) return undefined;
     const matchKey = (photo) => {
       const keys = [photo?.assetKey, photo?.mediaKey, photo?.refKey, ...(Array.isArray(photo?.legacyKeys) ? photo.legacyKeys : [])]
         .map(k => String(k || '').trim()).filter(Boolean);
@@ -1139,7 +1157,7 @@ export function ChatGalleryModal({
     };
     const index = sharedPhotos.findIndex(matchKey);
     if (index < 0) return undefined;
-    galleryDeepLinkHandledRef.current = imgParam;
+    galleryDeepLinkHandledRef.current = targetKey;
     setActiveLightbox({
       urls: sharedPhotos.map(p => p.full),
       index,
@@ -1149,10 +1167,11 @@ export function ChatGalleryModal({
         meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
         sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey,
         refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey
-      }))
+      })),
+      focusCommentId: commentParam || null
     });
     return undefined;
-  }, [sharedPhotos, setActiveLightbox]);
+  }, [sharedPhotos, setActiveLightbox, galleryDeepLinkTarget]);
 
 
   React.useEffect(() => {

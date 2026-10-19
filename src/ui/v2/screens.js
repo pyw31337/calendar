@@ -1340,10 +1340,19 @@ export function SettlementScreen(p) {
         h(
           'div',
           { className: 'v2-settlement-summary' },
-          (p.cards || []).map(card =>
-            h(
+          (p.cards || []).map(card => {
+            const isFocusedSettlement = String(card?.id || '') === String(p.focusSettlementId || '');
+            return h(
               'article',
-              { className: 'bp-settlement-card', key: card.id },
+              {
+                className: 'bp-settlement-card',
+                key: card.id,
+                'data-settlement-card-id': card.id,
+                tabIndex: isFocusedSettlement ? -1 : undefined,
+                style: isFocusedSettlement
+                  ? { outline: '2px solid var(--brand, #7C3AED)', outlineOffset: '3px', boxShadow: '0 0 0 5px rgba(124, 58, 237, 0.14)' }
+                  : undefined,
+              },
               h(
                 'div',
                 { className: 'bp-settlement-card-header' },
@@ -1397,8 +1406,8 @@ export function SettlementScreen(p) {
                 { type: 'button', className: 'bp-settlement-share-btn', onClick: p.onShare },
                 '정산 카드 공유'
               )
-            )
-          ),
+            );
+          }),
           h(
             'article',
             { className: 'bp-settlement-card' },

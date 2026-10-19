@@ -106,15 +106,15 @@ test('memo comment notifications name that comment and keep the memo deep link',
   assert.equal(decision.skipParticipantId, 'person_other');
   assert.equal(
     buildPushTargetUrl('cal_cw', { view: 'memo', memo: decision.memoId, comment: decision.commentId }),
-    './?id=cw&view=memo&memo=memo_place&comment=cmt_new'
+    './app/cw/memo/?memo=memo_place&comment=cmt_new'
   );
   assert.equal(
     buildPushTargetUrl('cal_cw', { view: 'chat', msg: 'msg_1' }),
-    './?id=cw&view=chat&msg=msg_1'
+    './app/cw/chat/?msg=msg_1'
   );
   assert.equal(
     buildPushTargetUrl('cal_cw', { view: 'memo', memo: 'memo_place' }),
-    './?id=cw&view=memo&memo=memo_place'
+    './app/cw/memo/?memo=memo_place'
   );
 });
 
@@ -149,7 +149,13 @@ test('editing or deleting an existing memo comment does not notify', () => {
 
 test('photo comment push URL carries gallery view and asset img', () => {
   assert.equal(
-    buildPushTargetUrl('cal_cw', { view: 'gallery', img: 'asset:v1:photo1' }),
-    './?id=cw&view=gallery&img=asset%3Av1%3Aphoto1'
+    buildPushTargetUrl('cal_cw', { view: 'gallery', img: 'asset:v1:photo1', comment: 'comment_1' }),
+    './app/cw/gallery/?img=asset%3Av1%3Aphoto1&comment=comment_1'
   );
+});
+
+test('calendar notifications use the canonical calendar path and retain their exact target', () => {
+  assert.equal(buildPushTargetUrl('cal_cw', { date: '2026-11-14' }), './app/cw/?date=2026-11-14');
+  assert.equal(buildPushTargetUrl('cal_cw', { poll: 'poll_1' }), './app/cw/?poll=poll_1');
+  assert.equal(buildPushTargetUrl('cal_cw', { view: 'settlement', settlement: 'settle_1' }), './app/cw/settlement/?settlement=settle_1');
 });
