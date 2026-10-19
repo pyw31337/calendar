@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '9f94a5a101cf1e86202e16c8e5d47665aac502dc';
+const BUILD_SHA = 'dd4cfad56a5b650020586af8ba813b6eaebc09b0';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -322,7 +322,7 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  // data is the push payload url string (./?id=&view=chat&msg= / view=memo&memo=&comment=).
+  // data is the canonical app payload URL (./app/<calendar>/chat/?msg=... etc.).
   // Some browsers hand the same field back as { url }.
   const raw = event.notification && event.notification.data;
   const targetUrl = (raw && typeof raw === 'object' && raw.url) || (typeof raw === 'string' ? raw : '') || './';
