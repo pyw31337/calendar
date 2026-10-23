@@ -1,3 +1,4 @@
+/* !important policy (audited 2026-10): no-effect !important were dropped; the remaining ones win over inline styles or earlier !important layers (memo-card rules work as redundant pairs with chat-bubble-modules.css). Replace them only with a specificity fix. */
 /**
  * V2 destination full-bleed layout module
  * ---------------------------------------
@@ -29,11 +30,11 @@
 /* ---- Shared destination page shell (Memo / Places / Settlement / Gallery /
       Content / Archive / Chat) ---- */
 .v2-design .v2-dest-page {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x) !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x);
+  box-sizing: border-box;
   background: var(--bg-primary);
 }
 
@@ -56,7 +57,7 @@
 /* Sticky PageHeader flush to pane top (no shell pad above it) */
 .v2-design .v2-dest-page > .bp-app-shell > .v2-page-header,
 .v2-design .v2-dest-page > .v2-page-header {
-  margin: 0 !important;
+  margin: 0;
 }
 
 /* Body / legacy fill under sticky PageHeader — no outer inset */
@@ -64,11 +65,11 @@
 .v2-design .v2-dest-page .v2-legacy-body,
 .v2-design .v2-wrap-legacy > .v2-legacy-body,
 .v2-design .v2-embed-frame > .v2-legacy-body {
-  width: 100% !important;
-  max-width: none !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
 }
 
 /* Kill floating “card in a frame” outer gutters on map / sticky map shells.
@@ -81,10 +82,10 @@
 .v2-design .v2-dest-page .places-map-sticky-area,
 .v2-design .v2-places-legacy .places-map-sticky-area,
 .v2-design .v2-map-panel .places-map-sticky-area {
-  margin-left: var(--v2-dest-pad-x) !important;
-  margin-right: var(--v2-dest-pad-x) !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
+  margin-left: var(--v2-dest-pad-x);
+  margin-right: var(--v2-dest-pad-x);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Optional helper: apply content-column pad without reintroducing outer gutters */
@@ -103,7 +104,7 @@
  */
 .v2-design .renewal-shell-main.v2-destination,
 .v2-design .renewal-shell-main.is-records {
-  min-width: 0 !important;
+  min-width: 0;
   min-height: 100dvh !important;
   background: var(--bg-primary) !important;
 }
@@ -134,7 +135,7 @@
 .v2-design .v2-dest-page .v2-legacy-body,
 .v2-design .v2-dest-page .gallery-page-scroll,
 .v2-design .v2-dest-page .history-page-scroll {
-  min-height: 0 !important;
+  min-height: 0;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -157,8 +158,8 @@
    controls too, so they must use the same 40 / 20 gutter instead of legacy 12px padding. */
 .v2-design .v2-wrap-legacy .places-list-toolbar,
 .v2-design .v2-wrap-legacy .places-category-sticky-tabs {
-  padding-left: var(--v2-dest-content-pad-x) !important;
-  padding-right: var(--v2-dest-content-pad-x) !important;
+  padding-left: var(--v2-dest-content-pad-x);
+  padding-right: var(--v2-dest-content-pad-x);
 }
 
 
