@@ -9,8 +9,9 @@
 //     formatting with no shared id to join on directly. KOPIS + Interpark together carry far
 //     more currently-active theater/performance listings than 문화포털 alone, with near-complete
 //     region/district coverage, so all ticket/portal sources are kept (merged where they
-//     overlap) rather than picking one. Class/tourism/sports/movie buckets stay on their own
-//     feeds -- this file is the 문화행사 tab only.
+//     overlap) rather than picking one. A merged card keeps `sourceListings` and every booking
+//     URL while using the richer KOPIS/문화포털 record as its canonical source. Class/tourism/
+//     sports/movie buckets stay on their own feeds -- this file is the 문화행사 tab only.
 //   - culture-festivals.json (지역축제 탭): source 'festival' -- Culture Flow already aggregates
 //     VisitKorea/문체부/VisitSeoul/경기관광공사 등 지역축제 sources into this one merged bucket, so
 //     this repo doesn't need its own scrapers for any of those sites.

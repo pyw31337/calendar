@@ -241,6 +241,16 @@ export function dateRangesOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart <= bE && bStart <= aE;
 }
 
+// An OPEN RUN listing has no dates, but ticket portals often publish it next to a dated
+// KOPIS listing for the very same venue. Treat that as an overlap only when the venue and
+// normalized title already agree; never use an open run to merge two touring productions.
+export function duplicateDateWindowMatches(a, b) {
+  if (dateRangesOverlap(a.startDate, a.endDate, b.startDate, b.endDate)) return true;
+  const aOpen = Boolean(a.openEnded || a.isOpenEnded) && !a.startDate && !a.endDate;
+  const bOpen = Boolean(b.openEnded || b.isOpenEnded) && !b.startDate && !b.endDate;
+  return (aOpen && Boolean(b.startDate || b.endDate)) || (bOpen && Boolean(a.startDate || a.endDate)) || (aOpen && bOpen);
+}
+
 // Prefer whichever value is actually present; when both are, prefer the longer/richer one.
 export function pickRicher(a, b) {
   const av = (a ?? '').toString().trim();
@@ -254,12 +264,72 @@ function isRealPoster(url) {
   return !!url && !/\/fallbacks\//i.test(String(url));
 }
 
+const SOURCE_PRIORITY = {
+  'culture-portal': 100,
+  kopis: 98,
+  interpark: 82,
+  'yes24-exclusive': 80,
+  timeticket: 76,
+  festival: 70,
+  movie: 70
+};
+
+function sourceNames(value) {
+  return [...new Set(String(value || '').split('+').map(s => s.trim()).filter(Boolean))];
+}
+
+function sourceListingFor(item) {
+  const existing = Array.isArray(item?.sourceListings) ? item.sourceListings : [];
+  if (existing.length) return existing;
+  const sources = sourceNames(item?.source);
+  const urls = [item?.link, item?.website].filter(Boolean);
+  if (!sources.length && !urls.length) return [];
+  return [{
+    source: sources[0] || 'unknown',
+    id: String(item?.id || ''),
+    link: String(item?.link || '').trim(),
+    website: String(item?.website || '').trim()
+  }];
+}
+
+function sourceListingKey(listing) {
+  return [listing?.source, listing?.id, listing?.link, listing?.website].map(value => String(value || '').trim()).join('|');
+}
+
+function mergeSourceListings(base, other) {
+  const merged = [...sourceListingFor(base), ...sourceListingFor(other)];
+  const seen = new Set();
+  return merged.filter(listing => {
+    const key = sourceListingKey(listing);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function canonicalSource(sourceListings, fallback) {
+  return [...sourceListings]
+    .sort((a, b) => (SOURCE_PRIORITY[b.source] || 0) - (SOURCE_PRIORITY[a.source] || 0))[0]?.source || sourceNames(fallback)[0] || '';
+}
+
+function ensureSourceMetadata(item) {
+  const sourceListings = mergeSourceListings(item, null);
+  if (!sourceListings.length && !item?.source) return item;
+  return {
+    ...item,
+    sourceListings,
+    canonicalSource: item.canonicalSource || canonicalSource(sourceListings, item.source),
+    bookingLinkCount: sourceListings.filter(listing => listing.link || listing.website).length
+  };
+}
+
 function mergePair(base, other) {
   const image = isRealPoster(base.image) ? base.image : (isRealPoster(other.image) ? other.image : pickRicher(base.image, other.image));
   const backupCandidate = [base.backupPoster, other.backupPoster, base.image, other.image]
     .find(u => isRealPoster(u) && u !== image && !isFallbackOrEmptyPoster(u)) || '';
   const startDate = [base.startDate, other.startDate].filter(Boolean).sort()[0] || null;
   const endDate = [base.endDate, other.endDate].filter(Boolean).sort().pop() || null;
+  const sourceListings = mergeSourceListings(base, other);
   const sources = [...new Set(`${base.source || ''}+${other.source || ''}`.split('+').filter(Boolean))];
   return {
     ...base,
@@ -284,7 +354,13 @@ function mergePair(base, other) {
     cast: (base.cast && base.cast.length) ? base.cast : other.cast,
     runningTime: pickRicher(base.runningTime, other.runningTime),
     ageRating: pickRicher(base.ageRating, other.ageRating),
-    source: sources.join('+')
+    source: sources.join('+'),
+    // Keep every portal listing so the UI can offer all booking choices from one canonical card.
+    // `link` remains stable for existing deep links; consumers that understand sourceListings
+    // can render a richer reservation sheet without re-fetching the upstream feed.
+    sourceListings,
+    canonicalSource: canonicalSource(sourceListings, sources.join('+')),
+    bookingLinkCount: sourceListings.filter(listing => listing.link || listing.website).length
   };
 }
 
@@ -306,7 +382,7 @@ export function mergeDuplicates(items) {
   let mergedCount = 0;
   for (const key of order) {
     const group = groups.get(key);
-    if (group.length === 1) { merged.push(group[0]); continue; }
+    if (group.length === 1) { merged.push(ensureSourceMetadata(group[0])); continue; }
     const used = new Array(group.length).fill(false);
     for (let i = 0; i < group.length; i++) {
       if (used[i]) continue;
@@ -320,14 +396,14 @@ export function mergeDuplicates(items) {
           if (used[j]) continue;
           const other = group[j];
           if (!venuesMatch(base.venue, other.venue)) continue;
-          if (!dateRangesOverlap(base.startDate, base.endDate, other.startDate, other.endDate)) continue;
+          if (!duplicateDateWindowMatches(base, other)) continue;
           used[j] = true;
           mergedCount++;
           changed = true;
           base = mergePair(base, other);
         }
       }
-      merged.push(base);
+      merged.push(ensureSourceMetadata(base));
     }
   }
   return { items: merged, mergedCount };
@@ -453,6 +529,13 @@ export function normalizeItem(raw) {
     : [];
   const primaryImage = resolveNormalizedPoster(raw);
   const backupPoster = resolveBackupPoster(raw, primaryImage);
+  const source = String(raw.source || '').trim();
+  const sourceListings = sourceNames(source).map(name => ({
+    source: name,
+    id: String(raw.id || `${raw.title}::${raw.date}`),
+    link: String(raw.link || '').trim(),
+    website: String(raw.website || '').trim()
+  }));
   return {
     startDate: normalizedStartDate, endDate: normalizedEndDate, openEnded,
     item: {
@@ -479,7 +562,10 @@ export function normalizeItem(raw) {
       // Capped: KOPIS descriptions routinely run several paragraphs and are the single biggest
       // field in a tab that's fetched whole on open.
       description: cleanMultilineText(raw.description, 600),
-      source: raw.source || '',
+      source,
+      sourceListings,
+      canonicalSource: canonicalSource(sourceListings, source),
+      bookingLinkCount: sourceListings.filter(listing => listing.link || listing.website).length,
       // 스포츠 경기 전용 필드 -- Culture Flow의 KBO/K리그/KBL/KOVO/핸드볼코리아 스크레이퍼가 수집한
       // 홈/원정팀과 팀 로고. 다른 피드에서는 비어 있어 compactItem이 떨어뜨린다.
       homeTeam: cleanInlineText(raw.homeTeam),

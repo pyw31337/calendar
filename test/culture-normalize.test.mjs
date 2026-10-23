@@ -8,6 +8,7 @@ import {
   inferRegion,
   isVisible,
   mergeDuplicates,
+  duplicateDateWindowMatches,
   movieTheatricalEnd,
   normalizeItem,
   normalizeTitleForMatch,
@@ -67,6 +68,36 @@ test('non-overlapping dates at the same venue stay separate', () => {
     { id: 'a', title: '11시 콘서트 (9월)', venue: '예술의전당', startDate: '2026-09-10', endDate: '2026-09-10', source: 'kopis' },
     { id: 'b', title: '11시 콘서트 (10월)', venue: '예술의전당', startDate: '2026-10-08', endDate: '2026-10-08', source: 'kopis' }
   ]);
+  assert.equal(out.length, 2);
+});
+
+test('an open-run ticket listing merges with the dated canonical listing and keeps every booking source', () => {
+  const { items: out, mergedCount } = mergeDuplicates([
+    {
+      id: 'k-open', title: '김종욱 찾기', venue: '틴틴홀', startDate: '2026-03-07', endDate: '2026-10-31',
+      source: 'kopis', link: 'https://www.kopis.or.kr/performance/k-open', isOpenEnded: false
+    },
+    {
+      id: 'tt-open', title: '뮤지컬 〈김종욱찾기〉', venue: '틴틴홀', startDate: null, endDate: null,
+      source: 'timeticket', link: 'https://timeticket.co.kr/product/123', openEnded: true, isOpenEnded: true
+    }
+  ]);
+  assert.equal(mergedCount, 1);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, 'k-open', 'the canonical id remains stable for calendar deep links');
+  assert.equal(out[0].source, 'kopis+timeticket');
+  assert.equal(out[0].canonicalSource, 'kopis');
+  assert.equal(out[0].bookingLinkCount, 2);
+  assert.deepEqual(out[0].sourceListings.map(item => item.source), ['kopis', 'timeticket']);
+  assert.ok(duplicateDateWindowMatches(out[0], { startDate: null, endDate: null, openEnded: true }));
+});
+
+test('same title at different venues remains separate even when one listing is open-run', () => {
+  const { items: out, mergedCount } = mergeDuplicates([
+    { id: 'a', title: '보물찾기', venue: '아트포레스트', startDate: '2025-11-07', endDate: '2026-10-31', source: 'kopis' },
+    { id: 'b', title: '보물찾기', venue: '아산아트홀', startDate: null, endDate: null, source: 'timeticket', openEnded: true, isOpenEnded: true }
+  ]);
+  assert.equal(mergedCount, 0);
   assert.equal(out.length, 2);
 });
 

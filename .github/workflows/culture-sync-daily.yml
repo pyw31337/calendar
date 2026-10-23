@@ -28,6 +28,8 @@ jobs:
         uses: actions/checkout@v5
       - name: Sync culture performances snapshot
         run: node scripts/sync-culture-performances.mjs
+      - name: Enforce culture snapshot quality
+        run: node scripts/culture-quality-report.mjs --strict --output=/tmp/culture-quality-report.json
       - name: Commit if changed
         run: |
           if git diff --quiet -- 'public-vite/data/culture-*.json' 'scripts/data/culture-poster-cache.json'; then
