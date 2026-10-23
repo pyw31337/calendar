@@ -16,7 +16,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const html = fs.readFileSync(path.join(root, 'src/index.html'), 'utf8');
 const css = html.match(/<style id="app-splash-style">([\s\S]*?)<\/style>/)[1];
 const markup = html.match(/<div id="app-splash"[\s\S]*?\n {4}<\/div>\n/)[0];
-const icon = `data:image/png;base64,${fs.readFileSync(path.join(root, 'icons/icon-v6-192.png')).toString('base64')}`;
+const icon = `data:image/png;base64,${fs.readFileSync(path.join(root, 'icons/icon-v7-192.png')).toString('base64')}`;
 
 // [css width, css height, pixel ratio, safe-area top in css px]
 export const IOS_LAUNCH_DEVICES = [
@@ -46,7 +46,7 @@ for (const [width, height, dpr, safeTop] of IOS_LAUNCH_DEVICES) {
     html, body { margin: 0; background: #07021A; }
     .app-splash, .app-splash * { animation-play-state: paused !important; animation-delay: -10s !important; }
     .app-splash-glint, .app-splash-title, .app-splash-sub, .app-splash-footer { visibility: hidden !important; }
-  </style></head><body>${markup.replace(/src="icons\/icon-v6-192\.png"/, `src="${icon}"`)}</body></html>`);
+  </style></head><body>${markup.replace(/src="icons\/icon-v7-192\.png"/, `src="${icon}"`)}</body></html>`);
   await page.waitForTimeout(150);
   const name = `launch-${width * dpr}x${height * dpr}.jpg`;
   // JPEG: the soft gradient is ~2MB per PNG, ~100KB here. iOS accepts JPEG launch images.

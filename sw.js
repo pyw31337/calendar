@@ -24,14 +24,16 @@ const MEDIA_CACHE_MAX_ENTRIES = 800;
 const MEDIA_CACHE_MAX_BYTES_PER_ITEM = 8 * 1024 * 1024;
 const STATIC_ASSETS = [
   'favicon.ico',
+  'icons/favicon-v4-32.png',
+  'icons/favicon-v4-96.png',
   'manifest.json',
   'manifest-kkot.json',
   'manifest-cw.json',
   'manifest-jhair.json',
-  'icons/icon-v6-192.png',
-  'icons/icon-v6-512.png',
-  'icons/icon-v6-512-maskable.png',
-  'icons/icon-v6-apple-touch.png'
+  'icons/icon-v7-192.png',
+  'icons/icon-v7-512.png',
+  'icons/icon-v7-512-maskable.png',
+  'icons/icon-v7-apple-touch.png'
 ];
 
 self.addEventListener('install', event => {
@@ -296,7 +298,7 @@ self.addEventListener('push', event => {
   } catch (_) {}
   const title = payload.title || '렛츠 캘린더';
   const scopeUrl = self.registration?.scope || (self.location.origin + '/calendar/');
-  const iconUrl = new URL('icons/icon-v6-192.png', scopeUrl).href;
+  const iconUrl = new URL('icons/icon-v7-192.png', scopeUrl).href;
   const options = {
     body: payload.body || '',
     icon: iconUrl,
