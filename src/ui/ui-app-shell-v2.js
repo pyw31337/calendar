@@ -340,10 +340,12 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab, chatSen
  */
 function TopHeader({ calendarName, onOpenCalendarSettings, onOpenAnniversaries }) {
   const React = window.React;
-  // The calendar title is user data (for example, "모아엘가") and must not
-  // leak into the service-brand slot.  Keep the product identity stable so
-  // every calendar consistently presents the Let's brand.
-  const brandName = "Let's";
+  // The service brand is rendered separately in the PWA/OG metadata. This slot
+  // identifies the active calendar (모아엘가, 꽃잎반, 제이헤어, ...).
+  const brandName = String(calendarName || '렛츠 캘린더')
+    .replace(/^[^\p{L}\p{N}]+/u, '')
+    .replace(/\s*캘린더\s*$/u, '')
+    .trim();
   return React.createElement('div', { className: bentoClass('bento-title v2-title-row') },
     React.createElement('div', { className: bentoClass('bento-title-brand') },
       React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -4558,6 +4560,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const chatPillColor = chatAuthorPart?.color || lastChatAuthorInfo.color || '#EF4444';
 
   const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places' || activeTab === 'search';
+  const cleanCalBadge = (value) => String(value || '')
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]/gu, '')
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const activeCalendarLabel = cleanCalBadge(calendarName) || '렛츠 캘린더';
 
   // Per-tab side-nav submenu content (see the `is-tab-menu` group inside `bentoSideNav` below).
   // 캘린더's three items are static (openMoreModalById covers them directly); every other tab's
@@ -4588,7 +4596,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           className: bentoClass('side-nav-brand-icon'),
           'aria-hidden': 'true',
         }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: "Let's" }, "Let's")
+        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: activeCalendarLabel }, activeCalendarLabel)
       ),
       // 지금 이 기기에서 쓰는 참여자 (core/current-participant.js). Tap to switch; chat, memo,
       // comments and likes all follow.
