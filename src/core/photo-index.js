@@ -74,6 +74,14 @@ export async function fetchPhotoIndexSummary({ calendarId, projectId, force = fa
   return value;
 }
 
+// A summary revision is cheaper than downloading a gallery page.  Keep the comparison in a
+// small pure helper so the live-refresh policy is explicit and easy to regression-test.
+export function hasPhotoIndexRevisionChanged(previousRevision, nextRevision) {
+  const previous = normalizeCacheRevision(previousRevision);
+  const next = normalizeCacheRevision(nextRevision);
+  return Boolean(next && next !== previous);
+}
+
 function normalizeCacheRevision(value) {
   const revision = String(value || '').trim();
   return revision && revision !== '0' ? revision : '';
@@ -559,6 +567,7 @@ export function reconcilePhotoIndexTagItems(calendarId, _previousItems, fetchedI
 export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId, decodeDocument }) {
   const [state, setState] = React.useState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
   const optimisticItemsRef = React.useRef([]);
+  const latestSummaryRevisionRef = React.useRef('');
   const loadPage = React.useCallback(async (page = 1, options = {}) => {
     if (!calendarId) return false;
     const requestedPage = Math.max(1, Number(page) || 1);
@@ -571,6 +580,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     try {
       if (options.force) invalidatePhotoIndexCache(calendarId);
       const summary = await fetchPhotoIndexSummary({ calendarId, projectId, force: Boolean(options.force) });
+      latestSummaryRevisionRef.current = normalizeCacheRevision(summary.version);
       // A first page is useful immediately; aggregate counts are metadata and used to hold the
       // first visual result behind two extra Firestore queries. Commit the page first, then let
       // the total settle in the background so side-menu navigation can paint without waiting.
@@ -695,6 +705,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     const shouldLoadPreview = activeView === 'calendar';
     if (!calendarId || (!shouldLoadPreview && activeView !== 'gallery' && activeView !== 'history')) {
       optimisticItemsRef.current = [];
+      latestSummaryRevisionRef.current = '';
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
       return undefined;
     }
@@ -719,6 +730,49 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     const timerId = setTimeout(start, activeView === 'history' ? 120 : 350);
     return () => { cancelled = true; clearTimeout(timerId); };
   }, [calendarId, activeView, loadPage, loadAll]);
+
+  // Collaborative photo surfaces should converge without a full-page refresh. The canonical
+  // summary is a single tiny Firestore REST read; only when its revision changes do we fetch the
+  // first page. This keeps the home screen cheap while covering uploads made on another device,
+  // background-tab resumes and PWA reconnects. Uploaders still render immediately through
+  // upsertItems(), so this watcher is a cross-session safety net rather than a replacement for
+  // optimistic UI.
+  React.useEffect(() => {
+    const enabled = Boolean(calendarId)
+      && (activeView === 'calendar' || activeView === 'gallery' || activeView === 'history');
+    if (!enabled || typeof window === 'undefined') return undefined;
+    let disposed = false;
+    let inFlight = false;
+    const refreshIfChanged = async () => {
+      if (disposed || inFlight || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
+      inFlight = true;
+      try {
+        const summary = await fetchPhotoIndexSummary({ calendarId, projectId, force: true });
+        if (disposed || !hasPhotoIndexRevisionChanged(latestSummaryRevisionRef.current, summary.version)) return;
+        latestSummaryRevisionRef.current = normalizeCacheRevision(summary.version);
+        await loadPage(1, { force: true, includeTotal: activeView !== 'calendar' });
+      } catch (error) {
+        // A background convergence check must never turn a usable gallery into an error state.
+        console.debug('photo index background refresh skipped:', error);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const intervalId = window.setInterval(refreshIfChanged, 30000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshIfChanged();
+    };
+    window.addEventListener('focus', refreshIfChanged);
+    window.addEventListener('online', refreshIfChanged);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshIfChanged);
+      window.removeEventListener('online', refreshIfChanged);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [calendarId, activeView, projectId, loadPage]);
   return { ...state, loadPage, loadAll, patchItems, upsertItems };
 }
 

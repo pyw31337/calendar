@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchPhotoIndexSummary } from '../src/core/photo-index.js';
+import { fetchPhotoIndexSummary, hasPhotoIndexRevisionChanged } from '../src/core/photo-index.js';
+
+test('photo index revision changes only trigger a refresh for a real server revision', () => {
+  assert.equal(hasPhotoIndexRevisionChanged('', ''), false);
+  assert.equal(hasPhotoIndexRevisionChanged('', '17'), true);
+  assert.equal(hasPhotoIndexRevisionChanged('17', '17'), false);
+  assert.equal(hasPhotoIndexRevisionChanged('17', '18'), true);
+  assert.equal(hasPhotoIndexRevisionChanged('17', '0'), false);
+});
 
 test('photo index summary exposes a server-issued revision and tolerates pre-deploy absence', async () => {
   const originalFetch = globalThis.fetch;
