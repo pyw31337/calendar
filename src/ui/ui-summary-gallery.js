@@ -36,6 +36,7 @@ import { isExcludedFromPeople, personNameVariants, tagMatchesPerson, withNotAPer
 import { CommonPagination } from './ui-shared.js';
 import { contentPosterStatusBadge } from '../core/culture-poster-badge.js';
 import { orderCultureEventItems } from '../core/culture-event-order.js';
+import { CultureSourceLinks } from './culture-source-links.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -4695,15 +4696,6 @@ const CULTURE_GENRE_LABELS = {
   ,movie: '영화'
 };
 const cultureGenreLabel = genre => CULTURE_GENRE_LABELS[genre] || genre || '기타';
-const CULTURE_SOURCE_LABELS = {
-  'culture-portal': '문화포털',
-  kopis: 'KOPIS',
-  interpark: '인터파크',
-  timeticket: '타임티켓',
-  'yes24-exclusive': 'YES24'
-};
-const cultureSourceLabel = source => CULTURE_SOURCE_LABELS[String(source || '').trim()] || String(source || '예약처');
-
 // 문화공연/지역축제 탭의 지역 필터용 전국 시/도-군/구 목록 (동 단위는 두지 않음). `code`는
 // culture-performances.json/culture-festivals.json의 각 항목이 이미 들고 있는 `region` 필드값과
 // 그대로 맞춘 것 -- 이 코드로 데이터를 직접 필터링한다. `gugun`은 데이터에 별도 필드가 없어
@@ -7034,28 +7026,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 (label === '감독' || label === '출연') ? renderPersonLinks(value)
                   : (label === '공식 홈페이지' ? renderDescriptionWithLinks(value) : value))
             )),
-            Array.isArray(selected.sourceListings) && selected.sourceListings.filter(listing => listing && (listing.link || listing.website)).length > 1 && /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px' }
-            },
-              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, "예약·상세 링크"),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px' } },
-                selected.sourceListings.filter(listing => listing && (listing.link || listing.website)).map(listing => {
-                  const href = String(listing.link || listing.website || '').trim();
-                  return /*#__PURE__*/React.createElement("a", {
-                    key: `${listing.source || 'source'}-${href}`,
-                    href,
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                    style: {
-                      display: 'inline-flex', alignItems: 'center', minHeight: '32px', padding: '0 10px',
-                      borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)',
-                      backgroundColor: 'var(--bg-primary)', color: 'var(--accent-primary)',
-                      fontSize: 'var(--font-size-xs)', fontWeight: 800, textDecoration: 'none'
-                    }
-                  }, cultureSourceLabel(listing.source));
-                })
-              )
-            ),
+            /*#__PURE__*/React.createElement(CultureSourceLinks, { selected }),
             selected.description && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
             }, renderDescriptionWithLinks(selected.description))
