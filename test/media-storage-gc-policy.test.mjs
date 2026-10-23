@@ -33,3 +33,10 @@ test('sweepStorageGc builds in-use set from messages, memos, places, and fileAtt
   assert.match(src, /isOriginalStoragePath/);
   assert.match(src, /skippedOriginal/);
 });
+
+test('mergeAssets queues duplicate copies for GC and removes photoIndex', async () => {
+  const src = await readFile(new URL('../functions/media-commands.js', import.meta.url), 'utf8');
+  assert.match(src, /tx\.delete\(root\.collection\('photoIndex'\)\.doc\(extraKey\)\)/);
+  assert.match(src, /reason: 'merge-duplicate-photos'/);
+  assert.match(src, /allowOriginal: true/);
+});

@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --bg-primary: #FAFAFC; --bg-card: #FFFFFF; --border-subtle: #ECEAF5;
+      --text-main: #1E1B2E; --text-muted: #6B6580; --text-light: #83798F;
+      --brand: #7C3AED; --brand-soft: #F3EEFF;
+      --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
+      --p-yeongwoo: #F87171; --p-yuri: #FB923C; --p-manshik: #34D399; --p-eunhye: #22D3EE;
+      --p-doeun: #A78BFA; --p-seojun: #FBBF24;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
+    button, input { font-family: inherit; }
+
+    .app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
+
+    .header { position: sticky; top: 0; background: var(--bg-card); z-index: 5; padding: 12px 14px 10px; border-bottom: 1px solid var(--border-subtle); }
+    .header-row { display: flex; align-items: center; gap: 8px; }
+    .back-btn { background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
+    .header-title { font-weight: 800; font-size: 0.96rem; color: var(--text-main); }
+    .header-actions { margin-left: auto; display: flex; gap: 4px; }
+    .icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
+    .icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
+    .fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
+
+    .search-row { margin-top: 10px; position: relative; }
+    .search-input { width: 100%; border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 9px 14px 9px 34px; font-size: 0.78rem; background: var(--bg-primary); color: var(--text-main); }
+    .search-row svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-light); }
+
+    .tag-filter-row { display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px 0; }
+    .tag-filter-row::-webkit-scrollbar { display: none; }
+    .tag-chip { flex: 0 0 auto; font-size: 0.68rem; font-weight: 700; color: var(--text-muted); background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 5px 12px; cursor: pointer; }
+    .tag-chip.is-selected { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+
+    .memo-grid { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 14px; }
+    .memo-card { background: var(--bg-card); border-radius: 0 14px 14px 0; border-left: 4px solid var(--memo-author-color, var(--border-subtle)); padding: 14px; position: relative; box-shadow: 0 4px 14px rgba(30,27,46,0.07); }
+    .memo-pin-badge { position: absolute; top: 10px; right: 10px; color: var(--brand); opacity: 0.8; }
+    .memo-card-title { font-weight: 800; font-size: 0.88rem; color: var(--text-main); margin-bottom: 4px; padding-right: 18px; }
+    .memo-summary { font-size: 0.74rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+    .memo-link-card { display: flex; gap: 10px; background: var(--bg-primary); border-radius: var(--radius-md); padding: 10px; margin-bottom: 10px; }
+    .memo-link-thumb { width: 52px; height: 52px; border-radius: var(--radius-sm); flex-shrink: 0; background-size: cover; background-position: center; }
+    .memo-link-title { font-weight: 800; font-size: 0.76rem; color: var(--text-main); margin-bottom: 2px; }
+    .memo-link-desc { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 3px; }
+    .memo-link-domain { font-size: 0.62rem; color: var(--text-light); }
+    .memo-tags-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .chat-name-pill { font-size: 0.6rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); }
+    .memo-tag { color: var(--brand); font-weight: 700; font-size: 0.66rem; }
+    .memo-comments { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+    .memo-comment-item { display: flex; gap: 6px; align-items: flex-start; }
+    .memo-comment-avatar { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    .memo-comment-author { font-size: 0.68rem; font-weight: 800; color: var(--text-main); margin-right: 4px; }
+    .memo-comment-text { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+    .memo-comment-input-row { display: flex; gap: 6px; margin-top: 8px; }
+    .memo-comment-input { flex: 1; border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 7px 12px; font-size: 0.7rem; background: var(--bg-primary); }
+    .memo-comment-send { background: var(--brand-soft); color: var(--brand); font-weight: 800; font-size: 0.68rem; border: none; border-radius: var(--radius-full); padding: 7px 12px; cursor: pointer; flex-shrink: 0; }
+
+    @media (min-width: 768px) {
+      .app-shell { max-width: 720px; }
+      .memo-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 1200px) {
+      .app-shell { max-width: 1080px; padding: 0 20px; }
+      .memo-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+  </style>
+</helmet>
+<div class="app-shell">
+  <div class="header">
+    <div class="header-row">
+      <button class="back-btn" type="button" aria-label="뒤로"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6l6-6"/></svg></button>
+      <span class="header-title">메모</span>
+      <div class="header-actions">
+        <button class="icon-btn" type="button" aria-label="정렬"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg></button>
+      </div>
+    </div>
+    <div class="search-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input class="search-input" type="text" placeholder="메모 검색" readonly>
+    </div>
+    <div class="tag-filter-row">
+      <button class="tag-chip is-selected" type="button">전체</button>
+      <button class="tag-chip" type="button">#캠핑준비물</button>
+      <button class="tag-chip" type="button">#반값여행</button>
+      <button class="tag-chip" type="button">#유치원면담</button>
+      <button class="tag-chip" type="button">#지역사랑</button>
+    </div>
+  </div>
+
+  <div class="memo-grid">
+    <div class="memo-card" style="--memo-author-color: var(--p-yeongwoo);">
+      <div class="memo-card-title">서천 '반값 여행' 지역사랑 휴가지원</div>
+      <div class="memo-summary">참여대상: 타 지역에서 서천을 여행하고 싶은 관광객 · 지원내용: 서천에서 소비한 관광 경비의 최대 50% 환급 (1인 최대 10만원 · 가족 최대 50만원)</div>
+      <div class="memo-link-card">
+        <div class="memo-link-thumb" style="background-color:#8FBF8A"></div>
+        <div style="min-width:0;">
+          <div class="memo-link-title">서천 반값여행</div>
+          <div class="memo-link-desc">서천군을 여행하고 정산 신청하면 여행경비의 최대 50%를 모바일 서천사랑상품권으로 돌려받는 지역사랑 휴가지원 사업입니다.</div>
+          <div class="memo-link-domain">seocheontour.kr</div>
+        </div>
+      </div>
+      <div class="memo-tags-row">
+        <span class="chat-name-pill" style="background:var(--p-yeongwoo)">박영우</span>
+        <span class="memo-tag">#충남서천</span><span class="memo-tag">#반값여행</span><span class="memo-tag">#지역사랑</span>
+      </div>
+      <div class="memo-comments">
+        <div class="memo-comment-item"><span class="memo-comment-avatar" style="background:var(--p-eunhye)"></span><div><span class="memo-comment-author">송은혜</span><span class="memo-comment-text">오 이거 우리도 신청 가능한거야? 링크 봤는데 완전 좋다</span></div></div>
+        <div class="memo-comment-item"><span class="memo-comment-avatar" style="background:var(--p-yeongwoo)"></span><div><span class="memo-comment-author">박영우</span><span class="memo-comment-text">응 가능! 10월 연휴 캠핑 갈 때 겸사겸사 신청하자</span></div></div>
+      </div>
+      <div class="memo-comment-input-row">
+        <input class="memo-comment-input" type="text" placeholder="댓글 달기" readonly>
+        <button class="memo-comment-send" type="button">등록</button>
+      </div>
+    </div>
+
+    <div class="memo-card" style="--memo-author-color: var(--p-eunhye);">
+      <svg class="memo-pin-badge" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5z"/></svg>
+      <div class="memo-card-title">10월 연휴 캠핑용품 체크리스트</div>
+      <div class="memo-summary">텐트·버너·랜턴은 지난번 그대로, 은혜가 침낭 2개 추가 구매 예정. 도은이 우비 사이즈 확인 필요.</div>
+      <div class="memo-tags-row">
+        <span class="chat-name-pill" style="background:var(--p-eunhye)">송은혜</span>
+        <span class="memo-tag">#캠핑준비물</span>
+      </div>
+      <div class="memo-comment-input-row">
+        <input class="memo-comment-input" type="text" placeholder="첫 댓글을 남겨보세요" readonly>
+        <button class="memo-comment-send" type="button">등록</button>
+      </div>
+    </div>
+
+    <div class="memo-card" style="--memo-author-color: var(--p-yuri);">
+      <div class="memo-card-title">연지근린공원 유치원 면담 후기</div>
+      <div class="memo-summary">담임 선생님이 서준이 요즘 친구들이랑 잘 어울린다고 칭찬해주심. 다음 학기 준비물 목록은 알림장으로 따로 옴.</div>
+      <div class="memo-tags-row">
+        <span class="chat-name-pill" style="background:var(--p-yuri)">김유리</span>
+        <span class="memo-tag">#유치원면담</span>
+      </div>
+      <div class="memo-comments">
+        <div class="memo-comment-item"><span class="memo-comment-avatar" style="background:var(--p-yeongwoo)"></span><div><span class="memo-comment-author">박영우</span><span class="memo-comment-text">서준이 요즘 부쩍 의젓해졌네 ㅎㅎ</span></div></div>
+      </div>
+      <div class="memo-comment-input-row">
+        <input class="memo-comment-input" type="text" placeholder="댓글 달기" readonly>
+        <button class="memo-comment-send" type="button">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab" type="button" aria-label="메모 작성"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+</x-dc>
+</body>
+</html>

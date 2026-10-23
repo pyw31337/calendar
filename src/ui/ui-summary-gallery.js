@@ -43,6 +43,7 @@ const PERSON_UNCLASSIFIED_KEY = '__person_unclassified__';
 // Archive routes can contain thousands of photos. Same 100-item page size as 갤러리 (GALLERY_PAGE_SIZE in ui-chat-gallery.js).
 const PAGE_RENDER_SIZE = 100;
 const ARCHIVE_GRID_INITIAL_COUNT = PAGE_RENDER_SIZE;
+const ARCHIVE_PREFETCH_COUNT = 8;
 
 // Gallery's existing number-window calculation is the single pagination rule. Archive and
 // content intentionally use the same 40-item bounded rendering instead of scroll-driven DOM
@@ -116,7 +117,7 @@ function ProgressiveArchivePhotoGrid({ photos, listKey, renderPhoto }) {
     const nextPageStart = currentPage * ARCHIVE_GRID_INITIAL_COUNT;
     const nextPageItems = list.slice(nextPageStart, nextPageStart + ARCHIVE_GRID_INITIAL_COUNT);
     const prefetch = () => {
-      nextPageItems.slice(0, 32).forEach(p => {
+      nextPageItems.slice(0, ARCHIVE_PREFETCH_COUNT).forEach(p => {
         const url = selectImageVariant({
           surface: 'grid',
           uploadSource: p?.uploadSource || p?.source,
@@ -2396,14 +2397,9 @@ export function HistoryView({
         return '추천을 되돌렸습니다.';
       });
       return true;
-    } catch (error) {
-      showToast?.('저장하지 못했어요. 잠시 후 다시 시도해 주세요.', 'error');
-      return false;
-    }
+    } catch (error) { showToast?.('저장하지 못했어요. 잠시 후 다시 시도해 주세요.', 'error'); return false; }
   };
-  const duplicateSuggestions = React.useMemo(() => (historyTab === 'suggest'
-    ? buildDuplicateSuggestions(historyPhotoEntries, { findDuplicatePhotoGroups, chooseDedupWinner })
-    : []), [historyTab, historyPhotoEntries]);
+  const duplicateSuggestions = React.useMemo(() => (historyTab === 'suggest' ? buildDuplicateSuggestions(historyPhotoEntries, { findDuplicatePhotoGroups, chooseDedupWinner }) : []), [historyTab, historyPhotoEntries]);
   // 비슷한 사진: different files that look alike (Mac worker). A hint only, never merged.
   const [similarGroupKeys, setSimilarGroupKeys] = React.useState([]);
   React.useEffect(() => {
@@ -2415,12 +2411,27 @@ export function HistoryView({
       .catch(error => console.warn('Similar photo groups unavailable:', error?.message || error));
     return () => { alive = false; };
   }, [historyTab, calendar?.id]);
+  const [dismissedSimilarGroupIds, setDismissedSimilarGroupIds] = React.useState(() => new Set());
   const similarSuggestions = React.useMemo(() => (historyTab === 'suggest' && similarGroupKeys.length
-    ? buildSimilarPhotoSuggestions(historyPhotoEntries, similarGroupKeys, {
-      keyOf: faceSuggestionKey,
-      exclude: new Set(duplicateSuggestions.flatMap(dup => [dup.keep, ...dup.extra].map(faceSuggestionKey)))
-    })
-    : []), [historyTab, historyPhotoEntries, similarGroupKeys, duplicateSuggestions]);
+    ? buildSimilarPhotoSuggestions(historyPhotoEntries, similarGroupKeys, { keyOf: faceSuggestionKey, exclude: new Set(duplicateSuggestions.flatMap(dup => [dup.keep, ...dup.extra].map(faceSuggestionKey))) }).filter(group => !dismissedSimilarGroupIds.has(group.id))
+    : []), [historyTab, historyPhotoEntries, similarGroupKeys, duplicateSuggestions, dismissedSimilarGroupIds]);
+  const dismissSimilarGroup = group => { if (group?.id) setDismissedSimilarGroupIds(prev => new Set(prev).add(group.id)); showToast?.('추천 목록에서 제외했어요.', 'info'); };
+  const deleteSimilarOthers = async group => {
+    if (!group?.photos || group.photos.length <= 1) return;
+    const toDelete = group.photos.slice(1);
+    const run = async () => {
+      setIsApplyingSuggestion(true);
+      try {
+        let deleted = 0;
+        if (typeof onDeletePhotos === 'function') deleted = (await onDeletePhotos(toDelete))?.deleted || 0;
+        else if (typeof onDeletePhoto === 'function') for (const p of toDelete) { if (await onDeletePhoto(p) !== false) deleted += 1; }
+        setDismissedSimilarGroupIds(prev => new Set(prev).add(group.id));
+        showToast?.(deleted > 0 ? `비슷한 사진 ${deleted}장을 삭제했어요.` : '삭제하지 못했습니다.', deleted > 0 ? 'success' : 'error');
+      } catch (_) { showToast?.('사진을 삭제하지 못했습니다.', 'error'); } finally { setIsApplyingSuggestion(false); }
+    };
+    if (typeof onRequestConfirm === 'function') onRequestConfirm('비슷한 사진 정리', `첫 번째 사진 1장만 남기고 나머지 ${toDelete.length}장을 모두 삭제할까요? 삭제된 사진은 복구할 수 없어요.`, run);
+    else run();
+  };
   const placeVisitSuggestions = React.useMemo(() => (historyTab === 'suggest' && typeof onSavePlace === 'function'
     ? buildPlaceVisitSuggestions({ places: getCalendarPlaces(calendar), photos: historyPhotoEntries, getPhotoDates: photo => parseHistoryDateTokens(photo?.tags || ''), today: todayStr })
     : []), [historyTab, historyPhotoEntries, calendar, onSavePlace, todayStr]);
@@ -2431,10 +2442,7 @@ export function HistoryView({
       if (ok === false) throw new Error('save');
       showUndoableToast(showToast, `${visit.place.alias || visit.place.name} 방문 기록 ${visit.dates.length}건을 추가했어요.`, () => revertPlaceSave(placesBefore));
       return true;
-    } catch (_) {
-      showToast?.('방문 기록을 저장하지 못했습니다.', 'error');
-      return false;
-    }
+    } catch (_) { showToast?.('방문 기록을 저장하지 못했습니다.', 'error'); return false; }
   };
   // Merge, never delete: the server checks the copies are the same file, points every chat,
   // memo and album place showing a copy at the kept photo (same position), merges tags and moves
@@ -3960,8 +3968,7 @@ export function HistoryView({
       onApply: (photos, tag) => applySuggestedTags([{ photos, tag }]),
       onApplyAll: () => {
         const run = () => { void applySuggestedTags((tagSuggestions?.groups || []).map(group => ({ photos: group.photos, tag: group.tag }))); };
-        const count = tagSuggestions?.autoPhotoCount || 0;
-        if (typeof onRequestConfirm === 'function') onRequestConfirm('추천 태그 모두 적용', `사진 ${count}장에 추천된 장소·날짜 태그를 붙일까요? 기존 태그는 그대로 두고, 직후에 되돌릴 수 있어요.`, run);
+        if (typeof onRequestConfirm === 'function') onRequestConfirm('추천 태그 모두 적용', `사진 ${tagSuggestions?.autoPhotoCount || 0}장에 추천된 장소·날짜 태그를 붙일까요? 기존 태그는 그대로 두고, 직후에 되돌릴 수 있어요.`, run);
         else run();
       },
       renderGrid: renderArchivePhotoGrid,
@@ -3971,9 +3978,11 @@ export function HistoryView({
       similar: similarSuggestions,
       onRemoveDuplicate: dup => {
         const run = () => { void mergeDuplicateCopies(dup); };
-        if (typeof onRequestConfirm === 'function') onRequestConfirm('중복 사진 합치기', `같은 사진 ${dup.extra.length + 1}장을 1장으로 합칠까요? 채팅·메모의 사진은 그대로 보이고, 태그와 댓글은 모두 합쳐져요. 지워지는 사진은 없어요.`, run);
+        if (typeof onRequestConfirm === 'function') onRequestConfirm('중복 사진 합치기', `같은 사진 ${dup.extra.length + 1}장을 1장으로 합칠까요? 표시는 1장으로 통합되고 중복 파일은 삭제되며, 태그와 댓글은 모두 유지돼요.`, run);
         else run();
       },
+      onDismissSimilar: dismissSimilarGroup,
+      onDeleteSimilarOthers: deleteSimilarOthers,
       placeVisits: placeVisitSuggestions,
       onApplyPlaceVisit: applyPlaceVisit,
       faceGroups: faceSuggestions,

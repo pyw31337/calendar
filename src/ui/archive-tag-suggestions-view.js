@@ -154,10 +154,26 @@ function DuplicateCard({ dup, busy, onRemove, renderGrid }) {
   );
 }
 
-function SimilarCard({ group, renderGrid }) {
+function SimilarCard({ group, busy, onDismiss, onDeleteOthers, renderGrid }) {
   return h('div', { style: cardStyle },
-    h('div', { style: titleStyle }, `비슷한 사진 ${group.photos.length}장`),
-    h('div', { style: mutedStyle }, '서로 다른 파일이라 자동으로 합치지 않아요. 눌러서 확인하고, 필요 없는 사진만 사진 화면에서 지워 주세요.'),
+    h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
+      h('div', { style: titleStyle }, `비슷한 사진 ${group.photos.length}장`),
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+        typeof onDeleteOthers === 'function' && h('button', {
+          type: 'button',
+          disabled: busy,
+          onClick: () => onDeleteOthers(group),
+          style: { ...pillStyle(true), backgroundColor: '#ef4444', borderColor: '#ef4444', color: '#fff' }
+        }, '1장 남기고 삭제'),
+        typeof onDismiss === 'function' && h('button', {
+          type: 'button',
+          disabled: busy,
+          onClick: () => onDismiss(group),
+          style: pillStyle(false)
+        }, '제거')
+      )
+    ),
+    h('div', { style: mutedStyle }, '연사나 비슷한 구도로 찍힌 사진이에요. 첫 번째 사진을 남기고 나머지를 삭제하거나, 추천 목록에서 제외할 수 있어요.'),
     renderGrid(group.photos, `suggest_${group.id}`)
   );
 }
@@ -178,7 +194,7 @@ function PlaceVisitCard({ visit, busy, onApply, formatDate }) {
   );
 }
 
-export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onApplyAll, renderGrid, formatDate, selectKeyOf, duplicates = [], onRemoveDuplicate, similar = [], placeVisits = [], onApplyPlaceVisit, faceGroups = [], onRejectFaces }) {
+export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onApplyAll, renderGrid, formatDate, selectKeyOf, duplicates = [], onRemoveDuplicate, similar = [], onDismissSimilar, onDeleteSimilarOthers, placeVisits = [], onApplyPlaceVisit, faceGroups = [], onRejectFaces }) {
   const [personDaysShown, setPersonDaysShown] = React.useState(PERSON_DAYS_PAGE);
   const groups = suggestions?.groups || [];
   const personDays = suggestions?.personDays || [];
@@ -209,9 +225,16 @@ export function ArchiveTagSuggestions({ suggestions, loading, busy, onApply, onA
     placeVisits.length > 0 && typeof onApplyPlaceVisit === 'function' && h('div', { style: mutedStyle }, '이 장소 태그가 붙은 사진의 날짜를 장소 방문 기록에 더해요. 방문 예정 장소는 방문으로 바뀌어요.'),
     typeof onApplyPlaceVisit === 'function' && placeVisits.map(visit => h(PlaceVisitCard, { key: visit.id, visit, busy, onApply: onApplyPlaceVisit, formatDate: fmt })),
     duplicates.length > 0 && typeof onRemoveDuplicate === 'function' && sectionTitle(`중복 의심 사진 ${duplicates.length}묶음`),
-    duplicates.length > 0 && typeof onRemoveDuplicate === 'function' && h('div', { style: mutedStyle }, '같은 파일 크기로 몇 분 안에 다시 올라간 사진이에요. 똑같은 파일이면 1장으로 합치고, 태그와 댓글은 모두 남겨요. 지워지는 사진은 없어요.'),
+    duplicates.length > 0 && typeof onRemoveDuplicate === 'function' && h('div', { style: mutedStyle }, '같은 파일 크기로 다시 올라간 중복 사진이에요. 1장으로 합치면 중복 파일은 서버에서 삭제되고, 태그와 댓글은 남은 사진에 모두 유지돼요.'),
     typeof onRemoveDuplicate === 'function' && duplicates.slice(0, 12).map(dup => h(DuplicateCard, { key: dup.id, dup, busy, onRemove: onRemoveDuplicate, renderGrid })),
     similar.length > 0 && sectionTitle(`비슷한 사진 ${similar.length}묶음`),
-    similar.slice(0, 12).map(group => h(SimilarCard, { key: group.id, group, renderGrid }))
+    similar.slice(0, 12).map(group => h(SimilarCard, {
+      key: group.id,
+      group,
+      busy,
+      onDismiss: onDismissSimilar,
+      onDeleteOthers: onDeleteSimilarOthers,
+      renderGrid
+    }))
   );
 }

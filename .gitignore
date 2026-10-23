@@ -32,5 +32,14 @@ ops-backups/
 scripts/data/*
 !scripts/data/culture-poster-cache.json
 
+# Design QA captures are generated evidence and may contain live calendar data.
+# Keep the capture scripts/source inputs in Git, but do not track their reports
+# or screenshots by default.
+designv2/parity-shots/audit-live-capture/
+designv2/parity-shots/audit-live-user/
+designv2/parity-shots/**/report.json
+designv2/parity-shots/**/pre-report.json
+designv2/parity-shots/**/default-report.json
+
 # Firestore emulator logs
 firestore-debug.log

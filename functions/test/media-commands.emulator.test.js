@@ -244,8 +244,14 @@ test('mergeAssets points identical copies at the kept file, moves comments, and 
   assert.equal(album[0].id, 'x');
   assert.equal((await root.collection('photoCommentItems').doc('c1').get()).data().assetKey, keyOf(keep));
   assert.deepEqual((await root.collection('messages').doc('mk').get()).data().imageTags, ['서준 고성']);
-  assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], true, 'the file is kept');
-  assert.equal((await db.collection('storageGc').get()).size, 0);
+  assert.equal((await root.collection('photoIndex').doc(keyOf(dup)).get()).exists, false, 'duplicate photoIndex is deleted');
+  assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], true, 'the file exists during grace period');
+  assert.equal((await db.collection('storageGc').get()).size, 1, 'queued for GC');
+
+  const sweep = await sweepStorageGc({ db, bucket, now: 5 + GC_GRACE_MS + 1000 });
+  assert.equal(sweep.deleted, 1);
+  assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], false, 'duplicate file is deleted from Storage');
+  assert.equal((await bucket.file('chatImages/testcal/k_original.jpg').exists())[0], true, 'kept file is preserved in Storage');
 });
 
 

@@ -546,7 +546,7 @@ async function mergeAssets({ db, bucket, calendarDocId, keep, extras, tags, now 
   const keepMd5 = await storageMd5(bucket, keepFile.imageUrl);
   if (!keepMd5) return { ok: false, reason: 'keep-file-missing' };
   const value = sanitizeTagText(tags);
-  const result = { ok: true, assetKey: keepKey, merged: [], notIdentical: [], slotsRepointed: 0, albumEntriesMoved: 0, commentsMoved: 0 };
+  const result = { ok: true, assetKey: keepKey, merged: [], notIdentical: [], slotsRepointed: 0, albumEntriesMoved: 0, commentsMoved: 0, queuedStoragePaths: [] };
 
   for (const extra of list) {
     const extraKey = getPhotoAssetKey(extra?.imageUrl || extra?.thumbUrl);
@@ -610,9 +610,22 @@ async function mergeAssets({ db, bucket, calendarDocId, keep, extras, tags, now 
         if (!snap.exists) writes.push(() => tx.set(snap.ref, { createdAt: now, claimKey: snap.id, reason: 'merge-duplicate-photos' }));
       });
       comments.docs.forEach(doc => writes.push(() => tx.update(doc.ref, { assetKey: keepKey, mergedFrom: extraKey })));
+      writes.push(() => tx.delete(root.collection('photoIndex').doc(extraKey)));
+      const keepPaths = new Set([storagePathFromUrl(keepFile.imageUrl), storagePathFromUrl(keepFile.thumbUrl)].filter(Boolean));
+      const extraPaths = Array.from(new Set([
+        storagePathFromUrl(extraFile.imageUrl),
+        storagePathFromUrl(extraFile.thumbUrl),
+      ].filter(Boolean))).filter(path => !keepPaths.has(path));
+      extraPaths.forEach(path => {
+        writes.push(() => tx.set(db.collection('storageGc').doc(Buffer.from(path).toString('base64url')), {
+          path, calendarDocId, assetKey: extraKey, queuedAt: now, deleteAfter: now + GC_GRACE_MS,
+          reason: 'merge-duplicate-photos', allowOriginal: true,
+        }));
+      });
       writes.forEach(write => write());
       result.slotsRepointed += slots;
       result.albumEntriesMoved += album;
+      if (Array.isArray(result.queuedStoragePaths)) result.queuedStoragePaths.push(...extraPaths);
     });
     result.commentsMoved += comments.size;
     result.merged.push(extraKey);
@@ -696,10 +709,10 @@ async function sweepStorageGc({ db, bucket, now = Date.now(), limit = 200 }) {
     collectStoragePaths(calendarDoc.data()?.calendar?.places, referenced);
   }
   for (const doc of due.docs) {
-    const { path } = doc.data() || {};
+    const { path, allowOriginal, reason } = doc.data() || {};
     if (!path) { await doc.ref.delete(); continue; }
-    // Never delete originals even if somehow queued.
-    if (isOriginalStoragePath(path)) {
+    // Never delete originals even if somehow queued, unless duplicate photo merge explicitly allows it.
+    if (isOriginalStoragePath(path) && !allowOriginal && reason !== 'merge-duplicate-photos') {
       result.skippedOriginal += 1;
       await doc.ref.delete();
       continue;
