@@ -1,7 +1,7 @@
 {
   "id": "/calendar/",
-  "name": "모아엘가 캘린더",
-  "short_name": "모아엘가 캘린더",
+  "name": "렛츠 캘린더",
+  "short_name": "렛츠 캘린더",
   "description": "만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에.",
   "start_url": "./",
   "scope": "./",

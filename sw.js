@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '5821dad1df8061b784142f9f262c48b34bf95532';
+const BUILD_SHA = '32140f988dacc3f17b74494ac5ad76cd63ab17ef';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -287,14 +287,14 @@ async function serveStorageMedia(req) {
 // Web Notifications API path in index.html's notifyNewChatMessage() is a separate, tab-must-
 // be-open fallback that doesn't depend on this at all.
 self.addEventListener('push', event => {
-  let payload = { title: '모아엘가', body: '새 알림이 도착했습니다.', url: './', tag: 'gather-push' };
+  let payload = { title: '렛츠 캘린더', body: '새 알림이 도착했습니다.', url: './', tag: 'gather-push' };
   try {
     if (event.data) {
       try { payload = Object.assign(payload, event.data.json()); }
       catch (e) { payload.body = event.data.text() || payload.body; }
     }
   } catch (_) {}
-  const title = payload.title || '모아엘가';
+  const title = payload.title || '렛츠 캘린더';
   const scopeUrl = self.registration?.scope || (self.location.origin + '/calendar/');
   const iconUrl = new URL('icons/icon-v6-192.png', scopeUrl).href;
   const options = {
