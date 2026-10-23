@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const PROJECT_ID = 'metro-live-2918e';
 const BASE_URL = 'https://pyw31337.github.io/calendar';
-const OG_IMAGE_URL = `${BASE_URL}/og-thumb-v2.jpg?v=20260917`;
+const OG_IMAGE_URL = `${BASE_URL}/og-thumb-v3.jpg?v=20261023`;
 const OUT_DIR = path.resolve('share');
 const FALLBACK_TITLE = '소모임 올인원 캘린더';
 const FALLBACK_DESCRIPTION = '만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에.';
