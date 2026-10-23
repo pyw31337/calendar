@@ -25,11 +25,11 @@ run_bounded() {
   local watchdog="$!"
   set +e
   wait "$child"
-  local status="$?"
+  local exit_code="$?"
   set -e
   kill "$watchdog" 2>/dev/null || true
   wait "$watchdog" 2>/dev/null || true
-  return "$status"
+  return "$exit_code"
 }
 
 # Pull only a clean main checkout. Local uncommitted work is never overwritten.
