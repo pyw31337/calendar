@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="312652450c33cb7d37b3c840381b401c4076be3a" />
+    <meta name="build-sha" content="d066559b8486a830fcd22a3067426d4e9da602e6" />
     <meta name="v2-polish" content="2026-09-21-search-page" />
     <title>렛츠 캘린더</title>
     <meta name="description" content="만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에." />
@@ -15,14 +15,14 @@
     <meta property="og:site_name" content="렛츠 캘린더" />
     <meta property="og:title" content="렛츠 캘린더" />
     <meta property="og:description" content="만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에." />
-    <meta property="og:image" content="https://pyw31337.github.io/calendar/og-thumb-v4.jpg?v=20261023-lets" />
+    <meta property="og:image" content="https://pyw31337.github.io/calendar/og-thumb-v5.jpg?v=20261023-calendar" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:url" content="https://pyw31337.github.io/calendar/" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="렛츠 캘린더" />
     <meta name="twitter:description" content="만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에." />
-    <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb-v4.jpg?v=20261023-lets" />
+    <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb-v5.jpg?v=20261023-calendar" />
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
          Vite entry actually served by dist/), so the deployed site never linked a manifest at
          all -- beforeinstallprompt/"홈 화면에 추가" had no valid installability signal to fire
@@ -30,7 +30,7 @@
          reach dist/. No beforeinstallprompt capture script here on purpose: this app has no
          custom install-prompt UI (see PR #236), so Chromium's own default install affordance
          (address-bar icon / mini-infobar) is left to handle itself undisturbed. -->
-    <link rel="apple-touch-icon" href="icons/icon-v6-apple-touch.png" />
+    <link rel="apple-touch-icon" href="icons/icon-v7-apple-touch.png" />
     <!-- iOS home-screen launch images (scripts/generate-ios-splash.mjs): without them iOS shows a
          white screen from the tap until this page paints and #app-splash appears. Each one is that
          splash's first frame for one iPhone screen size. -->
@@ -45,15 +45,10 @@
     <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/splash/launch-828x1792.jpg" />
     <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/launch-1242x2208.jpg" />
     <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="icons/splash/launch-750x1334.jpg" />
-    <!-- Browser tab only. No large rel="icon" here: Samsung Internet uses the biggest rel="icon"
-         for "홈 화면에 추가" instead of the manifest, which put the transparent favicon on the
-         home screen. Home-screen icons come from manifest*.json / apple-touch-icon. -->
-    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v3-32.png" />
-    <!-- 96px transparent M: large enough that mobile browsers (tab strip, history) use it
-         instead of borrowing the filled apple-touch/manifest icon, still well below the
-         192px they take for a home-screen shortcut. -->
-    <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-v3-96.png" />
-    <link rel="icon" href="favicon.ico" />
+    <!-- Browser-tab favicon: transparent calendar-only mark. Home-screen icons come from
+         manifest*.json / apple-touch-icon so Samsung Internet does not reuse this small mark. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v4-32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-v4-96.png" />
     <meta name="theme-color" content="#4F46E5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -418,7 +413,7 @@
         50% { transform: scale(1.3); opacity: 1; }
       }
     </style>
-    <script type="module" crossorigin src="/calendar/assets/index-9pRf3ojE.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-x-WDoJbv.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-DFLxtAlF.js">
@@ -433,7 +428,7 @@
         <div class="app-splash-icon-wrap">
           <div class="app-splash-ring"></div>
           <div class="app-splash-icon-box">
-            <img class="app-splash-icon" src="icons/icon-v6-192.png" alt="렛츠 캘린더" width="92" height="92" />
+            <img class="app-splash-icon" src="icons/icon-v7-192.png" alt="렛츠 캘린더" width="92" height="92" />
             <div class="app-splash-glint"></div>
           </div>
         </div>

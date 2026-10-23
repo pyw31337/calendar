@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '312652450c33cb7d37b3c840381b401c4076be3a';
+const BUILD_SHA = 'd066559b8486a830fcd22a3067426d4e9da602e6';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 // Uploaded photos/posters/files live at unique, never-overwritten Firebase Storage paths
 // (timestamped names, see app-image-pipeline.js), so a copy fetched once is valid forever.
@@ -24,14 +24,16 @@ const MEDIA_CACHE_MAX_ENTRIES = 800;
 const MEDIA_CACHE_MAX_BYTES_PER_ITEM = 8 * 1024 * 1024;
 const STATIC_ASSETS = [
   'favicon.ico',
+  'icons/favicon-v4-32.png',
+  'icons/favicon-v4-96.png',
   'manifest.json',
   'manifest-kkot.json',
   'manifest-cw.json',
   'manifest-jhair.json',
-  'icons/icon-v6-192.png',
-  'icons/icon-v6-512.png',
-  'icons/icon-v6-512-maskable.png',
-  'icons/icon-v6-apple-touch.png'
+  'icons/icon-v7-192.png',
+  'icons/icon-v7-512.png',
+  'icons/icon-v7-512-maskable.png',
+  'icons/icon-v7-apple-touch.png'
 ];
 
 self.addEventListener('install', event => {
@@ -296,7 +298,7 @@ self.addEventListener('push', event => {
   } catch (_) {}
   const title = payload.title || '렛츠 캘린더';
   const scopeUrl = self.registration?.scope || (self.location.origin + '/calendar/');
-  const iconUrl = new URL('icons/icon-v6-192.png', scopeUrl).href;
+  const iconUrl = new URL('icons/icon-v7-192.png', scopeUrl).href;
   const options = {
     body: payload.body || '',
     icon: iconUrl,
