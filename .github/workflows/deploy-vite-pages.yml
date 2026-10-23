@@ -30,7 +30,11 @@ jobs:
       - name: Check Vite build output budget
         run: npm run check:dist-budget
       - name: Install Chromium for browser smoke
-        run: npx playwright install --with-deps chromium
+        # GitHub-hosted Ubuntu runners already provide the system libraries needed
+        # by Chromium. Avoid apt-based --with-deps here: it can hang indefinitely
+        # behind a runner package mirror and prevent an otherwise healthy build
+        # from ever reaching the Pages publish step.
+        run: npx playwright install chromium
       - name: Run browser smoke before publishing artifact
         # The deploy gate covers every calendar's core routes plus representative desktop/mobile
         # interactions. The exhaustive 3-engine matrix remains a local release gate; running all
