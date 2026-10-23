@@ -668,7 +668,7 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '');
-    new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
+    new Notification(`${calendar?.title || '렛츠 캘린더'} · ${participantName}`, {
       body,
       tag: `chat-${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
@@ -690,7 +690,7 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
   const body = `${whenLabel} 모임입니다. ${label}`;
   if (isNotificationSupported() && Notification.permission === 'granted') {
     try {
-      new Notification(`${calendar?.title || '모여라 캘린더'} 모임 알림`, {
+      new Notification(`${calendar?.title || '렛츠 캘린더'} 모임 알림`, {
         body,
         tag: `meeting-reminder-${calendar?.id}-${meeting.date}`
       });
@@ -875,10 +875,10 @@ function getPinnedNotices(calendar) {
 }
 
 // The chat room header is cramped for space (back button + title + bell + share icons all
-// competing for one row), so strip a trailing "모여라 캘린더" from a calendar's title there --
+// competing for one row), so strip a trailing "렛츠 캘린더" from a calendar's title there --
 // it's just the app's own name and is redundant once already inside the app.
 function formatChatHeaderTitle(title) {
-  return (title || '').replace(/\s*모여라\s*캘린더\s*$/, '').trim() || (title || '');
+  return (title || '').replace(/\s*렛츠\s*캘린더\s*$/, '').trim() || (title || '');
 }
 
 const isValidCalendarId = GATHER_APP_UTILS.isValidCalendarId;
@@ -977,7 +977,7 @@ const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
 // Builds a per-calendar Web App Manifest at runtime. Static manifest-<id>.json files only
 // ever covered kkot/cw (see the pwa-manifest-switch bootstrap script in <head>) -- any
 // calendar created since (calendar creation is no longer restricted to those two ids) fell
-// back to manifest.json's generic "모여라 캘린더" name, so "Add to Home Screen" installed
+// back to manifest.json's generic "렛츠 캘린더" name, so "Add to Home Screen" installed
 // every calendar under the same placeholder label instead of its own title.
 //
 // Every URL below (id/start_url/scope/icons) must be absolute, not just the icons: a manifest
@@ -989,7 +989,7 @@ const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
 // manual-instructions fallback even on an otherwise fully installable browser.
 function buildDynamicManifest(calendar) {
   const base = getAppBaseUrl();
-  const name = calendar.title ? `${calendar.title} 캘린더` : '모여라 캘린더';
+  const name = calendar.title ? `${calendar.title} 캘린더` : '렛츠 캘린더';
   const startUrl = `${base}?id=${calendar.id}`;
   return {
     id: startUrl,
@@ -3684,7 +3684,7 @@ function buildICSTimestamp() {
 // meeting for a calendar can be imported at once instead of one file per date.
 function buildCalendarConfirmedMeetingsICS(calendar, events) {
   const dtstamp = buildICSTimestamp();
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//모여라 캘린더//KO', 'CALSCALE:GREGORIAN'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//렛츠 캘린더//KO', 'CALSCALE:GREGORIAN'];
   events.forEach(({ dateStr, description }) => {
     lines.push(
       'BEGIN:VEVENT',

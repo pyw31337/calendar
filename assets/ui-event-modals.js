@@ -1976,7 +1976,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     ctx.fillRect(0, 0, W, 160);
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '700 22px sans-serif';
-    ctx.fillText(calendar?.title || '모여라 캘린더', 40, 60);
+    ctx.fillText(calendar?.title || '렛츠 캘린더', 40, 60);
     ctx.font = '900 34px sans-serif';
     ctx.fillText('회비 정산 결과', 40, 105);
     ctx.font = '500 18px sans-serif';
@@ -2039,7 +2039,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
     ctx.fillStyle = '#94A3B8';
     ctx.font = '500 13px sans-serif';
-    ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, 40, H - 30);
+    ctx.fillText(`렛츠 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, 40, H - 30);
 
     setShareImageUrl(canvas.toDataURL('image/png'));
   };

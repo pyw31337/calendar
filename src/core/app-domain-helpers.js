@@ -1425,7 +1425,7 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
-    const notice = new Notification(participantName || calendar?.title || '모아엘가', {
+    const notice = new Notification(participantName || calendar?.title || "Let's", {
       body,
       tag: message?.id ? `chat-cal_${calendar?.id}-${message.id}` : `chat-cal_${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
@@ -1714,10 +1714,10 @@ function getPinnedNotices(calendar) {
 }
 
 // The chat room header is cramped for space (back button + title + bell + share icons all
-// competing for one row), so strip a trailing "모여라 캘린더" from a calendar's title there --
+// competing for one row), so strip a trailing "렛츠 캘린더" from a calendar's title there --
 // it's just the app's own name and is redundant once already inside the app.
 function formatChatHeaderTitle(title) {
-  return (title || '').replace(/\s*모여라\s*캘린더\s*$/, '').trim() || (title || '');
+  return (title || '').replace(/\s*렛츠\s*캘린더\s*$/, '').trim() || (title || '');
 }
 
 function isValidCalendarId(id) {
@@ -1923,7 +1923,7 @@ const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
 // Builds a per-calendar Web App Manifest at runtime. Static manifest-<id>.json files only
 // ever covered kkot/cw (see the pwa-manifest-switch bootstrap script in <head>) -- any
 // calendar created since (calendar creation is no longer restricted to those two ids) fell
-// back to manifest.json's generic "모여라 캘린더" name, so "Add to Home Screen" installed
+// back to manifest.json's generic "렛츠 캘린더" name, so "Add to Home Screen" installed
 // every calendar under the same placeholder label instead of its own title.
 //
 // Every URL below (id/start_url/scope/icons) must be absolute, not just the icons: a manifest
@@ -1935,7 +1935,7 @@ const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
 // manual-instructions fallback even on an otherwise fully installable browser.
 function buildDynamicManifest(calendar) {
   const base = getAppBaseUrl();
-    const name = calendar.title ? `${calendar.title} 캘린더` : '모아엘가 캘린더';
+    const name = calendar.title ? `${calendar.title} 캘린더` : '렛츠 캘린더';
   const startUrl = `${base}?id=${calendar.id}`;
   return {
     id: startUrl,
@@ -1973,7 +1973,7 @@ let activeManifestBlobUrl = null;
 // stably-addressable manifest file removes that variable entirely. Calendars outside this map
 // (any created since calendar creation stopped being restricted to kkot/cw) still fall back to
 // the blob-generated manifest below so they at least get their own title instead of the generic
-// "모여라 캘린더" placeholder -- accepting that install-identity risk only for that admin-only,
+// "렛츠 캘린더" placeholder -- accepting that install-identity risk only for that admin-only,
 // rarely-installed-to-home-screen case.
 function applyDynamicManifest(calendar) {
   try {

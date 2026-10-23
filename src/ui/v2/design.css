@@ -1632,7 +1632,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 /* (mobile consistency) always-show override removed — progressive rules above */
 
 
-/* Side-nav service brand (모여라 캘린더) — outline icon + text + cal pill */
+/* Side-nav service brand (렛츠 캘린더) — outline icon + text + cal pill */
 .v2-design .bp-side-nav-brand {
   display: inline-flex;
   align-items: center;

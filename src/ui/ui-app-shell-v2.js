@@ -340,10 +340,10 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab, chatSen
  */
 function TopHeader({ calendarName, onOpenCalendarSettings, onOpenAnniversaries }) {
   const React = window.React;
-  const brandName = String(calendarName || '모아엘가')
-    .replace(/^[^\p{L}\p{N}]+/u, '')
-    .replace(/\s*캘린더\s*$/u, '')
-    .trim();
+  // The calendar title is user data (for example, "모아엘가") and must not
+  // leak into the service-brand slot.  Keep the product identity stable so
+  // every calendar consistently presents the Let's brand.
+  const brandName = "Let's";
   return React.createElement('div', { className: bentoClass('bento-title v2-title-row') },
     React.createElement('div', { className: bentoClass('bento-title-brand') },
       React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -1977,7 +1977,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
       onOpenGalleryAnalysis
     }),
     React.createElement('footer', { className: bentoClass('renewal-home-footer footer') },
-      React.createElement('span', null, 'Copyright © 2026 모아엘가. All Rights Reserved.'),
+      React.createElement('span', null, 'Copyright © 2026 렛츠 캘린더. All Rights Reserved.'),
       React.createElement('span', { className: bentoClass('renewal-home-footer-links links') },
         React.createElement('b', null, 'FAMILY LINK'), React.createElement('b', null, '밖에눈오나'), React.createElement('b', null, 'Culture Flow')
       )
@@ -4593,7 +4593,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           className: bentoClass('side-nav-brand-icon'),
           'aria-hidden': 'true',
         }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: cleanCalBadge(calendarName) || '모아엘가' }, cleanCalBadge(calendarName) || '모아엘가')
+        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: "Let's" }, "Let's")
       ),
       // 지금 이 기기에서 쓰는 참여자 (core/current-participant.js). Tap to switch; chat, memo,
       // comments and likes all follow.

@@ -129,7 +129,7 @@ function ImageShareViewer({ shareId }) {
     }),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: '0.78rem', color: 'rgba(255,255,255,0.72)', textAlign: 'center' }
-    }, "모여라 캘린더 공유 이미지")
+    }, "렛츠 캘린더 공유 이미지")
   ));
 }
 

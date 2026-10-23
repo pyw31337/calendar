@@ -147,7 +147,7 @@ function UserManualOverlay({ calendar, onClose }) {
     style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '999px', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', fontSize: '0.78rem', fontWeight: 900, marginBottom: '10px' }
   }, "첫 사용자를 위한 빠른 안내"), /*#__PURE__*/React.createElement("h2", {
     style: { margin: 0, fontSize: 'clamp(1.45rem, 4vw, 2.2rem)', lineHeight: 1.12, letterSpacing: '-0.04em', fontWeight: 950 }
-  }, "모여라 캘린더 사용법"), /*#__PURE__*/React.createElement("p", {
+  }, "렛츠 캘린더 사용법"), /*#__PURE__*/React.createElement("p", {
     style: { margin: '10px 0 0', color: 'var(--text-muted)', fontSize: 'clamp(0.9rem, 2.5vw, 1rem)', lineHeight: 1.55 }
   }, calendar?.title ? `${calendar.title}에서 날짜를 고르고, 본인 일정을 등록하고, 모두가 좋은 날짜를 확정하는 흐름입니다.` : "날짜를 고르고, 본인 일정을 등록하고, 모두가 좋은 날짜를 확정하는 흐름입니다.")), /*#__PURE__*/React.createElement("button", {
     type: "button",

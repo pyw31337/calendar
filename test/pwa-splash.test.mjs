@@ -33,7 +33,7 @@ test('PWA splash screen dismiss logic is integrated into main.jsx boot lifecycle
   assert.match(mainJs, /showBootStatus[\s\S]*?app-splash[\s\S]*?splash\.remove\(\)/, 'showBootStatus cleans up splash overlay');
   // The normal "loading" status at the start of boot() must leave the splash up; it used to
   // remove it ~0.2-0.5s after launch, so phones showed a gray loading line instead.
-  assert.match(mainJs, /showBootStatus\('모아엘가 캘린더 불러오는 중…', \{ keepSplash: true \}\)/);
+  assert.match(mainJs, /showBootStatus\('렛츠 캘린더 불러오는 중…', \{ keepSplash: true \}\)/);
 });
 
 test('iOS launch images exist for every linked iPhone size', () => {

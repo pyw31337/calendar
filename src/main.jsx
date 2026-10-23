@@ -313,7 +313,7 @@ window.__gatherLoadViewUi = loadViewUi;
 
 async function boot() {
   try {
-    showBootStatus('모아엘가 캘린더 불러오는 중…', { keepSplash: true });
+    showBootStatus('렛츠 캘린더 불러오는 중…', { keepSplash: true });
     // Loaded and awaited FIRST, before any of the dynamic imports below -- an earlier version
     // kicked this off in parallel with them to save a little latency, but that meant it was
     // competing for bandwidth with ~30 concurrent chunk fetches on a slow/cold mobile connection
