@@ -1,6 +1,6 @@
 {
   "name": "functions",
-  "description": "Cloud Functions for Moyeora Calendar",
+  "description": "Cloud Functions for Let's Calendar",
   "scripts": {
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",

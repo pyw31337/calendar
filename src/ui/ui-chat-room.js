@@ -2,6 +2,7 @@
  * Chat room view (P4-16)
  */
 
+import { stableUiComponent } from '../core/lazy-ui-proxy.js';
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
 import { useChatTypingPresence } from '../core/chat-typing-presence.js';
 import { findMemoShareUrlInText } from '../core/memo-share-link.js';
@@ -410,7 +411,7 @@ export function ChatRoomView({
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
-  const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const Lightbox = stableUiComponent('Lightbox', __comp) || __deps.Lightbox;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
   const getActiveParticipants = __deps.getActiveParticipants;
   const extractFirstUrl = __deps.extractFirstUrl;

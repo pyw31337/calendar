@@ -2,6 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
+import { stableUiComponent } from '../core/lazy-ui-proxy.js';
 import { LikeButton } from './like-button.js';
 import { KOREA_REGIONS } from '../core/korean-regions.js';
 import { identityLabels, photoTagTokens } from '../core/photo-tag-identity.js';
@@ -656,7 +657,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
-  const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const Lightbox = stableUiComponent('Lightbox', __comp) || __deps.Lightbox;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     const countStr = String(count);
@@ -1420,7 +1421,7 @@ export function HistoryView({
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
-  const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const Lightbox = stableUiComponent('Lightbox', __comp) || __deps.Lightbox;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;

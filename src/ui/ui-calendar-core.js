@@ -1,3 +1,4 @@
+import { stableUiComponent } from '../core/lazy-ui-proxy.js';
 import { shortParticipantName } from './v2/view-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { routeSearchParams } from '../core/app-address.js';
@@ -1336,7 +1337,7 @@ export function CommentsSection({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
-  const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const Lightbox = stableUiComponent('Lightbox', __comp) || __deps.Lightbox;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const getActiveParticipants = __deps.getActiveParticipants;

@@ -7,7 +7,7 @@
  * client filename -- Storage paths are generated (`chatImages/<calId>/<stamp>_<rand>_<index>_
  * original_<sizeBytes>b.<ext>`, see uploadChatImageAssets in app-image-pipeline.js), and the
  * only "filename" a user ever sees is synthesized from the message timestamp + extension
- * (buildLightboxImageInfo in app-chat-render.js: `moyeora_YYYYMMDD_HHMMSS.ext`). So "same
+ * (buildLightboxImageInfo in app-chat-render.js: `letscalendar_YYYYMMDD_HHMMSS.ext`). So "same
  * filename" as a user would judge it by eye is already equivalent to "same extension + same
  * timestamp (to the second)" -- this module treats it that way, and adds byte size (embedded in
  * every Storage URL, parsed with no extra network request) as the fourth, independent signal

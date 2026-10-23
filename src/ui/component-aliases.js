@@ -5,6 +5,7 @@
  * compatibility, but this bridge loads the owning chunk only when React first needs it. That
  * keeps archive/gallery/admin code out of calendar startup without changing the old contract.
  */
+import { stableUiComponent } from '../core/lazy-ui-proxy.js';
 
 const iconNames = [
   'PhotoCommentCountBadge', 'KakaoTalkIcon', 'MenuIcon', 'CakeIcon', 'BalloonIcon', 'ConfettiIcon',
@@ -56,7 +57,7 @@ register(['AdminDashboard', 'AdminModal', 'AdminUnifiedSearchResultsView', 'Admi
 
 const componentLoadPromises = new Map();
 function currentComponent(name) {
-  return window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS[name];
+  return stableUiComponent(name, window.GATHER_UI_COMPONENTS);
 }
 function loadComponent(name) {
   if (typeof currentComponent(name) === 'function') return Promise.resolve();

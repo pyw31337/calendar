@@ -31,6 +31,21 @@ export function createLazyComponent(React, name, loadChunk, registry = () => win
   return LazyUiComponent;
 }
 
+// When a chunk loads it replaces its placeholder in the registry. A render site that looked the
+// name up before that and again after would get two different component types, and React would
+// throw away whatever the first one had open and mount a fresh one: a date popup opened right
+// after app start blinked about a second later and lost the tab that had just been tapped. So once
+// a placeholder has been handed out, every later lookup gets that same placeholder (it renders the
+// real component inside itself); a name first looked up after its chunk loaded gets the real one.
+const handedOutPlaceholders = new Map();
+export function stableUiComponent(name, registry = (typeof window !== 'undefined' && window.GATHER_UI_COMPONENTS) || {}) {
+  const pinned = handedOutPlaceholders.get(name);
+  if (pinned) return pinned;
+  const current = registry && registry[name];
+  if (typeof current === 'function' && current.__lazyUiProxy) handedOutPlaceholders.set(name, current);
+  return current;
+}
+
 /**
  * `specs`: { chunkKey: { load: () => import(...), components: ['DateModal', ...] } }.
  * Returns a prefetch() that loads every chunk once.
