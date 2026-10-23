@@ -4558,11 +4558,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const chatPillColor = chatAuthorPart?.color || lastChatAuthorInfo.color || '#EF4444';
 
   const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places' || activeTab === 'search';
-  const cleanCalBadge = (value) => String(value || '')
-    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]/gu, '')
-    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
 
   // Per-tab side-nav submenu content (see the `is-tab-menu` group inside `bentoSideNav` below).
   // 캘린더's three items are static (openMoreModalById covers them directly); every other tab's
