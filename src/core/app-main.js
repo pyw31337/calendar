@@ -4594,7 +4594,9 @@ function CalendarApp() {
           const keys = getMediaIdentityKeys({
             source: 'meeting',
             meetingDate: dateStr,
-            photoId
+            photoId,
+            sourceMessageId: newMessageId,
+            sourceImageIndex: idx
           }, { source: 'meeting', meetingDate: dateStr });
           newRefs.push({
             id: photoId,
@@ -4604,6 +4606,7 @@ function CalendarApp() {
             source: 'lightbox-tag',
             sourceMessageId: newMessageId || '',
             sourceImageIndex: idx,
+            meetingDate: dateStr,
             tags: dateStrToHashtag(dateStr),
             assetKey: keys.assetKey,
             mediaKey: keys.mediaKey,
@@ -4623,6 +4626,23 @@ function CalendarApp() {
         : m);
       const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${newRefs.length}장 일정 사진 추가`);
       const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '일정 사진 저장완료', photoLog ? [photoLog] : []);
+      if (ok && typeof galleryPhotoIndex?.upsertItems === 'function') {
+        // Cloud Functions update photoIndex asynchronously. Feed the exact rows we
+        // just stored into the shared gallery state so the home strip and gallery
+        // page render the upload immediately, then let the server row replace the
+        // temporary item through photo-index identity reconciliation.
+        galleryPhotoIndex.upsertItems(newRefs.map(photo => ({
+          ...photo,
+          full: photo.imageUrl,
+          thumb: photo.thumbUrl || photo.imageUrl,
+          imageIndex: photo.sourceImageIndex,
+          messageId: photo.sourceMessageId,
+          uploadSource: 'meeting',
+          text: `${dateStr} 일정 사진`,
+          indexBacked: false,
+          timestamp: Number(photo.createdAt) || now
+        })));
+      }
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '일정 사진 저장 완료' });
       if (failedCount > 0) showRetryableUploadToast(`${successfulImages.length}장 저장 완료, ${failedCount}장은 실패했습니다. 실패한 사진만 다시 시도할 수 있습니다.`, () => handleAddMeetingPhotos(dateStr, failedFiles), 7000);
       return ok;

@@ -222,6 +222,59 @@ function mapPhotoIndexRow(row, decodeDocument) {
   };
 }
 
+// A locally-uploaded meeting photo can be visible before the Cloud Function has
+// denormalized its message into photoIndex. Keep the temporary row separate from
+// the server row and collapse it as soon as either the canonical asset URL or the
+// durable message slot appears in a fetched page.
+function photoIndexIdentityKeys(item = {}) {
+  const keys = [];
+  const push = value => {
+    const key = String(value || '').trim();
+    if (key && !keys.includes(key)) keys.push(key);
+  };
+  push(item.assetKey);
+  push(item.mediaKey);
+  push(item.refKey);
+  const sourceMessageId = String(item.sourceMessageId || item.messageId || '').trim();
+  const sourceImageIndex = Number.isInteger(item.sourceImageIndex)
+    ? item.sourceImageIndex
+    : (Number.isInteger(item.imageIndex) ? item.imageIndex : null);
+  if (sourceMessageId && sourceImageIndex != null) push(`slot:${sourceMessageId}:${sourceImageIndex}`);
+  push(item.full || item.imageUrl || item.url);
+  push(item.thumb || item.thumbUrl);
+  return keys;
+}
+
+function photoIndexItemsShareIdentity(left, right) {
+  const rightKeys = new Set(photoIndexIdentityKeys(right));
+  return photoIndexIdentityKeys(left).some(key => rightKeys.has(key));
+}
+
+function mergePhotoIndexItems(preferred, fallback) {
+  const output = [];
+  const add = (item, replace = false) => {
+    if (!item) return;
+    const index = output.findIndex(existing => photoIndexItemsShareIdentity(existing, item));
+    if (index >= 0) {
+      if (replace) output[index] = item;
+      return;
+    }
+    output.push(item);
+  };
+  (Array.isArray(preferred) ? preferred : []).forEach(item => add(item));
+  (Array.isArray(fallback) ? fallback : []).forEach(item => add(item));
+  return output;
+}
+
+// Exported for the upload path and for plain-node tests. Server rows win when a
+// fetched item represents the same photo; unmatched local rows remain at the top.
+export function mergeOptimisticPhotoIndexItems(optimisticItems, fetchedItems) {
+  const fetched = Array.isArray(fetchedItems) ? fetchedItems : [];
+  const pending = (Array.isArray(optimisticItems) ? optimisticItems : [])
+    .filter(item => !fetched.some(serverItem => photoIndexItemsShareIdentity(item, serverItem)));
+  return [...pending, ...mergePhotoIndexItems(fetched, [])];
+}
+
 function cursorAfterRow(row) {
   const timestamp = row?.document?.fields?.timestamp;
   const name = row?.document?.name;
@@ -505,6 +558,7 @@ export function reconcilePhotoIndexTagItems(calendarId, _previousItems, fetchedI
 
 export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId, decodeDocument }) {
   const [state, setState] = React.useState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
+  const optimisticItemsRef = React.useRef([]);
   const loadPage = React.useCallback(async (page = 1, options = {}) => {
     if (!calendarId) return false;
     const requestedPage = Math.max(1, Number(page) || 1);
@@ -525,7 +579,15 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         force: Boolean(options.force), cacheRevision: summary.version
       });
       setState(previous => {
-        const merged = reconcilePhotoIndexTagItems(calendarId, previous.items, items);
+        const serverItems = reconcilePhotoIndexTagItems(calendarId, previous.items, items);
+        const merged = requestedPage === 1
+          ? mergeOptimisticPhotoIndexItems(optimisticItemsRef.current, serverItems)
+          : serverItems;
+        if (requestedPage === 1) {
+          optimisticItemsRef.current = optimisticItemsRef.current.filter(item =>
+            !serverItems.some(serverItem => photoIndexItemsShareIdentity(item, serverItem))
+          );
+        }
         return {
           // Do not call an empty first filtered page a fallback yet. The count resolves whether
           // the index really has no gallery rows; page one may contain only content posters.
@@ -571,12 +633,17 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       const pages = await fetchAllPhotoIndexPages({
         calendarId, projectId, pageCount, decodeDocument, cacheRevision: summary.version
       });
+      const serverItems = filterGalleryPhotoIndexItems(pages.flat());
+      const mergedItems = mergeOptimisticPhotoIndexItems(optimisticItemsRef.current, serverItems);
+      optimisticItemsRef.current = optimisticItemsRef.current.filter(item =>
+        !serverItems.some(serverItem => photoIndexItemsShareIdentity(item, serverItem))
+      );
       setState(previous => ({
         status: 'ready',
         items: reconcilePhotoIndexTagItems(
           calendarId,
           previous.items,
-          filterGalleryPhotoIndexItems(pages.flat())
+          mergedItems
         ),
         total,
         page: previous.page || 1,
@@ -590,6 +657,17 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       return false;
     }
   }, [calendarId, projectId, decodeDocument]);
+  const upsertItems = React.useCallback(items => {
+    const incoming = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!incoming.length) return;
+    optimisticItemsRef.current = mergePhotoIndexItems(incoming, optimisticItemsRef.current);
+    setState(previous => ({
+      ...previous,
+      status: previous.status === 'idle' || previous.status === 'loading' ? 'ready' : previous.status,
+      items: mergePhotoIndexItems(incoming, previous.items),
+      total: Math.max(Number(previous.total) || 0, mergePhotoIndexItems(incoming, previous.items).length)
+    }));
+  }, []);
   const patchItems = React.useCallback(updater => {
     setState(previous => {
       const current = Array.isArray(previous.items) ? previous.items : [];
@@ -616,6 +694,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     // home summary is permanently empty until the user visits Gallery.
     const shouldLoadPreview = activeView === 'calendar';
     if (!calendarId || (!shouldLoadPreview && activeView !== 'gallery' && activeView !== 'history')) {
+      optimisticItemsRef.current = [];
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
       return undefined;
     }
@@ -640,7 +719,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     const timerId = setTimeout(start, activeView === 'history' ? 120 : 350);
     return () => { cancelled = true; clearTimeout(timerId); };
   }, [calendarId, activeView, loadPage, loadAll]);
-  return { ...state, loadPage, loadAll, patchItems };
+  return { ...state, loadPage, loadAll, patchItems, upsertItems };
 }
 
 export { PAGE_SIZE as PHOTO_INDEX_PAGE_SIZE };

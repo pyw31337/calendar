@@ -49,3 +49,28 @@ test('a direct jump without a cursor falls back to offset, and loadAll walks eve
   assert.equal(bodies.length, 3);
   assert.ok(bodies.every(body => !body.offset));
 });
+
+test('an optimistic upload stays visible until the matching server index row arrives', () => {
+  const optimistic = {
+    source: 'meeting',
+    sourceMessageId: 'meeting-message-1',
+    sourceImageIndex: 0,
+    full: 'https://firebasestorage.googleapis.com/v0/b/demo/o/photo.jpg?token=local',
+    thumb: 'https://firebasestorage.googleapis.com/v0/b/demo/o/photo.jpg?token=local',
+    mediaKey: 'chat:meeting-message-1:0'
+  };
+  const fetchedDifferent = {
+    source: 'meeting',
+    sourceMessageId: 'meeting-message-2',
+    sourceImageIndex: 0,
+    full: 'https://firebasestorage.googleapis.com/v0/b/demo/o/other.jpg',
+    thumb: 'https://firebasestorage.googleapis.com/v0/b/demo/o/other.jpg',
+    mediaKey: 'chat:meeting-message-2:0'
+  };
+  assert.equal(m.mergeOptimisticPhotoIndexItems([optimistic], [fetchedDifferent]).length, 2);
+
+  const fetchedSame = { ...optimistic, indexBacked: true };
+  const merged = m.mergeOptimisticPhotoIndexItems([optimistic], [fetchedSame]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].indexBacked, true);
+});
