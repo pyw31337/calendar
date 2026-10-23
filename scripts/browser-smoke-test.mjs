@@ -46,7 +46,7 @@ const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}${LOCAL_BASE_PATH === '/' 
 
 const CALENDARS = [
   ['kkot', '꽃잎반'],
-  ['cw', '모아엘가'],
+  ['cw', "Let's Calendar"],
   ['jhair', '제이헤어']
 ];
 const VIEWS = [
