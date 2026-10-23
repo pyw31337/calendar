@@ -7,6 +7,9 @@ WORKER_DIR="${0:A:h}"
 REPO_DIR="${MOYEORA_CULTURE_REPO_DIR:-${WORKER_DIR:h:h}}"
 REPORT_DIR="${MOYEORA_CULTURE_REPORT_DIR:-$HOME/Library/Application Support/Moyeora/culture-reports}"
 MODEL="${OLLAMA_CULTURE_MODEL:-}"
+AI_TIMEOUT="${MOYEORA_CULTURE_AI_TIMEOUT_SEC:-420}"
+AI_BATCH_SIZE="${OLLAMA_CULTURE_BATCH_SIZE:-8}"
+AI_REQUEST_TIMEOUT_MS="${OLLAMA_CULTURE_REQUEST_TIMEOUT_MS:-60000}"
 
 [[ -d "$REPO_DIR/.git" ]] || { print -u2 "Not a calendar checkout: $REPO_DIR"; exit 2; }
 mkdir -p "$REPORT_DIR"
@@ -60,11 +63,16 @@ run_bounded "${MOYEORA_CULTURE_QUALITY_TIMEOUT_SEC:-120}" \
   /usr/bin/env node scripts/culture-quality-report.mjs --strict --output="$REPORT_DIR/latest-quality.json"
 
 if [[ -n "$MODEL" ]]; then
-  run_bounded "${MOYEORA_CULTURE_AI_TIMEOUT_SEC:-180}" /usr/bin/env node scripts/culture-ai-review.mjs \
+  run_bounded "$AI_TIMEOUT" /usr/bin/env node scripts/culture-ai-review.mjs \
     --model="$MODEL" \
+    --batch-size="$AI_BATCH_SIZE" \
+    --timeout-ms="$AI_REQUEST_TIMEOUT_MS" \
     --output="$REPORT_DIR/latest-ai-review.json"
 else
-  run_bounded "${MOYEORA_CULTURE_AI_TIMEOUT_SEC:-180}" /usr/bin/env node scripts/culture-ai-review.mjs --output="$REPORT_DIR/latest-ai-review.json"
+  run_bounded "$AI_TIMEOUT" /usr/bin/env node scripts/culture-ai-review.mjs \
+    --batch-size="$AI_BATCH_SIZE" \
+    --timeout-ms="$AI_REQUEST_TIMEOUT_MS" \
+    --output="$REPORT_DIR/latest-ai-review.json"
 fi
 
 # Publishing is explicit. Set MOYEORA_CULTURE_PUSH=1 only on a dedicated checkout with a

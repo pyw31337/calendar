@@ -19,6 +19,8 @@
 
 `tools/local-culture-worker/run-culture-intelligence.sh`는 결정론적 동기화와 품질 리포트를 항상 실행하고, 애매한 동일 제목 그룹만 로컬 Ollama에 보낸다. Ollama의 응답은 JSON 스키마로 제한된 검토 사이드카(`culture-ai-review.json`)이며, 바로 공개 데이터에 반영하지 않는다. 제안은 근거와 신뢰도를 포함하고 별도 검토·회귀 테스트를 통과한 뒤 승격해야 한다.
 
+AI 검토는 한 번에 모든 그룹을 보내지 않고 작은 배치로 나눠 처리한다. 일부 배치가 로컬 모델의 응답 제한시간을 넘겨도 성공한 배치는 `partial` 리포트로 보존하며, 결정론적 동기화·품질 게이트·배포 결과에는 영향을 주지 않는다. 기본값은 배치 8개, 요청 60초, AI 전체 420초이며 Mac mini의 모델 성능에 따라 `OLLAMA_CULTURE_BATCH_SIZE`, `OLLAMA_CULTURE_REQUEST_TIMEOUT_MS`, `MOYEORA_CULTURE_AI_TIMEOUT_SEC`로 조정할 수 있다.
+
 `CulturePosterInsight.swift`는 Mac의 Apple Vision으로 포스터 OCR과 이미지 feature print를 생성할 수 있다. OCR은 서로 다른 제목/표기나 포스터 누락을 보완하는 후보를 만들고, feature print는 같은 포스터의 재수집 여부를 비교하는 후보 키로 쓴다. 사용자 사진·원본 포스터를 클라우드로 보내지 않는 것이 기본 정책이다.
 
 ## 품질 기준

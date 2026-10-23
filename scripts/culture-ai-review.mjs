@@ -17,6 +17,8 @@ const output = path.resolve(valueFor('--output', path.resolve(__dirname, 'data/c
 const host = String(valueFor('--ollama', process.env.OLLAMA_HOST || 'http://127.0.0.1:11434')).replace(/\/$/, '');
 const model = valueFor('--model', process.env.OLLAMA_CULTURE_MODEL || '');
 const limit = Math.max(1, Number(valueFor('--limit', '40')) || 40);
+const batchSize = Math.max(1, Number(valueFor('--batch-size', process.env.OLLAMA_CULTURE_BATCH_SIZE || '8')) || 8);
+const requestTimeoutMs = Math.max(10000, Number(valueFor('--timeout-ms', process.env.OLLAMA_CULTURE_REQUEST_TIMEOUT_MS || '60000')) || 60000);
 const required = args.includes('--required');
 
 function loadItems(file) {
@@ -119,27 +121,9 @@ const system = [
   'Mark sameProduction=true only when the evidence supports the same production and the records should be merged into one card.',
   'Do not invent dates, venues, links, or booking facts. Use an empty evidence array only when there is no evidence.'
 ].join(' ');
-const prompt = JSON.stringify({ task: 'Review the following same-normalized-title groups.', groups });
 
-try {
-  const response = await fetch(`${host}/api/chat`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      format: schema,
-      options: { temperature: 0, seed: 17 },
-      messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
-    }),
-    signal: AbortSignal.timeout(120000)
-  });
-  if (!response.ok) throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0, 240)}`);
-  const payload = await response.json();
-  const content = payload?.message?.content || '';
-  const parsed = JSON.parse(content);
-  const decisions = Array.isArray(parsed?.decisions) ? parsed.decisions : [];
-  const safeDecisions = decisions.filter(decision => {
+function sanitizeDecisions(decisions) {
+  return (Array.isArray(decisions) ? decisions : []).filter(decision => {
     const confidence = Number(decision.confidence);
     return typeof decision.canonicalId === 'string'
       && typeof decision.duplicateId === 'string'
@@ -151,8 +135,65 @@ try {
     confidence: Number(decision.confidence),
     evidence: Array.isArray(decision.evidence) ? decision.evidence.slice(0, 6).map(String) : []
   }));
-  writeReport({ ...baseReport, status: 'completed', modelResponse: { done: payload?.done === true, totalDurationNs: payload?.total_duration || null }, groups, decisions: safeDecisions });
-} catch (error) {
-  writeReport({ ...baseReport, status: 'unavailable', message: String(error?.message || error), groups });
-  if (required) process.exitCode = 1;
 }
+
+async function reviewBatch(batch) {
+  const prompt = JSON.stringify({ task: 'Review the following same-normalized-title groups.', groups: batch });
+  const response = await fetch(`${host}/api/chat`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      format: schema,
+      options: { temperature: 0, seed: 17 },
+      messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }]
+    }),
+    signal: AbortSignal.timeout(requestTimeoutMs)
+  });
+  if (!response.ok) throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0, 240)}`);
+  const payload = await response.json();
+  const content = payload?.message?.content || '';
+  const parsed = JSON.parse(content);
+  return {
+    decisions: sanitizeDecisions(parsed?.decisions),
+    response: { done: payload?.done === true, totalDurationNs: payload?.total_duration || null }
+  };
+}
+
+const decisions = [];
+const modelResponses = [];
+const failures = [];
+async function reviewBatchWithFallback(batch, start) {
+  if (!batch.length) return;
+  try {
+    const result = await reviewBatch(batch);
+    decisions.push(...result.decisions);
+    modelResponses.push({ start, count: batch.length, ...result.response });
+  } catch (error) {
+    // Smaller requests are more reliable on memory-constrained Mac minis. Split a timed-out
+    // batch before giving up so one slow group cannot discard the rest of the review pass.
+    if (batch.length > 1) {
+      const midpoint = Math.ceil(batch.length / 2);
+      await reviewBatchWithFallback(batch.slice(0, midpoint), start);
+      await reviewBatchWithFallback(batch.slice(midpoint), start + midpoint);
+      return;
+    }
+    failures.push({ start, count: batch.length, message: String(error?.message || error) });
+  }
+}
+
+for (let start = 0; start < groups.length; start += batchSize) {
+  await reviewBatchWithFallback(groups.slice(start, start + batchSize), start);
+}
+
+const status = failures.length === 0 ? 'completed' : (decisions.length ? 'partial' : 'unavailable');
+writeReport({
+  ...baseReport,
+  status,
+  modelResponse: { batchSize, requestTimeoutMs, batches: modelResponses },
+  groups,
+  decisions,
+  ...(failures.length ? { failures } : {})
+});
+if (required && failures.length) process.exitCode = 1;
