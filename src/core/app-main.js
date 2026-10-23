@@ -4633,6 +4633,7 @@ function CalendarApp() {
         // temporary item through photo-index identity reconciliation.
         galleryPhotoIndex.upsertItems(newRefs.map(photo => ({
           ...photo,
+          source: 'meeting',
           full: photo.imageUrl,
           thumb: photo.thumbUrl || photo.imageUrl,
           imageIndex: photo.sourceImageIndex,
