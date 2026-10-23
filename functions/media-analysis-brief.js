@@ -43,7 +43,7 @@ function summaryValue(summary, key) {
 
 function makeText(brief) {
   const lines = [
-    `모여라 캘린더 AI 운영 브리핑 · ${brief.dateLabel}`,
+    `모아엘가 AI 운영 브리핑 · ${brief.dateLabel}`,
     `지금 확인할 운영 작업 ${brief.operationCount}건 · 분석 오류 ${brief.total.failed}건 · 활성 캘린더 ${brief.calendars.length}개`,
     ''
   ];
@@ -177,7 +177,7 @@ function buildBrief({ dateLabel, calendars = [] } = {}) {
     staleCount: normalized.filter(calendar => calendar.stale).length,
     operationCount: normalized.reduce((count, calendar) => count + calendar.operations.length, 0)
   };
-  return { ...brief, subject: `모여라 캘린더 AI 운영 브리핑 · ${brief.dateLabel}`, text: makeText(brief), html: renderHtml(brief) };
+  return { ...brief, subject: `모아엘가 AI 운영 브리핑 · ${brief.dateLabel}`, text: makeText(brief), html: renderHtml(brief) };
 }
 
 module.exports = { ACTION_URL, buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured };

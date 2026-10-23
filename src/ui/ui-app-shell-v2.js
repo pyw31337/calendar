@@ -340,7 +340,7 @@ export function MobileBottomNav({ activeTab, isSideNavOpen, onSelectTab, chatSen
  */
 function TopHeader({ calendarName, onOpenCalendarSettings, onOpenAnniversaries }) {
   const React = window.React;
-  const brandName = String(calendarName || '모여라 캘린더')
+  const brandName = String(calendarName || '모아엘가')
     .replace(/^[^\p{L}\p{N}]+/u, '')
     .replace(/\s*캘린더\s*$/u, '')
     .trim();
@@ -1977,7 +1977,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
       onOpenGalleryAnalysis
     }),
     React.createElement('footer', { className: bentoClass('renewal-home-footer footer') },
-      React.createElement('span', null, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
+      React.createElement('span', null, 'Copyright © 2026 모아엘가. All Rights Reserved.'),
       React.createElement('span', { className: bentoClass('renewal-home-footer-links links') },
         React.createElement('b', null, 'FAMILY LINK'), React.createElement('b', null, '밖에눈오나'), React.createElement('b', null, 'Culture Flow')
       )
@@ -4593,7 +4593,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           className: bentoClass('side-nav-brand-icon'),
           'aria-hidden': 'true',
         }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: cleanCalBadge(calendarName) || '모여라 캘린더' }, cleanCalBadge(calendarName) || '모여라 캘린더')
+        React.createElement('span', { className: bentoClass('side-nav-brand-text'), title: cleanCalBadge(calendarName) || '모아엘가' }, cleanCalBadge(calendarName) || '모아엘가')
       ),
       // 지금 이 기기에서 쓰는 참여자 (core/current-participant.js). Tap to switch; chat, memo,
       // comments and likes all follow.

@@ -2618,7 +2618,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
     ctx.fillStyle = P.faint;
     ctx.font = '500 12px sans-serif';
-    ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, PAD, H - 24);
+    ctx.fillText(`모아엘가 · ${new Date().toLocaleDateString('ko-KR')} 생성`, PAD, H - 24);
 
     setSettlementCardImageUrl(canvas.toDataURL('image/jpeg', 0.92));
   };

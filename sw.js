@@ -1,4 +1,4 @@
-// Service worker for 모여라 캘린더.
+// Service worker for 모아엘가.
 //
 // Scope decision: index.html itself ships with
 // `Cache-Control: no-cache, no-store, must-revalidate` -- a deliberate choice by this app (many
@@ -287,14 +287,14 @@ async function serveStorageMedia(req) {
 // Web Notifications API path in index.html's notifyNewChatMessage() is a separate, tab-must-
 // be-open fallback that doesn't depend on this at all.
 self.addEventListener('push', event => {
-  let payload = { title: '모여라 캘린더', body: '새 알림이 도착했습니다.', url: './', tag: 'gather-push' };
+  let payload = { title: '모아엘가', body: '새 알림이 도착했습니다.', url: './', tag: 'gather-push' };
   try {
     if (event.data) {
       try { payload = Object.assign(payload, event.data.json()); }
       catch (e) { payload.body = event.data.text() || payload.body; }
     }
   } catch (_) {}
-  const title = payload.title || '모여라 캘린더';
+  const title = payload.title || '모아엘가';
   const scopeUrl = self.registration?.scope || (self.location.origin + '/calendar/');
   const iconUrl = new URL('icons/icon-v6-192.png', scopeUrl).href;
   const options = {

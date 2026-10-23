@@ -151,7 +151,7 @@ test('daily briefing produces an actionable HTML digest and flags stale or faile
       summary: { received: 12, suggested: 9, failed: 1, withPeople: 3, withPlaces: 4, withMeetings: 2 }
     }]
   });
-  assert.match(brief.subject, /^모여라 캘린더 AI 운영 브리핑/);
+  assert.match(brief.subject, /^모아엘가 AI 운영 브리핑/);
   assert.match(brief.html, /모아엘가/);
   assert.match(brief.html, /운영 인박스에서 확인하기/);
   assert.match(brief.text, /오류 1건/);

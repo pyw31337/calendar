@@ -67,7 +67,7 @@ function createShareHtml(calendar, { title, description, calendarUrl, shareUrl, 
   <meta name="description" content="${escapedDescription}">
   <link rel="canonical" href="${escapedCalendarUrl}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="모여라 캘린더">
+  <meta property="og:site_name" content="모아엘가 캘린더">
   <meta property="og:title" content="${escapedTitle}">
   <meta property="og:description" content="${escapedDescription}">
   <meta property="og:image" content="${OG_IMAGE_URL}">
@@ -183,7 +183,7 @@ async function main() {
   <title>${FALLBACK_TITLE}</title>
   <meta name="description" content="${FALLBACK_DESCRIPTION}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="모여라 캘린더">
+  <meta property="og:site_name" content="모아엘가 캘린더">
   <meta property="og:title" content="${FALLBACK_TITLE}">
   <meta property="og:description" content="${FALLBACK_DESCRIPTION}">
   <meta property="og:image" content="${OG_IMAGE_URL}">
@@ -192,7 +192,7 @@ async function main() {
 </head>
 <body>
   <script>window.location.replace('${BASE_URL}/');</script>
-  <a href="${BASE_URL}/">모여라 캘린더로 이동하기</a>
+  <a href="${BASE_URL}/">모아엘가 캘린더로 이동하기</a>
 </body>
 </html>
 `;

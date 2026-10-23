@@ -2110,7 +2110,7 @@ export function AdminDashboard({ initialCalendars }) {
       },
         /*#__PURE__*/React.createElement("div", { className: "admin-header-title" },
           /*#__PURE__*/React.createElement("div", { style: styles.title },
-            "모여라 캘린더 ",
+            "모아엘가 캘린더 ",
             /*#__PURE__*/React.createElement("span", {
               style: {
                 fontSize: 'var(--font-size-xs)', fontWeight: 800, padding: '3px 10px', borderRadius: 'var(--radius-full)',

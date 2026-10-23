@@ -1857,7 +1857,7 @@ export function Footer() {
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   return /*#__PURE__*/React.createElement('footer', { className: 'app-footer' },
-    /*#__PURE__*/React.createElement('p', { className: 'app-footer-copyright' }, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
+    /*#__PURE__*/React.createElement('p', { className: 'app-footer-copyright' }, 'Copyright © 2026 모아엘가. All Rights Reserved.'),
     /*#__PURE__*/React.createElement('div', { className: 'app-footer-family' },
       /*#__PURE__*/React.createElement('span', { className: 'app-footer-family-label' }, 'FAMILY LINK'),
       /*#__PURE__*/React.createElement('div', { className: 'app-footer-family-links' },

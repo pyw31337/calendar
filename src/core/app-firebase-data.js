@@ -3843,7 +3843,7 @@ function buildICSTimestamp() {
 // meeting for a calendar can be imported at once instead of one file per date.
 function buildCalendarConfirmedMeetingsICS(calendar, events) {
   const dtstamp = buildICSTimestamp();
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//모여라 캘린더//KO', 'CALSCALE:GREGORIAN'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//모아엘가//KO', 'CALSCALE:GREGORIAN'];
   events.forEach(({ dateStr, description }) => {
     lines.push(
       'BEGIN:VEVENT',

@@ -1425,7 +1425,7 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
-    const notice = new Notification(participantName || calendar?.title || '모여라 캘린더', {
+    const notice = new Notification(participantName || calendar?.title || '모아엘가', {
       body,
       tag: message?.id ? `chat-cal_${calendar?.id}-${message.id}` : `chat-cal_${calendar?.id}`,
       icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
@@ -1935,7 +1935,7 @@ const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
 // manual-instructions fallback even on an otherwise fully installable browser.
 function buildDynamicManifest(calendar) {
   const base = getAppBaseUrl();
-  const name = calendar.title ? `${calendar.title} 캘린더` : '모여라 캘린더';
+    const name = calendar.title ? `${calendar.title} 캘린더` : '모아엘가 캘린더';
   const startUrl = `${base}?id=${calendar.id}`;
   return {
     id: startUrl,

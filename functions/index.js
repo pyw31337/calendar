@@ -871,7 +871,7 @@ exports.onMessageCreate = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRI
       return;
     }
     const calendarData = calendarSnap.data().calendar || {};
-    const calendarTitle = calendarData.title || '모여라 캘린더';
+    const calendarTitle = calendarData.title || '모아엘가';
     
     // 2. Resolve sender name
     const senderId = message.participantId;
@@ -3276,7 +3276,7 @@ async function sendNaverSmtpMail({ account, appPassword, subject, html, text, da
   });
   try {
     const info = await transport.sendMail({
-      from: `모여라 캘린더 <${account}>`,
+      from: `모아엘가 <${account}>`,
       to: [MEDIA_BRIEF_RECIPIENT],
       subject,
       html,
