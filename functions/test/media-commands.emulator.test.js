@@ -206,7 +206,7 @@ test('GC sweep keeps a file an anniversary photo or a culture poster still point
   await root.collection('customCultureItems').doc('c1').delete();
 });
 
-test('mergeAssets points identical copies at the kept file, moves comments, and deletes nothing', async () => {
+test('mergeAssets points identical copies at the kept file and queues duplicate storage paths', async () => {
   await reset();
   const keep = photo('k');
   const dup = photo('d');
@@ -246,11 +246,12 @@ test('mergeAssets points identical copies at the kept file, moves comments, and 
   assert.deepEqual((await root.collection('messages').doc('mk').get()).data().imageTags, ['서준 고성']);
   assert.equal((await root.collection('photoIndex').doc(keyOf(dup)).get()).exists, false, 'duplicate photoIndex is deleted');
   assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], true, 'the file exists during grace period');
-  assert.equal((await db.collection('storageGc').get()).size, 1, 'queued for GC');
+  assert.equal((await db.collection('storageGc').get()).size, 2, 'original and thumbnail queued for GC');
 
   const sweep = await sweepStorageGc({ db, bucket, now: 5 + GC_GRACE_MS + 1000 });
-  assert.equal(sweep.deleted, 1);
+  assert.equal(sweep.deleted, 2);
   assert.equal((await bucket.file('chatImages/testcal/d_original.jpg').exists())[0], false, 'duplicate file is deleted from Storage');
+  assert.equal((await bucket.file('chatImages/testcal/d_thumb.jpg').exists())[0], false, 'duplicate thumbnail is deleted from Storage');
   assert.equal((await bucket.file('chatImages/testcal/k_original.jpg').exists())[0], true, 'kept file is preserved in Storage');
 });
 

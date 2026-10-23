@@ -9,7 +9,8 @@
 //   tagAsset    -> writes the tag to every owning message/memo slot and every album copy;
 //   mergeAssets -> turns byte-identical copies (same Storage md5) into one photo: every slot and
 //                  album entry showing a copy shows the kept file instead, tags are merged and
-//                  comments move to it. Nothing is deleted (no slot, document, comment or file).
+//                  comments move to it. Storage files are queued for delayed garbage collection
+//                  after all references have been repointed.
 // Storage objects are never deleted inline. They go to `storageGc/{id}` with a grace period and
 // the sweeper deletes them only if no photoIndex row of any calendar still points at the file
 // (invariant I2).
