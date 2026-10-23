@@ -1939,7 +1939,7 @@ exports.tourApiSearchProxy = seoulFunctions().runWith(PUBLIC_PROXY_RUNTIME).http
     const params = new URLSearchParams({
       serviceKey: tourApiServiceKey,
       MobileOS: 'ETC',
-      MobileApp: 'MoyeoraCalendar',
+      MobileApp: 'LetsCalendar',
       _type: 'json',
       mapX: String(lng),
       mapY: String(lat),

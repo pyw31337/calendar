@@ -327,8 +327,8 @@ function buildLightboxImageInfo(url, timestamp) {
   const ext = getImageExtFromMime(mime);
   const fileDate = timestamp ? new Date(timestamp) : null;
   const fileName = fileDate
-    ? `moyeora_${fileDate.getFullYear()}${String(fileDate.getMonth() + 1).padStart(2, '0')}${String(fileDate.getDate()).padStart(2, '0')}_${String(fileDate.getHours()).padStart(2, '0')}${String(fileDate.getMinutes()).padStart(2, '0')}${String(fileDate.getSeconds()).padStart(2, '0')}.${ext}`
-    : `moyeora_image.${ext}`;
+    ? `letscalendar_${fileDate.getFullYear()}${String(fileDate.getMonth() + 1).padStart(2, '0')}${String(fileDate.getDate()).padStart(2, '0')}_${String(fileDate.getHours()).padStart(2, '0')}${String(fileDate.getMinutes()).padStart(2, '0')}${String(fileDate.getSeconds()).padStart(2, '0')}.${ext}`
+    : `letscalendar_image.${ext}`;
   let dateLabel = null;
   if (timestamp) {
     const { dateStr, timeStr } = formatCommentDate(timestamp);

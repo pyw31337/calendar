@@ -1,4 +1,4 @@
-# Gather Calendar
+# 렛츠 캘린더 (Let's Calendar)
 
 모임별 참석 가능 일정을 실시간으로 조율하는 캘린더 서비스입니다.
 
