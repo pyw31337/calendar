@@ -36,7 +36,10 @@ run_bounded() {
 if [[ "${MOYEORA_CULTURE_AUTO_PULL:-1}" == "1" ]] \
   && [[ "$(/usr/bin/git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null)" == "main" ]] \
   && [[ -z "$(/usr/bin/git -C "$REPO_DIR" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
-  /usr/bin/git -C "$REPO_DIR" pull --ff-only --quiet origin main || true
+  if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/usr/bin/false run_bounded 30 \
+    /usr/bin/git -C "$REPO_DIR" pull --ff-only --quiet origin main; then
+    print -u2 "[culture-worker] auto-pull unavailable; continuing with the current clean checkout"
+  fi
 fi
 
 cd "$REPO_DIR"
