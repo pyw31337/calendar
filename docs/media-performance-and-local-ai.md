@@ -98,10 +98,16 @@ firebase deploy --only functions:ingestMediaAnalysis,functions:recordMediaAnalys
 
 ### 평일 이메일 브리핑과 장애 안전장치
 
-평일 08:00(KST)에는 `pyw213@naver.com`으로 누적 분석 결과를 HTML 이메일로 보낸다. 메일에는
-캘린더별 추천·오류·인물/장소/일정 후보 수와 라이브 검토 링크만 포함하고, 사진 원본 URL·댓글·OCR
-원문은 포함하지 않는다. 발송 기록은 `operationsMediaBriefs`에 남아 이메일 보관함과 별도로 감사할 수
-있다.
+평일 08:00(KST)에는 `pyw213@naver.com`으로 "렛츠 캘린더 아침 브리핑"을 HTML 이메일로 보낸다.
+
+- **새로 올라온 기록** (2026-10-26~, `functions/daily-activity-digest.js`): 지난 브리핑이 나간 날부터 어제까지
+  (월요일은 주말 포함) 캘린더별로 새로 올라온 채팅·사진·참석 가능 날짜·모임 확정·정산·메모·장소·기념일·
+  사진 댓글·투표를 표로 보여 준다. 표마다 최근 10건, 글은 60자까지만 싣고 사진은 장수만 적는다(사진 URL 없음).
+  기간 안에 생긴 문서만 범위 쿼리로 읽고, `stress_`/`test_`/`smoke_` 테스트 캘린더는 뺀다. 이 부분이
+  실패해도 운영 브리핑은 그대로 나간다.
+- **운영 점검**: 캘린더별 추천·오류·인물/장소/일정 후보 수와 라이브 검토 링크. OCR 원문은 포함하지 않는다.
+
+발송 기록은 `operationsMediaBriefs`(`activityTotal` 포함)에 남아 이메일 보관함과 별도로 감사할 수 있다.
 
 발송은 검증된 네이버 SMTP 발신 계정으로 처리한다. 앱 비밀번호는 Secret Manager에만 저장하며,
 명령어 이력, 저장소, `launchd` 설정, 로컬 JSON에는 남지 않는다. Resend는 비상용 보조 경로로만
@@ -110,7 +116,7 @@ firebase deploy --only functions:ingestMediaAnalysis,functions:recordMediaAnalys
 ```bash
 cd /Users/pyw31337/Developer/calendar
 NAVER_SMTP_APP_PASSWORD='앱-비밀번호' \
-MEDIA_BRIEF_FROM='모여라 캘린더 <pyw213@naver.com>' \
+MEDIA_BRIEF_FROM='렛츠 캘린더 <pyw213@naver.com>' \
   tools/local-media-worker/configure-media-brief-email.sh
 ```
 

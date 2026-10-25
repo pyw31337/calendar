@@ -29,6 +29,7 @@ const { completeAnalysisLocationTags } = require('./media-auto-tags');
 const { MAX_BATCH_ITEMS, MAX_TAGS, faceName, sanitizeAnalysisItem, sanitizeFaceItem, sanitizeSimilarGroups, stableAnalysisId, summarize } = require('./media-analysis');
 const { buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured } = require('./media-analysis-brief');
 const { collectMediaBriefCalendars } = require('./media-analysis-brief-data');
+const { activityWindow, findLastSentBriefDateKey, collectDailyActivity } = require('./daily-activity-digest');
 const { buildIntegrityReview, assetProjection, assetEdges, storagePath: mediaGraphStoragePath } = require('./media-graph');
 const {
   decideMemoNotification,
@@ -3276,7 +3277,7 @@ async function sendNaverSmtpMail({ account, appPassword, subject, html, text, da
   });
   try {
     const info = await transport.sendMail({
-      from: `모아엘가 <${account}>`,
+      from: `렛츠 캘린더 <${account}>`,
       to: [MEDIA_BRIEF_RECIPIENT],
       subject,
       html,
@@ -3307,7 +3308,11 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
   const existing = await reportRef.get();
   if (existing.data()?.deliveryStatus === 'sent') return null;
   const calendars = await collectMediaBriefCalendars(db, dateKey, now);
-  const brief = buildBrief({ dateLabel: formatBriefDate(new Date(now)), calendars });
+  // What people added since the last delivered brief (Monday's covers the weekend). A failure here
+  // must not hold back the operations brief.
+  const window = activityWindow({ now, lastSentDateKey: await findLastSentBriefDateKey(db, dateKey).catch(() => '') });
+  const activity = await collectDailyActivity(db, window).catch(error => { console.error('daily activity digest failed:', error); return null; });
+  const brief = buildBrief({ dateLabel: formatBriefDate(new Date(now)), calendars, activity });
   const apiKey = String(process.env.RESEND_API_KEY || RESEND_API_KEY.value() || '').trim();
   const from = String(process.env.MEDIA_BRIEF_FROM || MEDIA_BRIEF_FROM.value() || '').trim();
   const naverAppPassword = String(process.env.NAVER_SMTP_APP_PASSWORD || NAVER_SMTP_APP_PASSWORD.value() || '').trim();
@@ -3329,7 +3334,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
       lastCheckedAt: now,
       generatedAt: now,
       calendarCount: calendars.length,
-      summary: brief.total,
+      summary: brief.total, activityTotal: activity ? activity.total : null,
       staleCount: brief.staleCount,
       operationCount: brief.operationCount,
       operations: calendars.map(calendar => ({ id: calendar.id, name: calendar.name, items: calendar.operations || [] }))
@@ -3347,7 +3352,7 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
     lastAttemptAt: now,
     generatedAt: now,
     calendarCount: calendars.length,
-    summary: brief.total,
+    summary: brief.total, activityTotal: activity ? activity.total : null,
     staleCount: brief.staleCount,
     operationCount: brief.operationCount,
     operations: calendars.map(calendar => ({ id: calendar.id, name: calendar.name, items: calendar.operations || [] })),

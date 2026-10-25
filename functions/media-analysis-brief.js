@@ -41,11 +41,30 @@ function summaryValue(summary, key) {
   return Math.max(0, number(summary?.[key]));
 }
 
+const BRAND = '렛츠 캘린더';
+
+function activityText(activity) {
+  if (!activity) return [];
+  const lines = [`새로 올라온 기록 (${activity.window.label}) · 모두 ${activity.total}건`];
+  if (!activity.calendars.length) lines.push('새로 올라온 기록이 없습니다.');
+  for (const calendar of activity.calendars) {
+    lines.push(`[${calendar.name}] ${calendar.sections.map(section => `${section.title} ${section.count}`).join(' · ')}`);
+    for (const section of calendar.sections) {
+      lines.push(`  ${section.title}`);
+      section.rows.forEach(row => lines.push(`  - ${row.filter(Boolean).join(' | ')}`));
+      if (section.more) lines.push(`  - 외 ${section.more}건`);
+    }
+  }
+  lines.push('');
+  return lines;
+}
+
 function makeText(brief) {
   const lines = [
-    `모아엘가 AI 운영 브리핑 · ${brief.dateLabel}`,
-    `지금 확인할 운영 작업 ${brief.operationCount}건 · 분석 오류 ${brief.total.failed}건 · 활성 캘린더 ${brief.calendars.length}개`,
-    ''
+    `${BRAND} 아침 브리핑 · ${brief.dateLabel}`,
+    `새 기록 ${brief.activity ? brief.activity.total : 0}건 · 지금 확인할 운영 작업 ${brief.operationCount}건 · 분석 오류 ${brief.total.failed}건 · 활성 캘린더 ${brief.calendars.length}개`,
+    '',
+    ...activityText(brief.activity)
   ];
   for (const calendar of brief.calendars) {
     lines.push(`${calendar.name}: ${calendar.operations.length ? `확인 ${calendar.operations.length}건` : '확인할 작업 없음'}, 분석 오류 ${calendar.summary.failed}건, 상태 ${calendar.healthLabel}`);
@@ -98,38 +117,69 @@ function renderActionBox(brief) {
   </div>`;
 }
 
+const cell = 'padding:7px 8px;border-top:1px solid #efeef6;vertical-align:top;font-size:12px;line-height:17px;color:#16162a;';
+
+function renderActivitySection(section) {
+  const head = section.columns.map(column => `<th align="left" style="padding:6px 8px;font-size:11px;font-weight:700;color:#6b7280;background:#f8f7fd;white-space:nowrap;">${escapeHtml(column)}</th>`).join('');
+  const body = section.rows.map(row => `<tr>${row.map((value, index) => `<td style="${cell}${index === section.wrap ? 'word-break:break-word;overflow-wrap:anywhere;' : 'white-space:nowrap;'}">${escapeHtml(value)}</td>`).join('')}</tr>`).join('');
+  const more = section.more
+    ? `<tr><td colspan="${section.columns.length}" style="${cell}color:#6b7280;">외 ${section.more}건 더 있어요. 앱에서 확인해 주세요.</td></tr>`
+    : '';
+  return `<div style="margin-top:12px;font-size:13px;font-weight:800;color:#6d28d9;">${escapeHtml(section.title)} <span style="color:#16162a;">${section.count}${section.key === 'photo' ? '장' : '건'}</span></div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:6px;border-collapse:collapse;border:1px solid #efeef6;border-radius:10px;">
+      <tr>${head}</tr>${body}${more}
+    </table>`;
+}
+
+function renderActivity(activity) {
+  if (!activity) return '';
+  const calendars = activity.calendars.map(calendar => `<div style="margin-top:14px;padding:14px 14px 16px;border:1px solid #e8e7f2;border-radius:16px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+        <td style="font-size:15px;font-weight:900;color:#16162a;">${escapeHtml(calendar.name)}</td>
+        <td align="right"><a href="${escapeHtml(calendarUrl(calendar.id))}" style="font-size:12px;color:#6d28d9;">캘린더 열기</a></td>
+      </tr></table>
+      <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(calendar.sections.map(section => `${section.title} ${section.count}`).join(' · '))}</div>
+      ${calendar.sections.map(renderActivitySection).join('')}
+    </div>`).join('');
+  return `<div style="margin-top:28px;font-size:16px;font-weight:900;">새로 올라온 기록</div>
+    <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(activity.window.label)} · 모두 ${activity.total}건</div>
+    ${calendars || '<div style="margin-top:12px;padding:14px;border-radius:14px;background:#f8fafc;color:#64748b;font-size:13px;">새로 올라온 채팅·사진·일정·메모·장소가 없습니다.</div>'}`;
+}
+
 function renderHtml(brief) {
   const rows = brief.calendars.map(renderCalendarRow).join('') || '<tr><td style="padding:20px 0;color:#64748b;">아직 수집된 분석 기록이 없습니다.</td></tr>';
   return `<!doctype html>
 <html lang="ko">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;background:#f5f5fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#16162a;">
-  <span style="display:none!important;visibility:hidden;mso-hide:all;">운영 작업 ${brief.operationCount}건, 분석 오류 ${brief.total.failed}건</span>
+  <span style="display:none!important;visibility:hidden;mso-hide:all;">새 기록 ${brief.activity ? brief.activity.total : 0}건, 운영 작업 ${brief.operationCount}건, 분석 오류 ${brief.total.failed}건</span>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:28px 12px;background:#f5f5fb;"><tr><td align="center">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 12px 32px rgba(39,24,96,.10);">
       <tr><td style="padding:30px 30px 28px;background:linear-gradient(125deg,#5520da 0%,#7c3aed 52%,#d6298b 100%);color:#fff;">
-        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.8;">MOYEORA CALENDAR</div>
-        <div style="margin-top:10px;font-size:25px;line-height:32px;font-weight:900;">AI 운영 브리핑</div>
-        <div style="margin-top:7px;font-size:14px;opacity:.9;">${escapeHtml(brief.dateLabel)} · 실제 데이터에서 확인할 다음 작업</div>
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.8;">LET'S CALENDAR</div>
+        <div style="margin-top:10px;font-size:25px;line-height:32px;font-weight:900;">아침 브리핑</div>
+        <div style="margin-top:7px;font-size:14px;opacity:.9;">${escapeHtml(brief.dateLabel)} · 새로 올라온 기록과 확인할 다음 작업</div>
       </td></tr>
       <tr><td style="padding:26px 30px 30px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
-          <td style="width:33.33%;padding-right:8px;"><div style="padding:15px 12px;border-radius:14px;background:#f5f3ff;"><div style="font-size:11px;color:#6b7280;">운영 작업</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:#6d28d9;">${brief.operationCount}</div></div></td>
-          <td style="width:33.33%;padding:0 4px;"><div style="padding:15px 12px;border-radius:14px;background:#eff6ff;"><div style="font-size:11px;color:#6b7280;">분석 사진</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:#2563eb;">${brief.total.received}</div></div></td>
-          <td style="width:33.33%;padding-left:8px;"><div style="padding:15px 12px;border-radius:14px;background:${brief.total.failed || brief.staleCount ? '#fff1f2' : '#f0fdf4'};"><div style="font-size:11px;color:#6b7280;">확인 필요</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:${brief.total.failed || brief.staleCount ? '#dc2626' : '#16a34a'};">${brief.total.failed + brief.staleCount}</div></div></td>
+          <td style="width:25%;padding-right:6px;"><div style="padding:15px 12px;border-radius:14px;background:#fdf2f8;"><div style="font-size:11px;color:#6b7280;">새 기록</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:#be185d;">${brief.activity ? brief.activity.total : 0}</div></div></td>
+          <td style="width:25%;padding:0 3px;"><div style="padding:15px 12px;border-radius:14px;background:#f5f3ff;"><div style="font-size:11px;color:#6b7280;">운영 작업</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:#6d28d9;">${brief.operationCount}</div></div></td>
+          <td style="width:25%;padding:0 3px;"><div style="padding:15px 12px;border-radius:14px;background:#eff6ff;"><div style="font-size:11px;color:#6b7280;">분석 사진</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:#2563eb;">${brief.total.received}</div></div></td>
+          <td style="width:25%;padding-left:6px;"><div style="padding:15px 12px;border-radius:14px;background:${brief.total.failed || brief.staleCount ? '#fff1f2' : '#f0fdf4'};"><div style="font-size:11px;color:#6b7280;">확인 필요</div><div style="margin-top:5px;font-size:22px;font-weight:900;color:${brief.total.failed || brief.staleCount ? '#dc2626' : '#16a34a'};">${brief.total.failed + brief.staleCount}</div></div></td>
         </tr></table>
+        ${renderActivity(brief.activity)}
         <div style="margin-top:28px;font-size:16px;font-weight:900;">캘린더별 다음 작업</div>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:4px;">${rows}</table>
         ${renderActionBox(brief)}
         <a href="${ACTION_URL}" style="display:block;margin-top:24px;padding:14px 18px;border-radius:12px;background:#17172d;color:#fff;text-align:center;text-decoration:none;font-size:14px;font-weight:800;">운영 인박스에서 확인하기</a>
       </td></tr>
-      <tr><td style="padding:17px 30px;background:#fafafd;color:#8a8aa0;font-size:11px;line-height:17px;">당일 기록된 분석과 최근 60일~향후 21일의 운영 점검입니다. 사진 원본·댓글·정산은 자동 변경하지 않습니다. 새 사진의 GPS 행정구역 보완은 처리 이력을 남깁니다.</td></tr>
+      <tr><td style="padding:17px 30px;background:#fafafd;color:#8a8aa0;font-size:11px;line-height:17px;">새로 올라온 기록은 지난 브리핑 이후(주말 포함) 하루 단위로 모았고, 표마다 최근 10건까지 보여 줍니다. 당일 기록된 분석과 최근 60일~향후 21일의 운영 점검입니다. 사진 원본·댓글·정산은 자동 변경하지 않습니다. 새 사진의 GPS 행정구역 보완은 처리 이력을 남깁니다.</td></tr>
     </table>
   </td></tr></table>
 </body></html>`;
 }
 
-function buildBrief({ dateLabel, calendars = [] } = {}) {
+function buildBrief({ dateLabel, calendars = [], activity = null } = {}) {
   const normalized = calendars.map(calendar => {
     const summary = calendar.summary || {};
     const fallbackOperations = [];
@@ -172,12 +222,14 @@ function buildBrief({ dateLabel, calendars = [] } = {}) {
   }, { received: 0, suggested: 0, failed: 0, withPeople: 0, withPlaces: 0, withMeetings: 0 });
   const brief = {
     dateLabel: String(dateLabel || ''),
+    activity,
     calendars: normalized,
     total,
     staleCount: normalized.filter(calendar => calendar.stale).length,
     operationCount: normalized.reduce((count, calendar) => count + calendar.operations.length, 0)
   };
-  return { ...brief, subject: `모아엘가 AI 운영 브리핑 · ${brief.dateLabel}`, text: makeText(brief), html: renderHtml(brief) };
+  const newRecords = activity && activity.total ? ` · 새 기록 ${activity.total}건` : '';
+  return { ...brief, subject: `${BRAND} 아침 브리핑 · ${brief.dateLabel}${newRecords}`, text: makeText(brief), html: renderHtml(brief) };
 }
 
 module.exports = { ACTION_URL, buildBrief, isEmailDeliveryConfigured, isNaverSmtpConfigured };
