@@ -7,6 +7,7 @@ import { LikeButton } from './like-button.js';
 import { KOREA_REGIONS } from '../core/korean-regions.js';
 import { identityLabels, photoTagTokens } from '../core/photo-tag-identity.js';
 import { getPhotoCommentIdentityFromList } from '../core/app-domain-helpers.js';
+import { photoCommentBadgeCount } from '../core/photo-comment-items.js';
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory, paginateGalleryItems } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
@@ -2712,7 +2713,7 @@ export function HistoryView({
     photos,
     renderPhoto: (photo, idx) => {
     const identity = getPhotoCommentIdentityFromList(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
-    const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+    const commentCount = photoCommentBadgeCount(getPhotoCommentCount(identity, photoCommentCounts), photoCommentCounts, photo.commentCount);
     const selectKey = selection ? archivePhotoSelectKey(photo, idx) : '';
     const isSelected = !!selection && selection.keys.has(selectKey);
     return /*#__PURE__*/React.createElement("button", {
@@ -3126,7 +3127,7 @@ export function HistoryView({
       const photoKey = ids[0] || photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
       const isChecked = checkable && selectedKeys.has(photoKey);
       const identity = getPhotoCommentIdentityFromList(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
-      const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+      const commentCount = photoCommentBadgeCount(getPhotoCommentCount(identity, photoCommentCounts), photoCommentCounts, photo.commentCount);
       return /*#__PURE__*/React.createElement("button", {
         key: archiveCellKey(photos, idx, `thumb:${keyPrefix}`, (p, i) => collectMemoryPhotoIdentityKeys(p, getPhotoAssetCommentKey)[0] || p.mediaKey || p.refKey || `${keyPrefix}${i}`), type: "button",
         className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
@@ -5016,7 +5017,6 @@ function sportsMatchSides(item) {
   if (leads(home.name) && !leads(away.name)) return [home, away];
   return [away, home];
 }
-
 
 // Pull the first http(s) URL out of free text. Custom festival cards often store the homepage
 // only in description, so link/website are empty while a blue URL still shows in the sheet.

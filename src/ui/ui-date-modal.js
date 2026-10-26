@@ -10,6 +10,7 @@ import { launchClipboardConfetti } from './celebrate-confetti.js';
 import { DateTitle } from './date-title.js';
 import { useOverlayHistory } from './ui-shared.js';
 import { resolveAnniversaryCoverPhoto } from '../core/anniversary-cover-photo.js';
+import { photoCommentBadgeCount } from '../core/photo-comment-items.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -3626,7 +3627,7 @@ export function DateModal({
         }
       }, visibleMeetingImages.map((photo, index) => {
         const commentIdentity = getPhotoCommentIdentity(photo, visibleMeetingImages, { source: photo.source || 'meeting', meetingDate: dateStr }) || {};
-        const commentCount = getPhotoCommentCount(commentIdentity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+        const commentCount = photoCommentBadgeCount(getPhotoCommentCount(commentIdentity, photoCommentCounts), photoCommentCounts, photo.commentCount);
         return /*#__PURE__*/React.createElement("div", {
         key: photo.id || `${photo.imageUrl}_${index}`,
         className: commentCount ? 'gallery-comment-heartbeat' : '',

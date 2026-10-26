@@ -4,7 +4,7 @@
  *
  *   calendars/cal_{id}/photoCommentItems/{commentId}
  *     { id, assetKey, participantId, text, createdAt, updatedAt, deletedAt: null|number,
- *       legacyKey?, migratedFrom? }
+ *       legacyKey?, previousAssetKeys?, migratedFrom? }
  *   calendars/cal_{id}/photoCommentSummary/counts
  *     { counts: { [assetKey]: number }, updatedAt }   <- one small doc the app listens to
  *
@@ -140,6 +140,34 @@ async function recountAsset(db, FieldValue, calendarDocId, assetKey) {
   return count;
 }
 
+/**
+ * What filing one comment under another photo writes: the same two fields the app's own move
+ * writes (src/core/photo-comment-items.js movePhotoComments). firestore.rules only accepts known
+ * fields on an update, so any other marker would leave the moved comment impossible to edit or
+ * delete from the app.
+ */
+function movedCommentPatch(data, fromKey, toKey) {
+  const previous = Array.isArray(data?.previousAssetKeys) ? data.previousAssetKeys : [];
+  return { assetKey: toKey, previousAssetKeys: Array.from(new Set([...previous, fromKey])).slice(-20) };
+}
+
+/**
+ * Move every comment of one photo onto another (a duplicate being folded into the copy that is
+ * kept). Only the photo it is filed under changes, so nothing is re-sent as a notification; the
+ * item trigger recounts both photos. Returns how many comments moved.
+ */
+async function moveAssetComments(db, calendarDocId, fromKey, toKey) {
+  if (!fromKey || !toKey || fromKey === toKey) return 0;
+  const items = await db.collection('calendars').doc(calendarDocId).collection(ITEMS)
+    .where('assetKey', '==', fromKey).get();
+  for (let offset = 0; offset < items.docs.length; offset += 400) {
+    const batch = db.batch();
+    items.docs.slice(offset, offset + 400).forEach(doc => batch.update(doc.ref, movedCommentPatch(doc.data(), fromKey, toKey)));
+    await batch.commit();
+  }
+  return items.size;
+}
+
 /** Which photos' counts a change to one item can affect (none for a plain text edit). */
 function assetKeysToRecount(before, after) {
   const b = before || null;
@@ -158,5 +186,7 @@ module.exports = {
   resolveAssetKeyForLegacyDoc,
   mirrorLegacyThread,
   recountAsset,
+  movedCommentPatch,
+  moveAssetComments,
   assetKeysToRecount
 };

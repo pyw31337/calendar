@@ -24,6 +24,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 const media = require('./media-commands.js');
+const { movedCommentPatch } = require('./photo-comment-items.js');
 const policy = require('./push-notify-policy.js');
 
 const APPLY = process.env.APPLY === '1';
@@ -165,7 +166,7 @@ async function mergeCalendar(calendarId) {
       }
       for (const comment of commentsByKey.get(extra.id) || []) {
         report.commentsMoved += 1;
-        if (APPLY) await comment.ref.update({ assetKey: kept.id, mergedFrom: extra.id });
+        if (APPLY) await comment.ref.update(movedCommentPatch(comment.data(), extra.id, kept.id));
       }
       report.likesOnMergedCopies += likeSnap.docs.filter(doc => doc.data()?.kind === 'photo' && doc.data()?.ref === extra.id).length;
       report.copiesMerged += 1;

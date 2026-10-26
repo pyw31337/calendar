@@ -506,7 +506,7 @@ assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'his
 assert(galleryIndexSource.includes('useGalleryPhotoIndex') && appMainSource.includes('useGalleryIndexBindings'), 'gallery must consume the canonical server-maintained photo index');
 assert(calendarViewsSource.includes("galleryPhotoIndex.status === 'fallback' ? null : []"), 'gallery must not present a partial local archive while the canonical index is loading or failed');
 assert(chatGallerySource.includes('사진 목록 다시 불러오기'), 'failed canonical gallery reads must expose an explicit retry action');
-assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');
+assert(chatGallerySource.includes('photoCommentCounts), photoCommentCounts, photo.commentCount)'), 'indexed comment counts must paint thumbnail badges (without loading comment bodies) until the live summary answers');
 assert(chatGallerySource.includes('gallery-pagination'), 'large galleries must render bounded 100-photo pagination');
 assert(chatGallerySource.includes('getPaginationWindow'), 'gallery pagination must use the shared centered window helper');
 assert(chatGallerySource.includes("is-mobile"), 'gallery pagination must mark the mobile (no-arrow) variant');

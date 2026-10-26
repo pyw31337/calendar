@@ -18,6 +18,8 @@
 // Pure dependency injection (db, bucket) so the logic is tested against the Firestore/Storage
 // emulator (functions/test/media-commands.emulator.test.js).
 
+const { movedCommentPatch } = require('./photo-comment-items');
+
 const GC_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 // Uploaded originals use names like `...${base}_original_${size}b.ext` (see app-image-pipeline).
 // Invariant: never delete originals — only orphan derived thumbnails may be swept.
@@ -610,7 +612,7 @@ async function mergeAssets({ db, bucket, calendarDocId, keep, extras, tags, now 
       claimSnaps.forEach(snap => {
         if (!snap.exists) writes.push(() => tx.set(snap.ref, { createdAt: now, claimKey: snap.id, reason: 'merge-duplicate-photos' }));
       });
-      comments.docs.forEach(doc => writes.push(() => tx.update(doc.ref, { assetKey: keepKey, mergedFrom: extraKey })));
+      comments.docs.forEach(doc => writes.push(() => tx.update(doc.ref, movedCommentPatch(doc.data(), extraKey, keepKey))));
       writes.push(() => tx.delete(root.collection('photoIndex').doc(extraKey)));
       const keepPaths = new Set([storagePathFromUrl(keepFile.imageUrl), storagePathFromUrl(keepFile.thumbUrl)].filter(Boolean));
       const extraPaths = Array.from(new Set([

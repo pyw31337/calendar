@@ -2596,7 +2596,7 @@ exports.adminBulkTagPhotos = seoulFunctions().https.onRequest(async (req, res) =
 
 // Admin "중복사진 검사" 보고서의 병합 실행. 사용자가 요청한 "데이터가 적은 쪽을 많은 쪽으로
 // 합쳐주고 데이터가 적은 사진을 제거해줘" 중 병합 절반만 서버에서 수행한다: 태그(해시태그
-// 토큰의 합집합)와 댓글(합쳐서 시간순 정렬)을 승자 쪽으로 옮긴다. 의도적으로 패자 사진 자체
+// 토큰의 합집합)와 댓글(photoCommentItems의 assetKey)을 승자 쪽으로 옮긴다. 의도적으로 패자 사진 자체
 // (Storage 객체, 소유 문서의 imageUrls/photos[] 배열 항목)는 여기서 지우지 않는다 -- 그 삭제
 // 로직은 이미 클라이언트에 있고(handleDeleteChatMessagePhoto 등, 이번 세션에서 방금 검증한
 // 경로) 실사용/테스트가 된 코드라, 같은 로직을 서버에서 라이브 검증 없이 새로 복제하는 것은
@@ -2645,19 +2645,12 @@ exports.mergeDedupPhotos = seoulFunctions().https.onRequest(async (req, res) => 
       if (!tagOutcome.ok) { res.status(200).json({ ok: false, reason: `tag-${tagOutcome.reason || 'failed'}` }); return; }
     }
 
-    const commentsColl = db.collection('calendars').doc(calendarDocId).collection('photoComments');
-    const [winnerCommentsSnap, loserCommentsSnap] = await Promise.all([commentsColl.doc(winnerAssetKey).get(), commentsColl.doc(loserAssetKey).get()]);
-    const winnerComments = Array.isArray(winnerCommentsSnap.data()?.comments) ? winnerCommentsSnap.data().comments : [];
-    const loserComments = Array.isArray(loserCommentsSnap.data()?.comments) ? loserCommentsSnap.data().comments : [];
-    let mergedCommentCount = winnerComments.length;
-    if (loserComments.length > 0) {
-      const merged = [...winnerComments, ...loserComments]
-        .sort((a, b) => Number(a?.timestamp || 0) - Number(b?.timestamp || 0))
-        .slice(0, 200);
-      await commentsColl.doc(winnerAssetKey).set({ comments: merged }, { merge: true });
-      await commentsColl.doc(loserAssetKey).delete();
-      mergedCommentCount = merged.length;
-    }
+    // Comments live in photoCommentItems (the old photoComments arrays are retired: writing one
+    // would only be mirrored back as duplicates). Move the copy's comments onto the kept photo.
+    await photoCommentItems.moveAssetComments(db, calendarDocId, loserAssetKey, winnerAssetKey);
+    const mergedCommentCount = Number((await db.collection('calendars').doc(calendarDocId)
+      .collection(photoCommentItems.ITEMS).where('assetKey', '==', winnerAssetKey)
+      .where('deletedAt', '==', null).count().get()).data().count) || 0;
 
     await indexColl.doc(loserAssetKey).set({ mergedInto: winnerAssetKey, mergedAt: Date.now() }, { merge: true });
 
