@@ -105,7 +105,19 @@ async function scoreModel(model) {
       const categoryCorrect = actual.category === expected.category;
       const abstainCorrect = Boolean(actual.abstain) === Boolean(expected.abstain);
       const placeAbstainCorrect = expected.abstainPlace ? actual.placeEvidence === false : true;
-      rows.push({ id: testCase.id, ok: categoryCorrect && equalSet(actualEntities, expectedEntities) && abstainCorrect && placeAbstainCorrect, categoryCorrect, entityExact: equalSet(actualEntities, expectedEntities), abstainCorrect, placeAbstainCorrect, latencyMs: Date.now() - started, actual, expected });
+      rows.push({
+        id: testCase.id,
+        ok: categoryCorrect && equalSet(actualEntities, expectedEntities) && abstainCorrect && placeAbstainCorrect,
+        categoryCorrect,
+        entityExact: equalSet(actualEntities, expectedEntities),
+        entityPrecision: actualEntities.size ? entityTp / actualEntities.size : (expectedEntities.size ? 0 : 1),
+        entityRecall: expectedEntities.size ? entityTp / expectedEntities.size : (actualEntities.size ? 0 : 1),
+        abstainCorrect,
+        placeAbstainCorrect,
+        latencyMs: Date.now() - started,
+        actual,
+        expected
+      });
     } catch (error) {
       rows.push({ id: testCase.id, ok: false, error: String(error?.message || error), latencyMs: Date.now() - started });
     }
