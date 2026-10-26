@@ -1142,9 +1142,9 @@ export function ChatGalleryModal({
   // Chat uses img as a numeric message index — only treat non-numeric /
   // asset-like values here.
   const galleryDeepLinkHandledRef = React.useRef('');
+  const galleryDeepLinkFetchRef = React.useRef('');
   React.useEffect(() => {
     if (typeof setActiveLightbox !== 'function') return undefined;
-    if (!Array.isArray(sharedPhotos) || sharedPhotos.length === 0) return undefined;
     const imgParam = galleryDeepLinkTarget.img;
     const commentParam = galleryDeepLinkTarget.comment;
     if (!imgParam || /^\d+$/.test(imgParam)) return undefined;
@@ -1155,23 +1155,61 @@ export function ChatGalleryModal({
         .map(k => String(k || '').trim()).filter(Boolean);
       return keys.includes(imgParam);
     };
-    const index = sharedPhotos.findIndex(matchKey);
-    if (index < 0) return undefined;
-    galleryDeepLinkHandledRef.current = targetKey;
-    setActiveLightbox({
-      urls: sharedPhotos.map(p => p.full),
-      index,
-      meta: sharedPhotos.map(p => ({
+    const toMeta = p => ({
         timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
         tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
         meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
         sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey,
         refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey
-      })),
-      focusCommentId: commentParam || null
-    });
-    return undefined;
-  }, [sharedPhotos, setActiveLightbox, galleryDeepLinkTarget]);
+      });
+    const openPhoto = (photos, index) => {
+      if (!Array.isArray(photos) || !photos.length || index < 0) return false;
+      const urls = photos.map(p => String(p?.full || p?.imageUrl || p?.url || p?.thumb || '').trim());
+      if (!urls.some(Boolean)) return false;
+      galleryDeepLinkHandledRef.current = targetKey;
+      setActiveLightbox({
+        urls,
+        index: Math.max(0, Math.min(index, urls.length - 1)),
+        meta: photos.map(toMeta),
+        focusCommentId: commentParam || null
+      });
+      return true;
+    };
+    const indexedPhotos = Array.isArray(sharedPhotos) ? sharedPhotos : [];
+    const index = indexedPhotos.findIndex(matchKey);
+    if (index >= 0) {
+      openPhoto(indexedPhotos, index);
+      return undefined;
+    }
+
+    // The gallery is deliberately paged, so a notification may point to a
+    // photo that is not in the currently loaded window (or the window may
+    // still be empty while it hydrates). Fetch that one canonical photo by
+    // asset key instead of silently leaving the user on the home screen.
+    const calendarId = String(calendar?.id || '').trim();
+    const projectId = String(window.__gatherFirebaseConfig?.projectId || '').trim();
+    if (!calendarId || !projectId || galleryDeepLinkFetchRef.current === targetKey) return undefined;
+    galleryDeepLinkFetchRef.current = targetKey;
+    let canceled = false;
+    fetchMediaAnalysisPhoto({ calendarId, projectId, assetKey: imgParam })
+      .then(row => {
+        if (canceled || !row) return;
+        const full = String(row.full || row.imageUrl || row.url || row.downloadURL || row.directMediaUrl || row.thumb || '').trim();
+        const thumb = String(row.thumb || row.thumbnailUrl || row.thumbUrl || full).trim();
+        if (!full && !thumb) return;
+        const normalized = {
+          ...row,
+          assetKey: String(row.assetKey || imgParam).trim(),
+          mediaKey: String(row.mediaKey || row.assetKey || imgParam).trim(),
+          refKey: String(row.refKey || row.assetKey || imgParam).trim(),
+          full: full || thumb,
+          thumb: thumb || full,
+        };
+        openPhoto([normalized], 0);
+      })
+      .catch(() => { /* keep the notification actionable without surfacing a second error */ });
+    return () => { canceled = true; };
+  }, [calendar?.id, sharedPhotos, setActiveLightbox, galleryDeepLinkTarget]);
 
 
   React.useEffect(() => {

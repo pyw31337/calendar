@@ -52,6 +52,7 @@ import {
   getTrulyConfirmedMeetings, getNextConfirmedMeeting, getActiveAvailabilities, getActiveParticipants,
   calculateSettlementBalance, formatBalanceBadge,
   getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
+  getPhotoCommentCount,
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
@@ -2305,7 +2306,24 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
     }),
     [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
   );
-  const photos = homeGalleryStrip.photos;
+  // The photo-index row is intentionally light-weight and can lag the live
+  // photo-comment listener.  Project the listener's count onto the same
+  // canonical asset key here so the home strip shows a badge immediately,
+  // without waiting for a gallery-page refresh.  Keep an indexed count as a
+  // fallback for rows written before the listener began publishing counts.
+  const photos = React.useMemo(() => {
+    const counts = calendarContext?.photoCommentCounts || {};
+    return homeGalleryStrip.photos.map(photo => {
+      const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || '').trim();
+      const liveCount = getPhotoCommentCount({
+        mediaKey: assetKey,
+        refKey: assetKey,
+        legacyKeys: Array.isArray(photo?.legacyKeys) ? photo.legacyKeys : [],
+      }, counts);
+      const indexedCount = Math.max(0, Number(photo?.commentCount) || 0);
+      return liveCount > indexedCount ? { ...photo, commentCount: liveCount } : photo;
+    });
+  }, [homeGalleryStrip.photos, calendarContext?.photoCommentCounts]);
   const placeItems = calendarContext?.places;
   const places = React.useMemo(
     () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 4) : []),
@@ -2501,6 +2519,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
                 return React.createElement('span', {
                   className: `${bentoClass('comment-badge')} ${isMulti ? 'is-multi-digit' : 'is-single-digit'}`,
                   'data-digits': isMulti ? 'multi' : 'single',
+                  'aria-label': `댓글 ${photo.commentCount}개`,
                 }, photo.commentCount);
               })() : null
             );

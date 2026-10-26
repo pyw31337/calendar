@@ -8413,3 +8413,57 @@ html:has(.renewal-shell.v2-design) :is(.modal-overlay, .bottom-sheet-overlay):no
 html:has(.renewal-shell.v2-design) .poll-voter-sheet:not(.is-exit-ghost) {
   animation: none !important;
 }
+
+html:has(.renewal-shell.v2-design) .renewal-home-photo-strip .bp-comment-badge {
+  z-index: 4 !important;
+  pointer-events: none !important;
+  background: rgba(20, 15, 35, 0.72) !important;
+  color: #fff !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Stable mobile backdrop height
+ *
+ * A form sheet used to size itself from whichever tab happened to be mounted
+ * first.  Switching 목록/등록 or adding a field then made the outer sheet
+ * shrink, leaving a second scrollbar inside the form and sometimes putting the
+ * close/save row behind the iOS home indicator.  Give form-like backdrops a
+ * deterministic visual-viewport height on first paint.  The drag controller
+ * adds .is-sheet-resized, which intentionally opts out so the user can still
+ * make the sheet shorter with the handle.
+ * -------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) >
+    :is(.modal-container, .v2-responsive-modal, .modal, .bp-event-sheet, .memo-edit-modal-container, .weather-detail-modal-container, .region-filter-sheet, .v2-settings-modal):not(.is-sheet-resized):not(.confirm-dialog-modal) {
+    height: min(
+      calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px))),
+      var(--gather-vv-modal-max, 860px)
+    ) !important;
+    max-height: min(
+      calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px))),
+      var(--gather-vv-modal-max, 860px)
+    ) !important;
+    min-height: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) >
+    .bottom-sheet:not(.is-sheet-resized):has(.date-modal, form, textarea, input[type="date"]) {
+    height: min(
+      calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px))),
+      var(--gather-vv-modal-max, 860px)
+    ) !important;
+    max-height: min(
+      calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px))),
+      var(--gather-vv-modal-max, 860px)
+    ) !important;
+    min-height: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) :is(.modal-overlay, .bottom-sheet-overlay) >
+    :is(.modal-container, .v2-responsive-modal, .modal, .bp-event-sheet, .bottom-sheet):not(.is-sheet-resized) >
+    :is(.modal-body, .bottom-sheet-body, form) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+  }
+}
