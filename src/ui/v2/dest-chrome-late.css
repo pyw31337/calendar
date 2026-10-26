@@ -8414,7 +8414,7 @@ html:has(.renewal-shell.v2-design) .poll-voter-sheet:not(.is-exit-ghost) {
   animation: none !important;
 }
 
-html:has(.renewal-shell.v2-design) .renewal-home-photo-strip .bp-comment-badge {
+html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip .bp-comment-badge {
   z-index: 4 !important;
   pointer-events: none !important;
   background: rgba(20, 15, 35, 0.72) !important;
