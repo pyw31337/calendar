@@ -95,3 +95,47 @@ test('assetKeysToRecount ignores plain text edits', () => {
   assert.deepEqual(items.assetKeysToRecount(base, { ...base, deletedAt: 1 }), ['a']);
   assert.deepEqual(items.assetKeysToRecount(base, { ...base, assetKey: 'b' }), ['a', 'b']);
 });
+
+test('a duplicate merge moves the copy’s comments onto the kept photo, deleted ones included', async () => {
+  const cal = 'cal_mergecomments';
+  const root = db.collection('calendars').doc(cal);
+  await root.collection('photoIndex').doc('asset:v1:keep').set({ commentCount: 1 });
+  await root.collection('photoIndex').doc('asset:v1:copy').set({ commentCount: 2 });
+  const seed = (id, assetKey, deletedAt = null) => root.collection(items.ITEMS).doc(id).set({
+    id, assetKey, participantId: 'p1', text: id, createdAt: 1, updatedAt: 1, deletedAt
+  });
+  await Promise.all([
+    seed('cmt_keep', 'asset:v1:keep'),
+    seed('cmt_copy1', 'asset:v1:copy'),
+    seed('cmt_copy2', 'asset:v1:copy'),
+    seed('cmt_copy_gone', 'asset:v1:copy', 5)
+  ]);
+  assert.equal(await items.moveAssetComments(db, cal, 'asset:v1:copy', 'asset:v1:keep'), 3);
+  const moved = await root.collection(items.ITEMS).where('assetKey', '==', 'asset:v1:keep').get();
+  assert.deepEqual(moved.docs.map(doc => doc.id).sort(), ['cmt_copy1', 'cmt_copy2', 'cmt_copy_gone', 'cmt_keep']);
+  assert.deepEqual((await root.collection(items.ITEMS).doc('cmt_copy1').get()).data().previousAssetKeys, ['asset:v1:copy']);
+  assert.equal((await root.collection(items.ITEMS).doc('cmt_copy1').get()).data().text, 'cmt_copy1', 'text untouched');
+  // What the item trigger then does for both photos.
+  assert.equal(await items.recountAsset(db, FieldValue, cal, 'asset:v1:keep'), 3);
+  assert.equal(await items.recountAsset(db, FieldValue, cal, 'asset:v1:copy'), 0);
+  assert.equal(await items.moveAssetComments(db, cal, 'asset:v1:keep', 'asset:v1:keep'), 0, 'same photo is a no-op');
+});
+
+test('rules: a comment moved by a duplicate merge can still be edited and deleted in the app', async () => {
+  const cal = 'cal_mergedrules';
+  const root = db.collection('calendars').doc(cal);
+  await root.collection(items.ITEMS).doc('cmt_m1').set({
+    id: 'cmt_m1', assetKey: 'asset:v1:copy', participantId: 'p_yuri', text: '좋다',
+    createdAt: 1790000000000, updatedAt: 1790000000000, deletedAt: null
+  });
+  await items.moveAssetComments(db, cal, 'asset:v1:copy', 'asset:v1:keep');
+  const moved = { previousAssetKeys: { arrayValue: { values: [str('asset:v1:copy')] } }, assetKey: str('asset:v1:keep') };
+  assert.equal((await put(cal, 'photoCommentItems/cmt_m1', comment('cmt_m1', { ...moved, text: str('수정') }))).status, 200, 'edit after merge');
+  assert.equal((await put(cal, 'photoCommentItems/cmt_m1', comment('cmt_m1', { ...moved, deletedAt: num(1790000001000) }))).status, 200, 'delete after merge');
+  // The marker the merge used to write is not a field the rules accept on an update.
+  await root.collection(items.ITEMS).doc('cmt_m2').set({
+    id: 'cmt_m2', assetKey: 'asset:v1:keep', participantId: 'p_yuri', text: '좋다',
+    createdAt: 1790000000000, updatedAt: 1790000000000, deletedAt: null, mergedFrom: 'asset:v1:copy'
+  });
+  assert.equal((await put(cal, 'photoCommentItems/cmt_m2', comment('cmt_m2', { assetKey: str('asset:v1:keep'), mergedFrom: str('asset:v1:copy'), deletedAt: num(1790000001000) }))).status, 403);
+});

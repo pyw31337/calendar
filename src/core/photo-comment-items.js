@@ -193,6 +193,31 @@ export async function movePhotoComments({ calendarId, fromKey, toKey }) {
   return results.every(Boolean);
 }
 
+// Count objects that came from the summary document itself, as opposed to the `{}` a surface
+// holds before the summary has answered (or gets as a default prop).
+const loadedCounts = new WeakSet();
+function loaded(counts) {
+  const value = counts && typeof counts === 'object' ? { ...counts } : {};
+  loadedCounts.add(value);
+  return value;
+}
+
+export function arePhotoCommentCountsLoaded(counts) {
+  return !!counts && typeof counts === 'object' && loadedCounts.has(counts);
+}
+
+/**
+ * What a thumbnail badge shows. Once the summary has answered it is the whole truth: a photo row
+ * can come from the cached photo index, whose commentCount is not refreshed when a comment is
+ * added or deleted (comments do not change the photo index revision). Until then, the larger of
+ * the two, so a badge never blinks away while the summary loads.
+ */
+export function photoCommentBadgeCount(liveCount, counts, indexedCount) {
+  const live = Math.max(0, Number(liveCount) || 0);
+  if (arePhotoCommentCountsLoaded(counts)) return live;
+  return Math.max(live, Math.max(0, Number(indexedCount) || 0));
+}
+
 /**
  * Comment counts for every photo of the calendar, from the summary document.
  * onChange(countsByAssetKey). Returns an unsubscribe function.
@@ -205,10 +230,10 @@ export function subscribePhotoCommentCounts({ calendarId, onChange }) {
       const { firebaseConfig, firestoreDocumentToJs } = await firebaseData();
       const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calendarId}/${SUMMARY}/${SUMMARY_DOC}`);
       if (stopped) return;
-      if (res.status === 404) { onChange({}); return; }
+      if (res.status === 404) { onChange(loaded({})); return; }
       if (!res.ok) return;
       const data = firestoreDocumentToJs(await res.json()) || {};
-      if (!stopped) onChange(data.counts && typeof data.counts === 'object' ? data.counts : {});
+      if (!stopped) onChange(loaded(data.counts));
     } catch (_) {}
   };
   const db = liveDb();
@@ -217,8 +242,7 @@ export function subscribePhotoCommentCounts({ calendarId, onChange }) {
       const unsubscribe = db.collection('calendars').doc(`cal_${calendarId}`).collection(SUMMARY).doc(SUMMARY_DOC)
         .onSnapshot(snap => {
           if (stopped) return;
-          const counts = snap.exists ? snap.data()?.counts : null;
-          onChange(counts && typeof counts === 'object' ? { ...counts } : {});
+          onChange(loaded(snap.exists ? snap.data()?.counts : null));
         }, () => { void restOnce(); });
       return () => { stopped = true; unsubscribe(); };
     } catch (_) {}

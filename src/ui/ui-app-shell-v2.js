@@ -56,6 +56,7 @@ import {
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
+import { photoCommentBadgeCount } from '../core/photo-comment-items.js';
 import { useHomeSummaryUi } from './home-summary-ui.js';
 
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
@@ -423,7 +424,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     // It must not create an unrelated `new Date()` state on every page load.
     currentMonthDate,
     setCurrentMonthAndSync,
-    displayChatMessages, memos, galleryPhotoIndex, setActiveLightbox,
+    displayChatMessages, memos, galleryPhotoIndex, setActiveLightbox, photoCommentCounts,
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
     handleMoveAvailability,
@@ -2306,24 +2307,20 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
     }),
     [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
   );
-  // The photo-index row is intentionally light-weight and can lag the live
-  // photo-comment listener.  Project the listener's count onto the same
-  // canonical asset key here so the home strip shows a badge immediately,
-  // without waiting for a gallery-page refresh.  Keep an indexed count as a
-  // fallback for rows written before the listener began publishing counts.
-  const photos = React.useMemo(() => {
-    const counts = calendarContext?.photoCommentCounts || {};
-    return homeGalleryStrip.photos.map(photo => {
-      const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || '').trim();
-      const liveCount = getPhotoCommentCount({
-        mediaKey: assetKey,
-        refKey: assetKey,
-        legacyKeys: Array.isArray(photo?.legacyKeys) ? photo.legacyKeys : [],
-      }, counts);
-      const indexedCount = Math.max(0, Number(photo?.commentCount) || 0);
-      return liveCount > indexedCount ? { ...photo, commentCount: liveCount } : photo;
-    });
-  }, [homeGalleryStrip.photos, calendarContext?.photoCommentCounts]);
+  // These rows come from the photo index, which the phone keeps between visits and refreshes only
+  // when a photo changes -- a new or deleted comment leaves its commentCount behind. Badges take
+  // the live comment summary instead, the same count the gallery and the lightbox show.
+  const photoCommentCounts = calendarContext?.photoCommentCounts;
+  const photos = React.useMemo(() => homeGalleryStrip.photos.map(photo => {
+    const assetKey = String(photo?.assetKey || photo?.mediaKey || photo?.refKey || '').trim();
+    const liveCount = getPhotoCommentCount({
+      mediaKey: assetKey,
+      refKey: assetKey,
+      legacyKeys: Array.isArray(photo?.legacyKeys) ? photo.legacyKeys : [],
+    }, photoCommentCounts || {});
+    const commentCount = photoCommentBadgeCount(liveCount, photoCommentCounts, photo?.commentCount);
+    return commentCount === (Number(photo?.commentCount) || 0) ? photo : { ...photo, commentCount };
+  }), [homeGalleryStrip.photos, photoCommentCounts]);
   const placeItems = calendarContext?.places;
   const places = React.useMemo(
     () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 4) : []),

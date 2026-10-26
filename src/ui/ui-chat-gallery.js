@@ -20,6 +20,7 @@ import { collectChatFileAttachmentsFromMessages } from '../core/chat-file-attach
 import { requestGalleryChatCorpus } from '../core/gallery-archive-state.js';
 import { buildGalleryKeyIndex, buildGalleryLinks, createGalleryOwnerLookup, galleryFileKey, resolveIndexedGalleryPhotos, withUniqueGalleryKeys } from '../core/gallery-collections.js';
 import { createPhotoCommentIdentityResolver } from '../core/app-domain-helpers.js';
+import { photoCommentBadgeCount } from '../core/photo-comment-items.js';
 import { useLikes } from '../core/likes-store.js';
 import { groupLikesByKind, LIKE_KIND_LABELS, photoLikeItem as galleryPhotoLikeItem } from '../core/likes-model.js';
 import { LikeButton } from './like-button.js';
@@ -2469,10 +2470,10 @@ export function ChatGalleryModal({
     // comment document key even after the meeting photo receives its own photoId.
     // Include that key as a read fallback so the badge follows the same thread as
     // the lightbox instead of silently showing zero.
-    const commentCount = Math.max(Number(photo.commentCount || 0), getPhotoCommentCount({
+    const commentCount = photoCommentBadgeCount(getPhotoCommentCount({
       ...commentIdentity,
       legacyKeys: [...(commentIdentity.legacyKeys || []), legacyMeetingKey].filter(Boolean)
-    }, photoCommentCounts));
+    }, photoCommentCounts), photoCommentCounts, photo.commentCount);
     const thumb = /*#__PURE__*/React.createElement(PhotoAssetThumb, {
       key: isBulkShareMode ? undefined : itemKey,
       photo: photo,
