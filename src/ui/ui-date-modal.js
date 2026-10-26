@@ -9,6 +9,7 @@ import { inferUploadSourceFromMessageId } from './lightbox-photo-origin.js';
 import { launchClipboardConfetti } from './celebrate-confetti.js';
 import { DateTitle } from './date-title.js';
 import { useOverlayHistory } from './ui-shared.js';
+import { resolveAnniversaryCoverPhoto } from '../core/anniversary-cover-photo.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -357,7 +358,14 @@ export function DateModal({
     if (!ann) return [];
     if (Array.isArray(ann.photos) && ann.photos.length) return ann.photos;
     if (ann.image) return [{ url: ann.image, thumbUrl: ann.image, id: `img_${ann.id}` }];
-    return [];
+    // When the anniversary itself has no media, reuse a photo attached to this date's
+    // meeting album as the banner/lightbox cover. This is presentation-only; the source
+    // anniversary remains untouched and the photo still belongs to its original album.
+    const datePhoto = resolveAnniversaryCoverPhoto(ann, (visibleMeetingImages || []).map(photo => ({
+      ...photo,
+      meetingDate: photo?.meetingDate || dateStr
+    })));
+    return datePhoto ? [{ ...datePhoto, id: datePhoto.id || `date_photo_${ann.id}` }] : [];
   };
   // Same as ui-event-modals.js's getKakaoMapLinkUrl -- see that file's comment for why this
   // isn't going through the (dead) getPlaceKakaoRouteUrl bridge.

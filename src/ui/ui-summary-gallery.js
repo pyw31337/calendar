@@ -37,6 +37,7 @@ import { CommonPagination } from './ui-shared.js';
 import { contentPosterStatusBadge } from '../core/culture-poster-badge.js';
 import { orderCultureEventItems } from '../core/culture-event-order.js';
 import { CultureSourceLinks } from './culture-source-links.js';
+import { resolveAnniversaryCoverPhoto } from '../core/anniversary-cover-photo.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -4174,6 +4175,15 @@ export function ContentView({
     setIsContentRegisterOpen(true);
   };
 
+  // Content cards can be registered on a date without their own poster. Keep a small, calendar
+  // scoped list of meeting-album photos available for the shared anniversary-cover fallback.
+  const contentDatePhotoCandidates = React.useMemo(() => getConfirmedMeetings(calendar).flatMap(meeting => (
+    (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
+      ...photo,
+      meetingDate: photo?.meetingDate || meeting?.date || ''
+    }))
+  )), [calendar]);
+
   // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event/sports도 각 탭에 보이도록,
   // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
   const selfAuthoredCultureItems = React.useMemo(() => {
@@ -4204,9 +4214,9 @@ export function ContentView({
         // 쓰지만, AnniversaryModal에서 직접 첨부한 사진은 a.photos 배열(url/thumbUrl)에 저장되어
         // a.image는 항상 비어 있다. a.image가 없을 때는 첫 번째 첨부 사진으로 대체해야
         // 사용자가 직접 올린 사진이 있는데도 "포스터 없음"으로 나오는 걸 막을 수 있다.
-        image: culturePosterUrl(a)
+        image: culturePosterUrl(a, contentDatePhotoCandidates)
       }));
-  }, [anniversaries]);
+  }, [anniversaries, contentDatePhotoCandidates]);
 
   // Memoized per-kind so each stays reference-stable across renders when its actual contents
   // haven't changed. Building these inline in JSX (as a fresh .filter()/.filter() spread every
@@ -5086,7 +5096,7 @@ function sanitizeCultureVenueValue(venue, description) {
   return stripped || raw;
 }
 
-function culturePosterUrl(item) {
+function culturePosterUrl(item, datePhotos = []) {
   if (!item || typeof item !== 'object') return '';
   const photos = Array.isArray(item.photos) ? item.photos : [];
   const photo = photos.find(entry => entry && (entry.thumbUrl || entry.url || entry.imageUrl || entry.image)) || null;
@@ -5116,7 +5126,8 @@ function culturePosterUrl(item) {
     }
     return url;
   }
-  return fallbackCandidate;
+  const datePhoto = resolveAnniversaryCoverPhoto(item, datePhotos);
+  return datePhoto?.thumb || datePhoto?.full || fallbackCandidate;
 }
 
 function mergeCultureItemPreferPoster(base, overlay) {
@@ -6112,6 +6123,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
+  const contentDatePhotoCandidates = React.useMemo(() => getConfirmedMeetings(calendar).flatMap(meeting => (
+    (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
+      ...photo,
+      meetingDate: photo?.meetingDate || meeting?.date || ''
+    }))
+  )), [calendar]);
   // 상세 시트의 "공유" 버튼 -- 이 카드의 전체 필드를 URL 프래그먼트에 실어(사진 공유와 동일한
   // 원칙) 복사한다. 이 URL을 열면 그 카드 백드롭이 바로 뜨고(App의 SharedContentPreviewModal),
   // 컨텐츠 등록 폼에 붙여넣으면 포스터~설명까지 그대로 복제 등록된다.
@@ -6321,10 +6338,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           bookingRate: a.movieMeta?.bookingRate || snapshot.bookingRate || '',
           audienceCount: a.movieMeta?.audienceCount || snapshot.audienceCount || '',
           isOpenEnded: a.movieMeta ? a.movieMeta.isOpenEnded !== false : (snapshot.isOpenEnded !== false),
-          image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : (snapshot.image || ''))
+          image: culturePosterUrl(a, contentDatePhotoCandidates) || snapshot.image || ''
         };
       });
-  }, [items, anniversaries, anniversaryCategory]);
+  }, [items, anniversaries, anniversaryCategory, contentDatePhotoCandidates]);
 
   // Merge calendar-owned custom items (컨텐츠 등록) with the crawled snapshot.
   // Custom ids normally use custom_perf_/custom_fest_ prefixes, but editing a crawled card

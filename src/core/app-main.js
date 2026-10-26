@@ -61,6 +61,7 @@ import {
   calculateDday,
   getSolarFromLunar
 } from './app-anniversary-dates.js';
+import { resolveAnniversaryCoverPhoto } from './anniversary-cover-photo.js';
 import { planAnniversaryMove, describeAnniversaryMove } from './app-anniversary-move.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
@@ -1483,6 +1484,12 @@ function CalendarApp() {
   // In-memory poster/genre enrichment for DateModal / calendar display (no Firestore rewrite).
   const anniversariesWithPosters = React.useMemo(() => {
     if (!Array.isArray(anniversaries)) return [];
+    const datePhotos = getConfirmedMeetings(activeCal).flatMap(meeting => (
+      (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
+        ...photo,
+        meetingDate: photo?.meetingDate || meeting?.date || ''
+      }))
+    ));
     return anniversaries.map(ann => {
       if (!ann) return ann;
       let next = ann;
@@ -1492,16 +1499,29 @@ function CalendarApp() {
       }
       const hasPhotos = Array.isArray(next.photos) && next.photos.length > 0;
       const hasImage = !!(next.image && String(next.image).trim());
-      if (hasPhotos || hasImage || !next.cultureSourceId) return next;
-      const poster = customPosterById.get(next.cultureSourceId) || culturePosterById.get(next.cultureSourceId);
-      if (!poster) return next;
+      if (hasPhotos || hasImage) return next;
+      const poster = next.cultureSourceId
+        ? (customPosterById.get(next.cultureSourceId) || culturePosterById.get(next.cultureSourceId) || '')
+        : '';
+      if (poster) {
+        return {
+          ...next,
+          image: poster,
+          photos: [{ id: `poster_${next.id}`, url: poster, thumbUrl: poster }]
+        };
+      }
+      // A date album photo is a valid representative even for ordinary anniversaries. Keep
+      // this enrichment in memory only: deleting/replacing the source photo must not mutate the
+      // anniversary document or create a second ownership record.
+      const datePhoto = resolveAnniversaryCoverPhoto(next, datePhotos);
+      if (!datePhoto) return next;
       return {
         ...next,
-        image: poster,
-        photos: [{ id: `poster_${next.id}`, url: poster, thumbUrl: poster }]
+        image: datePhoto.thumb || datePhoto.full,
+        photos: [{ ...datePhoto, id: `date_photo_${next.id}`, source: 'date' }]
       };
     });
-  }, [anniversaries, customPosterById, culturePosterById, cultureGenreById]);
+  }, [activeCal, anniversaries, customPosterById, culturePosterById, cultureGenreById]);
 
   // 히스토리 > 문화공연 탭의 "캘린더에 일정 추가" 체크박스가 직접 호출하는 write path -- reuses
   // the exact same anniversaries write shape AnniversaryModal's own handleSaveAnniversary uses
