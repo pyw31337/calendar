@@ -37,7 +37,7 @@ import { CommonPagination } from './ui-shared.js';
 import { contentPosterStatusBadge } from '../core/culture-poster-badge.js';
 import { orderCultureEventItems } from '../core/culture-event-order.js';
 import { CultureSourceLinks } from './culture-source-links.js';
-import { resolveAnniversaryCoverPhoto } from '../core/anniversary-cover-photo.js';
+import { resolveAnniversaryCoverPhoto, collectAnniversaryDatePhotos } from '../core/anniversary-cover-photo.js';
 const localTodaySeoul = (n) => window.GATHER_APP_UTILS?.todaySeoulDateKey?.(n) || '';
 const localAddDays = (iso, d) => window.GATHER_APP_UTILS?.addDaysToDateKey?.(iso, d) || iso;
 
@@ -4175,14 +4175,7 @@ export function ContentView({
     setIsContentRegisterOpen(true);
   };
 
-  // Content cards can be registered on a date without their own poster. Keep a small, calendar
-  // scoped list of meeting-album photos available for the shared anniversary-cover fallback.
-  const contentDatePhotoCandidates = React.useMemo(() => getConfirmedMeetings(calendar).flatMap(meeting => (
-    (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
-      ...photo,
-      meetingDate: photo?.meetingDate || meeting?.date || ''
-    }))
-  )), [calendar]);
+  const contentDatePhotoCandidates = React.useMemo(() => collectAnniversaryDatePhotos(calendar, getConfirmedMeetings), [calendar]);
 
   // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event/sports도 각 탭에 보이도록,
   // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
@@ -6123,12 +6116,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
-  const contentDatePhotoCandidates = React.useMemo(() => getConfirmedMeetings(calendar).flatMap(meeting => (
-    (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
-      ...photo,
-      meetingDate: photo?.meetingDate || meeting?.date || ''
-    }))
-  )), [calendar]);
+  const contentDatePhotoCandidates = React.useMemo(() => collectAnniversaryDatePhotos(calendar, getConfirmedMeetings), [calendar]);
   // 상세 시트의 "공유" 버튼 -- 이 카드의 전체 필드를 URL 프래그먼트에 실어(사진 공유와 동일한
   // 원칙) 복사한다. 이 URL을 열면 그 카드 백드롭이 바로 뜨고(App의 SharedContentPreviewModal),
   // 컨텐츠 등록 폼에 붙여넣으면 포스터~설명까지 그대로 복제 등록된다.

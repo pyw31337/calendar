@@ -109,3 +109,13 @@ export function anniversaryPhotoMatchesDate(photo, anniversary) {
   return photoMatchesAnniversary(photo, anniversary);
 }
 
+export function collectAnniversaryDatePhotos(calendar, getMeetings) {
+  const meetings = typeof getMeetings === 'function' ? getMeetings(calendar) : [];
+  return (Array.isArray(meetings) ? meetings : []).flatMap(meeting => (
+    (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
+      ...photo,
+      meetingDate: photo?.meetingDate || meeting?.date || ''
+    }))
+  ));
+}
+

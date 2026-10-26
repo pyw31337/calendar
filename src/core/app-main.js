@@ -61,7 +61,7 @@ import {
   calculateDday,
   getSolarFromLunar
 } from './app-anniversary-dates.js';
-import { resolveAnniversaryCoverPhoto } from './anniversary-cover-photo.js';
+import { resolveAnniversaryCoverPhoto, collectAnniversaryDatePhotos } from './anniversary-cover-photo.js';
 import { planAnniversaryMove, describeAnniversaryMove } from './app-anniversary-move.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
@@ -1484,12 +1484,7 @@ function CalendarApp() {
   // In-memory poster/genre enrichment for DateModal / calendar display (no Firestore rewrite).
   const anniversariesWithPosters = React.useMemo(() => {
     if (!Array.isArray(anniversaries)) return [];
-    const datePhotos = getConfirmedMeetings(activeCal).flatMap(meeting => (
-      (Array.isArray(meeting?.photos) ? meeting.photos : []).map(photo => ({
-        ...photo,
-        meetingDate: photo?.meetingDate || meeting?.date || ''
-      }))
-    ));
+    const datePhotos = collectAnniversaryDatePhotos(activeCal, getConfirmedMeetings);
     return anniversaries.map(ann => {
       if (!ann) return ann;
       let next = ann;
