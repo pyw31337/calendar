@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="f1edc56410ec9f4ee05dfdc849aff679ec88b2cd" />
+    <meta name="build-sha" content="473943417dfc13c8548c02df7d2ef78d21908552" />
     <meta name="v2-polish" content="2026-09-21-search-page" />
     <title>렛츠 캘린더</title>
     <meta name="description" content="만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에." />
@@ -167,7 +167,9 @@
             history.replaceState(history.state, '', rootPath + 'app/' + id + '/' + (routedQuery ? '?' + routedQuery : '') + window.location.hash);
           } catch (_) {}
         }
-        var titleByCalendar = { kkot: "Let's Calendar", cw: "Let's Calendar", jhair: "Let's Calendar" };
+        // The install label is the calendar identity, not the service brand. The generic
+        // manifest remains 렛츠 캘린더 only when no calendar has been selected yet.
+        var titleByCalendar = { kkot: "꽃잎반", cw: "모아엘가", jhair: "제이헤어" };
         var manifestHref = (id && manifestByCalendar[id]) || 'manifest.json';
         var link = document.createElement('link');
         link.setAttribute('rel', 'manifest');
@@ -412,7 +414,7 @@
         50% { transform: scale(1.3); opacity: 1; }
       }
     </style>
-    <script type="module" crossorigin src="/calendar/assets/index-B2h7y0Vp.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-BNVMzky4.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-DFLxtAlF.js">
@@ -460,7 +462,7 @@
             var m = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)/) || window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
             if (m) calId = m[1];
           }
-          var titles = { kkot: "Let's Calendar", cw: "Let's Calendar", jhair: "Let's Calendar" };
+          var titles = { kkot: "꽃잎반", cw: "모아엘가", jhair: "제이헤어" };
           if (calId && titles[calId]) {
             var el = document.getElementById('app-splash-title');
             if (el) el.textContent = titles[calId];
