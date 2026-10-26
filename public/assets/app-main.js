@@ -4683,7 +4683,9 @@ function App() {
       const calTitle = `${activeCal.title} 캘린더`;
       const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
       const currentShareUrl = getCalendarShareUrl(activeCal.id);
-      document.title = calTitle;
+      // iOS uses document.title as the home-screen label; keep the exact calendar name
+      // there. Social previews continue using calTitle with the descriptive suffix.
+      document.title = activeCal.title;
       const ogTitle = document.getElementById('og-title');
       if (ogTitle) ogTitle.setAttribute('content', calTitle);
       const ogDesc = document.getElementById('og-desc');

@@ -1403,7 +1403,9 @@ const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
 // manual-instructions fallback even on an otherwise fully installable browser.
 function buildDynamicManifest(calendar) {
   const base = getAppBaseUrl();
-  const name = calendar.title ? `${calendar.title} 캘린더` : '렛츠 캘린더';
+  // A home-screen app represents a calendar, so use its exact title. The service brand
+  // (렛츠) is reserved for the generic no-calendar manifest and social metadata.
+  const name = calendar.title ? String(calendar.title).trim() : '렛츠 캘린더';
   const startUrl = `${base}?id=${calendar.id}`;
   return {
     id: startUrl,

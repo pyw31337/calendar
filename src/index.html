@@ -166,7 +166,9 @@
             history.replaceState(history.state, '', rootPath + 'app/' + id + '/' + (routedQuery ? '?' + routedQuery : '') + window.location.hash);
           } catch (_) {}
         }
-        var titleByCalendar = { kkot: "Let's Calendar", cw: "Let's Calendar", jhair: "Let's Calendar" };
+        // The install label is the calendar identity, not the service brand. The generic
+        // manifest remains 렛츠 캘린더 only when no calendar has been selected yet.
+        var titleByCalendar = { kkot: "꽃잎반", cw: "모아엘가", jhair: "제이헤어" };
         var manifestHref = (id && manifestByCalendar[id]) || 'manifest.json';
         var link = document.createElement('link');
         link.setAttribute('rel', 'manifest');
@@ -452,7 +454,7 @@
             var m = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)/) || window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
             if (m) calId = m[1];
           }
-          var titles = { kkot: "Let's Calendar", cw: "Let's Calendar", jhair: "Let's Calendar" };
+          var titles = { kkot: "꽃잎반", cw: "모아엘가", jhair: "제이헤어" };
           if (calId && titles[calId]) {
             var el = document.getElementById('app-splash-title');
             if (el) el.textContent = titles[calId];
