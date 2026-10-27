@@ -3389,21 +3389,22 @@ exports.sendDailyMediaAnalysisBrief = functions.region(SEOUL_REGION).runWith({
   return null;
 });
 
-// Nightly reconciliation (invariant I6): rebuild every calendar's photoIndex from its source
+// Weekly reconciliation (invariant I6): rebuild every calendar's photoIndex from its source
 // documents, so owners that incremental triggers missed or processed out of order cannot
-// linger (they were ~2% of owners and every stale 404 row), then sweep the Storage GC queue.
-exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 540, memory: '1GB' })
-  .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
+// linger, then sweep the Storage GC queue. Runs weekly on Sunday (04:10 KST) with 512MB to stay
+// comfortably within the free tier.
+exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeoutSeconds: 300, memory: '512MB' })
+  .pubsub.schedule('10 4 * * 0').timeZone('Asia/Seoul').onRun(async () => {
     const calendars = await getFirestore().collection('calendars').select().get();
     const rebuildFailures = [];
     for (const doc of calendars.docs) {
       const calendarId = doc.id.startsWith('cal_') ? doc.id.slice(4) : doc.id;
-      if (!CALENDAR_ID_RE.test(calendarId)) continue;
+      if (!CALENDAR_ID_RE.test(calendarId) || calendarId.startsWith('stress_') || calendarId.startsWith('test_')) continue;
       try {
         const report = await rebuildPhotoIndexForCalendarAdmin(calendarId, true);
-        console.log('nightly photoIndex rebuild', JSON.stringify({ calendarId, indexedPhotos: report.indexedPhotos, staleRows: report.staleRows }));
+        console.log('weekly photoIndex rebuild', JSON.stringify({ calendarId, indexedPhotos: report.indexedPhotos, staleRows: report.staleRows }));
       } catch (err) {
-        console.error(`nightly photoIndex rebuild failed for ${calendarId}:`, err);
+        console.error(`weekly photoIndex rebuild failed for ${calendarId}:`, err);
         rebuildFailures.push(calendarId);
       }
     }
@@ -3414,11 +3415,11 @@ exports.nightlyMediaMaintenance = functions.region(SEOUL_REGION).runWith({ timeo
       return null;
     }
     const gc = await mediaCommands.sweepStorageGc({ db: getFirestore(), bucket: getStorage().bucket() });
-    console.log('nightly storage GC', JSON.stringify(gc));
+    console.log('weekly storage GC', JSON.stringify(gc));
     return null;
   });
 
-exports.rebuildPhotoIndex = seoulFunctions().runWith({ timeoutSeconds: 300, memory: '1GB' }).https.onRequest(async (req, res) => {
+exports.rebuildPhotoIndex = seoulFunctions().runWith({ timeoutSeconds: 300, memory: '512MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
@@ -3572,7 +3573,7 @@ async function prepareMediaIntegrityReview({ calendarId, apply = false, material
 
 // Administrator entry point: dry-run is the default. `apply` only creates review records and
 // optional dual-write graph records; it does not delete legacy documents or Storage objects.
-exports.prepareMediaIntegrityReview = seoulFunctions().runWith({ timeoutSeconds: 540, memory: '1GB' }).https.onRequest(async (req, res) => {
+exports.prepareMediaIntegrityReview = seoulFunctions().runWith({ timeoutSeconds: 300, memory: '512MB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }

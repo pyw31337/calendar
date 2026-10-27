@@ -759,6 +759,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Hair Shop SaaS Reservation System (/hairShops/{shopId})
+    match /hairShops/{shopId} {
+      allow read: if shopId is string && shopId.matches('^[A-Za-z0-9_-]{1,64}$');
+      allow write: if shopId is string && shopId.matches('^[A-Za-z0-9_-]{1,64}$');
+
+      match /reservations/{reservationId} {
+        allow read, write: if shopId is string && shopId.matches('^[A-Za-z0-9_-]{1,64}$');
+      }
+
+      match /holidays/{holidayId} {
+        allow read, write: if shopId is string && shopId.matches('^[A-Za-z0-9_-]{1,64}$');
+      }
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
