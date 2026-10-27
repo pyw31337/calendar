@@ -52,6 +52,13 @@
         return;
       }
 
+      // Admin route direct hit fallback (e.g. /calendar/admin or /calendar/admin/something)
+      var adminMatch = path.match(/^(.*\/)admin(?:\/.*)?$/);
+      if (adminMatch) {
+        loc.replace(adminMatch[1] + 'admin/' + search + hash);
+        return;
+      }
+
       // Fallback for any other 404 on GitHub Pages
       var base = path.indexOf('/calendar/') !== -1 ? '/calendar/' : '/';
       loc.replace(base + search + hash);
