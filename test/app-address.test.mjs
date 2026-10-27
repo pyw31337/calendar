@@ -147,5 +147,8 @@ test('admin global tabs stay on one row and call the Mac backup tab 백업', () 
   assert.match(dashboard, /"데이터풀"/);
   assert.match(dashboard, /"백업"/);
   assert.doesNotMatch(dashboard, /"맥 백업"/);
+  const backupPanel = readFileSync(new URL('../src/ui/ui-mac-backup-admin.js', import.meta.url), 'utf8');
+  assert.match(backupPanel, /h\('h4',[\s\S]*'백업'/);
+  assert.doesNotMatch(backupPanel, /'맥 백업'/);
   assert.match(css, /\.admin-tab-button\s*\{[\s\S]*white-space:\s*nowrap\s*!important;/);
 });

@@ -1,5 +1,5 @@
 /**
- * 어드민 '맥 백업' 탭. The button stores a request (functions/index.js macBackupAdmin); the Mac
+ * 어드민 '백업' 탭. The button stores a request (functions/index.js macBackupAdmin); the Mac
  * picks it up on its next 15-minute check (tools/mac-automation/mac-backup-sync.mjs), runs
  * backup.sh --auto and reports the summary back. Only times and the summary are shown -- the
  * backup itself stays in the Mac's iCloud Drive "Moyeora Backups" folder.
@@ -38,7 +38,7 @@ export function MacBackupPanel({ password, cardStyle, titleStyle }) {
     h('span', { style: { color: 'var(--text-sub)', minWidth: '96px' } }, label), h('span', { style: { color: 'var(--text-main)', fontWeight: 600 } }, value));
 
   return h('section', { style: cardStyle },
-    h('h4', { style: titleStyle }, '맥 백업'),
+    h('h4', { style: titleStyle }, '백업'),
     h('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-sub)', lineHeight: 1.5, marginBottom: '10px' } },
       '맥미니의 자동 실행·사진 분석 데이터·비밀값(암호로 잠금)을 iCloud Drive "Moyeora Backups"에 백업해요. 버튼을 누르면 맥이 15분 안에 확인하고 백업합니다.'),
     error && h('div', { style: { color: '#B91C1C', fontSize: 'var(--font-size-sm)', marginBottom: '8px' } }, error),
