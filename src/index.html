@@ -150,7 +150,8 @@
           || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
         if (hasAppPaths && id && manifestByCalendar[id] && !appMatch && window.top === window
           && !isStandaloneApp && !/\/share\//.test(window.location.pathname)
-          && !params.has('admin') && params.get('mode') !== 'admin') {
+          && !params.has('admin') && params.get('mode') !== 'admin'
+          && !/\/admin(?:\/|$)/.test(window.location.pathname)) {
           var rootPath = window.location.pathname.replace(/[^/]*$/, '');
           try {
             // Once the root URL is promoted to its calendar-scoped app path, the

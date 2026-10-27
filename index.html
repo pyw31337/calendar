@@ -119,7 +119,8 @@
     (function () {
       try {
         var params = new URLSearchParams(window.location.search);
-        if (params.get('admin') === '1') {
+        if (/(?:^|\/)admin(?:\/|$)/.test(window.location.pathname)
+          || params.get('admin') === '1' || params.get('mode') === 'admin') {
           document.documentElement.setAttribute('data-theme', 'light');
           return;
         }

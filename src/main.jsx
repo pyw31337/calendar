@@ -359,7 +359,11 @@ async function boot() {
     // Admin dashboard/modals are normally loaded only for a direct admin route. The main
     // screen can also request AdminModal from its side menu; that path uses loadAdminUi above.
     const params = new URLSearchParams(window.location.search);
-    const isAdminRoute = params.get('admin') === '1' || params.get('mode') === 'admin';
+    // `/admin` is the canonical staff route. Keep the legacy query form working while
+    // loading the admin chunk early enough that a direct `/calendar/admin` visit never
+    // paints the regular calendar shell first.
+    const isAdminRoute = /(?:^|\/)admin(?:\/|$)/.test(window.location.pathname)
+      || params.get('admin') === '1' || params.get('mode') === 'admin';
     const initialView = params.get('view') || 'calendar';
     if (initialView === 'chat' || initialView === 'gallery') {
       await loadChatUi();

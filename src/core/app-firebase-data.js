@@ -3271,28 +3271,32 @@ function updateMetaRevision(meta, calendarId, revision) {
   return next;
 }
 
-function isAdminDashboardRoute() {
-  const params = new URLSearchParams(window.location.search);
+function isAdminDashboardRoute(locationLike = typeof window !== 'undefined' ? window.location : null) {
+  if (!locationLike) return false;
+  const pathname = locationLike.pathname || '';
+  if (/(?:^|\/)admin(?:\/|$)/.test(pathname)) return true;
+  const params = new URLSearchParams(locationLike.search || '');
   return params.get('admin') === '1' || params.get('mode') === 'admin';
 }
 
-function isAdminRestoreRoute() {
-  const params = new URLSearchParams(window.location.search);
-  return isAdminDashboardRoute() && params.get('restore') === '1';
+function isAdminRestoreRoute(locationLike = typeof window !== 'undefined' ? window.location : null) {
+  if (!locationLike) return false;
+  const params = new URLSearchParams(locationLike.search || '');
+  return isAdminDashboardRoute(locationLike) && params.get('restore') === '1';
 }
 
 function getAdminSelectedCalendarIdFromUrl(fallback = 'kkot') {
   if (!isAdminDashboardRoute()) return fallback;
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const id = params.get('id') || '';
   return isValidCalendarId(id) ? id : fallback;
 }
 
 // Makes the admin 통합검색결과 page addressable/bookmarkable/back-button-navigable as its own
-// URL (?admin=1&search=<query>) instead of only existing as in-memory component state.
+// URL (?search=<query> or /calendar/admin?search=<query>) instead of only existing as in-memory component state.
 function getAdminSearchQueryFromUrl() {
   if (!isAdminDashboardRoute()) return null;
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   return params.get('search') || null;
 }
 
@@ -3300,7 +3304,7 @@ function getAdminSearchQueryFromUrl() {
 // (?cal=<id|all>&from=<YYYY-MM-DD>&to=<YYYY-MM-DD>).
 function getAdminSearchFilterFromUrl() {
   if (!isAdminDashboardRoute()) return { calFilter: 'all', dateStart: '', dateEnd: '' };
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   return {
     calFilter: params.get('cal') || 'all',
     dateStart: params.get('from') || '',

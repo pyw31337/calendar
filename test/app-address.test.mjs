@@ -55,8 +55,14 @@ test('tab/sub/view still route internally from a short path', () => {
   assert.equal(pageFromParams(new URLSearchParams('view=admin')), null);
 });
 
-test('admin, root and other-origin addresses keep their query apart from shell/_update', () => {
-  assert.equal(show('/calendar/app/cw/?admin=1&cal=jhair&shell=v2'), '/calendar/app/cw/?admin=1&cal=jhair');
+test('admin addresses canonicalize to /calendar/admin while root and other origins keep query', () => {
+  assert.equal(show('/calendar/?id=cw&admin=1'), '/calendar/admin');
+  assert.equal(show('/calendar/admin'), '/calendar/admin');
+  assert.equal(show('/calendar/admin/'), '/calendar/admin');
+  assert.equal(show('/calendar/admin?id=cw&admin=1'), '/calendar/admin');
+  assert.equal(show('/calendar/app/cw/?admin=1&cal=jhair&shell=v2'), '/calendar/admin');
+  assert.equal(show('/calendar/admin?search=test'), '/calendar/admin?search=test');
+  assert.equal(show('/calendar/admin?restore=1'), '/calendar/admin?restore=1');
   assert.equal(show('/calendar/?id=cw&tab=records&sub=content&_update=1'), '/calendar/?id=cw&tab=records&sub=content');
   assert.equal(show('/calendar/?id=cw&tab=calendar'), '/calendar/?id=cw');
   assert.equal(show('https://other.test/x?shell=v2'), 'https://other.test/x?shell=v2');
@@ -86,9 +92,11 @@ test('the build, 404 page, boot script and service worker know the page paths', 
   const copy = readFileSync(new URL('../scripts/copy-static-to-dist.mjs', import.meta.url), 'utf8');
   assert.match(copy, /import \{ APP_PAGE_SLUGS \} from '\.\.\/src\/core\/app-address\.js'/);
   assert.match(copy, /<base href="\.\.\/\.\.\/\.\.\/" \/>/);
+  assert.match(copy, /<base href="\.\.\/" \/>/);
   for (const file of ['../404.html', '../public-vite/404.html']) {
     const page = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.match(page, /app\\\/\(\[A-Za-z0-9_-\]\+\)\\\/\.\+\$/, `${file} sends an unknown page back to its calendar`);
+    assert.match(page, /admin/, `${file} handles admin route fallback`);
   }
   const html = readFileSync(new URL('../src/index.html', import.meta.url), 'utf8');
   assert.match(html, /var APP_PATH_RE = \/\\\/app\\\/\(\[A-Za-z0-9_-\]\+\)\(\?:\\\/\[a-z\]\+\)\?\\\/\?\$\//);
@@ -113,4 +121,31 @@ test('moved address helpers keep their old behaviour', async () => {
   assert.deepEqual(readSharedContentFromHash(hash), item);
   assert.equal(readSharedContentFromHash('#other'), null);
   assert.equal(readSharedContentFromHash('#gatherContent=%%%'), null);
+});
+
+test('isAdminDashboardRoute recognizes /calendar/admin, /admin, and admin query params', async () => {
+  globalThis.window = globalThis.window || {};
+  const { isAdminDashboardRoute, getAdminSelectedCalendarIdFromUrl } = await import('../src/core/app-firebase-data.js');
+  assert.equal(isAdminDashboardRoute({ pathname: '/calendar/admin', search: '' }), true);
+  assert.equal(isAdminDashboardRoute({ pathname: '/calendar/admin/', search: '' }), true);
+  assert.equal(isAdminDashboardRoute({ pathname: '/admin', search: '' }), true);
+  assert.equal(isAdminDashboardRoute({ pathname: '/calendar/', search: '?id=cw&admin=1' }), true);
+  assert.equal(isAdminDashboardRoute({ pathname: '/calendar/', search: '?mode=admin' }), true);
+  assert.equal(isAdminDashboardRoute({ pathname: '/calendar/app/cw/', search: '' }), false);
+  globalThis.window.location = { pathname: '/calendar/admin', search: '?id=cw' };
+  assert.equal(getAdminSelectedCalendarIdFromUrl('kkot'), 'cw');
+  globalThis.window.location = { pathname: '/calendar/admin', search: '' };
+  assert.equal(getAdminSelectedCalendarIdFromUrl('kkot'), 'kkot');
+});
+
+test('admin global tabs stay on one row and call the Mac backup tab 백업', () => {
+  const dashboard = readFileSync(new URL('../src/ui/ui-admin-dashboard.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/app.css', import.meta.url), 'utf8');
+  assert.match(dashboard, /gridTemplateColumns: `repeat\(\$\{adminViewMode === 'global' \? 4 : 3\}/);
+  assert.match(dashboard, /"통계"/);
+  assert.match(dashboard, /"밈키보드"/);
+  assert.match(dashboard, /"데이터풀"/);
+  assert.match(dashboard, /"백업"/);
+  assert.doesNotMatch(dashboard, /"맥 백업"/);
+  assert.match(css, /\.admin-tab-button\s*\{[\s\S]*white-space:\s*nowrap\s*!important;/);
 });

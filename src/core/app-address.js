@@ -108,18 +108,23 @@ export function routeSearchParams(locationLike) {
  * The address to show for an app URL given as `{ pathname, search, hash }`. On an app path the
  * calendar comes from the path, unless the URL deliberately names a different calendar with
  * ?id= (a calendar switch), which then moves into the path; the page comes from tab/sub/view
- * when given (tab=calendar means the calendar), else it stays the path's page. Admin URLs and
- * non-app paths only lose ?shell=/?_update= (and the internal tab=calendar marker).
+ * when given (tab=calendar means the calendar), else it stays the path's page. Admin URLs
+ * canonicalize to `<prefix>admin`, while non-app paths only lose ?shell=/?_update= (and the internal tab=calendar marker).
  */
 export function displayAddress({ pathname = '/', search = '', hash = '' } = {}, { now = new Date() } = {}) {
   const params = new URLSearchParams(search);
   params.delete('shell');
   params.delete('_update');
   const app = parseAppPath(pathname);
-  const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin';
+  const adminMatch = String(pathname || '').match(/^(.*?\/)admin(?:\/.*)?$/);
+  const isAdmin = params.get('admin') === '1' || params.get('mode') === 'admin' || !!adminMatch;
   const named = app && !isAdmin ? pageFromParams(params) : '';
   let path = pathname;
-  if (!app || isAdmin || named === null) {
+  if (isAdmin) {
+    const prefix = adminMatch ? adminMatch[1] : (app ? app.prefix : String(pathname || '/').replace(/[^/]*$/, ''));
+    path = `${prefix}admin`;
+    ['admin', 'mode', 'tab', 'sub', 'view', 'id', 'cal'].forEach(key => params.delete(key));
+  } else if (!app || named === null) {
     if (params.get('tab') === 'calendar') {
       params.delete('tab');
       params.delete('sub');

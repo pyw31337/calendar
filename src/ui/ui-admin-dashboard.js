@@ -363,7 +363,8 @@ export function AdminDashboard({ initialCalendars }) {
   const isRestoreMode = isAdminRestoreRoute();
 
   // Tab control state. Two tab sets exist depending on adminViewMode:
-  // 'global' (no particular calendar in focus) -> 'metrics'(통계) / 'meme'(밈키보드) / 'datapool'(데이터풀)
+  // 'global' (no particular calendar in focus) -> 'metrics'(통계) / 'meme'(밈키보드) /
+  // 'datapool'(데이터풀) / 'macbackup'(백업)
   // 'calendar' (a calendar picked from the header) -> 'settings'(일반) / 'logs'(채팅) / 'recovery'(복구)
   // 'audit'(로그) used to be a separate top-level tab; its data now lives inside the 복구 detail
   // popup instead (see openRecoveryLogDetail) since it was slow to load and largely redundant with
@@ -849,13 +850,21 @@ export function AdminDashboard({ initialCalendars }) {
     if (next.cal && next.cal !== 'all') params.set('cal', next.cal); else params.delete('cal');
     if (next.from) params.set('from', next.from); else params.delete('from');
     if (next.to) params.set('to', next.to); else params.delete('to');
-    window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+    const query = params.toString();
+    window.history.pushState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
   };
   const syncSelectedCalendarUrl = (calId, mode = 'replace') => {
+    const isAdminPath = /(?:^|\/)admin(?:\/|$)/.test(window.location.pathname);
     const params = new URLSearchParams(window.location.search);
-    params.set('admin', '1');
-    if (calId && isValidCalendarId(calId)) params.set('id', calId); else params.delete('id');
-    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    if (!isAdminPath) {
+      params.set('admin', '1');
+      if (calId && isValidCalendarId(calId)) params.set('id', calId); else params.delete('id');
+    } else {
+      params.delete('admin');
+      params.delete('id');
+    }
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
     if (mode === 'push') window.history.pushState({}, '', nextUrl);
     else window.history.replaceState({}, '', nextUrl);
   };
@@ -1930,7 +1939,7 @@ export function AdminDashboard({ initialCalendars }) {
     },
     tabBar: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+      gridTemplateColumns: `repeat(${adminViewMode === 'global' ? 4 : 3}, minmax(0, 1fr))`,
       gap: 0,
       borderTop: '1px solid var(--border-subtle)',
       padding: '6px 12px 0 12px',
@@ -2190,7 +2199,12 @@ export function AdminDashboard({ initialCalendars }) {
               title: "새 창으로 캘린더 열기",
               disabled: !selectedCalId,
               style: { width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)', flexShrink: 0 },
-              onClick: () => { if (selectedCalId) window.open(`${window.location.pathname}?id=${selectedCalId}`, '_blank', 'noopener,noreferrer'); }
+              onClick: () => {
+                if (selectedCalId) {
+                  const rootPath = window.location.pathname.replace(/\/admin(?:\/.*)?$/, '/');
+                  window.open(`${rootPath}?id=${selectedCalId}`, '_blank', 'noopener,noreferrer');
+                }
+              }
             }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null))
         )
       ),
@@ -2231,7 +2245,7 @@ export function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("button", {
             key: "macbackup", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('macbackup'),
             style: styles.tabButton(activeTab === 'macbackup')
-          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "맥 백업")
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "백업")
         ]
       )
     ),
@@ -2469,7 +2483,10 @@ export function AdminDashboard({ initialCalendars }) {
                         ),
                         group.losers.some(l => dedupMergedKeys[l.photo.assetKey]) && /*#__PURE__*/React.createElement("button", {
                           type: "button", className: "btn btn-secondary",
-                          onClick: () => window.open(`${window.location.pathname}?id=${group.calendarId}`, '_blank', 'noopener,noreferrer'),
+                          onClick: () => {
+                            const rootPath = window.location.pathname.replace(/\/admin(?:\/.*)?$/, '/');
+                            window.open(`${rootPath}?id=${group.calendarId}`, '_blank', 'noopener,noreferrer');
+                          },
                           style: { marginTop: '8px', height: '30px', padding: '0 10px', fontWeight: 800, fontSize: 'var(--font-size-xs)' }
                         }, `${group.calendarId} 캘린더 열어서 중복 사진 삭제하기 →`)
                       ))

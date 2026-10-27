@@ -86,6 +86,14 @@ if (fs.existsSync(distIndex)) {
     }
   }
   console.log(`[copy-static-to-dist] app/<id>/ pages: ${calendarIds.join(', ')} (+ ${APP_PAGE_SLUGS.join(', ')})`);
+
+  // Admin route: dist/admin/index.html (one level deep relative to site root, so <base href="../" />).
+  // GitHub Pages serves this file directly when visitors open /calendar/admin/ or /calendar/admin.
+  const adminHtml = html.replace(/<head>/i, '<head>\n    <base href="../" />');
+  const adminDir = path.join(dist, 'admin');
+  fs.mkdirSync(adminDir, { recursive: true });
+  fs.writeFileSync(path.join(adminDir, 'index.html'), adminHtml);
+  console.log('[copy-static-to-dist] admin page: admin/index.html');
 }
 
 // MapLibre's ESM worker falls back to `new URL('./maplibre-gl-worker.mjs', import.meta.url)`.
