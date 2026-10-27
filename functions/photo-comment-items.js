@@ -41,6 +41,27 @@ function itemIdForLegacyComment(comment, legacyDocId) {
   return `cmt_m_${fnv1a(`${legacyDocId}|${comment?.createdAt || ''}|${comment?.participantId || ''}|${comment?.text || ''}`)}`;
 }
 
+/** Return only comments that were added to an old array after it already existed.
+ *
+ * The legacy writer rewrites the whole thread, so the Firestore trigger cannot use the
+ * document's update time to tell an edit from a new comment.  IDs are preferred; old clients
+ * without IDs are matched by participant + createdAt.  A first-time migration intentionally
+ * returns an empty list so importing history never sends a notification storm.
+ */
+function findNewLegacyComments(beforeComments, afterComments) {
+  const hadBeforeThread = Array.isArray(beforeComments);
+  const before = hadBeforeThread ? beforeComments.filter(c => c && typeof c === 'object') : [];
+  const after = Array.isArray(afterComments) ? afterComments.filter(c => c && typeof c === 'object' && String(c.text || '').trim()) : [];
+  if (!hadBeforeThread || !after.length) return [];
+  const key = comment => {
+    const own = String(comment?.id || '').trim();
+    if (own) return `id:${own}`;
+    return `legacy:${String(comment?.participantId || '')}|${Number(comment?.createdAt) || 0}`;
+  };
+  const known = new Set(before.map(key));
+  return after.filter(comment => !known.has(key(comment)));
+}
+
 function cleanText(value, max) {
   return String(value == null ? '' : value).slice(0, max);
 }
@@ -182,6 +203,7 @@ module.exports = {
   SUMMARY_DOC,
   fnv1a,
   itemIdForLegacyComment,
+  findNewLegacyComments,
   buildItemFromLegacy,
   resolveAssetKeyForLegacyDoc,
   mirrorLegacyThread,

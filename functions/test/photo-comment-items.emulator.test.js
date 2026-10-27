@@ -96,6 +96,17 @@ test('assetKeysToRecount ignores plain text edits', () => {
   assert.deepEqual(items.assetKeysToRecount(base, { ...base, assetKey: 'b' }), ['a', 'b']);
 });
 
+test('legacy array diff identifies only newly appended comments', () => {
+  const before = [{ id: 'old', participantId: 'p1', createdAt: 10, text: '이전' }];
+  const after = [
+    { id: 'old', participantId: 'p1', createdAt: 10, text: '수정된 이전' },
+    { participantId: 'p2', createdAt: 20, text: '새 댓글' }
+  ];
+  assert.deepEqual(items.findNewLegacyComments(before, after), [after[1]]);
+  assert.deepEqual(items.findNewLegacyComments([], after), after, 'an existing empty thread can receive its first comment');
+  assert.deepEqual(items.findNewLegacyComments(null, after), [], 'initial migration stays silent');
+});
+
 test('a duplicate merge moves the copy’s comments onto the kept photo, deleted ones included', async () => {
   const cal = 'cal_mergecomments';
   const root = db.collection('calendars').doc(cal);

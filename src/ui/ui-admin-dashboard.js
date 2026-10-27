@@ -959,6 +959,7 @@ export function AdminDashboard({ initialCalendars }) {
   const [isAdminListLoading, setIsAdminListLoading] = React.useState(true);
   const adminListLastModifiedRef = React.useRef(0);
   const adminListModeRef = React.useRef('none');
+  const adminSummaryInFlightRef = React.useRef(null);
   const selectedCalIdRef = React.useRef(selectedCalId);
   selectedCalIdRef.current = selectedCalId;
   React.useEffect(() => {
@@ -980,17 +981,25 @@ export function AdminDashboard({ initialCalendars }) {
       setError('');
       setIsAdminListLoading(false);
     };
-    const preferId = selectedCalIdRef.current || getAdminSelectedCalendarIdFromUrl('kkot');
-    const fast = (preferId ? fetchSingleCalendarWithRest(preferId, 6000) : Promise.resolve(null))
-      .then(one => {
-        if (!isMounted || !one || !one.id) return;
-        if (adminListModeRef.current !== 'none') return;
-        setServerCalendars([normalizeCalendarForSave(one)]);
-        setIsAdminListLoading(false);
-        setError('');
-      }).catch(() => {});
-    const loadSummary = () => listAllCalendarsRemote(session.password, { mode: 'summary' })
-      .then(result => applyList(result.calendars, result.lastModified, 'summary'));
+    // The old dashboard started a selected-calendar REST request, the cross-calendar summary,
+    // the full list, and N×2 subcollection count queries at the same time. On a slower device
+    // that made the first render look frozen and multiplied Firestore/Functions load. Keep one
+    // small list request in flight; detail/metrics hydration is explicitly sequenced below.
+    const loadSummary = () => {
+      if (adminSummaryInFlightRef.current) return adminSummaryInFlightRef.current;
+      adminListModeRef.current = 'summary-loading';
+      setIsAdminListLoading(true);
+      const request = listAllCalendarsRemote(session.password, { mode: 'summary' })
+        .then(result => {
+          if (isMounted) applyList(result.calendars, result.lastModified, 'summary');
+          return result;
+        })
+        .finally(() => {
+          if (adminSummaryInFlightRef.current === request) adminSummaryInFlightRef.current = null;
+        });
+      adminSummaryInFlightRef.current = request;
+      return request;
+    };
     const loadViaRestFallback = async () => {
       const knownIds = ['cw', 'kkot', 'jhair'];
       const preferId = selectedCalIdRef.current || getAdminSelectedCalendarIdFromUrl('kkot');
@@ -1014,7 +1023,6 @@ export function AdminDashboard({ initialCalendars }) {
         setIsAdminListLoading(false);
       }
     });
-    void fast;
     const startPoll = () => {
       if (intervalId) return;
       intervalId = setInterval(() => { loadSummary().catch(() => {}); }, 180000);
@@ -1036,10 +1044,14 @@ export function AdminDashboard({ initialCalendars }) {
   React.useEffect(() => {
     if (activeTab !== 'metrics' && activeTab !== 'recovery') return;
     if (adminListModeRef.current === 'full') return;
+    // Wait until the lightweight index has painted. This makes tab entry responsive even when
+    // the full payload is large; the request itself is still cancellable at the state-apply
+    // boundary so a quick tab switch cannot overwrite a newer summary.
+    if (isAdminListLoading) return;
     const session = getAdminSession();
     if (!session) return;
     let cancelled = false;
-    listAllCalendarsRemote(session.password, { mode: 'full' })
+    const run = () => listAllCalendarsRemote(session.password, { mode: 'full' })
       .then(result => {
         if (cancelled) return;
         adminListModeRef.current = 'full';
@@ -1047,8 +1059,15 @@ export function AdminDashboard({ initialCalendars }) {
         setServerCalendars(cloneCalendarList(result.calendars || []).map(normalizeCalendarForSave));
         setLoadedAt(new Date());
       }).catch(err => console.warn('admin full list', err));
-    return () => { cancelled = true; };
-  }, [activeTab, refreshTick]);
+    const idleId = typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback(run, { timeout: 1200 })
+      : window.setTimeout(run, 120);
+    return () => {
+      cancelled = true;
+      if (typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+      else if (typeof window !== 'undefined') window.clearTimeout(idleId);
+    };
+  }, [activeTab, refreshTick, isAdminListLoading]);
 
   const calendarsList = React.useMemo(() => serverCalendars
     .filter(cal => cal && !isInternalTestCalendarId(cal.id))
@@ -1084,6 +1103,8 @@ export function AdminDashboard({ initialCalendars }) {
 
   React.useEffect(() => {
     if (!__fb() || !calendarsList.length) return;
+    if (activeTab !== 'metrics' && activeTab !== 'recovery') return;
+    if (adminListModeRef.current !== 'full') return;
     let cancelled = false;
     const ids = calendarsList.map(c => c.id).filter(Boolean);
     (async () => {
@@ -1107,7 +1128,7 @@ export function AdminDashboard({ initialCalendars }) {
       });
     })();
     return () => { cancelled = true; };
-  }, [__fb(), calendarsList.map(c => c.id).join('|')]);
+  }, [__fb(), activeTab, adminListModeRef.current, calendarsList.map(c => c.id).join('|')]);
 
   // Chat messages: only selected calendar while 채팅 tab is open
   React.useEffect(() => {
@@ -1676,11 +1697,11 @@ export function AdminDashboard({ initialCalendars }) {
   const adminUpdatedText = loadedAt ? loadedAt.toLocaleString('ko-KR') : '불러오는 중';
 
   // Merge messages across all calendars for Tab 1 feed
-  const allMergedMessages = Object.entries(messagesMap).flatMap(([calId, list]) =>
+  const allMergedMessages = React.useMemo(() => Object.entries(messagesMap).flatMap(([calId, list]) =>
     list.map(m => ({ ...m, calId }))
-  ).sort((a, b) => b.timestamp - a.timestamp);
+  ).sort((a, b) => b.timestamp - a.timestamp), [messagesMap]);
 
-  const filteredMessages = allMergedMessages.filter(msg => {
+  const filteredMessages = React.useMemo(() => allMergedMessages.filter(msg => {
     if (selectedCalId && msg.calId !== selectedCalId) return false;
     const cal = serverCalendars.find(c => c.id === msg.calId);
     const pMap = (cal?.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -1688,7 +1709,7 @@ export function AdminDashboard({ initialCalendars }) {
     const author = p?.name || '알수없음';
     const query = chatSearchQuery.toLowerCase();
     return author.toLowerCase().includes(query) || (msg.text || '').toLowerCase().includes(query);
-  });
+  }), [allMergedMessages, chatSearchQuery, selectedCalId, serverCalendars]);
 
   const selectedCal = serverCalendars.find(c => c.id === selectedCalId);
 

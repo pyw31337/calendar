@@ -1282,7 +1282,7 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId, op
   // every channel is off.
   try {
     const ch = typeof getNotifyChannels === 'function' ? getNotifyChannels() : null;
-    const anyChannel = !ch || ch.chat !== false || ch.memo !== false || ch.poll !== false || ch.schedule !== false;
+    const anyChannel = !ch || ch.chat !== false || ch.comment !== false || ch.memo !== false || ch.poll !== false || ch.schedule !== false;
     if (typeof isChatNotifyEnabledForCalendar === 'function' && !isChatNotifyEnabledForCalendar(calendarId) && !anyChannel) {
       return { ok: false, reason: 'pref-disabled' };
     }

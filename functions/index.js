@@ -610,36 +610,52 @@ exports.onPhotoCommentItemWrite = seoulTriggerFunctions().runWith({ secrets: ['V
       await photoCommentItems.recountAsset(getFirestore(), FieldValue, context.params.calendarDocId, key);
     }
     if (before || !after || after.migratedFrom || after.deletedAt != null) return null;
-    const calendarDocId = context.params.calendarDocId;
-    const claimKey = `photo-comment:${context.params.commentId}`;
-    if (!(await claimPushDelivery(calendarDocId, claimKey))) return null;
-    const calendarSnap = await getFirestore().collection('calendars').doc(calendarDocId).get();
-    const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
-    const named = participants.find(person => person && person.id === after.participantId);
-    const author = (named && named.name) || '참여자';
-    await broadcastCalendarPush(calendarDocId, {
-      title: `${author}의 사진 댓글`,
-      body: String(after.text || '').slice(0, 120),
-      url: buildPushTargetUrl(calendarDocId, {
-        view: 'gallery',
-        img: after.assetKey || '',
-        comment: context.params.commentId
-      }),
-      tag: `photo-comment-${calendarDocId}-${context.params.commentId}`,
-      renotify: false
-    }, { skipParticipantId: after.participantId || null, channel: 'comment' });
+    await sendPhotoCommentPush(context.params.calendarDocId, context.params.commentId, after, after.assetKey);
     return null;
   });
+
+// Shared sender for both the canonical item writer and the legacy array bridge. Keeping the
+// claim and URL construction in one place prevents one path from silently losing the deep link
+// or delivering the same comment twice when both triggers observe a migration write.
+async function sendPhotoCommentPush(calendarDocId, commentId, comment, assetKey) {
+  if (!comment || comment.deletedAt != null || comment.migratedFrom) return null;
+  const claimKey = `photo-comment:${commentId}`;
+  if (!(await claimPushDelivery(calendarDocId, claimKey))) return null;
+  const db = getFirestore();
+  const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+  const participants = ((calendarSnap.data() || {}).calendar || {}).participants || [];
+  const named = participants.find(person => person && person.id === comment.participantId);
+  const author = (named && named.name) || '참여자';
+  return broadcastCalendarPush(calendarDocId, {
+    title: `${author}의 사진 댓글`,
+    body: String(comment.text || '').slice(0, 120),
+    url: buildPushTargetUrl(calendarDocId, {
+      view: 'gallery', img: assetKey || comment.assetKey || '', comment: commentId
+    }),
+    tag: `photo-comment-${calendarDocId}-${commentId}`,
+    renotify: false
+  }, { skipParticipantId: comment.participantId || null, channel: 'comment' });
+}
 
 // The old photoComments/{key} arrays are no longer the source of truth. An app that has not
 // updated yet may still write one; copy any comment it adds into photoCommentItems (create-only,
 // so its stale copy of the thread can never undo an edit or delete made in the new app).
-exports.onPhotoCommentIndexWrite = seoulTriggerFunctions().firestore
+exports.onPhotoCommentIndexWrite = seoulTriggerFunctions().runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/photoComments/{photoKey}')
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;
-    const comments = change.after.data()?.comments;
-    await photoCommentItems.mirrorLegacyThread(getFirestore(), context.params.calendarDocId, context.params.photoKey, comments);
+    const beforeData = change.before.exists ? (change.before.data() || {}) : null;
+    const afterData = change.after.data() || {};
+    const comments = afterData.comments;
+    const mirror = await photoCommentItems.mirrorLegacyThread(getFirestore(), context.params.calendarDocId, context.params.photoKey, comments);
+    // A first write is normally historical data being migrated and must stay silent. For an old
+    // client that is still appending to the array, notify only comments newly added to an
+    // existing thread; edits and the mirror's migrated item writes are never re-notified.
+    const added = photoCommentItems.findNewLegacyComments(beforeData?.comments, comments);
+    for (const comment of added) {
+      const id = photoCommentItems.itemIdForLegacyComment(comment, context.params.photoKey);
+      await sendPhotoCommentPush(context.params.calendarDocId, id, comment, mirror.assetKey || context.params.photoKey);
+    }
     return null;
   });
 
@@ -773,13 +789,13 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
       result.skippedSender += 1;
       return;
     }
-    // Channel filter: legacy docs without channels → chat only
+    // Older subscriptions predate channel preferences and have no `channels` object. Treat
+    // those as the current default (all channels on), rather than silently dropping comments,
+    // memos, polls and schedules from every device that has not opened settings since the
+    // channel feature shipped.
     const ch = data.channels;
     if (ch && typeof ch === 'object') {
       if (ch[channel] === false) { result.skippedChannel += 1; return; }
-    } else if (channel !== 'chat') {
-      result.skippedChannel += 1;
-      return;
     }
     if (!data.endpoint || !data.keys?.auth || !data.keys?.p256dh) {
       result.skippedInvalid += 1;
@@ -2685,7 +2701,9 @@ exports.listPushSubscriptionHealth = seoulFunctions().https.onRequest(async (req
       if (data.lastPushStatus && data.lastPushStatus !== 'sent') summary.failed += 1;
       if (now - Number(data.lastSeenAt || data.updatedAt || data.createdAt || 0) > 30 * 24 * 60 * 60 * 1000) summary.stale30d += 1;
       else summary.active += 1;
-      const channels = data.channels && typeof data.channels === 'object' ? data.channels : { chat: true };
+      const channels = data.channels && typeof data.channels === 'object'
+        ? data.channels
+        : { chat: true, comment: true, memo: true, poll: true, schedule: true };
       Object.keys(summary.channels).forEach(channel => { if (channels[channel] !== false) summary.channels[channel] += 1; });
     });
     res.status(200).json({ ok: true, calendarId, summary, generatedAt: now });
