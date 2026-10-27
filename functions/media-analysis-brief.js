@@ -93,7 +93,7 @@ function renderCalendarRow(calendar) {
     <td style="padding:16px 0;border-bottom:1px solid #e8e7f2;vertical-align:top;">
       <div style="font-size:15px;font-weight:800;color:#16162a;">${escapeHtml(calendar.name)}</div>
       <div style="margin-top:4px;font-size:12px;line-height:18px;color:#64748b;">${detail.split('<br>').map(escapeHtml).join('<br>')}</div>
-      <a href="${escapeHtml(calendarUrl(calendar.id))}" style="font-size:12px;color:#6d28d9;">이 캘린더에서 확인</a>
+      <a href="${escapeHtml(calendarUrl(calendar.id))}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#6d28d9;">이 캘린더에서 확인</a>
     </td>
     <td style="padding:16px 0;border-bottom:1px solid #e8e7f2;vertical-align:top;text-align:right;white-space:nowrap;">
       <span style="display:inline-block;padding:5px 9px;border-radius:999px;background:${color}14;color:${color};font-size:12px;font-weight:800;">${escapeHtml(calendar.healthLabel)}</span>
@@ -121,7 +121,19 @@ const cell = 'padding:7px 8px;border-top:1px solid #efeef6;vertical-align:top;fo
 
 function renderActivitySection(section) {
   const head = section.columns.map(column => `<th align="left" style="padding:6px 8px;font-size:11px;font-weight:700;color:#6b7280;background:#f8f7fd;white-space:nowrap;">${escapeHtml(column)}</th>`).join('');
-  const body = section.rows.map(row => `<tr>${row.map((value, index) => `<td style="${cell}${index === section.wrap ? 'word-break:break-word;overflow-wrap:anywhere;' : 'white-space:nowrap;'}">${escapeHtml(value)}</td>`).join('')}</tr>`).join('');
+  const body = section.rows.map((row, rowIndex) => {
+    const url = row.url || (Array.isArray(section.urls) ? section.urls[rowIndex] : '');
+    const cells = row.map((value, index) => {
+      const escaped = escapeHtml(value);
+      const isWrap = index === section.wrap;
+      const wrapStyle = isWrap ? 'word-break:break-word;overflow-wrap:anywhere;' : 'white-space:nowrap;';
+      const inner = url
+        ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:#16162a;text-decoration:none;display:block;${wrapStyle}">${escaped}</a>`
+        : escaped;
+      return `<td style="${cell}${wrapStyle}">${inner}</td>`;
+    }).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
   const more = section.more
     ? `<tr><td colspan="${section.columns.length}" style="${cell}color:#6b7280;">외 ${section.more}건 더 있어요. 앱에서 확인해 주세요.</td></tr>`
     : '';
@@ -136,7 +148,7 @@ function renderActivity(activity) {
   const calendars = activity.calendars.map(calendar => `<div style="margin-top:14px;padding:14px 14px 16px;border:1px solid #e8e7f2;border-radius:16px;">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
         <td style="font-size:15px;font-weight:900;color:#16162a;">${escapeHtml(calendar.name)}</td>
-        <td align="right"><a href="${escapeHtml(calendarUrl(calendar.id))}" style="font-size:12px;color:#6d28d9;">캘린더 열기</a></td>
+        <td align="right"><a href="${escapeHtml(calendarUrl(calendar.id))}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#6d28d9;">캘린더 열기</a></td>
       </tr></table>
       <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(calendar.sections.map(section => `${section.title} ${section.count}`).join(' · '))}</div>
       ${calendar.sections.map(renderActivitySection).join('')}

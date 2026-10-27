@@ -4,6 +4,8 @@
 // meetings, settlements, memos, places, 기념일, photo comments, polls. Read-only: it only reads
 // documents created inside the window, so a quiet day costs one read per query.
 
+const { getPhotoAssetKey } = require('./media-commands');
+
 const KST_OFFSET_MS = 9 * 3600000;
 const DAY_MS = 24 * 3600000;
 const MAX_WINDOW_DAYS = 7;
@@ -12,6 +14,18 @@ const QUERY_LIMIT = 500;
 // Fixture calendars made by the stress and smoke tests (stress_*, test_*, smoke_*).
 const FIXTURE_CALENDAR = /^(?:stress|test|smoke)_/;
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+const BASE_APP_URL = 'https://pyw31337.github.io/calendar/?shell=v2';
+
+function activityItemUrl(calendarId, query = {}) {
+  const cal = String(calendarId || '').replace(/^cal_/, '').trim();
+  const url = new URL(BASE_APP_URL);
+  if (cal) url.searchParams.set('id', cal);
+  Object.entries(query).forEach(([k, v]) => {
+    if (v != null && String(v).trim() !== '') url.searchParams.set(k, String(v).trim());
+  });
+  return url.toString();
+}
 
 const kstParts = ms => {
   const date = new Date(Number(ms) + KST_OFFSET_MS);
@@ -93,55 +107,107 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
     const files = Array.isArray(m.fileAttachments) ? m.fileAttachments.length : 0;
     if (source === 'chat' || source === 'meme') {
       const text = clip(m.text) || (source === 'meme' ? '(이모티콘)' : photos ? `(사진 ${photos}장)` : files ? `(파일 ${files}개)` : '');
-      if (text) rows.chat.push({ at: m.timestamp, cells: [timeLabel(m.timestamp), who(m.participantId), text] });
+      if (text) rows.chat.push({ at: m.timestamp, cells: [timeLabel(m.timestamp), who(m.participantId), text], url: activityItemUrl(id, { view: 'chat', msg: m.id }) });
     }
-    if (photos) rows.photo.push({ at: m.timestamp, count: photos, cells: [timeLabel(m.timestamp), who(m.participantId), `${photos}장`, PHOTO_PLACE[source] || '채팅'] });
+    if (photos) {
+      const firstUrl = Array.isArray(m.imageUrls) && m.imageUrls[0] ? m.imageUrls[0] : m.imageUrl;
+      const assetKey = firstUrl ? getPhotoAssetKey(firstUrl) : '';
+      const photoUrl = assetKey
+        ? activityItemUrl(id, { view: 'gallery', img: assetKey })
+        : (source === 'chat' ? activityItemUrl(id, { view: 'chat', msg: m.id, img: 0 }) : activityItemUrl(id, { view: 'gallery' }));
+      rows.photo.push({ at: m.timestamp, count: photos, cells: [timeLabel(m.timestamp), who(m.participantId), `${photos}장`, PHOTO_PLACE[source] || '채팅'], url: photoUrl });
+    }
   });
   memos.filter(m => !isGone(m) && inWindow(m.createdAt, window)).sort((a, b) => a.createdAt - b.createdAt).forEach(m => {
-    rows.memo.push({ at: m.createdAt, cells: [timeLabel(m.createdAt), who(m.participantId), clip([m.title, m.text].filter(Boolean).join(' · ')) || '(내용 없음)'] });
+    rows.memo.push({ at: m.createdAt, cells: [timeLabel(m.createdAt), who(m.participantId), clip([m.title, m.text].filter(Boolean).join(' · ')) || '(내용 없음)'], url: activityItemUrl(id, { view: 'memo', memo: m.id }) });
     const photos = photoCount(m);
-    if (photos) rows.photo.push({ at: m.createdAt, count: photos, cells: [timeLabel(m.createdAt), who(m.participantId), `${photos}장`, '메모'] });
+    if (photos) {
+      const firstUrl = Array.isArray(m.imageUrls) && m.imageUrls[0] ? m.imageUrls[0] : m.imageUrl;
+      const assetKey = firstUrl ? getPhotoAssetKey(firstUrl) : '';
+      const photoUrl = assetKey
+        ? activityItemUrl(id, { view: 'gallery', img: assetKey })
+        : activityItemUrl(id, { view: 'memo', memo: m.id });
+      rows.photo.push({ at: m.createdAt, count: photos, cells: [timeLabel(m.createdAt), who(m.participantId), `${photos}장`, '메모'], url: photoUrl });
+    }
   });
   rows.photo.sort((a, b) => a.at - b.at);
 
   (Array.isArray(calendar.availabilities) ? calendar.availabilities : [])
     .filter(a => inWindow(a?.deletedAt || a?.updatedAt, window))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    .forEach(a => rows.availability.push({ cells: [dateKeyLabel(a.date), who(a.participantId), clip(a.note, 40) || '-', a.deletedAt ? '취소' : '등록'] }));
+    .forEach(a => rows.availability.push({
+      cells: [dateKeyLabel(a.date), who(a.participantId), clip(a.note, 40) || '-', a.deletedAt ? '취소' : '등록'],
+      url: a.date ? activityItemUrl(id, { tab: 'calendar', date: a.date }) : activityItemUrl(id, { tab: 'calendar' })
+    }));
 
   meetings.forEach(meeting => {
+    const meetingDate = meeting.date || meeting.id;
     if (meeting.confirmed === true && inWindow(meeting.confirmedAt, window)) {
-      rows.meeting.push({ cells: [dateKeyLabel(meeting.date || meeting.id), clip(meeting.note, 50) || '-'] });
+      rows.meeting.push({
+        cells: [dateKeyLabel(meetingDate), clip(meeting.note, 50) || '-'],
+        url: meetingDate ? activityItemUrl(id, { tab: 'calendar', date: meetingDate }) : activityItemUrl(id, { tab: 'calendar' })
+      });
     }
     (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => !isGone(e) && inWindow(e.createdAt, window)).forEach(e => {
-      rows.expense.push({ cells: [dateKeyLabel(meeting.date || meeting.id), clip(e.label, 30) || '-', won(e.amount), e.isSelfPay ? '각자' : who(e.payerId)] });
+      rows.expense.push({
+        cells: [dateKeyLabel(meetingDate), clip(e.label, 30) || '-', won(e.amount), e.isSelfPay ? '각자' : who(e.payerId)],
+        url: meetingDate ? activityItemUrl(id, { tab: 'calendar', date: meetingDate }) : activityItemUrl(id, { view: 'settlement' })
+      });
     });
   });
   (Array.isArray(calendar.settlementCards) ? calendar.settlementCards : []).filter(card => !isGone(card) && inWindow(card.createdAt, window)).forEach(card => {
-    rows.expense.push({ cells: [String(card.monthStr || '-'), `정산 카드: ${clip(card.title, 24)}`, won(card.amount), card.perPersonAmount ? `1인 ${won(card.perPersonAmount)}` : '-'] });
+    rows.expense.push({
+      cells: [String(card.monthStr || '-'), `정산 카드: ${clip(card.title, 24)}`, won(card.amount), card.perPersonAmount ? `1인 ${won(card.perPersonAmount)}` : '-'],
+      url: activityItemUrl(id, { view: 'settlement' })
+    });
   });
 
   places.filter(p => !isGone(p) && inWindow(p.createdAt, window)).sort((a, b) => a.createdAt - b.createdAt)
-    .forEach(p => rows.place.push({ cells: [clip(p.name || p.alias, 30) || '-', clip(p.address, 40) || '-', p.visitDate ? dateKeyLabel(p.visitDate) : '-'] }));
+    .forEach(p => rows.place.push({
+      cells: [clip(p.name || p.alias, 30) || '-', clip(p.address, 40) || '-', p.visitDate ? dateKeyLabel(p.visitDate) : '-'],
+      url: p.visitDate ? activityItemUrl(id, { tab: 'calendar', date: p.visitDate }) : activityItemUrl(id, { view: 'places' })
+    }));
   anniversaries.filter(a => !isGone(a) && inWindow(a.createdAt, window)).sort((a, b) => a.createdAt - b.createdAt)
-    .forEach(a => rows.anniversary.push({ cells: [a.startDate && a.endDate ? `${dateKeyLabel(a.startDate)} ~ ${dateKeyLabel(a.endDate)}` : `${dateKeyLabel(a.date)}${a.isLunar ? ' (음력)' : ''}`, clip(a.title, 40) || '-'] }));
+    .forEach(a => {
+      const annDate = a.date || a.startDate;
+      rows.anniversary.push({
+        cells: [a.startDate && a.endDate ? `${dateKeyLabel(a.startDate)} ~ ${dateKeyLabel(a.endDate)}` : `${dateKeyLabel(a.date)}${a.isLunar ? ' (음력)' : ''}`, clip(a.title, 40) || '-'],
+        url: annDate ? activityItemUrl(id, { tab: 'calendar', date: annDate }) : activityItemUrl(id, { tab: 'calendar' })
+      });
+    });
   comments.filter(c => !isGone(c) && inWindow(c.createdAt, window)).sort((a, b) => a.createdAt - b.createdAt)
-    .forEach(c => rows.comment.push({ cells: [timeLabel(c.createdAt), who(c.participantId), clip(c.text) || '-'] }));
+    .forEach(c => rows.comment.push({
+      cells: [timeLabel(c.createdAt), who(c.participantId), clip(c.text) || '-'],
+      url: c.assetKey ? activityItemUrl(id, { view: 'gallery', img: c.assetKey, comment: c.id }) : activityItemUrl(id, { view: 'gallery' })
+    }));
   (Array.isArray(calendar.polls) ? calendar.polls : []).filter(p => !isGone(p) && inWindow(p.createdAt, window))
-    .forEach(p => rows.poll.push({ cells: [timeLabel(p.createdAt), clip(p.title, 50) || '-'] }));
+    .forEach(p => rows.poll.push({
+      cells: [timeLabel(p.createdAt), clip(p.title, 50) || '-'],
+      url: p.id ? activityItemUrl(id, { tab: 'calendar', poll: p.id }) : activityItemUrl(id, { tab: 'calendar' })
+    }));
 
   const counts = Object.fromEntries(SECTIONS.map(section => [section.key, section.key === 'photo'
     ? rows.photo.reduce((sum, row) => sum + row.count, 0)
     : rows[section.key].length]));
-  const sections = SECTIONS.filter(section => rows[section.key].length).map(section => ({
-    key: section.key,
-    title: section.title,
-    count: counts[section.key],
-    columns: section.columns,
-    wrap: section.wrap,
-    rows: rows[section.key].slice(0, maxRows).map(row => row.cells),
-    more: Math.max(0, rows[section.key].length - maxRows)
-  }));
+  const sections = SECTIONS.filter(section => rows[section.key].length).map(section => {
+    const list = rows[section.key].slice(0, maxRows);
+    const resultRows = list.map(row => {
+      const cells = row.cells.slice();
+      if (row.url) Object.defineProperty(cells, 'url', { value: row.url, enumerable: false, writable: true });
+      return cells;
+    });
+    const urls = list.map(row => row.url || '');
+    return {
+      key: section.key,
+      title: section.title,
+      count: counts[section.key],
+      columns: section.columns,
+      wrap: section.wrap,
+      rows: resultRows,
+      urls,
+      more: Math.max(0, rows[section.key].length - maxRows)
+    };
+  });
   return {
     id: String(id || calendar.id || ''),
     name: String(calendar.title || calendar.name || id || '캘린더'),
@@ -170,7 +236,7 @@ async function collectDailyActivity(db, window, options = {}) {
       rangeRows(doc.ref.collection('memos'), 'createdAt', window, ['createdAt', 'participantId', 'title', 'text', 'imageUrls', 'imageUrl']),
       rangeRows(doc.ref.collection('places'), 'createdAt', window, ['createdAt', 'name', 'alias', 'address', 'visitDate', 'deletedAt', 'removedAt']),
       rangeRows(doc.ref.collection('anniversaries'), 'createdAt', window, ['createdAt', 'title', 'date', 'startDate', 'endDate', 'isLunar', 'deletedAt']),
-      rangeRows(doc.ref.collection('photoCommentItems'), 'createdAt', window, ['createdAt', 'participantId', 'text', 'deletedAt']),
+      rangeRows(doc.ref.collection('photoCommentItems'), 'createdAt', window, ['createdAt', 'participantId', 'text', 'assetKey', 'deletedAt']),
       rangeRows(doc.ref.collection('confirmedMeetings'), 'confirmedAt', window, ['date', 'confirmed', 'confirmedAt', 'note', 'expenses']),
       rangeRows(doc.ref.collection('confirmedMeetings'), 'updatedAt', window, ['date', 'confirmed', 'confirmedAt', 'note', 'expenses'])
     ]);
@@ -182,4 +248,4 @@ async function collectDailyActivity(db, window, options = {}) {
   return { window, calendars: results, total: results.reduce((sum, calendar) => sum + calendar.total, 0) };
 }
 
-module.exports = { activityWindow, findLastSentBriefDateKey, summarizeCalendarActivity, collectDailyActivity, SECTIONS, FIXTURE_CALENDAR };
+module.exports = { activityWindow, findLastSentBriefDateKey, summarizeCalendarActivity, collectDailyActivity, SECTIONS, FIXTURE_CALENDAR, activityItemUrl };

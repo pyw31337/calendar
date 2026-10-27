@@ -71,6 +71,12 @@ test('everything added inside the window is listed per kind, with names and shor
   assert.match(brief.html, /새로 올라온 기록/);
   assert.match(brief.html, /내일 &lt;b&gt;캠핑&lt;\/b&gt; 가요/, 'chat text is escaped');
   assert.doesNotMatch(brief.html, /<b>캠핑/);
+  assert.equal(section('chat').rows[0].url, 'https://pyw31337.github.io/calendar/?shell=v2&id=demo&view=chat&msg=m1');
+  assert.match(section('photo').rows[1].url, /view=gallery&img=/);
+  assert.equal(section('availability').rows[0].url, 'https://pyw31337.github.io/calendar/?shell=v2&id=demo&tab=calendar&date=2026-11-03');
+  assert.match(brief.html, /href="https:\/\/pyw31337\.github\.io\/calendar\/\?shell=v2&amp;id=demo&amp;view=chat&amp;msg=m1"/);
+  assert.match(brief.html, /href="https:\/\/pyw31337\.github\.io\/calendar\/\?shell=v2&amp;id=demo&amp;tab=calendar&amp;date=2026-11-03"/);
+  assert.match(brief.html, /target="_blank" rel="noopener noreferrer"/);
   assert.match(brief.text, /\[데모 모임\] 채팅 3 · 사진 6/);
 });
 
