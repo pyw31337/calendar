@@ -129,6 +129,7 @@ test('isAdminDashboardRoute recognizes /calendar/admin, /admin, and admin query 
   assert.equal(isAdminDashboardRoute({ pathname: '/calendar/admin', search: '' }), true);
   assert.equal(isAdminDashboardRoute({ pathname: '/calendar/admin/', search: '' }), true);
   assert.equal(isAdminDashboardRoute({ pathname: '/admin', search: '' }), true);
+  assert.equal(isAdminDashboardRoute({ pathname: '/calendar/app/cw/admin', search: '' }), true);
   assert.equal(isAdminDashboardRoute({ pathname: '/calendar/', search: '?id=cw&admin=1' }), true);
   assert.equal(isAdminDashboardRoute({ pathname: '/calendar/', search: '?mode=admin' }), true);
   assert.equal(isAdminDashboardRoute({ pathname: '/calendar/app/cw/', search: '' }), false);
@@ -136,6 +137,8 @@ test('isAdminDashboardRoute recognizes /calendar/admin, /admin, and admin query 
   assert.equal(getAdminSelectedCalendarIdFromUrl('kkot'), 'cw');
   globalThis.window.location = { pathname: '/calendar/admin', search: '' };
   assert.equal(getAdminSelectedCalendarIdFromUrl('kkot'), 'kkot');
+  globalThis.window.location = { pathname: '/calendar/app/cw/admin', search: '' };
+  assert.equal(getAdminSelectedCalendarIdFromUrl('kkot'), 'cw');
 });
 
 test('admin global tabs stay on one row and call the Mac backup tab 백업', () => {

@@ -3287,8 +3287,12 @@ function isAdminRestoreRoute(locationLike = typeof window !== 'undefined' ? wind
 
 function getAdminSelectedCalendarIdFromUrl(fallback = 'kkot') {
   if (!isAdminDashboardRoute()) return fallback;
-  const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const id = params.get('id') || '';
+  const locationLike = typeof window !== 'undefined' ? window.location : null;
+  const params = new URLSearchParams(locationLike?.search || '');
+  // Calendar-scoped admin links (/app/<calendarId>/admin) deliberately keep the id in the
+  // path, because the canonical global /admin route removes admin selection query parameters.
+  const pathMatch = String(locationLike?.pathname || '').match(/(?:^|\/)app\/([A-Za-z0-9_-]+)\/admin(?:\/|$)/);
+  const id = params.get('id') || pathMatch?.[1] || '';
   return isValidCalendarId(id) ? id : fallback;
 }
 

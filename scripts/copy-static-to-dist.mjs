@@ -84,8 +84,14 @@ if (fs.existsSync(distIndex)) {
       fs.mkdirSync(path.join(dir, page), { recursive: true });
       fs.writeFileSync(path.join(dir, page, 'index.html'), pageHtml);
     }
+    // Keep a calendar-scoped admin entry point as well as the global /admin page.  This is
+    // useful for bookmarks and links such as /app/cw/admin: the runtime already treats any
+    // pathname containing /admin as an admin route, and the URL itself carries the calendar
+    // that should be selected on first load.
+    fs.mkdirSync(path.join(dir, 'admin'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'admin', 'index.html'), pageHtml);
   }
-  console.log(`[copy-static-to-dist] app/<id>/ pages: ${calendarIds.join(', ')} (+ ${APP_PAGE_SLUGS.join(', ')})`);
+  console.log(`[copy-static-to-dist] app/<id>/ pages: ${calendarIds.join(', ')} (+ ${APP_PAGE_SLUGS.join(', ')}, admin)`);
 
   // Admin route: dist/admin/index.html (one level deep relative to site root, so <base href="../" />).
   // GitHub Pages serves this file directly when visitors open /calendar/admin/ or /calendar/admin.
