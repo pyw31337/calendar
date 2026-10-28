@@ -90,6 +90,28 @@ test('long tables stop at ten rows and say how many more there are', () => {
   assert.match(buildBrief({ dateLabel: 'x', activity: { window, calendars: [summary], total: 13 } }).html, /외 3건 더 있어요/);
 });
 
+test('thumb-only uploads still get a canonical photo deep link and a visible mail affordance', () => {
+  const window = activityWindow({ now: kst('2026-10-27T08:05:00'), lastSentDateKey: '2026-10-26' });
+  const summary = summarizeCalendarActivity({
+    id: 'demo',
+    calendar: { participants: [{ id: 'p1', name: '송은혜' }] },
+    messages: [{
+      id: 'thumb-only',
+      timestamp: kst('2026-10-26T09:30:00'),
+      participantId: 'p1',
+      uploadSource: 'meeting',
+      thumbUrls: ['thumb-a', 'thumb-b', 'thumb-c']
+    }]
+  }, window);
+  const photo = summary.sections.find(section => section.key === 'photo');
+  assert.equal(photo.count, 3);
+  assert.match(photo.rows[0].url, /view=gallery&img=asset%3Av1%3A/);
+  const html = buildBrief({ dateLabel: 'x', activity: { window, calendars: [summary], total: 3 } }).html;
+  assert.match(html, /3장[\s\S]*사진 보기/);
+  assert.match(html, /송은혜/);
+  assert.match(buildBrief({ dateLabel: 'x', activity: { window, calendars: [summary], total: 3 } }).text, /→ https:\/\/pyw31337\.github\.io\/calendar/);
+});
+
 test('a quiet day says so, and test fixture calendars are never listed', () => {
   const window = activityWindow({ now: kst('2026-10-27T08:05:00'), lastSentDateKey: '2026-10-26' });
   assert.match(buildBrief({ dateLabel: 'x', activity: { window, calendars: [], total: 0 } }).html, /새로 올라온 채팅·사진·일정·메모·장소가 없습니다/);

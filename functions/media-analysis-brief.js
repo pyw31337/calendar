@@ -51,7 +51,11 @@ function activityText(activity) {
     lines.push(`[${calendar.name}] ${calendar.sections.map(section => `${section.title} ${section.count}`).join(' · ')}`);
     for (const section of calendar.sections) {
       lines.push(`  ${section.title}`);
-      section.rows.forEach(row => lines.push(`  - ${row.filter(Boolean).join(' | ')}`));
+      section.rows.forEach((row, rowIndex) => {
+        const target = row.url || (Array.isArray(section.urls) ? section.urls[rowIndex] : '');
+        const directLink = target && (section.key === 'photo' || section.key === 'availability') ? ` → ${target}` : '';
+        lines.push(`  - ${row.filter(Boolean).join(' | ')}${directLink}`);
+      });
       if (section.more) lines.push(`  - 외 ${section.more}건`);
     }
   }
@@ -127,8 +131,20 @@ function renderActivitySection(section) {
       const escaped = escapeHtml(value);
       const isWrap = index === section.wrap;
       const wrapStyle = isWrap ? 'word-break:break-word;overflow-wrap:anywhere;' : 'white-space:nowrap;';
+      // A mail table cannot make the whole <tr> a link.  Keep every cell actionable for
+      // keyboard/touch users, but make the cell that identifies the target visibly clickable:
+      // “사진 3장 보기” lands on the exact photo and “10/31(토) 날짜 보기” opens that date.
+      const primaryCell = section.key === 'photo' ? index === 2 : section.key === 'availability' ? index === 0 : index === 0;
+      const actionLabel = section.key === 'photo' && index === 2
+        ? ' · 사진 보기'
+        : section.key === 'availability' && index === 0
+          ? ' · 날짜 보기'
+          : '';
+      const linkStyle = primaryCell
+        ? 'color:#6d28d9;text-decoration:underline;text-underline-offset:2px;font-weight:800;'
+        : 'color:#16162a;text-decoration:none;';
       const inner = url
-        ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:#16162a;text-decoration:none;display:block;${wrapStyle}">${escaped}</a>`
+        ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${value}${actionLabel}`)}" style="${linkStyle}display:block;${wrapStyle}">${escaped}${actionLabel ? `<span style="font-size:11px;font-weight:700;">${escapeHtml(actionLabel)}</span>` : ''}</a>`
         : escaped;
       return `<td style="${cell}${wrapStyle}">${inner}</td>`;
     }).join('');
@@ -151,6 +167,7 @@ function renderActivity(activity) {
         <td align="right"><a href="${escapeHtml(calendarUrl(calendar.id))}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#6d28d9;">캘린더 열기</a></td>
       </tr></table>
       <div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(calendar.sections.map(section => `${section.title} ${section.count}`).join(' · '))}</div>
+      <div style="margin-top:5px;font-size:11px;color:#8a8aa0;">사진·참석 가능 날짜 행은 누르면 해당 사진 또는 날짜 상세로 바로 이동합니다.</div>
       ${calendar.sections.map(renderActivitySection).join('')}
     </div>`).join('');
   return `<div style="margin-top:28px;font-size:16px;font-weight:900;">새로 올라온 기록</div>

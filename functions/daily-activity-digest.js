@@ -78,7 +78,19 @@ const clip = (value, max = 60) => {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 };
 const won = value => (Number.isFinite(Number(value)) ? `${Math.round(Number(value)).toLocaleString('en-US')}원` : '');
-const photoCount = row => (Array.isArray(row?.imageUrls) && row.imageUrls.length ? row.imageUrls.length : (row?.imageUrl ? 1 : 0));
+// Uploads have existed in a few shapes over the life of the app.  In particular, older
+// records can retain only thumbUrls/thumbUrl after a storage migration.  The digest must use
+// the same first available asset identity as photoIndex, otherwise a perfectly valid upload is
+// reported but its mail link falls back to the gallery home page.
+const photoUrls = row => {
+  const fulls = Array.isArray(row?.imageUrls) ? row.imageUrls : (row?.imageUrl ? [row.imageUrl] : []);
+  const thumbs = Array.isArray(row?.thumbUrls) ? row.thumbUrls : (row?.thumbUrl ? [row.thumbUrl] : []);
+  const smalls = Array.isArray(row?.smallThumbUrls) ? row.smallThumbUrls : (row?.smallThumbUrl ? [row.smallThumbUrl] : []);
+  const count = Math.max(fulls.length, thumbs.length, smalls.length);
+  return Array.from({ length: count }, (_, index) => String(fulls[index] || thumbs[index] || smalls[index] || '').trim()).filter(Boolean);
+};
+const photoCount = row => photoUrls(row).length;
+const firstPhotoUrl = row => photoUrls(row)[0] || String(row?.full || row?.url || row?.directMediaUrl || '').trim();
 const PHOTO_PLACE = { chat: '채팅', gallery: '갤러리', meeting: '모임 앨범' };
 
 // `wrap`: the one free-text column that may wrap; the others stay on one line.
@@ -110,7 +122,7 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
       if (text) rows.chat.push({ at: m.timestamp, cells: [timeLabel(m.timestamp), who(m.participantId), text], url: activityItemUrl(id, { view: 'chat', msg: m.id }) });
     }
     if (photos) {
-      const firstUrl = Array.isArray(m.imageUrls) && m.imageUrls[0] ? m.imageUrls[0] : m.imageUrl;
+      const firstUrl = firstPhotoUrl(m);
       const assetKey = firstUrl ? getPhotoAssetKey(firstUrl) : '';
       const photoUrl = assetKey
         ? activityItemUrl(id, { view: 'gallery', img: assetKey })
@@ -122,7 +134,7 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
     rows.memo.push({ at: m.createdAt, cells: [timeLabel(m.createdAt), who(m.participantId), clip([m.title, m.text].filter(Boolean).join(' · ')) || '(내용 없음)'], url: activityItemUrl(id, { view: 'memo', memo: m.id }) });
     const photos = photoCount(m);
     if (photos) {
-      const firstUrl = Array.isArray(m.imageUrls) && m.imageUrls[0] ? m.imageUrls[0] : m.imageUrl;
+      const firstUrl = firstPhotoUrl(m);
       const assetKey = firstUrl ? getPhotoAssetKey(firstUrl) : '';
       const photoUrl = assetKey
         ? activityItemUrl(id, { view: 'gallery', img: assetKey })
@@ -217,7 +229,11 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
   };
 }
 
-const MESSAGE_FIELDS = ['timestamp', 'participantId', 'text', 'imageUrls', 'imageUrl', 'uploadSource', 'fileAttachments', 'deletedAt', 'isDeleted'];
+const MESSAGE_FIELDS = [
+  'timestamp', 'participantId', 'text',
+  'imageUrls', 'imageUrl', 'thumbUrls', 'thumbUrl', 'smallThumbUrls', 'smallThumbUrl',
+  'uploadSource', 'fileAttachments', 'deletedAt', 'isDeleted'
+];
 async function rangeRows(ref, field, window, fields) {
   const snap = await ref.where(field, '>=', window.start).where(field, '<', window.end).orderBy(field).limit(QUERY_LIMIT).select(...fields).get();
   return snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -233,7 +249,7 @@ async function collectDailyActivity(db, window, options = {}) {
     const calendar = doc.data()?.calendar || {};
     const [messages, memos, places, anniversaries, comments, confirmed, updated] = await Promise.all([
       rangeRows(doc.ref.collection('messages'), 'timestamp', window, MESSAGE_FIELDS),
-      rangeRows(doc.ref.collection('memos'), 'createdAt', window, ['createdAt', 'participantId', 'title', 'text', 'imageUrls', 'imageUrl']),
+      rangeRows(doc.ref.collection('memos'), 'createdAt', window, ['createdAt', 'participantId', 'title', 'text', 'imageUrls', 'imageUrl', 'thumbUrls', 'thumbUrl', 'smallThumbUrls', 'smallThumbUrl', 'deletedAt', 'removedAt', 'isDeleted']),
       rangeRows(doc.ref.collection('places'), 'createdAt', window, ['createdAt', 'name', 'alias', 'address', 'visitDate', 'deletedAt', 'removedAt']),
       rangeRows(doc.ref.collection('anniversaries'), 'createdAt', window, ['createdAt', 'title', 'date', 'startDate', 'endDate', 'isLunar', 'deletedAt']),
       rangeRows(doc.ref.collection('photoCommentItems'), 'createdAt', window, ['createdAt', 'participantId', 'text', 'assetKey', 'deletedAt']),
