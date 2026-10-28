@@ -10,7 +10,6 @@ import {
   setNotifyChannel,
   setChatNotifyEnabledForCalendar,
   setNotifGuideSeen,
-  subscribeUserToPushWithPermission,
   unsubscribeUserFromPush
 } from './app-domain-helpers.js';
 
@@ -74,11 +73,15 @@ export function useNotificationPwaState({
     const onVisible = () => { if (document.visibilityState === 'visible') run(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', run);
+    // Samsung Internet can restore a standalone PWA from the back-forward cache without
+    // emitting focus. pageshow is the reliable resume signal in that case.
+    window.addEventListener('pageshow', run);
     const intervalId = setInterval(run, 6 * 60 * 60 * 1000);
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', run);
+      window.removeEventListener('pageshow', run);
       clearInterval(intervalId);
     };
   }, [activeCalId, firebaseDb, getChatDeliveryOptions, mainChatNotifyEnabled]);
@@ -122,10 +125,13 @@ export function useNotificationPwaState({
       setMainChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(activeCalId, next);
       if (next) {
-        let result = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
+        // Do not blindly save the browser's current PushSubscription. Samsung Internet can
+        // keep returning an endpoint the server already removed (404/410); the health-aware
+        // path detects that row and rotates the subscription before saving it again.
+        let result = await ensurePushSubscriptionHealthy(activeCalId, currentParticipantId(), getChatDeliveryOptions());
         if (result && !result.ok) {
           await new Promise(resolve => setTimeout(resolve, 400));
-          result = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
+          result = await ensurePushSubscriptionHealthy(activeCalId, currentParticipantId(), getChatDeliveryOptions());
         }
         if (result && !result.ok) {
           setMainChatNotifyEnabled(false);
@@ -167,10 +173,10 @@ export function useNotificationPwaState({
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
     setMainChatNotifyEnabled(true);
-    let subscribeResult = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
+    let subscribeResult = await ensurePushSubscriptionHealthy(activeCalId, currentParticipantId(), getChatDeliveryOptions());
     if (subscribeResult && !subscribeResult.ok) {
       await new Promise(resolve => setTimeout(resolve, 400));
-      subscribeResult = await subscribeUserToPushWithPermission(activeCalId, currentParticipantId(), getChatDeliveryOptions());
+      subscribeResult = await ensurePushSubscriptionHealthy(activeCalId, currentParticipantId(), getChatDeliveryOptions());
     }
     if (subscribeResult && !subscribeResult.ok) {
       setMainChatNotifyEnabled(false);
