@@ -38,6 +38,11 @@ export const APP_PAGE_SLUGS = Object.freeze(PAGES.map(item => item.page));
 const APP_PATH_RE = /^(.*?\/)app\/([A-Za-z0-9_-]+)(?:\/([a-z]+))?\/?$/;
 const CALENDAR_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
+/** True for the calendar-scoped admin entry point (/…/app/<id>/admin[/]). */
+export function isCalendarScopedAdminPath(pathname = '') {
+  return /(?:^|\/)app\/[A-Za-z0-9_-]+\/admin(?:\/|$)/.test(String(pathname || ''));
+}
+
 /** `{ prefix, calendarId, page }` for /…/app/<id>/[<page>/], else null. */
 export function parseAppPath(pathname) {
   const match = String(pathname || '').match(APP_PATH_RE);

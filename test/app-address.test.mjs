@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  APP_PAGE_SLUGS, parseAppPath, pageFromParams, routeSearchParams, displayAddress, toDisplayUrl,
+  APP_PAGE_SLUGS, parseAppPath, isCalendarScopedAdminPath, pageFromParams, routeSearchParams, displayAddress, toDisplayUrl,
   readAddressMonth, installCanonicalAddress,
 } from '../src/core/app-address.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
@@ -67,6 +67,13 @@ test('admin addresses canonicalize to /calendar/admin while root and other origi
   assert.equal(show('/calendar/?id=cw&tab=calendar'), '/calendar/?id=cw');
   assert.equal(show('https://other.test/x?shell=v2'), 'https://other.test/x?shell=v2');
   assert.equal(displayAddress({ pathname: '/calendar/app/cw/', search: '?view=admin' }), '/calendar/app/cw/?view=admin');
+});
+
+test('calendar-scoped admin paths are distinct from the global admin route', () => {
+  assert.equal(isCalendarScopedAdminPath('/calendar/app/cw/admin'), true);
+  assert.equal(isCalendarScopedAdminPath('/calendar/app/cw/admin/'), true);
+  assert.equal(isCalendarScopedAdminPath('/calendar/admin'), false);
+  assert.equal(isCalendarScopedAdminPath('/calendar/app/cw/'), false);
 });
 
 test('installCanonicalAddress tidies the open address and every later history write', () => {

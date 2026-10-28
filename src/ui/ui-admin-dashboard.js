@@ -8,6 +8,7 @@ import { TABLER_ICONS } from './v2/tabler-icons.js';
 import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
 import { diffCalendarSettingsFields } from '../core/calendar-settings-diff.js';
 import { todaySeoulDateKey, seoulMonthKey } from '../core/seoul-date.js';
+import { isCalendarScopedAdminPath } from '../core/app-address.js';
 import { ParticipantBadge as WidgetParticipantBadge } from './ui-widgets.js';
 
 /**
@@ -369,8 +370,11 @@ export function AdminDashboard({ initialCalendars }) {
   // 'audit'(로그) used to be a separate top-level tab; its data now lives inside the 복구 detail
   // popup instead (see openRecoveryLogDetail) since it was slow to load and largely redundant with
   // what 채팅/복구 already showed.
-  const [adminViewMode, setAdminViewMode] = React.useState('global');
-  const [activeTab, setActiveTab] = React.useState('metrics');
+  // A calendar-scoped URL is the direct admin surface for that calendar. The canonical
+  // /calendar/admin route intentionally remains the cross-calendar/global dashboard.
+  const isScopedAdminEntry = isCalendarScopedAdminPath(typeof window !== 'undefined' ? window.location.pathname : '');
+  const [adminViewMode, setAdminViewMode] = React.useState(() => isScopedAdminEntry ? 'calendar' : 'global');
+  const [activeTab, setActiveTab] = React.useState(() => isScopedAdminEntry ? 'settings' : 'metrics');
 
   // Selected calendar for settings and recovery tabs
   const [selectedCalId, setSelectedCalId] = React.useState(() => getAdminSelectedCalendarIdFromUrl('kkot'));
