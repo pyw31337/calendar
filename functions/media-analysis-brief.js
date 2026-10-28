@@ -123,6 +123,13 @@ function renderActionBox(brief) {
 
 const cell = 'padding:7px 8px;border-top:1px solid #efeef6;vertical-align:top;font-size:12px;line-height:17px;color:#16162a;';
 
+// Participant colors are calendar data. Keep the email renderer limited to the same hex palette
+// accepted by the app so a malformed value can never become CSS/HTML in an email client.
+function participantColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : '';
+}
+
 function renderActivitySection(section) {
   const head = section.columns.map(column => `<th align="left" style="padding:6px 8px;font-size:11px;font-weight:700;color:#6b7280;background:#f8f7fd;white-space:nowrap;">${escapeHtml(column)}</th>`).join('');
   const body = section.rows.map((row, rowIndex) => {
@@ -140,9 +147,10 @@ function renderActivitySection(section) {
         : section.key === 'availability' && index === 0
           ? ' · 날짜 보기'
           : '';
-      const linkStyle = primaryCell
-        ? 'color:#6d28d9;text-decoration:underline;text-underline-offset:2px;font-weight:800;'
-        : 'color:#16162a;text-decoration:none;';
+      const coloredParticipant = Number(row.participantIndex) === index ? participantColor(row.participantColor) : '';
+      const textColor = coloredParticipant || (primaryCell ? '#6d28d9' : '#16162a');
+      const textWeight = coloredParticipant || primaryCell ? 'font-weight:800;' : '';
+      const linkStyle = `color:${textColor};text-decoration:${primaryCell ? 'underline' : 'none'};${primaryCell ? 'text-underline-offset:2px;' : ''}${textWeight}`;
       const inner = url
         ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(`${value}${actionLabel}`)}" style="${linkStyle}display:block;${wrapStyle}">${escaped}${actionLabel ? `<span style="font-size:11px;font-weight:700;">${escapeHtml(actionLabel)}</span>` : ''}</a>`
         : escaped;

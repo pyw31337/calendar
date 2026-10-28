@@ -109,8 +109,19 @@ const SECTIONS = [
 
 // Pure: what was added to one calendar inside the window, as display-ready table rows.
 function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [], places = [], anniversaries = [], comments = [], meetings = [] }, window, { maxRows = DEFAULT_MAX_ROWS } = {}) {
-  const names = new Map((Array.isArray(calendar.participants) ? calendar.participants : []).map(p => [String(p?.id || ''), String(p?.name || '')]));
+  const participants = new Map((Array.isArray(calendar.participants) ? calendar.participants : []).map(p => {
+    if (typeof p === 'string') return [p, { name: p, color: '' }];
+    return [String(p?.id || ''), { name: String(p?.name || ''), color: String(p?.color || '') }];
+  }));
+  const names = new Map(Array.from(participants, ([id, participant]) => [id, participant.name]));
   const who = participantId => names.get(String(participantId || '')) || (participantId ? '참여자' : '-');
+  const participantColor = participantId => participants.get(String(participantId || ''))?.color || '';
+  const participantRow = (cells, index, participantId, extra = {}) => ({
+    ...extra,
+    cells,
+    participantIndex: index,
+    participantColor: participantColor(participantId)
+  });
   const rows = Object.fromEntries(SECTIONS.map(section => [section.key, []]));
 
   messages.filter(m => !isGone(m) && inWindow(m.timestamp, window)).sort((a, b) => a.timestamp - b.timestamp).forEach(m => {
@@ -119,7 +130,7 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
     const files = Array.isArray(m.fileAttachments) ? m.fileAttachments.length : 0;
     if (source === 'chat' || source === 'meme') {
       const text = clip(m.text) || (source === 'meme' ? '(이모티콘)' : photos ? `(사진 ${photos}장)` : files ? `(파일 ${files}개)` : '');
-      if (text) rows.chat.push({ at: m.timestamp, cells: [timeLabel(m.timestamp), who(m.participantId), text], url: activityItemUrl(id, { view: 'chat', msg: m.id }) });
+      if (text) rows.chat.push(participantRow([timeLabel(m.timestamp), who(m.participantId), text], 1, m.participantId, { at: m.timestamp, url: activityItemUrl(id, { view: 'chat', msg: m.id }) }));
     }
     if (photos) {
       const firstUrl = firstPhotoUrl(m);
@@ -127,11 +138,11 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
       const photoUrl = assetKey
         ? activityItemUrl(id, { view: 'gallery', img: assetKey })
         : (source === 'chat' ? activityItemUrl(id, { view: 'chat', msg: m.id, img: 0 }) : activityItemUrl(id, { view: 'gallery' }));
-      rows.photo.push({ at: m.timestamp, count: photos, cells: [timeLabel(m.timestamp), who(m.participantId), `${photos}장`, PHOTO_PLACE[source] || '채팅'], url: photoUrl });
+      rows.photo.push(participantRow([timeLabel(m.timestamp), who(m.participantId), `${photos}장`, PHOTO_PLACE[source] || '채팅'], 1, m.participantId, { at: m.timestamp, count: photos, url: photoUrl }));
     }
   });
   memos.filter(m => !isGone(m) && inWindow(m.createdAt, window)).sort((a, b) => a.createdAt - b.createdAt).forEach(m => {
-    rows.memo.push({ at: m.createdAt, cells: [timeLabel(m.createdAt), who(m.participantId), clip([m.title, m.text].filter(Boolean).join(' · ')) || '(내용 없음)'], url: activityItemUrl(id, { view: 'memo', memo: m.id }) });
+    rows.memo.push(participantRow([timeLabel(m.createdAt), who(m.participantId), clip([m.title, m.text].filter(Boolean).join(' · ')) || '(내용 없음)'], 1, m.participantId, { at: m.createdAt, url: activityItemUrl(id, { view: 'memo', memo: m.id }) }));
     const photos = photoCount(m);
     if (photos) {
       const firstUrl = firstPhotoUrl(m);
@@ -139,7 +150,7 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
       const photoUrl = assetKey
         ? activityItemUrl(id, { view: 'gallery', img: assetKey })
         : activityItemUrl(id, { view: 'memo', memo: m.id });
-      rows.photo.push({ at: m.createdAt, count: photos, cells: [timeLabel(m.createdAt), who(m.participantId), `${photos}장`, '메모'], url: photoUrl });
+      rows.photo.push(participantRow([timeLabel(m.createdAt), who(m.participantId), `${photos}장`, '메모'], 1, m.participantId, { at: m.createdAt, count: photos, url: photoUrl }));
     }
   });
   rows.photo.sort((a, b) => a.at - b.at);
@@ -147,10 +158,12 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
   (Array.isArray(calendar.availabilities) ? calendar.availabilities : [])
     .filter(a => inWindow(a?.deletedAt || a?.updatedAt, window))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    .forEach(a => rows.availability.push({
-      cells: [dateKeyLabel(a.date), who(a.participantId), clip(a.note, 40) || '-', a.deletedAt ? '취소' : '등록'],
-      url: a.date ? activityItemUrl(id, { tab: 'calendar', date: a.date }) : activityItemUrl(id, { tab: 'calendar' })
-    }));
+    .forEach(a => rows.availability.push(participantRow(
+      [dateKeyLabel(a.date), who(a.participantId), clip(a.note, 40) || '-', a.deletedAt ? '취소' : '등록'],
+      1,
+      a.participantId,
+      { url: a.date ? activityItemUrl(id, { tab: 'calendar', date: a.date }) : activityItemUrl(id, { tab: 'calendar' }) }
+    )));
 
   meetings.forEach(meeting => {
     const meetingDate = meeting.date || meeting.id;
@@ -161,10 +174,13 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
       });
     }
     (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => !isGone(e) && inWindow(e.createdAt, window)).forEach(e => {
-      rows.expense.push({
-        cells: [dateKeyLabel(meetingDate), clip(e.label, 30) || '-', won(e.amount), e.isSelfPay ? '각자' : who(e.payerId)],
+      const cells = [dateKeyLabel(meetingDate), clip(e.label, 30) || '-', won(e.amount), e.isSelfPay ? '각자' : who(e.payerId)];
+      rows.expense.push(e.isSelfPay ? {
+        cells,
         url: meetingDate ? activityItemUrl(id, { tab: 'calendar', date: meetingDate }) : activityItemUrl(id, { view: 'settlement' })
-      });
+      } : participantRow(cells, 3, e.payerId, {
+        url: meetingDate ? activityItemUrl(id, { tab: 'calendar', date: meetingDate }) : activityItemUrl(id, { view: 'settlement' })
+      }));
     });
   });
   (Array.isArray(calendar.settlementCards) ? calendar.settlementCards : []).filter(card => !isGone(card) && inWindow(card.createdAt, window)).forEach(card => {
@@ -188,10 +204,12 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
       });
     });
   comments.filter(c => !isGone(c) && inWindow(c.createdAt, window)).sort((a, b) => a.createdAt - b.createdAt)
-    .forEach(c => rows.comment.push({
-      cells: [timeLabel(c.createdAt), who(c.participantId), clip(c.text) || '-'],
-      url: c.assetKey ? activityItemUrl(id, { view: 'gallery', img: c.assetKey, comment: c.id }) : activityItemUrl(id, { view: 'gallery' })
-    }));
+    .forEach(c => rows.comment.push(participantRow(
+      [timeLabel(c.createdAt), who(c.participantId), clip(c.text) || '-'],
+      1,
+      c.participantId,
+      { url: c.assetKey ? activityItemUrl(id, { view: 'gallery', img: c.assetKey, comment: c.id }) : activityItemUrl(id, { view: 'gallery' }) }
+    )));
   (Array.isArray(calendar.polls) ? calendar.polls : []).filter(p => !isGone(p) && inWindow(p.createdAt, window))
     .forEach(p => rows.poll.push({
       cells: [timeLabel(p.createdAt), clip(p.title, 50) || '-'],
@@ -206,6 +224,10 @@ function summarizeCalendarActivity({ id, calendar = {}, messages = [], memos = [
     const resultRows = list.map(row => {
       const cells = row.cells.slice();
       if (row.url) Object.defineProperty(cells, 'url', { value: row.url, enumerable: false, writable: true });
+      if (Number.isInteger(row.participantIndex) && row.participantColor) {
+        Object.defineProperty(cells, 'participantIndex', { value: row.participantIndex, enumerable: false, writable: true });
+        Object.defineProperty(cells, 'participantColor', { value: row.participantColor, enumerable: false, writable: true });
+      }
       return cells;
     });
     const urls = list.map(row => row.url || '');

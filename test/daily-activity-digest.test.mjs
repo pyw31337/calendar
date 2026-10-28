@@ -31,7 +31,7 @@ test('everything added inside the window is listed per kind, with names and shor
     id: 'demo',
     calendar: {
       title: '데모 모임',
-      participants: [{ id: 'p1', name: '영우' }, { id: 'p2', name: '유리' }],
+      participants: [{ id: 'p1', name: '영우', color: '#EF4444' }, { id: 'p2', name: '유리', color: '#06B6D4' }],
       availabilities: [
         { date: '2026-11-03', participantId: 'p1', note: '저녁 가능', updatedAt: at('09:00:00'), deletedAt: null },
         { date: '2026-11-04', participantId: 'p2', note: '', updatedAt: at('08:00:00'), deletedAt: at('10:00:00') },
@@ -77,6 +77,8 @@ test('everything added inside the window is listed per kind, with names and shor
   assert.match(brief.html, /href="https:\/\/pyw31337\.github\.io\/calendar\/\?shell=v2&amp;id=demo&amp;view=chat&amp;msg=m1"/);
   assert.match(brief.html, /href="https:\/\/pyw31337\.github\.io\/calendar\/\?shell=v2&amp;id=demo&amp;tab=calendar&amp;date=2026-11-03"/);
   assert.match(brief.html, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(brief.html, /color:#EF4444[^>]*display:block[^>]*>영우/);
+  assert.match(brief.html, /color:#06B6D4[^>]*display:block[^>]*>유리/);
   assert.match(brief.text, /\[데모 모임\] 채팅 3 · 사진 6/);
 });
 
