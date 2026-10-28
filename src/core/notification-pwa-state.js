@@ -10,7 +10,6 @@ import {
   setNotifyChannel,
   setChatNotifyEnabledForCalendar,
   setNotifGuideSeen,
-  subscribeUserToPush,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush
 } from './app-domain-helpers.js';
@@ -87,10 +86,13 @@ export function useNotificationPwaState({
   React.useEffect(() => {
     if (!activeCalId || !chatParticipantId) return;
     if (!mainChatNotifyEnabled || mainNotifPermission !== 'granted') return;
-    subscribeUserToPush(activeCalId, chatParticipantId, getChatDeliveryOptions()).then(result => {
+    // Use the same health-aware path as the visibility/focus repair. A browser can keep a
+    // locally valid-looking PushSubscription after the server removed it for HTTP 404/410;
+    // calling subscribeUserToPush directly would write that dead endpoint back indefinitely.
+    ensurePushSubscriptionHealthy(activeCalId, chatParticipantId, getChatDeliveryOptions()).then(result => {
       if (result && !result.ok) console.warn('Main chat notification auto-subscribe skipped:', result.reason);
     });
-  }, [activeCalId, chatParticipantId, getChatDeliveryOptions, mainChatNotifyEnabled, mainNotifPermission]);
+  }, [activeCalId, chatParticipantId, ensurePushSubscriptionHealthy, getChatDeliveryOptions, mainChatNotifyEnabled, mainNotifPermission]);
 
   const openNotificationHelp = React.useCallback(() => setIsNotificationHelpOpen(true), []);
   const handleMainToggleNotifications = React.useCallback(async () => {

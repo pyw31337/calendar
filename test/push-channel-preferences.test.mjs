@@ -24,7 +24,7 @@ test('channel normalization defaults legacy subscriptions to every supported cha
 test('notification state re-registers an enabled chat master with a chat delivery override', () => {
   const stateSrc = readFileSync(join(root, 'src/core/notification-pwa-state.js'), 'utf8');
   assert.match(stateSrc, /channelOverrides:\s*\{\s*chat:\s*true\s*\}/);
-  assert.match(stateSrc, /subscribeUserToPush\(activeCalId, chatParticipantId, getChatDeliveryOptions\(\)\)/);
+  assert.match(stateSrc, /ensurePushSubscriptionHealthy\(activeCalId, chatParticipantId, getChatDeliveryOptions\(\)\)/);
   assert.match(stateSrc, /ensurePushSubscriptionHealthy\(activeCalId, participantId, getChatDeliveryOptions\(\)\)/);
 });
 

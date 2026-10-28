@@ -1169,6 +1169,37 @@ function getSubscriptionHashId(endpoint) {
 
 let pushSubscribeInFlight = null;
 
+// A Web Push endpoint can be invalidated by Samsung Internet/FCM while the browser still
+// returns it from PushManager.getSubscription().  The server removes a 404/410 endpoint after
+// a failed delivery, but older clients then kept writing that same dead endpoint back on every
+// focus.  Read only the small, non-secret health document before the periodic refresh so a
+// missing/failed row triggers a real unsubscribe + subscribe cycle instead of another merge.
+async function readPushSubscriptionHealth(calendarId, subId) {
+  const db = typeof window !== 'undefined' ? window.__gatherFirebaseDb : null;
+  if (!db || !calendarId || !subId || typeof db.collection !== 'function') return { available: false };
+  let timer = null;
+  try {
+    const ref = db.collection('calendars').doc(`cal_${calendarId}`).collection('push_subscriptions').doc(subId);
+    const read = ref.get({ source: 'server' });
+    const timeout = new Promise(resolve => {
+      timer = setTimeout(() => resolve(null), 7000);
+    });
+    const snapshot = await Promise.race([read, timeout]);
+    if (!snapshot) return { available: false };
+    return {
+      available: true,
+      exists: !!snapshot.exists,
+      data: snapshot.exists && typeof snapshot.data === 'function' ? (snapshot.data() || {}) : null
+    };
+  } catch (_) {
+    // Offline/permission/transient SDK errors must not force an unsubscribe. The normal write
+    // path below remains the safe fallback and the next visibility/focus pass retries the read.
+    return { available: false };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function subscribeUserToPush(calendarId, activeParticipantId, options = {}) {
   if (pushSubscribeInFlight) {
     try { await pushSubscribeInFlight; } catch (_) {}
@@ -1293,7 +1324,19 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId, op
     if (!subscription) {
       return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: false });
     }
-    const result = await subscribeUserToPush(calendarId, activeParticipantId, options);
+    const subId = getSubscriptionHashId(subscription.endpoint);
+    const health = await readPushSubscriptionHealth(calendarId, subId);
+    const serverNeedsRepair = health.available && (
+      !health.exists
+      || (health.data && health.data.lastPushStatus && health.data.lastPushStatus !== 'sent')
+    );
+    const result = await subscribeUserToPush(calendarId, activeParticipantId, {
+      ...options,
+      // A 410/404 endpoint is deleted server-side. Samsung Internet can keep returning the
+      // deleted subscription locally, so explicitly rotate it when the health row is missing or
+      // records a failed send. This is safe after a granted permission and does not re-prompt.
+      forceResubscribe: serverNeedsRepair || options.forceResubscribe === true
+    });
     if (result.ok) return result;
     return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: true });
   } catch (err) {
