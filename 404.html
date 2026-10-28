@@ -43,6 +43,15 @@
         return;
       }
 
+      // A calendar-scoped admin URL is a valid entry point even when a stale Pages artifact has
+      // not generated its nested index yet. Keep it on the admin surface instead of treating
+      // "admin" as an arbitrary app page and sending the visitor back to the calendar home.
+      var appAdminMatch = path.match(/^(.*\/)app\/([A-Za-z0-9_-]+)\/admin\/?$/);
+      if (appAdminMatch) {
+        loc.replace(appAdminMatch[1] + 'admin/' + search + hash);
+        return;
+      }
+
       // An unknown page under a calendar (/calendar/app/<id>/<page>/ that this build does not
       // publish): open that calendar instead of the site root. Only a deeper path redirects, so a
       // missing /app/<id>/ itself still falls through below and can never loop.
