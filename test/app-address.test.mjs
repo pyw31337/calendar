@@ -25,7 +25,9 @@ test('every page has its own short path and reads back as the same page', () => 
     assert.equal(address, `/calendar/app/cw/${slug}/`, view);
     assert.equal(getInitialAppView({ pathname: address, search: '' }), view, `${address} reopens ${view}`);
   }
-  assert.equal(buildAppViewUrl({ pathname: '/calendar/app/cw/content/', search: '?historyTab=x' }, 'calendar', now), '/calendar/app/cw/?historyTab=x');
+  // Leaving a page for the calendar on this month: the month is only written when it is not
+  // the real current month (displayAddress reads today), so this uses today, not the fixed `now`.
+  assert.equal(buildAppViewUrl({ pathname: '/calendar/app/cw/content/', search: '?historyTab=x' }, 'calendar', new Date()), '/calendar/app/cw/?historyTab=x');
   assert.deepEqual([...APP_PAGE_SLUGS].sort(), ['archive', 'chat', 'content', 'gallery', 'memo', 'more', 'places', 'search', 'settlement']);
 });
 
