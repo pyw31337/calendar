@@ -10,6 +10,7 @@ import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { bindAppServiceWorker } from './service-worker-registration.js';
 import { normalizePushChannelPreferences } from './push-channel-preferences.js';
+import { planPushSubscriptionRepair, readRegisteredPushCalendars, staleDeviceRowIds, PUSH_HEALTH_KEY_PREFIX } from './push-subscription-repair.js';
 import { sanitizeImageIntakeList } from './upload-intake.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -1287,7 +1288,7 @@ async function _subscribeUserToPushInternal(calendarId, activeParticipantId, opt
       }, 'set', '기기 구독 등록', { merge: true });
       if (!saved?.success) throw new Error('Push subscription save failed');
       try {
-        getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
+        getLocalStorage().setItem(PUSH_HEALTH_KEY_PREFIX + calendarId, JSON.stringify({
           subId: subId,
           participantId: participantId,
           endpointTail: String(subscription.endpoint || '').slice(-32),
@@ -1302,6 +1303,8 @@ async function _subscribeUserToPushInternal(calendarId, activeParticipantId, opt
     return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
   }
 }
+
+const pushHealthInFlight = new Map();
 
 async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId, options = {}) {
   if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
@@ -1318,29 +1321,86 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId, op
       return { ok: false, reason: 'pref-disabled' };
     }
   } catch (_) {}
+  // Mount, focus, pageshow and visibilitychange all fire on one resume: share one repair.
+  const flightKey = `${calendarId}\u0000${activeParticipantId}`;
+  if (pushHealthInFlight.has(flightKey)) return pushHealthInFlight.get(flightKey);
+  const task = repairPushSubscription(calendarId, activeParticipantId, options);
+  pushHealthInFlight.set(flightKey, task);
+  try {
+    return await task;
+  } finally {
+    pushHealthInFlight.delete(flightKey);
+  }
+}
+
+// The subscription is only replaced when its endpoint is known dead (push-subscription-repair.js):
+// it is shared by every calendar this browser enabled, so replacing it for one calendar used to
+// silence all the others.
+async function repairPushSubscription(calendarId, activeParticipantId, options = {}) {
   try {
     const registration = await navigator.serviceWorker.ready;
     const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
-    if (!subscription) {
-      return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: false });
+    let action = 'register';
+    let hadRow = false;
+    if (subscription) {
+      const subId = getSubscriptionHashId(subscription.endpoint);
+      const health = await readPushSubscriptionHealth(calendarId, subId);
+      hadRow = !!(health.available && health.exists);
+      action = planPushSubscriptionRepair({ health, storedSubId: readStoredPushSubId(calendarId), subId });
     }
-    const subId = getSubscriptionHashId(subscription.endpoint);
-    const health = await readPushSubscriptionHealth(calendarId, subId);
-    const serverNeedsRepair = health.available && (
-      !health.exists
-      || (health.data && health.data.lastPushStatus && health.data.lastPushStatus !== 'sent')
-    );
     const result = await subscribeUserToPush(calendarId, activeParticipantId, {
       ...options,
-      // A 410/404 endpoint is deleted server-side. Samsung Internet can keep returning the
-      // deleted subscription locally, so explicitly rotate it when the health row is missing or
-      // records a failed send. This is safe after a granted permission and does not re-prompt.
-      forceResubscribe: serverNeedsRepair || options.forceResubscribe === true
+      forceResubscribe: action === 'rotate' || options.forceResubscribe === true
     });
-    if (result.ok) return result;
-    return subscribeUserToPush(calendarId, activeParticipantId, { ...options, forceResubscribe: true });
+    if (result.ok) await adoptPushSubscriptionEverywhere(calendarId, result.subId, { cleanCurrent: !hadRow || action === 'rotate' });
+    return result;
   } catch (err) {
     return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
+  }
+}
+
+function readStoredPushSubId(calendarId) {
+  try {
+    const record = JSON.parse(getLocalStorage().getItem(PUSH_HEALTH_KEY_PREFIX + calendarId) || 'null');
+    return record && record.subId ? String(record.subId) : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+// Point this browser's other enabled calendars at its current endpoint when they still hold an
+// older one, and drop the rows this device left for older endpoints: Cloud Functions send to one
+// row per device, and a stale row there means a dead endpoint and no notification.
+async function adoptPushSubscriptionEverywhere(calendarId, subId, { cleanCurrent = false } = {}) {
+  const deviceId = typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : '';
+  let others = [];
+  try {
+    others = readRegisteredPushCalendars(getLocalStorage()).filter(entry => entry.calendarId !== calendarId
+      && entry.subId !== subId
+      && entry.participantId
+      && isChatNotifyEnabledForCalendar(entry.calendarId));
+  } catch (_) {}
+  for (const entry of others) {
+    try {
+      const adopted = await subscribeUserToPush(entry.calendarId, entry.participantId, { channelOverrides: { chat: true } });
+      if (adopted.ok) await removeStaleDevicePushRows(entry.calendarId, deviceId, adopted.subId);
+    } catch (err) {
+      console.warn('push adopt:', entry.calendarId, err);
+    }
+  }
+  if (cleanCurrent) await removeStaleDevicePushRows(calendarId, deviceId, subId);
+}
+
+async function removeStaleDevicePushRows(calendarId, deviceId, subId) {
+  const db = typeof window !== 'undefined' ? window.__gatherFirebaseDb : null;
+  if (!db || !calendarId || !deviceId || !subId || typeof db.collection !== 'function') return;
+  try {
+    const snapshot = await db.collection('calendars').doc(`cal_${calendarId}`).collection('push_subscriptions')
+      .where('deviceId', '==', deviceId).get();
+    const stale = staleDeviceRowIds(snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) })), { deviceId, subId });
+    await Promise.all(stale.map(id => writeSharedCollection('push_subscriptions', calendarId, id, null, 'delete', '이전 기기 구독 정리')));
+  } catch (err) {
+    console.warn('push stale rows:', calendarId, err);
   }
 }
 
@@ -1407,7 +1467,7 @@ async function syncPushSubscriptionParticipant(calendarId, activeParticipantId) 
       saved = await writeSharedCollection('push_subscriptions', calendarId, subId, participantPatch, 'set', '참여자 변경 푸시 구독 동기화', { merge: true });
     }
     try {
-      getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
+      getLocalStorage().setItem(PUSH_HEALTH_KEY_PREFIX + calendarId, JSON.stringify({
         subId,
         participantId: activeParticipantId,
         endpointTail: String(subscription.endpoint || '').slice(-32),
