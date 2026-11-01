@@ -1,0 +1,1 @@
+function e(){return{isHeaderVisible:!0,onScroll:window.React.useCallback((()=>{}),[])}}export{e as t};
