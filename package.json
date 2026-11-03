@@ -23,6 +23,7 @@
     "ops:media-audit": "node scripts/firebase-media-audit.mjs",
     "ops:integrity-audit": "node scripts/audit-media-integrity.mjs",
     "ops:daily-report": "node scripts/ops-daily-report.mjs",
+    "ops:error-heal": "node scripts/daily-error-heal.mjs",
     "ops:integrity-repair": "node scripts/repair-media-integrity.mjs",
     "ops:repair-tag-divergence": "node scripts/repair-tag-divergence.mjs",
     "ops:apply-tag-suggestions": "node scripts/apply-tag-suggestions.mjs",

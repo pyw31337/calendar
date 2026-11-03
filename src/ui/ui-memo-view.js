@@ -15,6 +15,7 @@ import {
   memoDraftFieldsFromMemo, restorableDraftImages, pruneExpiredMemoDrafts, MEMO_DRAFT_CLOSE_MESSAGE,
 } from '../core/memo-draft-store.js';
 import { useMemoDraftAutosave, MemoDraftRestorePrompt } from './memo-draft-ui.js';
+import { logActionAttempt, logActionFailure, logActionSuccess } from '../core/error-logger.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -738,8 +739,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleSaveMemo = async () => {
     let memoId = null;
+    let memoAttempt = null;
     try {
       const calendarId = calendar.id;
+      memoAttempt = logActionAttempt({
+        calendarId,
+        action: 'memo_create',
+        target: '새 메모 작성 및 저장',
+        actorId: composerParticipantId || '',
+        actorName: (calendar?.participants || []).find(p => p.id === composerParticipantId)?.name || ''
+      });
       // A share URL is accepted in either the title or body field. Once detected, the source
       // memo is cloned as a complete record so users do not have to paste the link into the body.
       const sharedMemoShare = getMemoShareUrlFromText(newText) || getMemoShareUrlFromText(newTitle);
@@ -748,6 +757,17 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         showToast('공유 메모를 불러오는 중...', 'info', 12000);
         sourceMemo = await fetchMemoForClone(sharedMemoShare);
         if (!sourceMemo) {
+          logActionFailure({
+            calendarId,
+            action: 'memo_create_validation_failure',
+            target: '공유 메모 복제 대상 조회 실패',
+            actorId: composerParticipantId || '',
+            actorName: (calendar?.participants || []).find(p => p.id === composerParticipantId)?.name || '',
+            error: new Error('공유 메모를 찾지 못했습니다.'),
+            attemptId: memoAttempt?.attemptId,
+            durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()),
+            resource: { source: sharedMemoShare?.rawUrl || sharedMemoShare?.url || '' }
+          });
           showToast('공유 메모를 찾지 못했습니다. 링크가 만료되었거나 접근할 수 없습니다.', 'error', 5000);
           return;
         }
@@ -764,6 +784,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         .map(tag => tag.startsWith('#') ? tag : '#' + tag)
         .slice(0, MAX_MEMO_TAGS);
       if (!title && !text && newImages.length === 0) {
+        logActionFailure({
+          calendarId,
+          action: 'memo_create_validation_failure',
+          target: '제목·내용·사진이 없는 메모 저장 시도',
+          actorId: composerParticipantId || '',
+          actorName: (calendar?.participants || []).find(p => p.id === composerParticipantId)?.name || '',
+          error: new Error('제목, 내용, 사진 중 하나 이상 필요'),
+          attemptId: memoAttempt?.attemptId,
+          durationMs: Date.now() - (memoAttempt?.startedAt || Date.now())
+        });
         showToast('복제할 제목이나 내용이 없는 메모입니다.', 'error');
         return;
       }
@@ -785,9 +815,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }
         });
         if (queued) {
-          newDraftAutosave.clear(memoDraftKey(calendarId, 'new'));
-          showToast('오프라인입니다. 연결되면 메모와 사진을 자동 저장합니다.', 'info', 5000);
-          setNewTitle(''); setNewText(''); setNewColor('var(--bg-card)'); setNewIsPinned(false); setNewTags([]); setNewTagInput(''); setNewImages([]); setIsComposerExpanded(false);
+          logActionSuccess({ calendarId, action: 'memo_create', target: '오프라인 저장 큐에 보관', actorId: participantId, status: 'queued', attemptId: memoAttempt?.attemptId, durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()), resource: { id: memoId } });
+          // Keep the editor and draft visible while the media write is queued. iOS Safari/PWA
+          // may suspend the page before the queue replays; clearing here made the user's text
+          // look as if it had been reset even though the payload was safely queued.
+          showToast('오프라인입니다. 입력 내용은 임시 저장되며 연결되면 자동 저장합니다.', 'info', 5000);
           return;
         }
       }
@@ -839,6 +871,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const saved = await writeMemoDocument('memos', calendarId, memoId, sanitizeMemoForFirestore(memoData), 'set', '메모 저장');
       if (!saved?.success) throw new Error('Memo save failed');
+      logActionSuccess({ calendarId, action: 'memo_create', target: saved.queued ? '메모 저장 큐에 보관' : '메모 저장 완료', actorId: participantId, status: saved.queued ? 'queued' : 'succeeded', attemptId: memoAttempt?.attemptId, durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()), resource: { id: memoId } });
+      if (saved.queued) {
+        showToast('연결이 불안정해 메모를 저장 큐에 보관했습니다. 연결되면 자동 저장됩니다.', 'info', 5000);
+        return;
+      }
       hydrateMemoLinkPreviewsInBackground(calendarId, memoId, text, memoData);
 
       // 3. Write Activity Log (isolated so push failures never rollback memo creation)
@@ -881,6 +918,19 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       setIsComposerExpanded(false);
     } catch (err) {
       console.error('Failed to save memo:', err);
+      try {
+        logActionFailure({
+          calendarId: calendar?.id || 'unknown',
+          action: 'memo_create_failure',
+          target: '새 메모 작성 및 저장 실패',
+          actorId: composerParticipantId || '',
+          actorName: (calendar?.participants || []).find(p => p.id === composerParticipantId)?.name || '',
+          error: err,
+          attemptId: memoAttempt?.attemptId,
+          durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()),
+          resource: { id: memoId, title: newTitle }
+        });
+      } catch (_) {}
       if (memoId && typeof onDeleteMemo === 'function') onDeleteMemo(memoId);
       showToast(err?.code === 'PHOTO_NOT_STORED' ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '메모 저장 실패', 'error');
     } finally {
@@ -890,12 +940,30 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleUpdateMemo = async () => {
     if (!editTitle.trim() && !editText.trim() && editImages.length === 0) {
+      logActionFailure({
+        calendarId: calendar?.id || 'unknown',
+        action: 'memo_update_validation_failure',
+        target: '제목·내용·사진이 없는 메모 수정 저장 시도',
+        actorId: editParticipantId || composerParticipantId || '',
+        actorName: (calendar?.participants || []).find(p => p.id === (editParticipantId || composerParticipantId))?.name || '',
+        error: new Error('제목, 내용, 사진 중 하나 이상 필요'),
+        resource: { id: editingMemo?.id }
+      });
       showToast('제목, 내용, 사진 중 하나 이상 입력해 주세요.', 'error');
       return;
     }
 
+    let memoAttempt = null;
     try {
       const calendarId = calendar.id;
+      memoAttempt = logActionAttempt({
+        calendarId,
+        action: 'memo_update',
+        target: '메모 수정 내용 저장',
+        actorId: editParticipantId || composerParticipantId || '',
+        actorName: (calendar?.participants || []).find(p => p.id === (editParticipantId || composerParticipantId))?.name || '',
+        resource: { id: editingMemo?.id }
+      });
       const stamp = Date.now();
       const hasNewEditImages = editImages.some(image => !image.isExisting);
       if (typeof navigator !== 'undefined' && navigator.onLine === false && hasNewEditImages && memoImagesCanBeQueued(editImages)) {
@@ -920,9 +988,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }
         });
         if (queued) {
-          editDraftAutosave.clear(editDraftKey);
-          showToast('오프라인입니다. 연결되면 메모 수정을 자동 저장합니다.', 'info', 5000);
-          closeMemoEditor();
+          logActionSuccess({ calendarId, action: 'memo_update', target: '오프라인 수정 큐에 보관', actorId: participantId, status: 'queued', attemptId: memoAttempt?.attemptId, durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()), resource: { id: editingMemo.id } });
+          // Keep the editing sheet open until replay is acknowledged. Closing and clearing
+          // here looked like a destructive reset on iOS when the app was backgrounded.
+          showToast('오프라인입니다. 수정 내용은 임시 저장되며 연결되면 자동 저장합니다.', 'info', 5000);
           return;
         }
       }
@@ -982,6 +1051,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'update', '메모 수정');
       if (!saved?.success) throw new Error('Memo update failed');
+      logActionSuccess({ calendarId, action: 'memo_update', target: saved.queued ? '메모 수정 큐에 보관' : '메모 수정 완료', actorId: participantId, status: saved.queued ? 'queued' : 'succeeded', attemptId: memoAttempt?.attemptId, durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()), resource: { id: editingMemo.id } });
+      if (saved.queued) {
+        showToast('연결이 불안정해 수정 내용을 저장 큐에 보관했습니다. 연결되면 자동 저장됩니다.', 'info', 5000);
+        return;
+      }
       hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), localMemo);
 
       // Log Memo Update (isolated so push failures never rollback memo update)
@@ -1024,7 +1098,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       closeMemoEditor();
     } catch (err) {
       console.error('Failed to update memo:', err);
-      if (typeof onUpsertMemo === 'function') onUpsertMemo(editingMemo);
+      try {
+        const pId = editParticipantId || composerParticipantId || '';
+        logActionFailure({
+          calendarId: calendar?.id || 'unknown',
+          action: 'memo_update_failure',
+          target: '메모 수정 내용 저장 실패',
+          actorId: pId,
+          actorName: (calendar?.participants || []).find(p => p.id === pId)?.name || '',
+          error: err,
+          attemptId: memoAttempt?.attemptId,
+          durationMs: Date.now() - (memoAttempt?.startedAt || Date.now()),
+          resource: { id: editingMemo?.id, title: editTitle }
+        });
+      } catch (_) {}
+      if (typeof onUpsertMemo === 'function') onUpsertMemo({ ...editingMemo, __pendingWriteAt: null });
       else if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, editingMemo);
       showToast(err?.code === 'PHOTO_NOT_STORED' ? '사진이 안 올라갔어요. 다시 보내 주세요.' : '메모 수정 실패', 'error');
     } finally {
@@ -1035,15 +1123,34 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const handleDeleteMemo = async (memo) => {
     const action = async () => {
       const memoSnapshot = JSON.parse(JSON.stringify(memo));
+      let deleteAttempt = null;
       try {
         const calendarId = calendar.id;
         const stamp = Date.now();
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
+        deleteAttempt = logActionAttempt({
+          calendarId,
+          action: 'memo_delete',
+          target: '메모 삭제',
+          actorId: participantId,
+          actorName: (calendar?.participants || []).find(p => p.id === participantId)?.name || '',
+          resource: { id: memo?.id }
+        });
 
         if (typeof onDeleteMemo === 'function') onDeleteMemo(memo.id);
 
         const deleted = await writeMemoDocument('memos', calendarId, memo.id, null, 'delete', '메모 삭제');
         if (!deleted?.success) throw new Error('Memo delete failed');
+        logActionSuccess({
+          calendarId,
+          action: 'memo_delete',
+          target: deleted.queued ? '메모 삭제 큐에 보관' : '메모 삭제 완료',
+          actorId: participantId,
+          status: deleted.queued ? 'queued' : 'succeeded',
+          attemptId: deleteAttempt?.attemptId,
+          durationMs: Date.now() - (deleteAttempt?.startedAt || Date.now()),
+          resource: { id: memo?.id }
+        });
 
         // Log Memo Delete (isolated so push failures never rollback memo deletion)
         try {
@@ -1091,7 +1198,21 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         closeMemoEditor();
       } catch (err) {
         console.error('Failed to delete memo:', err);
-        if (typeof onUpsertMemo === 'function') onUpsertMemo(memoSnapshot);
+        try {
+          const pId = memo?.participantId || composerParticipantId || '';
+          logActionFailure({
+            calendarId: calendar?.id || 'unknown',
+            action: 'memo_delete_failure',
+            target: '메모 삭제 실패',
+            actorId: pId,
+            actorName: (calendar?.participants || []).find(p => p.id === pId)?.name || '',
+            error: err,
+            attemptId: deleteAttempt?.attemptId,
+            durationMs: Date.now() - (deleteAttempt?.startedAt || Date.now()),
+            resource: { id: memo?.id, title: memo?.title }
+          });
+        } catch (_) {}
+        if (typeof onUpsertMemo === 'function') onUpsertMemo({ ...memoSnapshot, __pendingWriteAt: null });
         showToast('메모 삭제 실패', 'error');
       }
     };

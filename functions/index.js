@@ -2125,6 +2125,7 @@ exports.auditEvent = seoulFunctions().https.onRequest(async (req, res) => {
   const calendarId = String(body.calendarId || '').trim();
   const action = String(body.action || '').trim();
   const actorId = String(body.actorId || '').trim();
+  const actorName = String(body.actorName || '').trim().slice(0, 80);
   const sessionId = String(body.sessionId || '').trim();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId) || !/^[A-Za-z0-9_:-]{1,80}$/.test(action)) {
     res.status(400).json({ ok: false }); return;
@@ -2139,6 +2140,15 @@ exports.auditEvent = seoulFunctions().https.onRequest(async (req, res) => {
     .digest('hex');
   const userAgent = String(req.get('user-agent') || '').slice(0, 600);
   const client = String(body.client || '').slice(0, 120);
+  const status = String(body.status || 'failed').slice(0, 24);
+  const attemptId = String(body.attemptId || '').slice(0, 100);
+  const durationMs = Number.isFinite(Number(body.durationMs)) ? Math.max(0, Math.min(24 * 60 * 60 * 1000, Math.round(Number(body.durationMs)))) : null;
+  const rawError = body.error && typeof body.error === 'object' ? body.error : null;
+  const error = rawError ? {
+    message: String(rawError.message || '').slice(0, 300),
+    code: String(rawError.code || '').slice(0, 40),
+    stack: String(rawError.stack || '').slice(0, 500)
+  } : null;
   const target = String(body.target || '').slice(0, 200);
   const rawResource = body.resource && typeof body.resource === 'object' ? body.resource : null;
   const resource = rawResource ? {
@@ -2152,8 +2162,9 @@ exports.auditEvent = seoulFunctions().https.onRequest(async (req, res) => {
   } : null;
   try {
     await getFirestore().collection('serverAuditLogs').add({
-      calendarId, action, actorId: actorId.slice(0, 80), sessionId: sessionId.slice(0, 100),
-      client, target, ...(resource ? { resource } : {}), ipHash, userAgent, receivedAt: Date.now()
+      calendarId, action, actorId: actorId.slice(0, 80), ...(actorName ? { actorName } : {}), sessionId: sessionId.slice(0, 100),
+      client, status, ...(attemptId ? { attemptId } : {}), ...(durationMs != null ? { durationMs } : {}),
+      ...(error ? { error } : {}), target, ...(resource ? { resource } : {}), ipHash, userAgent, receivedAt: Date.now()
     });
     res.status(204).send('');
   } catch (err) {

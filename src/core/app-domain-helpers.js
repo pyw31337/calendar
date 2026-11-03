@@ -717,7 +717,11 @@ function sanitizeMessageForFirestore(messageData) {
   return omitUndefinedDeep(out);
 }
 function sanitizeMemoForFirestore(memoData) {
-  return sanitizeMessageForFirestore(memoData);
+  const sanitized = sanitizeMessageForFirestore(memoData);
+  // Private UI-only marker used to keep optimistic memo writes visible while an iOS/PWA
+  // listener catches up. It must never be persisted as a user field.
+  if (sanitized && typeof sanitized === 'object') delete sanitized.__pendingWriteAt;
+  return sanitized;
 }
 
 function slimMessageForClient(message) {

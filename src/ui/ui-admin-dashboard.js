@@ -736,6 +736,8 @@ export function AdminDashboard({ initialCalendars }) {
       : [];
     const auditRows = relatedAuditLogs.flatMap((a, idx) => [
       [`관련 서버 로그 ${idx + 1}`, `${a.action || '-'} · ${new Date(Number(a.receivedAt) || 0).toLocaleString('ko-KR')}`],
+      ['  상태/시도 ID', `${a.status || '-'} / ${a.attemptId || '-'}`],
+      ['  사용자', `${a.actorName || a.actorId || '익명'}${a.sessionId ? ` · 세션 ${a.sessionId}` : ''}`],
       [`  클라이언트/IP해시`, `${a.client || '-'} / ${a.ipHash || '-'}`]
     ]);
     setLogDetail({

@@ -10,6 +10,7 @@
 // like the original inline effect did (the value itself is also passed for the deps array).
 import { MEMOS_PAGE_SIZE, queueServerAuditEvent, getClientAuditContext } from './app-domain-helpers.js';
 import { subscribeMemos, fetchMemosRest } from './app-firebase-data.js';
+import { mergeMemosPreservingPending } from './memo-sync-state.js';
 
 export function useMemoCollections({
   React,
@@ -62,7 +63,7 @@ export function useMemoCollections({
     if (!liveDb) {
       fetchMemosRest(activeCalId, effectiveMemosLimit).then(list => {
         if (!isMounted) return;
-        setMemos(list);
+        setMemos(previous => mergeMemosPreservingPending(list, previous));
         setHasMoreMemos(needsMemoCollection && list.length >= effectiveMemosLimit);
       });
       return () => { isMounted = false; };
@@ -75,7 +76,7 @@ export function useMemoCollections({
       pinnedList.forEach(m => byId.set(m.id, m));
       recentActivityList.forEach(m => byId.set(m.id, m));
       recentList.forEach(m => byId.set(m.id, m));
-      setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+      setMemos(previous => mergeMemosPreservingPending(Array.from(byId.values()), previous));
     };
 
     // 고정 메모는 원래도 적은 수라 문제된 적 없지만, 수년간 쓰는 가족 캘린더가 계속 늘려온
@@ -131,5 +132,9 @@ export function useMemoCollections({
     };
   }, [activeCalId, needsMemoCollection, memosLimit, firebaseDb, firebaseConnectionVersion]);
 
-  return { memos, setMemos, memosLimit, setMemosLimit, hasMoreMemos, setHasMoreMemos };
+  const mergeMemosFromServer = React.useCallback((list) => {
+    setMemos(previous => mergeMemosPreservingPending(list, previous));
+  }, []);
+
+  return { memos, setMemos, mergeMemosFromServer, memosLimit, setMemosLimit, hasMoreMemos, setHasMoreMemos };
 }

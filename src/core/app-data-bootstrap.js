@@ -270,6 +270,7 @@ export function subscribeAppResumeRefresh({
   fetchMemosRest,
   memosLimit,
   setMemos,
+  mergeMemosFromServer,
   setHasMoreMemos,
   restoreActiveCalendarFromCache,
   setIsInitialDataLoading,
@@ -297,7 +298,8 @@ export function subscribeAppResumeRefresh({
           if (activeView === 'memo') {
             fetchMemosRest(activeCalId, memosLimit).then(list => {
               if (!mounted) return;
-              setMemos(list);
+              if (typeof mergeMemosFromServer === 'function') mergeMemosFromServer(list);
+              else setMemos(list);
               setHasMoreMemos(list.length >= memosLimit);
             }).catch(() => {});
           }

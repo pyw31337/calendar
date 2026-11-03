@@ -101,36 +101,66 @@ function getStorage(storage) {
   try { return typeof window !== 'undefined' ? window.localStorage : null; } catch (_) { return null; }
 }
 
+function getSessionFallback() {
+  try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch (_) { return null; }
+}
+
+function notifyDraftStorageFailure(key, error) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent('gather:memo-draft-failure', {
+      detail: { key: String(key || '').slice(0, 180), message: String(error?.message || error || 'storage unavailable').slice(0, 180) }
+    }));
+  } catch (_) {}
+}
+
 export function saveMemoDraft(key, fields, { storage, now = Date.now() } = {}) {
   const store = getStorage(storage);
   if (!store || !key) return false;
   const draft = normalizeMemoDraft(fields);
   try {
-    if (isMemoDraftEmpty(draft)) { store.removeItem(key); return false; }
+    if (isMemoDraftEmpty(draft)) { store.removeItem(key); getSessionFallback()?.removeItem(key); return false; }
     store.setItem(key, JSON.stringify({ v: 1, savedAt: now, ...draft }));
     return true;
-  } catch (_) {
-    return false; // quota / private mode: autosave is best-effort
+  } catch (error) {
+    // iOS Safari private browsing and some embedded PWA contexts can reject localStorage while
+    // still allowing sessionStorage. Keep the draft for this launch and expose the failure so
+    // the server audit stream records the exact attempted action.
+    notifyDraftStorageFailure(key, error);
+    const fallback = getSessionFallback();
+    if (fallback && fallback !== store) {
+      try { fallback.setItem(key, JSON.stringify({ v: 1, savedAt: now, ...draft })); return true; } catch (fallbackError) { notifyDraftStorageFailure(key, fallbackError); }
+    }
+    return false;
   }
 }
 
 export function loadMemoDraft(key, { storage, now = Date.now(), ttlMs = MEMO_DRAFT_TTL_MS } = {}) {
   const store = getStorage(storage);
   if (!store || !key) return null;
+  const stores = [store];
+  const fallback = getSessionFallback();
+  if (!storage && fallback && fallback !== store) stores.push(fallback);
   try {
-    const raw = store.getItem(key);
+    let raw = null;
+    let source = store;
+    for (const candidate of stores) {
+      try { raw = candidate.getItem(key); source = candidate; } catch (error) { notifyDraftStorageFailure(key, error); }
+      if (raw) break;
+    }
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const savedAt = Number(parsed && parsed.savedAt);
     if (!parsed || parsed.v !== 1 || !Number.isFinite(savedAt) || now - savedAt > ttlMs || savedAt - now > ttlMs) {
-      store.removeItem(key);
+      source.removeItem(key);
       return null;
     }
     const draft = normalizeMemoDraft(parsed);
-    if (isMemoDraftEmpty(draft)) { store.removeItem(key); return null; }
+    if (isMemoDraftEmpty(draft)) { source.removeItem(key); return null; }
     return { ...draft, savedAt };
-  } catch (_) {
-    try { store.removeItem(key); } catch (__) { /* ignore */ }
+  } catch (error) {
+    notifyDraftStorageFailure(key, error);
+    try { store.removeItem(key); } catch (_) { /* ignore */ }
     return null;
   }
 }
@@ -139,6 +169,7 @@ export function clearMemoDraft(key, { storage } = {}) {
   const store = getStorage(storage);
   if (!store || !key) return;
   try { store.removeItem(key); } catch (_) { /* ignore */ }
+  if (!storage) { try { getSessionFallback()?.removeItem(key); } catch (_) { /* ignore */ } }
 }
 
 /** Drop every expired memo draft (any calendar). Cheap: only touches our own prefix. */

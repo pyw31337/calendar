@@ -1,6 +1,8 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
 import { installClientErrorMonitor } from './client-error-monitor.js';
+import { logActionFailure } from './error-logger.js';
+import { markMemoWritePending, clearMemoWritePending, PENDING_MEMO_WRITE_FIELD } from './memo-sync-state.js';
 import {
   classifyChatComposerFiles,
   createPendingChatFileAttachment,
@@ -613,6 +615,17 @@ function CalendarApp() {
         saveMode,
         error: String(err?.message || err || '').slice(0, 240)
       });
+      try {
+        const getStored = typeof window !== 'undefined' ? (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId : null;
+        logActionFailure({
+          calendarId: targetCalId,
+          action: 'calendar_save_failure',
+          target: `캘린더 저장 실패 (${saveMode})`,
+          actorId: typeof getStored === 'function' ? (getStored(targetCalId) || '') : '',
+          error: err,
+          resource: { saveMode, operationId: queueOperationId }
+        });
+      } catch (_) {}
       if (shouldQueueCalendarWriteFailure(err)) {
         const queued = await enqueueWriteOperation({
           id: queueOperationId,
@@ -928,7 +941,7 @@ function CalendarApp() {
     // activeCalRef is declared further down; only read from listener callbacks, after render.
     getActiveCal: () => activeCalRef.current
   });
-  const { memos, setMemos, memosLimit, setMemosLimit, hasMoreMemos, setHasMoreMemos } = useMemoCollections({
+  const { memos, setMemos, mergeMemosFromServer, memosLimit, setMemosLimit, hasMoreMemos, setHasMoreMemos } = useMemoCollections({
     React, activeCalId, activeView, isGlobalSearchOpen,
     firebaseDb, getFirebaseDb: () => firebaseDb, firebaseConnectionVersion
   });
@@ -1238,11 +1251,12 @@ function CalendarApp() {
     fetchMemosRest,
     memosLimit,
     setMemos,
+    mergeMemosFromServer,
     setHasMoreMemos,
     restoreActiveCalendarFromCache,
     setIsInitialDataLoading,
     setCloudReloadToken
-  }), [activeCalId, activeCalLoaded, activeView, applyCalendarSnapshot, memosLimit, restoreActiveCalendarFromCache]);
+  }), [activeCalId, activeCalLoaded, activeView, applyCalendarSnapshot, memosLimit, restoreActiveCalendarFromCache, mergeMemosFromServer]);
   // The chat message listener below only re-subscribes on [activeCalId], so without this ref it
   // would keep using the activeCal snapshot from whenever that effect last ran -- meaning a
   // participant added (or the calendar renamed) mid-session wouldn't be reflected in incoming
@@ -2536,13 +2550,17 @@ function CalendarApp() {
   };
   const upsertLocalMemo = memo => {
     if (!memo?.id) return;
+    const hasExplicitPendingState = Object.prototype.hasOwnProperty.call(memo, PENDING_MEMO_WRITE_FIELD);
+    const nextMemo = hasExplicitPendingState
+      ? (memo[PENDING_MEMO_WRITE_FIELD] == null ? clearMemoWritePending(memo) : memo)
+      : markMemoWritePending(memo, memo.updatedAt || Date.now());
     setMemos(prev => {
       const list = Array.isArray(prev) ? [...prev] : [];
       const idx = list.findIndex(m => m.id === memo.id);
       if (idx >= 0) {
-        list[idx] = { ...list[idx], ...memo };
+        list[idx] = { ...list[idx], ...nextMemo };
       } else {
-        list.unshift(memo);
+        list.unshift(nextMemo);
       }
       list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       return list;

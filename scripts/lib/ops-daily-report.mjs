@@ -1,6 +1,6 @@
 /**
  * Daily ops report (scripts/ops-daily-report.mjs): turns the media integrity audit and the last
- * 24h of client_error audit events into one markdown report, and decides whether anything got
+ * 24h of client/action audit events into one markdown report, and decides whether anything got
  * WORSE since the previous report. Existing legacy problems are listed but do not alert every day;
  * only a count that went up (or a new error message) does.
  *

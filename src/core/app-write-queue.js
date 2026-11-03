@@ -13,6 +13,7 @@ import {
   pushSingleCloudCalendar
 } from './app-firebase-data.js';
 import { resolveMemoImageBatch, resolveChatImageBatch, chunkResolvedImagesForMessages } from './app-image-pipeline.js';
+import { logActionFailure, logActionResolution } from './error-logger.js';
 
 const DB_NAME = 'gather-calendar-write-queue';
 const DB_VERSION = 2;
@@ -175,6 +176,8 @@ export async function enqueueWriteOperation(operation) {
     type: String(operation.type),
     calendarId: String(operation.calendarId || ''),
     payload: operation.payload || null,
+    actorId: String(operation.actorId || '').slice(0, 80),
+    resourceId: String(operation.resourceId || operation.id || '').slice(0, 200),
     queuedAt: Number(operation.queuedAt) || Date.now(),
     attempts: Number(operation.attempts) || 0,
     nextAttemptAt: Number(operation.nextAttemptAt) || 0,
@@ -275,10 +278,24 @@ async function deferOperation(operation, error = null) {
     RETRY_BACKOFF_MAX_MS,
     RETRY_BACKOFF_BASE_MS * (2 ** Math.min(5, attempts - 1))
   );
+  const errMsg = String(error?.message || error || operation?.lastError || '대기 저장 실패').slice(0, 240);
+  try {
+    logActionFailure({
+      calendarId: operation?.calendarId || 'unknown',
+      action: 'write_queue_deferred',
+      target: `백그라운드 지속 업로드 재시도 대기 (시도 ${attempts}회차)`,
+      actorId: operation?.actorId || '',
+      error: errMsg,
+      resource: {
+        type: operation?.type,
+        resourceId: operation?.resourceId || operation?.id
+      }
+    });
+  } catch (_) {}
   return enqueueWriteOperation({
     ...operation,
     attempts,
-    lastError: String(error?.message || error || operation?.lastError || '대기 저장 실패').slice(0, 240),
+    lastError: errMsg,
     nextAttemptAt: Date.now() + backoff
   });
 }
@@ -361,6 +378,15 @@ export async function flushWriteQueue(handler) {
           const success = await handler(operation);
           if (success) {
             await removeOperation(operation.id);
+            try {
+              logActionResolution({
+                calendarId: operation.calendarId || 'unknown',
+                action: 'write_queue_replayed',
+                target: `대기 저장 자동 복구 완료 (${operation.type})`,
+                actorId: operation.actorId || '',
+                resource: { type: operation.type, resourceId: operation.resourceId || operation.id }
+              });
+            } catch (_) {}
             processed += 1;
           } else {
             await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'));
