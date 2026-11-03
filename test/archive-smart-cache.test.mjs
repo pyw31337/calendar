@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ARCHIVE_CACHE_TTL_MS,
-  getArchiveStorageKey,
   getPersistedArchiveCache,
   savePersistedArchiveCache,
   clearPersistedArchiveCache,
