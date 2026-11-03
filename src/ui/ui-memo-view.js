@@ -509,10 +509,15 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       if (editingMemo) setEditingMemo(null);
       return;
     }
-    const incomingStamp = Number(initialEditingMemo.updatedAt || initialEditingMemo.createdAt || 0);
-    const activeStamp = Number(editingMemo?.updatedAt || editingMemo?.createdAt || 0);
-    if (editingMemo?.id !== initialEditingMemo.id || incomingStamp !== activeStamp) openMemoEditor(initialEditingMemo);
-  }, [editorOnly, initialEditingMemo, editingMemo, openMemoEditor]);
+    // Only re-initialize the editor if the target memo identity actually changed.
+    // If it is the same memo (e.g. background snapshot update or save acknowledgment),
+    // do not overwrite the user's active typing state with openMemoEditor.
+    if (editingMemo?.id !== initialEditingMemo.id) {
+      openMemoEditor(initialEditingMemo);
+    } else {
+      setEditingMemo(initialEditingMemo);
+    }
+  }, [editorOnly, initialEditingMemo, editingMemo?.id, openMemoEditor]);
   const memoEditorDirtySnapshot = () => JSON.stringify([
     editTitle,
     editText,
@@ -836,16 +841,20 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       if (!saved?.success) throw new Error('Memo save failed');
       hydrateMemoLinkPreviewsInBackground(calendarId, memoId, text, memoData);
 
-      // 3. Write Activity Log
-      const logNote = title ? `제목: ${title}` : (text ? text.slice(0, 30) + '...' : '사진 첨부');
-      const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
-      if (activityLog) {
-        const nextCal = {
-          ...calendar,
-          updatedAt: stamp,
-          revision: (calendar.revision || 0) + 1
-        };
-        await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+      // 3. Write Activity Log (isolated so push failures never rollback memo creation)
+      try {
+        const logNote = title ? `제목: ${title}` : (text ? text.slice(0, 30) + '...' : '사진 첨부');
+        const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
+        if (activityLog) {
+          const nextCal = {
+            ...calendar,
+            updatedAt: stamp,
+            revision: (calendar.revision || 0) + 1
+          };
+          await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+        }
+      } catch (logErr) {
+        console.warn('Activity log push failed (non-critical):', logErr);
       }
 
       newDraftAutosave.clear(memoDraftKey(calendarId, 'new'));
@@ -975,21 +984,25 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       if (!saved?.success) throw new Error('Memo update failed');
       hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), localMemo);
 
-      // Log Memo Update — before→after detail
-      const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
-        { key: '제목', before: editingMemo.title || '', after: editTitle.trim() },
-        { key: '내용', before: editingMemo.text || '', after: editText.trim() },
-        { key: '색상', before: editingMemo.color || '', after: editColor || '' },
-        { key: '고정', before: editingMemo.isPinned ? 'Y' : 'N', after: editIsPinned ? 'Y' : 'N' }
-      ]) || (editTitle.trim() || (editText.trim().slice(0, 40) + '...'));
-      const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
-      if (activityLog) {
-        const nextCal = {
-          ...calendar,
-          updatedAt: stamp,
-          revision: (calendar.revision || 0) + 1
-        };
-        await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+      // Log Memo Update (isolated so push failures never rollback memo update)
+      try {
+        const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
+          { key: '제목', before: editingMemo.title || '', after: editTitle.trim() },
+          { key: '내용', before: editingMemo.text || '', after: editText.trim() },
+          { key: '색상', before: editingMemo.color || '', after: editColor || '' },
+          { key: '고정', before: editingMemo.isPinned ? 'Y' : 'N', after: editIsPinned ? 'Y' : 'N' }
+        ]) || (editTitle.trim() || (editText.trim().slice(0, 40) + '...'));
+        const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
+        if (activityLog) {
+          const nextCal = {
+            ...calendar,
+            updatedAt: stamp,
+            revision: (calendar.revision || 0) + 1
+          };
+          await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+        }
+      } catch (logErr) {
+        console.warn('Activity log push failed (non-critical):', logErr);
       }
 
       editDraftAutosave.clear(editDraftKey);
@@ -1032,16 +1045,20 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         const deleted = await writeMemoDocument('memos', calendarId, memo.id, null, 'delete', '메모 삭제');
         if (!deleted?.success) throw new Error('Memo delete failed');
 
-        // Log Memo Delete
-        const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
-        const activityLog = createMemoActivityLog(calendarId, 'memo_delete', participantId, stamp, logNote);
-        if (activityLog) {
-          const nextCal = {
-            ...calendar,
-            updatedAt: stamp,
-            revision: (calendar.revision || 0) + 1
-          };
-          await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+        // Log Memo Delete (isolated so push failures never rollback memo deletion)
+        try {
+          const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
+          const activityLog = createMemoActivityLog(calendarId, 'memo_delete', participantId, stamp, logNote);
+          if (activityLog) {
+            const nextCal = {
+              ...calendar,
+              updatedAt: stamp,
+              revision: (calendar.revision || 0) + 1
+            };
+            await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+          }
+        } catch (logErr) {
+          console.warn('Activity log push failed (non-critical):', logErr);
         }
 
         clearMemoDraft(memoDraftKey(memoDraftCalId, memo?.id));

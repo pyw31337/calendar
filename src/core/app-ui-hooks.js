@@ -81,6 +81,19 @@ export function useModalDirtyGuard(onClose, onRequestConfirm, message, active = 
   }, [active, resetKey, readSnapshot]);
   const latestRef = React.useRef({ onClose, onRequestConfirm, message });
   latestRef.current = { onClose, onRequestConfirm, message };
+  const lastMouseDownTargetRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!active) return undefined;
+    const handleGlobalMouseDown = e => {
+      lastMouseDownTargetRef.current = e.target;
+    };
+    window.addEventListener('mousedown', handleGlobalMouseDown, true);
+    return () => {
+      window.removeEventListener('mousedown', handleGlobalMouseDown, true);
+    };
+  }, [active]);
+
   // Join the overlay stack (core/overlay-stack.js) while active: one Esc / a new top-level dialog
   // from navigation closes every stacked dialog, asking this guard's confirm once if dirty.
   React.useEffect(() => {
@@ -99,16 +112,22 @@ export function useModalDirtyGuard(onClose, onRequestConfirm, message, active = 
   }, [active, readSnapshot]);
   const requestClose = React.useCallback(() => {
     if (readSnapshot() !== baselineRef.current && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', message || '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', onClose);
+      onRequestConfirm('닫기 확인', message || '작업 중인 내용이 있습니다. 닫으시겠습니까?', onClose);
       return;
     }
     onClose();
   }, [onClose, onRequestConfirm, message, readSnapshot]);
+  const onOverlayMouseDown = React.useCallback(e => {
+    lastMouseDownTargetRef.current = e.target;
+  }, []);
   const overlayOnClick = React.useCallback(e => {
+    const mousedownTarget = lastMouseDownTargetRef.current;
+    lastMouseDownTargetRef.current = null;
     if (e.target !== e.currentTarget) return;
+    if (mousedownTarget && mousedownTarget !== e.currentTarget) return;
     requestClose();
   }, [requestClose]);
-  return { requestClose, overlayOnClick };
+  return { requestClose, overlayOnClick, onOverlayMouseDown, overlayProps: { onMouseDown: onOverlayMouseDown, onClick: overlayOnClick } };
 }
 
 // De-dupes rapid double-taps / pointerdown+click event duplication firing onSend() twice for the

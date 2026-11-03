@@ -2144,6 +2144,7 @@ export function DateModal({
   }, []);
   const [, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
+  const dateOverlayMouseDownTargetRef = React.useRef(null);
   const requestClose = () => {
     if (isSubmitting) return;
     const b = formBaselineRef.current;
@@ -2169,7 +2170,7 @@ export function DateModal({
       String(expensePayerInput || '') !== String(b.expensePayerInput || '')
     );
     if (dirty && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => finishClose());
+      onRequestConfirm('닫기 확인', '작업 중인 내용이 있습니다. 닫으시겠습니까?', () => finishClose());
       return;
     }
     finishClose();
@@ -2178,8 +2179,12 @@ export function DateModal({
   const isBentoSheet = shellChrome === 'bento';
   const portalContent = /*#__PURE__*/React.createElement("div", {
     className: isBentoSheet ? "modal-overlay bp-sheet-backdrop bp-is-open" : "modal-overlay",
+    onMouseDown: e => { dateOverlayMouseDownTargetRef.current = e.target; },
     onClick: e => {
+      const mousedownTarget = dateOverlayMouseDownTargetRef.current;
+      dateOverlayMouseDownTargetRef.current = null;
       if (e.target !== e.currentTarget) return;
+      if (mousedownTarget && mousedownTarget !== e.currentTarget) return;
       requestClose();
     },
     style: { zIndex: 11000 }
@@ -3793,7 +3798,7 @@ export function DateModal({
   // rather than sending the user away from this date detail sheet or offering a partial form.
   const dateMemoEditorHost = editingDateMemo && typeof MemoView === 'function'
     ? /*#__PURE__*/React.createElement(MemoView, {
-        key: `${editingDateMemo.id || ''}:${editingDateMemo.updatedAt || ''}`,
+        key: editingDateMemo.id || 'editing-date-memo',
         calendar,
         memos: [editingDateMemo],
         chatMessages: [],

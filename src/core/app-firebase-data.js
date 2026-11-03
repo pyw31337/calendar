@@ -1896,7 +1896,10 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields })
       }, timeoutMs);
-      if (!addRes.ok) return false;
+      if (!addRes.ok) {
+        const errorText = await addRes.text().catch(() => '');
+        return { success: false, retryable: true, status: addRes.status, error: new Error(`REST add failed (${addRes.status}): ${errorText.slice(0, 100)}`) };
+      }
       const addData = await addRes.json().catch(() => null);
       const id = typeof addData?.name === 'string' ? addData.name.split('/').pop() : '';
       return { success: true, id: id || null, transport: 'rest' };
@@ -1914,7 +1917,11 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields })
     }, timeoutMs);
-    return patchRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
+    if (!patchRes.ok) {
+      const errorText = await patchRes.text().catch(() => '');
+      return { success: false, retryable: true, status: patchRes.status, error: new Error(`REST patch failed (${patchRes.status}): ${errorText.slice(0, 100)}`) };
+    }
+    return { success: true, id: cleanDocId, transport: 'rest' };
   } catch (err) {
     if (err && err.code === 'PHOTO_NOT_STORED') return false;
     console.warn('writeCollectionDocumentRest error:', err);
@@ -2039,7 +2046,14 @@ function shouldQueueCollectionWrite(...errors) {
   try {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
   } catch (_) {}
-  return errors.some(error => /timeout|network|fetch|offline|연결|상태를 확인/i.test(String(error?.message || error || '')));
+  const hasPermanentError = errors.some(err => {
+    if (!err) return false;
+    const msg = String(err?.message || err || '');
+    const code = String(err?.code || '');
+    return isFirestoreRulesRejection(err) || code === 'permission-denied' || /permission-denied|insufficient permissions/i.test(msg);
+  });
+  if (hasPermanentError) return false;
+  return errors.some(Boolean) || errors.length > 0;
 }
 
 async function deleteMessageRest(calId, messageId) {
@@ -2236,7 +2250,7 @@ async function writeRootCollectionDocumentWithFallback(collectionName, docId, da
       body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data || {}).map(([key, value]) => [key, jsToFirestoreValue(value)])) })
     }, FIRESTORE_WRITE_DEADLINE_MS);
     if (res.ok) return { success: true, id: cleanDocId, transport: 'rest' };
-    return false;
+    throw new Error(`REST root write failed (${res.status})`);
   } catch (error) {
     if (options?.skipQueue || !shouldQueueCollectionWrite(error)) return false;
     const queued = await enqueueWriteOperation({ id: `root_${cleanCollection}_${cleanDocId}`, type: 'root-collection-write', calendarId: '', payload: { collectionName: cleanCollection, docId: cleanDocId, data, merge: Boolean(options?.merge), warnLabel } });

@@ -18,13 +18,8 @@ import { showUndoableToast } from '../core/undo-toast.js';
 import { snapshotPlaces, revertPlaceSave } from '../core/app-undo-actions.js';
 import { chooseDedupWinner, findDuplicatePhotoGroups } from '../core/gallery-dedup.js';
 import { ArchiveTagSuggestions } from './archive-tag-suggestions-view.js';
-import {
-  forgetArchiveDeleted,
-  photoHiddenByArchiveDelete,
-  projectArchivePhotoEntries,
-  rememberArchiveDeleted,
-  rememberArchiveTag,
-} from '../core/archive-photo-edits.js';
+import { forgetArchiveDeleted, photoHiddenByArchiveDelete, projectArchivePhotoEntries, rememberArchiveDeleted, rememberArchiveTag } from '../core/archive-photo-edits.js';
+import { getPersistedArchiveCache, savePersistedArchiveCache, computeArchiveMemoryGroups } from '../core/archive-smart-cache.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
 import { PhotoAssetThumb } from './photo-asset-thumb.js';
@@ -2771,34 +2766,23 @@ export function HistoryView({
   const entryMatchesDateRange = (entry, start, end, memoryId = '') => {
     return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
+  const cachedArchiveRef = React.useRef(getPersistedArchiveCache(calendar?.id));
   const travelMemoryGroups = React.useMemo(() => {
     if (historyTab !== 'memories' && !q) return [];
-    // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
-    // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
-    // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
-    // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
-    return assignPhotosToSingleMemory((anniversaries || [])
-      .filter(a => a && (a.startDate || a.date) && !a.hiddenFromMemories)
-      .map(a => {
-        const start = a.startDate || a.date;
-        const end = a.endDate || a.startDate || a.date;
-        // 날짜 구간으로 자동 수집되다 보니 그 기념일과 상관없는 사진이 섞여 들어올 수 있어,
-        // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
-        // 제외 목록은 기념일 문서 set()에도 살아남아야 한다 -- 같은 날 다른 일정의 사진이
-        // 다시 들어오는 건 한 번 고친 작업을 반복하게 만든다.
-        const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
-        const photosInRange = historyMemoryPhotoEntries.filter(entry => {
-          return entryMatchesDateRange(entry, start, end, a.id);
-        });
-        const photos = photosInRange.filter(entry => !isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
-        const excludedPhotos = photosInRange.filter(entry => isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
-        return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos, excludedPhotos };
-      }), getPhotoAssetCommentKey)
-      // 겹치는 추억(예: 여행 기간 중 하루짜리 축제)에서는 사진이 더 구체적인 한 곳에만 보인다.
-      // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
-      // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
-      .filter(group => group.photos.length > 0)
-      .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+    if (!historyMemoryPhotoEntries.length && cachedArchiveRef.current?.memoryGroups?.length) {
+      return cachedArchiveRef.current.memoryGroups;
+    }
+    const computed = computeArchiveMemoryGroups({
+      anniversaries, photoEntries: historyMemoryPhotoEntries, entryMatchesDateRange,
+      isMemoryPhotoExcluded, getPhotoAssetCommentKey, assignPhotosToSingleMemory
+    });
+    if (computed.length && calendar?.id) {
+      savePersistedArchiveCache(calendar.id, { memoryGroups: computed });
+      if (cachedArchiveRef.current) cachedArchiveRef.current.memoryGroups = computed;
+    } else if (!computed.length && cachedArchiveRef.current?.memoryGroups?.length) {
+      return cachedArchiveRef.current.memoryGroups;
+    }
+    return computed;
   }, [historyTab, anniversaries, historyMemoryPhotoEntries, q ? 1 : 0]);
 
   const archiveTextHas = (value, needle) => String(value || '').toLowerCase().includes(needle);
@@ -3015,7 +2999,7 @@ export function HistoryView({
       },
       className: 'archive-photo-cell'
     },
-      /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
+      /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photoCount || group.photos.length)),
       !isMemoryListEditMode && /*#__PURE__*/React.createElement(LikeButton, {
         as: 'span', variant: 'onMedia', calendarId: calendar?.id,
         item: { kind: 'memory', ref: group.id, title: group.title, subtitle: formatHistoryDate(group.startDate) || '', thumb: cover ? (cover.thumb || cover.full || '') : '', target: { startDate: group.startDate || '' } }
@@ -3060,7 +3044,7 @@ export function HistoryView({
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }
   }, groups.map(renderMemoryGroupCard));
   const renderMemoryGroups = () => {
-    if (archivePhotoIndexIsPending) {
+    if (archivePhotoIndexIsPending && visibleMemoryGroups.length === 0) {
       return /*#__PURE__*/React.createElement('div', {
         role: 'status',
         style: {

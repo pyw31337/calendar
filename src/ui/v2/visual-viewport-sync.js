@@ -393,6 +393,11 @@
     '.modal-overlay:not(.meme-preview-overlay) > .modal-container',
     '.modal-overlay:not(.meme-preview-overlay) > .modal',
     '.modal-overlay:not(.meme-preview-overlay) > .bp-event-sheet',
+    '.modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal',
+    '.modal-overlay:not(.meme-preview-overlay) > .weather-detail-modal-container',
+    '.modal-overlay:not(.meme-preview-overlay) > .memo-edit-modal-container',
+    '.modal-overlay:not(.meme-preview-overlay) > .region-filter-sheet',
+    '.modal-overlay:not(.meme-preview-overlay) > .v2-settings-modal',
   ].join(', ');
 
   let activeResize = null;
@@ -403,7 +408,7 @@
   );
   const isEligibleSheet = sheet => sheet instanceof Element && (
     (sheet.matches('.bottom-sheet') && sheet.parentElement?.matches('.bottom-sheet-overlay:not(.emoji-sheet-overlay)'))
-    || (sheet.matches('.modal-container, .modal, .bp-event-sheet') && sheet.parentElement?.matches('.modal-overlay:not(.meme-preview-overlay)'))
+    || (sheet.matches('.modal-container, .modal, .bp-event-sheet, .v2-responsive-modal, .weather-detail-modal-container, .memo-edit-modal-container, .region-filter-sheet, .v2-settings-modal') && sheet.parentElement?.matches('.modal-overlay:not(.meme-preview-overlay)'))
   );
   const enhanceSheet = sheet => {
     if (!isV2Active() || !isEligibleSheet(sheet) || hasDirectHandle(sheet)) return;
@@ -440,13 +445,14 @@
     activeResize = null;
   };
   const onPointerDown = event => {
-    const handle = event.target?.closest?.('[data-v2-injected-sheet-handle="true"]');
+    const handle = event.target?.closest?.('[data-v2-injected-sheet-handle="true"], .bp-sheet-handle, .v2-modal-drag-handle');
     if (!handle || !event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    const sheet = handle.parentElement;
+    const sheet = handle.closest?.('.bottom-sheet, .modal-container, .modal, .bp-event-sheet, .v2-responsive-modal, .weather-detail-modal-container') || handle.parentElement;
     if (!sheet) return;
     event.preventDefault();
     event.stopPropagation();
     endResize();
+    sheet.classList.add('is-sheet-resized');
     const pointerId = event.pointerId;
     const startY = event.clientY;
     const startHeight = sheet.getBoundingClientRect().height;
@@ -455,7 +461,9 @@
       if (!moveEvent.isPrimary || moveEvent.pointerId !== pointerId) return;
       if (moveEvent.cancelable) moveEvent.preventDefault();
       const nextHeight = Math.max(MIN_SHEET_HEIGHT, Math.min(maxHeight, Math.round(startHeight - (moveEvent.clientY - startY))));
+      sheet.classList.add('is-sheet-resized');
       sheet.style.setProperty('height', `${nextHeight}px`, 'important');
+      sheet.style.setProperty('--sheet-height', `${nextHeight}px`);
       sheet.style.setProperty('max-height', `${maxHeight}px`, 'important');
       sheet.style.setProperty('min-height', `${MIN_SHEET_HEIGHT}px`, 'important');
     };

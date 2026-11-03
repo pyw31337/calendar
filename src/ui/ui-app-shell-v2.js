@@ -429,6 +429,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     isLoading: !!isInitialDataLoading,
     handleMoveAvailability,
     handleMoveCultureLinkedAnniversary: handleMoveCultureLinkedAnniversary || window.__gatherMoveCultureLinkedAnniversary,
+    onToggleMemoPin: handleToggleMemoPin,
     // Bento 시안: 최대 8개까지 가로 칩 스트립으로 표시.
     upcomingMeetings: visibleConfirmedMeetings.slice(0, 8),
     hasVisiblePolls,
@@ -1974,6 +1975,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
         // the legacy callback compatible by converting it back to an id only
         // when the V2 shell has not supplied its focused-navigation handler.
         onOpenMemo: onOpenMemo || (memo => recordsContext?.memoProps?.onOpenMemo?.(memo?.id || memo)),
+        onToggleMemoPin: calendarContext?.onToggleMemoPin || calendarContext?.dateModalProps?.onToggleMemoPin,
       },
       onOpenDate,
       onChangeView,
@@ -2267,7 +2269,40 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
     selected.push(...remaining.slice(0, 4 - selected.length));
     return selected;
   }, [memoItems]);
-  const photoItems = calendarContext?.galleryPhotoIndex?.items;
+  const photoIndexItems = calendarContext?.galleryPhotoIndex?.items;
+  const photoItems = React.useMemo(() => {
+    const baseItems = Array.isArray(photoIndexItems) ? photoIndexItems : [];
+    const liveMessages = Array.isArray(allMessages) ? allMessages : [];
+    const livePhotos = [];
+    liveMessages.forEach(msg => {
+      const urls = Array.isArray(msg?.imageUrls) && msg.imageUrls.length > 0
+        ? msg.imageUrls
+        : (msg?.imageUrl ? [msg.imageUrl] : []);
+      const thumbs = Array.isArray(msg?.thumbUrls) && msg.thumbUrls.length > 0
+        ? msg.thumbUrls
+        : (msg?.thumbUrl ? [msg.thumbUrl] : []);
+      if (!urls.length) return;
+      const ts = Number(msg.timestamp || msg.createdAt || Date.now());
+      urls.forEach((full, idx) => {
+        const thumb = thumbs[idx] || full;
+        livePhotos.push({
+          full,
+          thumb,
+          imageUrl: full,
+          thumbUrl: thumb,
+          messageId: msg.id,
+          imageIndex: idx,
+          timestamp: ts,
+          uploadedAt: ts,
+          createdAt: ts,
+          updatedAt: ts,
+          source: msg.uploadSource || 'chat',
+        });
+      });
+    });
+    if (!livePhotos.length) return baseItems;
+    return [...livePhotos, ...baseItems];
+  }, [photoIndexItems, allMessages]);
   const photoIndexStatus = calendarContext?.galleryPhotoIndex?.status;
   const photoIndexLoading = !!calendarContext?.galleryPhotoIndex?.loading;
   const [brokenThumbUrls, setBrokenThumbUrls] = React.useState(() => new Set());
@@ -2452,7 +2487,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
             calendar: calendarContext?.calendar,
             variant: 'v2-page',
             onOpenEdit: openMemo,
-            onTogglePin: () => memoDateProps?.onToggleMemoPin?.(memo),
+            onTogglePin: () => {
+              if (typeof calendarContext?.onToggleMemoPin === 'function') {
+                calendarContext.onToggleMemoPin(memo);
+              } else if (typeof memoDateProps?.onToggleMemoPin === 'function') {
+                memoDateProps.onToggleMemoPin(memo);
+              } else {
+                const nextPinned = !memo.isPinned;
+                const calId = calendarContext?.calendar?.id;
+                if (calId && typeof window.GATHER_UI_DEPS?.writeCollectionDocumentWithFallback === 'function') {
+                  window.GATHER_UI_DEPS.writeCollectionDocumentWithFallback('memos', calId, memo.id, { isPinned: nextPinned }, 'update', '메모 고정 변경');
+                }
+              }
+            },
             onShare: () => setSharingMemo(memo),
             onSelectTag: () => openMemo(),
             onCommentsChange: next => (typeof onMemoCommentsChange === 'function' ? onMemoCommentsChange(memo, next) : false),

@@ -179,9 +179,7 @@ export function resolvePhotoAsset(item, options = {}) {
   };
 }
 
-function photoTimeMs(photo) {
-  const raw = photo?.timestamp ?? photo?.createdAt ?? photo?.updatedAt
-    ?? photo?.uploadedAt ?? photo?.messageTimestamp;
+function parseSingleTimestamp(raw) {
   if (raw == null || raw === '') return 0;
   if (typeof raw === 'number' && Number.isFinite(raw)) {
     return raw < 1e12 ? raw * 1000 : raw;
@@ -197,6 +195,15 @@ function photoTimeMs(photo) {
   }
   if (typeof raw?.seconds === 'number') return raw.seconds * 1000;
   return 0;
+}
+
+function photoTimeMs(photo) {
+  const t1 = parseSingleTimestamp(photo?.uploadedAt);
+  const t2 = parseSingleTimestamp(photo?.messageTimestamp);
+  const t3 = parseSingleTimestamp(photo?.updatedAt);
+  const t4 = parseSingleTimestamp(photo?.timestamp);
+  const t5 = parseSingleTimestamp(photo?.createdAt);
+  return Math.max(t1, t2, t3, t4, t5);
 }
 
 function photoIdentityKey(photo, index = 0) {
@@ -219,7 +226,7 @@ function photoIdentityKey(photo, index = 0) {
 export function selectGalleryPreviewPhotos(items, options = {}) {
   const {
     limit = 9,
-    scanLimit = 48,
+    scanLimit = 100,
     isMeme = isMemeKeyboardPhotoEntry,
     isBroken = () => false,
     isRenderable = isGalleryThumbUrl,
@@ -275,7 +282,7 @@ export function resolveHomeGalleryStripState({
     return { state: 'loading', photos: [], slots: limit };
   }
 
-  const photos = selectGalleryPreviewPhotos(items, { limit, isBroken });
+  const photos = selectGalleryPreviewPhotos(items, { limit, isBroken, scanLimit: Math.max(100, limit * 4) });
   if (!photos.length) {
     return { state: 'empty', photos: [], slots: 0 };
   }

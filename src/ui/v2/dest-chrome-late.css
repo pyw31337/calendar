@@ -2741,7 +2741,8 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
 html:has(.renewal-shell.v2-design) .bp-sheet-handle,
 html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
   width: 100% !important;
-  height: 16px !important;
+  height: 24px !important;
+  min-height: 24px !important;
   margin: 0 !important;
   padding: 0 !important;
   display: flex !important;
@@ -2749,8 +2750,9 @@ html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
   justify-content: center !important;
   flex-shrink: 0 !important;
   background: transparent !important;
-  touch-action: none;
-  user-select: none;
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 .v2-design .bp-event-sheet .underline-tabs {
   margin: 0 !important;
@@ -8434,7 +8436,7 @@ html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip .bp-comment-badg
  * -------------------------------------------------------------------------- */
 @media (max-width: 767px) {
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) >
-    :is(.modal-container, .v2-responsive-modal, .modal, .bp-event-sheet, .memo-edit-modal-container, .weather-detail-modal-container, .region-filter-sheet, .v2-settings-modal):not(.is-sheet-resized):not(.confirm-dialog-modal) {
+    :is(.modal-container, .v2-responsive-modal, .modal, .bp-event-sheet, .memo-edit-modal-container, .weather-detail-modal-container, .region-filter-sheet, .v2-settings-modal, .poll-voter-sheet, [class*="modal"]):not(.is-sheet-resized):not(.confirm-dialog-modal) {
     height: min(
       calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px))),
       var(--gather-vv-modal-max, 860px)
@@ -8446,7 +8448,7 @@ html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip .bp-comment-badg
     min-height: 0 !important;
   }
   html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) >
-    .bottom-sheet:not(.is-sheet-resized):has(.date-modal, form, textarea, input[type="date"]) {
+    .bottom-sheet:not(.is-sheet-resized):not(.confirm-dialog-modal) {
     height: min(
       calc(var(--app-vv-height, 100dvh) - var(--v2-pwa-safe-top, env(safe-area-inset-top, 0px)) - var(--v2-pwa-safe-bottom, env(safe-area-inset-bottom, 0px))),
       var(--gather-vv-modal-max, 860px)
@@ -8458,8 +8460,13 @@ html:has(.renewal-shell.v2-design) .bp-renewal-home-photo-strip .bp-comment-badg
     min-height: 0 !important;
   }
   html:has(.renewal-shell.v2-design) :is(.modal-overlay, .bottom-sheet-overlay) >
+    :is(.modal-container, .v2-responsive-modal, .modal, .bp-event-sheet, .bottom-sheet):not(.is-sheet-resized) {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  html:has(.renewal-shell.v2-design) :is(.modal-overlay, .bottom-sheet-overlay) >
     :is(.modal-container, .v2-responsive-modal, .modal, .bp-event-sheet, .bottom-sheet):not(.is-sheet-resized) >
-    :is(.modal-body, .bottom-sheet-body, form) {
+    :is(.modal-body, .bottom-sheet-body, .date-modal, form, .sheet-body) {
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow-y: auto !important;

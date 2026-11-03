@@ -2,8 +2,8 @@
  *
  * This module stores pending mutations only. It is intentionally never used as a source for
  * rendering collaborative calendar data; Firestore remains the sole read authority. IndexedDB
- * is used instead of localStorage because writes can contain structured calendar payloads and
- * must survive a mobile tab being suspended without blocking the main thread.
+ * is used with automatic localStorage fallback so writes survive mobile suspensions, private
+ * browsing restrictions, and network drops without data loss.
  */
 import { replayQueuedRootCollectionWrite, replayQueuedMemoSave, replayQueuedMediaMessage } from './app-media-outbox.js';
 import {
@@ -20,14 +20,72 @@ const STORE_NAME = 'operations';
 const LOCK_STORE_NAME = 'locks';
 const MAX_PENDING_OPERATIONS = 100;
 const MAX_OPERATION_PAYLOAD_BYTES = 8 * 1024 * 1024;
-const RETRY_BACKOFF_BASE_MS = 3000;
-const RETRY_BACKOFF_MAX_MS = 120000;
+const RETRY_BACKOFF_BASE_MS = 2000;
+const RETRY_BACKOFF_MAX_MS = 60000;
+const FALLBACK_STORAGE_KEY = 'gather_calendar_write_queue_fallback';
 
 let dbPromise = null;
 let flushPromise = null;
+let autoFlushHandler = null;
+let autoFlushTimer = null;
+const queueListeners = new Set();
 
 function canUseIndexedDb() {
   return typeof indexedDB !== 'undefined';
+}
+
+function getFallbackOperations() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const raw = window.localStorage.getItem(FALLBACK_STORAGE_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveFallbackOperations(list) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    if (!list || !list.length) {
+      window.localStorage.removeItem(FALLBACK_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch (_) {}
+}
+
+export function subscribeWriteQueue(listener) {
+  if (typeof listener !== 'function') return () => {};
+  queueListeners.add(listener);
+  return () => { queueListeners.delete(listener); };
+}
+
+function notifyQueueChange() {
+  queueListeners.forEach(listener => {
+    try { listener(); } catch (_) {}
+  });
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('gather:write-queue-change'));
+    } catch (_) {}
+  }
+}
+
+export function registerWriteQueueHandler(handler) {
+  if (typeof handler === 'function') autoFlushHandler = handler;
+}
+
+export function triggerImmediateFlush(delayMs = 250) {
+  if (autoFlushTimer) clearTimeout(autoFlushTimer);
+  autoFlushTimer = setTimeout(() => {
+    autoFlushTimer = null;
+    if (typeof autoFlushHandler === 'function') {
+      void flushWriteQueue(autoFlushHandler);
+    }
+  }, Math.max(50, delayMs));
 }
 
 function estimateValueBytes(value, seen = new Set()) {
@@ -66,7 +124,7 @@ function openQueueDb() {
     request.onblocked = () => console.warn('[write-queue] database upgrade blocked');
   }).catch(error => {
     dbPromise = null;
-    console.warn('[write-queue] IndexedDB unavailable:', error);
+    console.warn('[write-queue] IndexedDB unavailable, using localStorage fallback:', error);
     return null;
   });
   return dbPromise;
@@ -80,26 +138,42 @@ function requestToPromise(request) {
 }
 
 async function getAllOperations() {
+  const fallbackList = getFallbackOperations();
   const db = await openQueueDb();
-  if (!db) return [];
+  if (!db) return fallbackList;
   try {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const rows = await requestToPromise(tx.objectStore(STORE_NAME).index('queuedAt').getAll());
-    return Array.isArray(rows) ? rows : [];
+    const idbList = Array.isArray(rows) ? rows : [];
+    if (fallbackList.length > 0) {
+      const existingIds = new Set(idbList.map(item => item.id));
+      const unmerged = fallbackList.filter(item => !existingIds.has(item.id));
+      if (unmerged.length > 0) {
+        try {
+          const writeTx = db.transaction(STORE_NAME, 'readwrite');
+          const store = writeTx.objectStore(STORE_NAME);
+          unmerged.forEach(item => store.put(item));
+          await new Promise((res, rej) => { writeTx.oncomplete = res; writeTx.onerror = rej; });
+          saveFallbackOperations([]);
+          return [...idbList, ...unmerged].sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0));
+        } catch (_) {}
+      } else {
+        saveFallbackOperations([]);
+      }
+    }
+    return idbList;
   } catch (error) {
-    console.warn('[write-queue] read failed:', error);
-    return [];
+    console.warn('[write-queue] read failed, using localStorage fallback:', error);
+    return fallbackList;
   }
 }
 
 export async function enqueueWriteOperation(operation) {
   if (!operation || !operation.id || !operation.type || (!operation.calendarId && operation.type !== 'root-collection-write')) return false;
-  const db = await openQueueDb();
-  if (!db) return false;
   const record = {
     id: String(operation.id),
     type: String(operation.type),
-    calendarId: String(operation.calendarId),
+    calendarId: String(operation.calendarId || ''),
     payload: operation.payload || null,
     queuedAt: Number(operation.queuedAt) || Date.now(),
     attempts: Number(operation.attempts) || 0,
@@ -110,6 +184,25 @@ export async function enqueueWriteOperation(operation) {
   if (payloadBytes > MAX_OPERATION_PAYLOAD_BYTES) {
     console.warn(`[write-queue] payload too large: ${payloadBytes} bytes`);
     return false;
+  }
+  const db = await openQueueDb();
+  if (!db) {
+    try {
+      const current = getFallbackOperations();
+      const supersededCalendarWrites = record.type === 'calendar-snapshot'
+        ? current.filter(item => item.type === 'calendar-snapshot' && item.calendarId === record.calendarId && item.id !== record.id)
+        : [];
+      const supersededIds = new Set(supersededCalendarWrites.map(s => s.id));
+      const filtered = current.filter(item => item.id !== record.id && !supersededIds.has(item.id));
+      filtered.push(record);
+      saveFallbackOperations(filtered.slice(-MAX_PENDING_OPERATIONS));
+      notifyQueueChange();
+      triggerImmediateFlush(200);
+      return true;
+    } catch (fallbackErr) {
+      console.warn('[write-queue] localStorage fallback enqueue failed:', fallbackErr);
+      return false;
+    }
   }
   try {
     const current = await getAllOperations();
@@ -133,16 +226,34 @@ export async function enqueueWriteOperation(operation) {
       tx.onerror = () => reject(tx.error || new Error('write queue transaction failed'));
       tx.onabort = () => reject(tx.error || new Error('write queue transaction aborted'));
     });
+    notifyQueueChange();
+    triggerImmediateFlush(200);
     return true;
   } catch (error) {
-    console.warn('[write-queue] enqueue failed:', error);
-    return false;
+    console.warn('[write-queue] enqueue failed, falling back to localStorage:', error);
+    try {
+      const current = getFallbackOperations().filter(item => item.id !== record.id);
+      current.push(record);
+      saveFallbackOperations(current.slice(-MAX_PENDING_OPERATIONS));
+      notifyQueueChange();
+      triggerImmediateFlush(200);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
 async function removeOperation(id) {
+  const fallback = getFallbackOperations();
+  if (fallback.some(item => item.id === id)) {
+    saveFallbackOperations(fallback.filter(item => item.id !== id));
+  }
   const db = await openQueueDb();
-  if (!db) return;
+  if (!db) {
+    notifyQueueChange();
+    return;
+  }
   try {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).delete(id);
@@ -153,25 +264,28 @@ async function removeOperation(id) {
     });
   } catch (error) {
     console.warn('[write-queue] remove failed:', error);
+  } finally {
+    notifyQueueChange();
   }
 }
 
 async function deferOperation(operation, error = null) {
   const attempts = (Number(operation?.attempts) || 0) + 1;
+  const backoff = Math.min(
+    RETRY_BACKOFF_MAX_MS,
+    RETRY_BACKOFF_BASE_MS * (2 ** Math.min(5, attempts - 1))
+  );
   return enqueueWriteOperation({
     ...operation,
     attempts,
     lastError: String(error?.message || error || operation?.lastError || '대기 저장 실패').slice(0, 240),
-    nextAttemptAt: Date.now() + Math.min(
-      RETRY_BACKOFF_MAX_MS,
-      RETRY_BACKOFF_BASE_MS * (2 ** Math.min(6, attempts - 1))
-    )
+    nextAttemptAt: Date.now() + backoff
   });
 }
 
 async function acquireFlushLease() {
   const db = await openQueueDb();
-  if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return null;
+  if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return 'fallback_lease';
   const owner = `flush_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   const now = Date.now();
   try {
@@ -188,12 +302,12 @@ async function acquireFlushLease() {
     return owner;
   } catch (error) {
     console.warn('[write-queue] lease acquire failed:', error);
-    return null;
+    return 'fallback_lease';
   }
 }
 
 async function releaseFlushLease(owner) {
-  if (!owner) return;
+  if (!owner || owner === 'fallback_lease') return;
   const db = await openQueueDb();
   if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return;
   try {
@@ -212,7 +326,7 @@ async function releaseFlushLease(owner) {
 }
 
 async function renewFlushLease(owner) {
-  if (!owner) return;
+  if (!owner || owner === 'fallback_lease') return;
   const db = await openQueueDb();
   if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return;
   try {
@@ -273,9 +387,14 @@ export async function getPendingWriteCount() {
 }
 
 export function shouldQueueCalendarWriteFailure(error) {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  if (!error) return true;
+  if (error?.nonRetryable) return false;
   const message = String(error?.message || error || '').toLowerCase();
-  return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
+  const code = String(error?.code || '').toLowerCase();
+  if (/permission-denied|insufficient permissions|관리자에게 문의/i.test(message) || code === 'permission-denied') {
+    return false;
+  }
+  return true;
 }
 
 export async function replayQueuedCalendarWrite(operation) {

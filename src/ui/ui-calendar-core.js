@@ -1982,19 +1982,28 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) --
        hidden entirely on the main-screen preview (hidePinButton), which has no "고정" concept. */
     !hidePinButton && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "data-stop-card-open": true,
       onClick: (e) => {
         e.stopPropagation();
-        onTogglePin();
+        if (typeof onTogglePin === 'function') onTogglePin();
       },
+      onPointerDown: (e) => e.stopPropagation(),
+      onTouchStart: (e) => e.stopPropagation(),
       title: effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : undefined,
       "aria-label": effectivePinned ? (effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : "메모 고정 해제") : "메모 고정",
       style: {
-        position: 'absolute', top: '10px', right: '10px',
+        position: 'absolute', top: '4px', right: '4px',
+        width: '32px', height: '32px',
+        padding: '8px',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'none', border: 'none', cursor: 'pointer',
         // Unpinned = the same gray as the share icon next to it (it used to pick up the brand
         // purple from the V2 card CSS even when off).
         color: effectivePinned ? '#F59E0B' : 'var(--text-muted)',
-        opacity: effectivePinned ? 1 : 0.2
+        opacity: effectivePinned ? 1 : 0.4,
+        zIndex: 2,
+        touchAction: 'manipulation',
       },
       className: "memo-card-pin-btn" + (effectivePinned ? " is-pinned" : "")
     }, effectivePinned ?

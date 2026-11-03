@@ -2689,7 +2689,7 @@ export function ChatRoomView({
   const activeMemoView = (typeof window !== 'undefined' && (window.GATHER_UI_COMPONENTS?.MemoView || window.GATHER_UI_DEPS?.MemoView)) || MemoView;
   const chatMemoEditorHost = chatMemoEditingTarget && typeof activeMemoView === 'function'
     ? /*#__PURE__*/React.createElement(activeMemoView, {
-        key: `${chatMemoEditingTarget.memo?.id || ''}:${chatMemoEditingTarget.memo?.updatedAt || ''}`,
+        key: chatMemoEditingTarget.memo?.id || 'chat-memo-editor',
         calendar,
         memos: [chatMemoEditingTarget.memo],
         chatMessages: [],
