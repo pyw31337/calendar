@@ -24,7 +24,7 @@ test('server analysis accepts bounded recommendations but never takes a raw imag
   assert.equal(item.faceCount, 2);
   assert.equal(item.imageUrl, undefined);
   assert.equal(stableAnalysisId(item.sourceKey).length, 64);
-  assert.deepEqual(summarize([item]), { received: 1, suggested: 1, failed: 0, withPeople: 1, withPlaces: 1, withMeetings: 1, withText: 1 });
+  assert.deepEqual(summarize([item]), { received: 1, suggested: 1, candidateItems: 1, unreviewedItems: 1, failed: 0, withPeople: 1, withPlaces: 1, withMeetings: 1, withText: 1 });
 });
 
 test('KST schedule grants nights, weekends and holiday daytime only', () => {
@@ -108,7 +108,7 @@ test('home operations reads only bounded worker health fields after first paint'
   };
   try {
     const workers = await fetchMediaAnalysisWorkerStates({ calendarId: 'cw', projectId: 'metro-live-2918e', force: true });
-    assert.deepEqual(workers, [{ id: 'macos-vision-m2', workerId: 'macos-vision-m2', status: 'idle', lastError: '', lastHeartbeatAt: 1234, latestSummary: null }]);
+    assert.deepEqual(workers, [{ id: 'macos-vision-m2', workerId: 'macos-vision-m2', status: 'idle', lastError: '', lastHeartbeatAt: 1234, lastAnalysisAt: 0, latestSummary: null }]);
   } finally {
     globalThis.fetch = originalFetch;
   }

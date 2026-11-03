@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { loadOperationsCalendar, mergeCanonical } = require('../functions/media-analysis-brief-data.js');
+const { collectMediaBriefCalendars, loadOperationsCalendar, mergeCanonical } = require('../functions/media-analysis-brief-data.js');
 const { buildCalendarOperations } = require('../functions/ai-operations.js');
 const { buildAiOperationsInbox } = await import('../src/core/ai-operations.js');
 const { buildBrief } = require('../functions/media-analysis-brief.js');
@@ -67,4 +67,30 @@ test('brief renders all reported tasks and links to the right calendar without a
   assert.match(brief.html, /&amp;id=cw/);
   assert.match(brief.html, /&lt;가족&gt;/);
   assert.doesNotMatch(brief.html, /tab=gallery|<점검>/);
+});
+
+test('daily brief keeps the last real analysis summary after an idle heartbeat', async () => {
+  const worker = { workerId: 'macos-vision-m2', status: 'idle', lastHeartbeatAt: 2000,
+    latestRunId: 'macos_cw_20261104', latestSummary: { received: 0 } };
+  const run = { status: 'idle', receivedAt: 2000, summary: { received: 0 } };
+  const previous = { status: 'completed', receivedAt: 1000, summary: { received: 42, suggested: 42, candidateItems: 7, unreviewedItems: 7 } };
+  const makeQuery = name => {
+    const query = {
+      where: () => query,
+      select: () => query,
+      limit: () => query,
+      orderBy: () => query,
+      get: async () => ({ docs: name === 'confirmedMeetings' || name === 'places' ? [] : [] })
+    };
+    if (name === 'mediaAnalysisWorkerState') query.doc = id => ({ get: async () => ({ exists: true, data: () => worker }) });
+    if (name === 'mediaAnalysisRuns') query.doc = id => ({ get: async () => ({ exists: true, data: () => run }) });
+    if (name === 'mediaAnalysisRuns') query.get = async () => ({ docs: [{ data: () => previous }] });
+    return query;
+  };
+  const calendarDoc = { id: 'cal_cw', data: () => ({ calendar: {} }), ref: { collection: makeQuery } };
+  const db = { collection: name => ({ select: () => ({ get: async () => ({ docs: [calendarDoc] }) }) }) };
+  const result = await collectMediaBriefCalendars(db, '2026-11-04', 3000);
+  assert.equal(result[0].summary.received, 42);
+  assert.equal(result[0].summary.candidateItems, 7);
+  assert.equal(result[0].lastAnalysisAt, 1000);
 });

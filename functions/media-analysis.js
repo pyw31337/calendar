@@ -152,9 +152,21 @@ function sanitizeFaceItem(item = {}, rejected = [], now = Date.now()) {
 
 function summarize(items = []) {
   const successful = items.filter(item => item.status === 'suggested').length;
+  // `suggested` means the asset was processed successfully, not that a human-facing
+  // candidate exists. Keep those counters separate so an idle heartbeat cannot make the
+  // briefing claim there are no candidates.
+  const hasCandidate = item => (
+    item.status === 'suggested'
+      && (item.suggestedTags.length > 0 || item.candidateEvidence.length > 0
+        || item.people.some(tag => !item.recognizedEvidence.some(entry => entry.tag === tag))
+        || item.places.some(tag => !item.recognizedEvidence.some(entry => entry.tag === tag))
+        || item.meetings.length > 0)
+  );
   return {
     received: items.length,
     suggested: successful,
+    candidateItems: items.filter(hasCandidate).length,
+    unreviewedItems: items.filter(item => hasCandidate(item) && !item.review).length,
     failed: items.length - successful,
     withPeople: items.filter(item => item.people.length).length,
     withPlaces: items.filter(item => item.places.length).length,

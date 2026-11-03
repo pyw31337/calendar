@@ -224,7 +224,10 @@ async function fetchPhotoRows(args, cursor) {
   const rows = await timedRequest(firestoreRunQueryUrl(args.project, args.calendar), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery: query })
   }, 'Firestore photo-index query', async response => {
-    if (!response.ok) throw new Error(`Photo index query failed: ${response.status}`);
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => '')).trim().replace(/\s+/g, ' ').slice(0, 240);
+      throw new Error(`Photo index query failed: ${response.status}${detail ? ` ${detail}` : ''}`);
+    }
     return response.json();
   });
   return (Array.isArray(rows) ? rows : []).filter(row => row?.document).map(row => ({

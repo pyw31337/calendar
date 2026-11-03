@@ -101,7 +101,7 @@ function renderCalendarRow(calendar) {
     </td>
     <td style="padding:16px 0;border-bottom:1px solid #e8e7f2;vertical-align:top;text-align:right;white-space:nowrap;">
       <span style="display:inline-block;padding:5px 9px;border-radius:999px;background:${color}14;color:${color};font-size:12px;font-weight:800;">${escapeHtml(calendar.healthLabel)}</span>
-      <div style="margin-top:8px;font-size:12px;color:#64748b;">운영 작업 ${calendar.operations.length} · 분석 후보 ${calendar.summary.suggested}</div>
+      <div style="margin-top:8px;font-size:12px;color:#64748b;">운영 작업 ${calendar.operations.length} · 분석 후보 ${summaryValue(calendar.summary, 'candidateItems')} · 미검토 ${summaryValue(calendar.summary, 'unreviewedItems')}</div>
     </td>
   </tr>`;
 }
@@ -242,7 +242,9 @@ function buildBrief({ dateLabel, calendars = [], activity = null } = {}) {
         failed: summaryValue(summary, 'failed'),
         withPeople: summaryValue(summary, 'withPeople'),
         withPlaces: summaryValue(summary, 'withPlaces'),
-        withMeetings: summaryValue(summary, 'withMeetings')
+        withMeetings: summaryValue(summary, 'withMeetings'),
+        candidateItems: summaryValue(summary, 'candidateItems'),
+        unreviewedItems: summaryValue(summary, 'unreviewedItems')
       },
       stale: Boolean(calendar.stale),
       healthLabel: calendar.stale ? '생존 신호 확인' : String(calendar.healthLabel || '정상'),
@@ -256,7 +258,7 @@ function buildBrief({ dateLabel, calendars = [], activity = null } = {}) {
   const total = normalized.reduce((accumulator, calendar) => {
     for (const key of Object.keys(accumulator)) accumulator[key] += calendar.summary[key] || 0;
     return accumulator;
-  }, { received: 0, suggested: 0, failed: 0, withPeople: 0, withPlaces: 0, withMeetings: 0 });
+  }, { received: 0, suggested: 0, candidateItems: 0, unreviewedItems: 0, failed: 0, withPeople: 0, withPlaces: 0, withMeetings: 0 });
   const brief = {
     dateLabel: String(dateLabel || ''),
     activity,

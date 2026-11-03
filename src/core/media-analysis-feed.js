@@ -142,7 +142,7 @@ export async function fetchMediaAnalysisWorkerStates({ calendarId, projectId, fo
   const key = `workers:${projectId}:${calendarId}`;
   const cached = cache.get(key);
   if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
-  const fields = ['workerId', 'status', 'lastHeartbeatAt', 'lastError', 'latestSummary', 'lastSuccessAt'];
+  const fields = ['workerId', 'status', 'lastHeartbeatAt', 'lastError', 'latestSummary', 'lastSuccessAt', 'lastAnalysisAt'];
   const mask = fields.map(field => `mask.fieldPaths=${field}`).join('&');
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}/mediaAnalysisWorkerState?pageSize=10&${mask}`, { signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`AI 분석 상태 요청 실패 (${response.status})`);
@@ -155,6 +155,7 @@ export async function fetchMediaAnalysisWorkerStates({ calendarId, projectId, fo
       status: String(data.status || ''),
       lastError: String(data.lastError || ''),
       lastHeartbeatAt: Number(data.lastHeartbeatAt) || 0,
+      lastAnalysisAt: Number(data.lastAnalysisAt) || 0,
       latestSummary: data.latestSummary && typeof data.latestSummary === 'object' ? data.latestSummary : null,
     };
   });

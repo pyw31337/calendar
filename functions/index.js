@@ -3044,24 +3044,34 @@ exports.ingestMediaAnalysis = seoulFunctions().runWith({
       }, { merge: true });
     }
     const summary = summarize(acceptedItems);
+    const workerRef = calendarRef.collection('mediaAnalysisWorkerState').doc(workerId);
+    const previousWorkerSnap = await workerRef.get();
+    const previousSummary = previousWorkerSnap.exists && previousWorkerSnap.data()?.latestSummary
+      && typeof previousWorkerSnap.data().latestSummary === 'object'
+      ? previousWorkerSnap.data().latestSummary : null;
+    // An idle heartbeat is a liveness signal, not a new analysis pass. Preserve the last
+    // non-empty summary so the daily briefing does not reset to zero when the photo index is
+    // unchanged.
+    const effectiveSummary = acceptedItems.length ? summary : (previousSummary || summary);
     const workerState = {
       workerId,
       status,
       lastHeartbeatAt: now,
       lastError: String(req.body?.error || '').slice(0, 500),
       latestRunId: runId,
-      latestSummary: summary
+      latestSummary: effectiveSummary
     };
     // Do not erase the last known-good run when a later heartbeat reports a failure.  The
     // watchdog uses the two timestamps together to distinguish a fresh failure from a stale
     // worker, and preserving this value makes recovery auditable.
     if (status === 'completed' || status === 'idle') workerState.lastSuccessAt = now;
+    if (acceptedItems.length) workerState.lastAnalysisAt = now;
     if (Array.isArray(req.body?.similarGroups)) {
       // Firestore cannot hold nested arrays, so each group is { assetKeys: [...] }.
       workerState.similarGroups = sanitizeSimilarGroups(req.body.similarGroups);
       workerState.similarGroupsAt = now;
     }
-    batch.set(calendarRef.collection('mediaAnalysisWorkerState').doc(workerId), workerState, { merge: true });
+    batch.set(workerRef, workerState, { merge: true });
     batch.set(calendarRef.collection('mediaAnalysisRuns').doc(runId), {
       calendarId,
       runId,

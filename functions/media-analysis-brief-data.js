@@ -67,15 +67,35 @@ async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
       const { calendar, missing } = await loadOperationsCalendar(doc, dateKey);
       const stale = !worker.lastHeartbeatAt || now - Number(worker.lastHeartbeatAt) > 26 * 3600000;
       // Yesterday's analysis count is NOT today's activity. Preserve health separately.
-      const summary = runSnap.exists ? runSnap.data()?.summary || {} : {};
+      const runData = runSnap.exists ? runSnap.data() || {} : {};
+      const workerSummary = worker.latestSummary && typeof worker.latestSummary === 'object' ? worker.latestSummary : {};
+      // An idle heartbeat writes an empty daily run. Report the last real analysis summary
+      // instead of resetting the briefing to zero every day when no photo changed.
+      let summary = runData.status === 'idle' || !Number(runData.summary?.received)
+        ? workerSummary : (runData.summary || {});
+      let lastAnalysisAt = Number(worker.lastAnalysisAt || (Number(runData.summary?.received) ? runData.receivedAt : 0));
+      // Older workers overwrote latestSummary with `{ received: 0 }` on every idle heartbeat
+      // and did not record lastAnalysisAt. Recover the most recent non-empty run once, so the
+      // first deployment of this fix can report historical coverage instead of a false zero.
+      if (!Number(summary.received) && !lastAnalysisAt) {
+        const recentRuns = await doc.ref.collection('mediaAnalysisRuns').orderBy('receivedAt', 'desc').limit(10).get();
+        const previousRun = recentRuns.docs.map(row => ({ ...row.data(), receivedAt: Number(row.data()?.receivedAt) || 0 }))
+          .find(row => Number(row.summary?.received) > 0);
+        if (previousRun) {
+          summary = previousRun.summary || {};
+          lastAnalysisAt = previousRun.receivedAt;
+        }
+      }
+      const analysisAgeHours = lastAnalysisAt ? Math.max(0, (now - lastAnalysisAt) / 3600000) : null;
       const operations = buildCalendarOperations({ calendar, dateKey, summary, stale }).filter(item =>
         !(missing.includes('일정') && /^(place|attendance|settlement):/.test(item.id))
         && !(missing.includes('장소') && item.id.startsWith('place:')));
       if (missing.length) operations.unshift({ id: 'data-incomplete', priority: 'high', title: '운영 데이터 일부 미확인', detail: `${missing.join('·')} 데이터를 모두 확인하지 못했습니다. 정상 상태로 판정하지 않습니다.` });
       const workerFailed = ['failed', 'error'].includes(worker.status);
       if (workerFailed) operations.unshift({ id: 'worker-failed', priority: 'high', title: '사진 분석 작업 오류', detail: '기기는 연결되어 있지만 최근 작업이 실패했습니다. 작업 로그를 확인해 주세요.' });
-      results.push({ id, name: String(calendar.title || calendar.name || id), summary, stale,
-        healthLabel: missing.length ? '일부 미확인' : workerFailed ? '작업 오류' : stale ? '생존 신호 확인' : worker.status === 'idle' ? '대기' : '정상', operations });
+      if (!lastAnalysisAt) operations.unshift({ id: 'analysis-never-ran', priority: 'high', title: '사진 분석 실행 기록 없음', detail: '사진 분석 결과가 아직 한 번도 수집되지 않았습니다. 맥 워커 설정과 최초 분석 실행을 확인해 주세요.' });
+      results.push({ id, name: String(calendar.title || calendar.name || id), summary, stale, lastAnalysisAt, analysisAgeHours,
+        healthLabel: missing.length ? '일부 미확인' : workerFailed ? '작업 오류' : !lastAnalysisAt ? '분석 기록 없음' : stale ? '생존 신호 확인' : worker.status === 'idle' ? '대기' : '정상', operations });
     }
   }));
   return results.sort((a, b) => a.id.localeCompare(b.id));

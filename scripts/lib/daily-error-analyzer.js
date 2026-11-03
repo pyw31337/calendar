@@ -149,7 +149,7 @@ export function analyzeRecentErrors(logs = [], { now = Date.now(), windowMs = 24
 export function remediationForCluster(cluster = {}) {
   const action = String(cluster.action || '');
   if (cluster.pattern === FAILURE_PATTERNS.TRANSIENT_NETWORK) {
-    return { owner: 'client-write-queue', action: 'replay_when_online', description: 'IndexedDB/localStorage 대기 큐를 네트워크 복구 후 재생하고 결과를 감사 로그에 남김' };
+    return { owner: 'client-write-queue', action: 'replay_when_online', description: 'IndexedDB 대기 큐(미지원 환경은 현재 세션 메모리 큐)를 네트워크 복구 후 재생하고 결과를 감사 로그에 남김' };
   }
   if (/memo_/i.test(action) || /memo/i.test(cluster.message)) {
     return { owner: 'memo-persistence', action: 'preserve_draft_and_retry', description: '메모 초안 보존, 최신 스냅샷 병합, 저장 재시도. iOS PWA의 이전 스냅샷 덮어쓰기를 차단' };
