@@ -819,7 +819,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           // Keep the editor and draft visible while the media write is queued. iOS Safari/PWA
           // may suspend the page before the queue replays; clearing here made the user's text
           // look as if it had been reset even though the payload was safely queued.
-          showToast('오프라인입니다. 입력 내용은 임시 저장되며 연결되면 자동 저장합니다.', 'info', 5000);
+          showToast('오프라인입니다. 입력 내용은 임시 저장되며 연결되면 메모와 사진을 자동 저장합니다.', 'info', 5000);
           return;
         }
       }

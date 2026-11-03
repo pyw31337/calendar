@@ -2,8 +2,8 @@
  *
  * This module stores pending mutations only. It is intentionally never used as a source for
  * rendering collaborative calendar data; Firestore remains the sole read authority. IndexedDB
- * is used with automatic localStorage fallback so writes survive mobile suspensions, private
- * browsing restrictions, and network drops without data loss.
+ * is used because queued payloads may contain structured records and media blobs; keeping them
+ * out of string-only browser storage avoids partial writes and quota corruption.
  */
 import { replayQueuedRootCollectionWrite, replayQueuedMemoSave, replayQueuedMediaMessage } from './app-media-outbox.js';
 import {
@@ -23,39 +23,18 @@ const MAX_PENDING_OPERATIONS = 100;
 const MAX_OPERATION_PAYLOAD_BYTES = 8 * 1024 * 1024;
 const RETRY_BACKOFF_BASE_MS = 2000;
 const RETRY_BACKOFF_MAX_MS = 60000;
-const FALLBACK_STORAGE_KEY = 'gather_calendar_write_queue_fallback';
-
 let dbPromise = null;
 let flushPromise = null;
 let autoFlushHandler = null;
 let autoFlushTimer = null;
 const queueListeners = new Set();
+// A bounded in-memory fallback keeps a write alive for the current page session when a browser
+// blocks IndexedDB. Durable drafts still use their own storage path; media writes report failure
+// rather than pretending they survived a full app restart without a durable store.
+const memoryOperations = [];
 
 function canUseIndexedDb() {
   return typeof indexedDB !== 'undefined';
-}
-
-function getFallbackOperations() {
-  if (typeof window === 'undefined' || !window.localStorage) return [];
-  try {
-    const raw = window.localStorage.getItem(FALLBACK_STORAGE_KEY);
-    if (!raw) return [];
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function saveFallbackOperations(list) {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-  try {
-    if (!list || !list.length) {
-      window.localStorage.removeItem(FALLBACK_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(list));
-    }
-  } catch (_) {}
 }
 
 export function subscribeWriteQueue(listener) {
@@ -125,7 +104,7 @@ function openQueueDb() {
     request.onblocked = () => console.warn('[write-queue] database upgrade blocked');
   }).catch(error => {
     dbPromise = null;
-    console.warn('[write-queue] IndexedDB unavailable, using localStorage fallback:', error);
+    console.warn('[write-queue] IndexedDB unavailable:', error);
     return null;
   });
   return dbPromise;
@@ -139,33 +118,15 @@ function requestToPromise(request) {
 }
 
 async function getAllOperations() {
-  const fallbackList = getFallbackOperations();
   const db = await openQueueDb();
-  if (!db) return fallbackList;
+  if (!db) return memoryOperations.slice().sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0));
   try {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const rows = await requestToPromise(tx.objectStore(STORE_NAME).index('queuedAt').getAll());
-    const idbList = Array.isArray(rows) ? rows : [];
-    if (fallbackList.length > 0) {
-      const existingIds = new Set(idbList.map(item => item.id));
-      const unmerged = fallbackList.filter(item => !existingIds.has(item.id));
-      if (unmerged.length > 0) {
-        try {
-          const writeTx = db.transaction(STORE_NAME, 'readwrite');
-          const store = writeTx.objectStore(STORE_NAME);
-          unmerged.forEach(item => store.put(item));
-          await new Promise((res, rej) => { writeTx.oncomplete = res; writeTx.onerror = rej; });
-          saveFallbackOperations([]);
-          return [...idbList, ...unmerged].sort((a, b) => (a.queuedAt || 0) - (b.queuedAt || 0));
-        } catch (_) {}
-      } else {
-        saveFallbackOperations([]);
-      }
-    }
-    return idbList;
+    return Array.isArray(rows) ? rows : [];
   } catch (error) {
-    console.warn('[write-queue] read failed, using localStorage fallback:', error);
-    return fallbackList;
+    console.warn('[write-queue] read failed:', error);
+    return [];
   }
 }
 
@@ -190,22 +151,17 @@ export async function enqueueWriteOperation(operation) {
   }
   const db = await openQueueDb();
   if (!db) {
-    try {
-      const current = getFallbackOperations();
-      const supersededCalendarWrites = record.type === 'calendar-snapshot'
-        ? current.filter(item => item.type === 'calendar-snapshot' && item.calendarId === record.calendarId && item.id !== record.id)
-        : [];
-      const supersededIds = new Set(supersededCalendarWrites.map(s => s.id));
-      const filtered = current.filter(item => item.id !== record.id && !supersededIds.has(item.id));
-      filtered.push(record);
-      saveFallbackOperations(filtered.slice(-MAX_PENDING_OPERATIONS));
-      notifyQueueChange();
-      triggerImmediateFlush(200);
-      return true;
-    } catch (fallbackErr) {
-      console.warn('[write-queue] localStorage fallback enqueue failed:', fallbackErr);
-      return false;
+    const superseded = record.type === 'calendar-snapshot'
+      ? memoryOperations.filter(item => item.type === 'calendar-snapshot' && item.calendarId === record.calendarId && item.id !== record.id).map(item => item.id)
+      : [];
+    for (let i = memoryOperations.length - 1; i >= 0; i -= 1) {
+      if (memoryOperations[i].id === record.id || superseded.includes(memoryOperations[i].id)) memoryOperations.splice(i, 1);
     }
+    if (memoryOperations.length >= MAX_PENDING_OPERATIONS) return false;
+    memoryOperations.push(record);
+    notifyQueueChange();
+    triggerImmediateFlush(200);
+    return true;
   }
   try {
     const current = await getAllOperations();
@@ -233,24 +189,15 @@ export async function enqueueWriteOperation(operation) {
     triggerImmediateFlush(200);
     return true;
   } catch (error) {
-    console.warn('[write-queue] enqueue failed, falling back to localStorage:', error);
-    try {
-      const current = getFallbackOperations().filter(item => item.id !== record.id);
-      current.push(record);
-      saveFallbackOperations(current.slice(-MAX_PENDING_OPERATIONS));
-      notifyQueueChange();
-      triggerImmediateFlush(200);
-      return true;
-    } catch (_) {
-      return false;
-    }
+    console.warn('[write-queue] enqueue failed:', error);
+    return false;
   }
 }
 
 async function removeOperation(id) {
-  const fallback = getFallbackOperations();
-  if (fallback.some(item => item.id === id)) {
-    saveFallbackOperations(fallback.filter(item => item.id !== id));
+  const memoryIndex = memoryOperations.findIndex(item => item.id === id);
+  if (memoryIndex >= 0) {
+    memoryOperations.splice(memoryIndex, 1);
   }
   const db = await openQueueDb();
   if (!db) {
