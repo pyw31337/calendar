@@ -173,8 +173,7 @@ export async function executeAutomatedSelfHealing({
   calendarIds = [],
   clusters = [],
   dryRun = false,
-  repairTagDivergenceFn = null,
-  repairMediaIntegrityFn = null
+  repairTagDivergenceFn = null
 } = {}) {
   const actionsTaken = [];
   let healedCount = 0;
@@ -222,7 +221,7 @@ export async function executeAutomatedSelfHealing({
 /**
  * Formats Korean human-readable diagnostic report.
  */
-export function renderErrorDiagnosticReport({ date, analysis, healingResult, integrityCounts = {} }) {
+export function renderErrorDiagnosticReport({ date, analysis, healingResult }) {
   const lines = [
     `# 🩺 운영 일일 오류 분석 및 자동 복구 보고서 (${date})`,
     '',
