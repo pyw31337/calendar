@@ -41,6 +41,10 @@ function summaryValue(summary, key) {
   return Math.max(0, number(summary?.[key]));
 }
 
+function summaryDisplay(summary, key, known = true) {
+  return known === false ? '미집계' : String(summaryValue(summary, key));
+}
+
 const BRAND = '렛츠 캘린더';
 
 function activityText(activity) {
@@ -101,7 +105,7 @@ function renderCalendarRow(calendar) {
     </td>
     <td style="padding:16px 0;border-bottom:1px solid #e8e7f2;vertical-align:top;text-align:right;white-space:nowrap;">
       <span style="display:inline-block;padding:5px 9px;border-radius:999px;background:${color}14;color:${color};font-size:12px;font-weight:800;">${escapeHtml(calendar.healthLabel)}</span>
-      <div style="margin-top:8px;font-size:12px;color:#64748b;">운영 작업 ${calendar.operations.length} · 분석 후보 ${summaryValue(calendar.summary, 'candidateItems')} · 미검토 ${summaryValue(calendar.summary, 'unreviewedItems')}</div>
+      <div style="margin-top:8px;font-size:12px;color:#64748b;">운영 작업 ${calendar.operations.length} · 분석 후보 ${summaryDisplay(calendar.summary, 'candidateItems', calendar.candidateCountsKnown)} · 미검토 ${summaryDisplay(calendar.summary, 'unreviewedItems', calendar.candidateCountsKnown)}</div>
     </td>
   </tr>`;
 }
@@ -246,6 +250,7 @@ function buildBrief({ dateLabel, calendars = [], activity = null } = {}) {
         candidateItems: summaryValue(summary, 'candidateItems'),
         unreviewedItems: summaryValue(summary, 'unreviewedItems')
       },
+      candidateCountsKnown: calendar.candidateCountsKnown !== false,
       stale: Boolean(calendar.stale),
       healthLabel: calendar.stale ? '생존 신호 확인' : String(calendar.healthLabel || '정상'),
       operations: sourceOperations.map(item => ({

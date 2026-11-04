@@ -69,6 +69,12 @@ test('brief renders all reported tasks and links to the right calendar without a
   assert.doesNotMatch(brief.html, /tab=gallery|<점검>/);
 });
 
+test('legacy analysis summaries do not present an unknown candidate count as zero', () => {
+  const brief = buildBrief({ calendars: [{ id: 'cw', name: '모아엘가', candidateCountsKnown: false,
+    summary: { received: 42, suggested: 42 }, operations: [] }] });
+  assert.match(brief.html, /분석 후보 미집계 · 미검토 미집계/);
+});
+
 test('daily brief keeps the last real analysis summary after an idle heartbeat', async () => {
   const worker = { workerId: 'macos-vision-m2', status: 'idle', lastHeartbeatAt: 2000,
     latestRunId: 'macos_cw_20261104', latestSummary: { received: 0 } };
@@ -93,4 +99,5 @@ test('daily brief keeps the last real analysis summary after an idle heartbeat',
   assert.equal(result[0].summary.received, 42);
   assert.equal(result[0].summary.candidateItems, 7);
   assert.equal(result[0].lastAnalysisAt, 1000);
+  assert.equal(result[0].candidateCountsKnown, true);
 });

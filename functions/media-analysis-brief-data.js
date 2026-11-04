@@ -87,6 +87,8 @@ async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
         }
       }
       const analysisAgeHours = lastAnalysisAt ? Math.max(0, (now - lastAnalysisAt) / 3600000) : null;
+      const candidateCountsKnown = Object.prototype.hasOwnProperty.call(summary, 'candidateItems')
+        && Object.prototype.hasOwnProperty.call(summary, 'unreviewedItems');
       const operations = buildCalendarOperations({ calendar, dateKey, summary, stale }).filter(item =>
         !(missing.includes('일정') && /^(place|attendance|settlement):/.test(item.id))
         && !(missing.includes('장소') && item.id.startsWith('place:')));
@@ -94,7 +96,7 @@ async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
       const workerFailed = ['failed', 'error'].includes(worker.status);
       if (workerFailed) operations.unshift({ id: 'worker-failed', priority: 'high', title: '사진 분석 작업 오류', detail: '기기는 연결되어 있지만 최근 작업이 실패했습니다. 작업 로그를 확인해 주세요.' });
       if (!lastAnalysisAt) operations.unshift({ id: 'analysis-never-ran', priority: 'high', title: '사진 분석 실행 기록 없음', detail: '사진 분석 결과가 아직 한 번도 수집되지 않았습니다. 맥 워커 설정과 최초 분석 실행을 확인해 주세요.' });
-      results.push({ id, name: String(calendar.title || calendar.name || id), summary, stale, lastAnalysisAt, analysisAgeHours,
+      results.push({ id, name: String(calendar.title || calendar.name || id), summary, candidateCountsKnown, stale, lastAnalysisAt, analysisAgeHours,
         healthLabel: missing.length ? '일부 미확인' : workerFailed ? '작업 오류' : !lastAnalysisAt ? '분석 기록 없음' : stale ? '생존 신호 확인' : worker.status === 'idle' ? '대기' : '정상', operations });
     }
   }));
