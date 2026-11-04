@@ -36,9 +36,9 @@ const pages = [
 ];
 
 const sharePages = [
-  ['kkot', '🌸 꽃잎반 캘린더'],
-  ['cw', '🍺 모아엘가 캘린더'],
-  ['jhair', '💈 제이헤어 캘린더']
+  ['kkot', '꽃잎반 캘린더'],
+  ['cw', '모아엘가 캘린더'],
+  ['jhair', '제이헤어 캘린더']
 ];
 
 const CLASSIC_REQUIRED_SCRIPT_MARKERS = [
