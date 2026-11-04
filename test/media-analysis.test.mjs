@@ -108,7 +108,7 @@ test('home operations reads only bounded worker health fields after first paint'
   };
   try {
     const workers = await fetchMediaAnalysisWorkerStates({ calendarId: 'cw', projectId: 'metro-live-2918e', force: true });
-    assert.deepEqual(workers, [{ id: 'macos-vision-m2', workerId: 'macos-vision-m2', status: 'idle', lastError: '', lastHeartbeatAt: 1234, lastAnalysisAt: 0, latestSummary: null }]);
+    assert.deepEqual(workers, [{ id: 'macos-vision-m2', workerId: 'macos-vision-m2', status: 'idle', lastError: '', lastHeartbeatAt: 1234, lastAnalysisAt: 0, latestSummary: null, analysisStats: null }]);
   } finally {
     globalThis.fetch = originalFetch;
   }

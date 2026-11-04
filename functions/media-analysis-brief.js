@@ -45,6 +45,16 @@ function summaryDisplay(summary, key, known = true) {
   return known === false ? '미집계' : String(summaryValue(summary, key));
 }
 
+function statsDisplay(calendar) {
+  const stats = calendar?.analysisStats;
+  if (!stats || !Number.isFinite(Number(stats.attempts))) return '분석 누적 미집계';
+  const attempts = Math.max(0, Number(stats.attempts) || 0);
+  const unique = Math.max(0, Number(stats.uniqueAssets) || 0);
+  const reanalysis = Math.max(0, Number(stats.reanalysis) || 0);
+  const suffix = stats.ledgerTruncated === true ? ' · 일부 이력 제한' : '';
+  return `분석 누적 ${attempts} · 고유 자산 ${unique} · 재분석 ${reanalysis}${suffix}`;
+}
+
 const BRAND = '렛츠 캘린더';
 
 function activityText(activity) {
@@ -76,6 +86,7 @@ function makeText(brief) {
   ];
   for (const calendar of brief.calendars) {
     lines.push(`${calendar.name}: ${calendar.operations.length ? `확인 ${calendar.operations.length}건` : '확인할 작업 없음'}, 분석 오류 ${calendar.summary.failed}건, 상태 ${calendar.healthLabel}`);
+    lines.push(`- ${statsDisplay(calendar)}`);
     calendar.operations.forEach(item => lines.push(`- ${item.title}: ${item.detail}`));
     lines.push(`  확인: ${calendarUrl(calendar.id)}`);
   }
@@ -106,6 +117,7 @@ function renderCalendarRow(calendar) {
     <td style="padding:16px 0;border-bottom:1px solid #e8e7f2;vertical-align:top;text-align:right;white-space:nowrap;">
       <span style="display:inline-block;padding:5px 9px;border-radius:999px;background:${color}14;color:${color};font-size:12px;font-weight:800;">${escapeHtml(calendar.healthLabel)}</span>
       <div style="margin-top:8px;font-size:12px;color:#64748b;">운영 작업 ${calendar.operations.length} · 분석 후보 ${summaryDisplay(calendar.summary, 'candidateItems', calendar.candidateCountsKnown)} · 미검토 ${summaryDisplay(calendar.summary, 'unreviewedItems', calendar.candidateCountsKnown)}</div>
+      <div style="margin-top:4px;font-size:11px;color:#8a8aa0;">${escapeHtml(statsDisplay(calendar))}</div>
     </td>
   </tr>`;
 }
@@ -250,6 +262,15 @@ function buildBrief({ dateLabel, calendars = [], activity = null } = {}) {
         candidateItems: summaryValue(summary, 'candidateItems'),
         unreviewedItems: summaryValue(summary, 'unreviewedItems')
       },
+      analysisStats: calendar.analysisStats && typeof calendar.analysisStats === 'object'
+        ? {
+          attempts: summaryValue(calendar.analysisStats, 'attempts'),
+          uniqueAssets: summaryValue(calendar.analysisStats, 'uniqueAssets'),
+          reanalysis: summaryValue(calendar.analysisStats, 'reanalysis'),
+          changedAssets: summaryValue(calendar.analysisStats, 'changedAssets'),
+          failedAttempts: summaryValue(calendar.analysisStats, 'failedAttempts'),
+          ledgerTruncated: calendar.analysisStats.ledgerTruncated === true
+        } : null,
       candidateCountsKnown: calendar.candidateCountsKnown !== false,
       stale: Boolean(calendar.stale),
       healthLabel: calendar.stale ? '생존 신호 확인' : String(calendar.healthLabel || '정상'),

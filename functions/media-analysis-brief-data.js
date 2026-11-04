@@ -69,6 +69,7 @@ async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
       // Yesterday's analysis count is NOT today's activity. Preserve health separately.
       const runData = runSnap.exists ? runSnap.data() || {} : {};
       const workerSummary = worker.latestSummary && typeof worker.latestSummary === 'object' ? worker.latestSummary : {};
+      const analysisStats = worker.analysisStats && typeof worker.analysisStats === 'object' ? worker.analysisStats : null;
       // An idle heartbeat writes an empty daily run. Report the last real analysis summary
       // instead of resetting the briefing to zero every day when no photo changed.
       let summary = runData.status === 'idle' || !Number(runData.summary?.received)
@@ -96,7 +97,7 @@ async function collectMediaBriefCalendars(db, dateKey, now = Date.now()) {
       const workerFailed = ['failed', 'error'].includes(worker.status);
       if (workerFailed) operations.unshift({ id: 'worker-failed', priority: 'high', title: '사진 분석 작업 오류', detail: '기기는 연결되어 있지만 최근 작업이 실패했습니다. 작업 로그를 확인해 주세요.' });
       if (!lastAnalysisAt) operations.unshift({ id: 'analysis-never-ran', priority: 'high', title: '사진 분석 실행 기록 없음', detail: '사진 분석 결과가 아직 한 번도 수집되지 않았습니다. 맥 워커 설정과 최초 분석 실행을 확인해 주세요.' });
-      results.push({ id, name: String(calendar.title || calendar.name || id), summary, candidateCountsKnown, stale, lastAnalysisAt, analysisAgeHours,
+      results.push({ id, name: String(calendar.title || calendar.name || id), summary, analysisStats, candidateCountsKnown, stale, lastAnalysisAt, analysisAgeHours,
         healthLabel: missing.length ? '일부 미확인' : workerFailed ? '작업 오류' : !lastAnalysisAt ? '분석 기록 없음' : stale ? '생존 신호 확인' : worker.status === 'idle' ? '대기' : '정상', operations });
     }
   }));

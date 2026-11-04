@@ -333,7 +333,7 @@ async function inspectPhoto(photo, tempRoot, visionBinary) {
   }
 }
 
-async function upload(args, token, runId, items, window, { status = 'completed', error = '', similar = null } = {}) {
+async function upload(args, token, runId, items, window, { status = 'completed', error = '', similar = null, stats = null } = {}) {
   const endpoint = args.endpoint || `https://asia-northeast3-${args.project}.cloudfunctions.net/ingestMediaAnalysis`;
   const { response, payload } = await timedRequest(endpoint, {
     method: 'POST',
@@ -342,11 +342,12 @@ async function upload(args, token, runId, items, window, { status = 'completed',
       calendarId: args.calendar,
       runId,
       workerId: 'macos-vision-m2',
-      workerVersion: '6',
+      workerVersion: '7',
       window,
       status,
       error,
       items,
+      ...(stats ? { stats } : {}),
       ...(similar ? { similarGroups: similar } : {})
     })
   }, 'Analysis upload', async response => ({ response, payload: await response.json().catch(() => null) }));
@@ -364,6 +365,11 @@ async function main() {
   const stored = state.calendars?.[args.calendar] || {};
   const rebuilding = args.rebuild || Number(stored.analysisPolicyVersion || 0) !== ANALYSIS_POLICY_VERSION;
   const current = rebuilding ? {} : stored;
+  // Keep a bounded asset ledger so the operator can distinguish unique assets from repeated
+  // processing attempts. The old "uploaded" number was cumulative rows, not photo count.
+  const assetVersions = { ...(current.assetVersions && typeof current.assetVersions === 'object' ? current.assetVersions : {}) };
+  const cumulative = current.analysisStats && typeof current.analysisStats === 'object' ? current.analysisStats : {};
+  const legacyLookHashes = Object.keys(assetVersions).length ? null : (current.lookHashes && typeof current.lookHashes === 'object' ? current.lookHashes : null);
   const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService, args.tokenAccount)]);
   const now = Date.now();
   const runId = `macos_${args.calendar}_${kstDateStamp(new Date(now))}`;
@@ -373,9 +379,18 @@ async function main() {
     // Nothing new: one document read and no server call, except a heartbeat every 12 hours
     // (functions/index.js mediaWorkerIsStale allows 26 hours).
     const heartbeatDue = now - Number(current.lastIdleHeartbeatAt || 0) >= IDLE_HEARTBEAT_MS;
-    const result = heartbeatDue ? await upload(args, token, runId, [], 'scheduled', { status: 'idle' }) : {};
+    const idleStats = {
+      attempts: Math.max(0, Number(cumulative.attempts) || 0),
+      uniqueAssets: Math.max(0, Number(cumulative.uniqueAssets) || Object.keys(assetVersions).length),
+      reanalysis: Math.max(0, Number(cumulative.reanalysis) || 0),
+      changedAssets: Math.max(0, Number(cumulative.changedAssets) || 0),
+      failedAttempts: Math.max(0, Number(cumulative.failedAttempts) || 0),
+      ledgerSize: Object.keys(assetVersions).length,
+      ledgerTruncated: cumulative.ledgerTruncated === true
+    };
+    const result = heartbeatDue ? await upload(args, token, runId, [], 'scheduled', { status: 'idle', stats: idleStats }) : {};
     if (heartbeatDue) {
-      state.calendars = { ...(state.calendars || {}), [args.calendar]: { ...current, lastIdleHeartbeatAt: now } };
+      state.calendars = { ...(state.calendars || {}), [args.calendar]: { ...current, analysisStats: idleStats, lastIdleHeartbeatAt: now } };
       await mkdir(dirname(statePath), { recursive: true });
       await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
     }
@@ -422,6 +437,38 @@ async function main() {
     await rm(tempRoot, { recursive: true, force: true });
   }
   const previousFailures = current.failures && typeof current.failures === 'object' ? current.failures : {};
+  let uniqueAssets = 0;
+  let reanalysis = 0;
+  let changedAssets = 0;
+  rows.forEach(row => {
+    const key = String(row.data.assetKey || basename(row.name));
+    const version = String(Number(row.data.updatedAt) || 0);
+    const previous = assetVersions[key];
+    if (previous == null && legacyLookHashes?.[key]) reanalysis += 1;
+    else if (previous == null) uniqueAssets += 1;
+    else if (String(previous) === version) reanalysis += 1;
+    else { changedAssets += 1; uniqueAssets += 1; }
+    assetVersions[key] = version;
+  });
+  // A corrupt or malicious index must not make the local state unbounded. This is intentionally
+  // a diagnostic ledger only; the server remains the source of truth for live assets.
+  const ledgerKeys = Object.keys(assetVersions);
+  let ledgerTruncated = cumulative.ledgerTruncated === true;
+  if (ledgerKeys.length > 100000) {
+    ledgerKeys.slice(0, ledgerKeys.length - 100000).forEach(key => delete assetVersions[key]);
+    ledgerTruncated = true;
+  }
+  const analysisStats = {
+    attempts: Math.max(0, Number(cumulative.attempts) || 0) + rows.length,
+    uniqueAssets: Math.max(0, Number(cumulative.uniqueAssets) || 0) + uniqueAssets,
+    reanalysis: Math.max(0, Number(cumulative.reanalysis) || 0) + reanalysis,
+    changedAssets: Math.max(0, Number(cumulative.changedAssets) || 0) + changedAssets,
+    failedAttempts: Math.max(0, Number(cumulative.failedAttempts) || 0) + failures.length,
+    ledgerSize: Object.keys(assetVersions).length,
+    ledgerTruncated,
+    lastBatchAt: now,
+    lastBatchSize: rows.length
+  };
   const nextFailures = { ...previousFailures };
   for (const item of items.filter(item => item.status !== 'failed')) delete nextFailures[item.assetKey];
   for (const failure of failures) {
@@ -446,7 +493,8 @@ async function main() {
     // healthy scheduler while the bounded retry counter handles recovery.
     status: rows.length ? 'completed' : 'idle',
     error: failures[0]?.error || '',
-    similar: lookHashesChanged ? similarGroups(lookHashes) : null
+    similar: lookHashesChanged ? similarGroups(lookHashes) : null,
+    stats: analysisStats
   });
   const last = rows.at(-1);
   const pageMayHaveMore = rows.length === args.max;
@@ -463,6 +511,8 @@ async function main() {
         : (last ? { updatedAt: Number(last.data.updatedAt) || 0, name: last.name } : current.cursor || null),
       failures: nextFailures,
       lookHashes,
+      assetVersions,
+      analysisStats,
       analysisPolicyVersion: ANALYSIS_POLICY_VERSION,
       lastRunAt: now,
       lastIdleHeartbeatAt: now
@@ -476,6 +526,7 @@ async function main() {
     generatedAt: now,
     fetched: rows.length,
     uploaded: result.accepted || 0,
+    stats: analysisStats,
     failures,
     retrying: mustRetrySamePage,
     rebuilding,

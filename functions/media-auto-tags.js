@@ -1,14 +1,17 @@
 'use strict';
 
-// Trusted, additive automation. Model suggestions never become write instructions.
+// Trusted, additive automation. Face writes require an explicit safe-mode opt-in and threshold.
 const { getPhotoAssetKey } = require('./media-commands');
+const mediaCommands = require('./media-commands');
 const { stableAnalysisId } = require('./media-analysis');
 const { readImageGeo, isIndexGeoPair } = require('./photo-index-geo');
 const MAX_OWNERS = 12;
 const MAX_ATTEMPTS = 3;
+const FACE_AUTO_MIN_SCORE = 0.86;
 const completed = (automatic, signature) => automatic?.signature === signature && ['applied', 'unchanged', 'review-required'].includes(automatic.status);
 const active = data => data && !data.deletedAt && !data.removedAt && !data.isDeleted;
 const tagsOf = value => [...new Set(String(value || '').split(/[\s,#]+/).filter(Boolean))];
+const faceName = value => String(value || '').replace(/^#+/, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 const timestamp = value => value?.toMillis ? value.toMillis() : Number(value) || 0;
 
 function automationPolicy(calendar, photo) {
@@ -170,4 +173,48 @@ async function completeAnalysisLocationTags({ db, calendarDocId, assetKey, looku
   });
 }
 
-module.exports = { completeAnalysisLocationTags, geoSignature, appendTags };
+async function completeAnalysisFaceTags({ db, calendarDocId, accepted = [], photoSnaps = [], analysisSnaps = [], now = Date.now() }) {
+  const root = db.collection('calendars').doc(calendarDocId);
+  const calendarSnap = await root.get();
+  const settings = calendarSnap.data()?.calendar?.aiSettings || {};
+  // Safe mode is the default for new face results; an explicit review/false setting is the
+  // kill switch. A 24-hour fallback rollout window prevents historical backfills from mutating.
+  if (settings.autoFaceTags === false || String(settings.autoClassificationMode || 'safe') !== 'safe') return { status: 'requires-review-mode', applied: 0 };
+  const since = timestamp(settings.autoFaceTagsSince) || now - 24 * 60 * 60 * 1000;
+  const photos = new Map(photoSnaps.filter(snap => snap?.exists).map(snap => [snap.id, snap.data() || {}]));
+  const prior = new Map(analysisSnaps.filter(snap => snap?.exists).map(snap => [snap.id, snap.data() || {}]));
+  const items = [];
+  const audit = [];
+  accepted.forEach(item => {
+    const photo = photos.get(item.assetKey);
+    const previous = prior.get(item.id);
+    const best = (Array.isArray(item.facePeople) ? item.facePeople : []).slice().sort((a, b) => Number(b.score) - Number(a.score))[0];
+    const uploadedAt = timestamp(photo?.uploadedAt || photo?.timestamp || photo?.createdAt);
+    const name = faceName(best?.name);
+    if (previous?.review) { audit.push({ id: item.id, status: 'preserved', reason: 'human-review' }); return; }
+    if (previous?.automaticFace?.status === 'applied' && previous.automaticFace.name === name) { audit.push({ id: item.id, status: 'preserved', reason: 'automatic-write-complete', name }); return; }
+    if (!photo || !name || Number(best?.score) < FACE_AUTO_MIN_SCORE) { audit.push({ id: item.id, status: 'review-required', reason: 'low-confidence' }); return; }
+    if (uploadedAt && uploadedAt < since) { audit.push({ id: item.id, status: 'preserved', reason: 'historical-photo' }); return; }
+    const current = tagsOf(photo.tags);
+    if (current.some(tag => tag === name || (name.length === 3 && tag === name.slice(1)))) { audit.push({ id: item.id, status: 'unchanged', reason: 'person-tag-exists' }); return; }
+    const tags = appendTags(photo.tags, [name]);
+    if (!tags) { audit.push({ id: item.id, status: 'review-required', reason: 'tag-limit' }); return; }
+    items.push({ imageUrl: photo.full || photo.imageUrl, thumbUrl: photo.thumb || photo.thumbUrl, tags });
+    audit.push({ id: item.id, status: 'pending', reason: 'high-confidence-face', name, score: Number(best.score) });
+  });
+  if (items.length) {
+    const result = await mediaCommands.bulkTagAssets({ db, calendarDocId, items, now });
+    const applied = result.ok ? items.length : 0;
+    if (audit.length) await Promise.all(audit.map(entry => {
+      const finalStatus = entry.status === 'pending' ? (result.ok ? 'applied' : 'failed') : entry.status;
+      return root.collection('mediaAnalysis').doc(entry.id).set({ automaticFace: { status: finalStatus, reason: entry.reason, name: entry.name || '', score: entry.score || 0, updatedAt: now, policyVersion: 1 } }, { merge: true });
+    }));
+    return { status: result.ok ? 'applied' : 'failed', applied, audit };
+  }
+  if (audit.length) {
+    await Promise.all(audit.map(entry => root.collection('mediaAnalysis').doc(entry.id).set({ automaticFace: { status: entry.status, reason: entry.reason, name: entry.name || '', score: entry.score || 0, updatedAt: now, policyVersion: 1 } }, { merge: true })));
+  }
+  return { status: 'no-op', applied: 0, audit };
+}
+
+module.exports = { completeAnalysisLocationTags, completeAnalysisFaceTags, geoSignature, appendTags };

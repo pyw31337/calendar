@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { setTimeout: delay } = require('node:timers/promises');
-const { completeAnalysisLocationTags, appendTags } = require('../media-auto-tags');
+const { completeAnalysisLocationTags, completeAnalysisFaceTags, appendTags } = require('../media-auto-tags');
 const { getPhotoAssetKey } = require('../media-commands');
 const { stableAnalysisId } = require('../media-analysis');
 
@@ -36,6 +36,17 @@ module.exports = function registerAutoTagContract(createDb) {
     assert.deepEqual((await fixture.source.get()).data().imageTags, ['가족 #경기도 #광명시']);
     assert.equal((await fixture.album.get()).data().photos[0].tags, '여행 #경기도 #광명시');
     assert.equal((await fixture.analysis.get()).data().automatic.status, 'applied');
+  });
+
+  test('safe face mode auto-applies only high-confidence names and leaves the audit trail', async () => {
+    const fixture = await seed();
+    await fixture.root.update({ calendar: { aiSettings: { autoClassificationMode: 'safe', autoFaceTags: true, autoFaceTagsSince: 10 } } });
+    const accepted = [{ id: stableAnalysisId(fixture.assetKey), assetKey: fixture.assetKey, facePeople: [{ name: '송은혜', score: 0.91 }] }];
+    const result = await completeAnalysisFaceTags({ db: fixture.db, calendarDocId: fixture.root.id, accepted, photoSnaps: [await fixture.photo.get()], now: 100 });
+    assert.equal(result.status, 'applied');
+    assert.equal(result.applied, 1);
+    assert.match((await fixture.source.get()).data().imageTags[0], /송은혜/);
+    assert.equal((await fixture.analysis.get()).data().automaticFace.status, 'applied');
   });
 
   test('duplicate delivery and later user deletion never restore an automatically added tag', async () => {
