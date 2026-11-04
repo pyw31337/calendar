@@ -370,6 +370,7 @@ async function main() {
   const assetVersions = { ...(current.assetVersions && typeof current.assetVersions === 'object' ? current.assetVersions : {}) };
   const cumulative = current.analysisStats && typeof current.analysisStats === 'object' ? current.analysisStats : {};
   const legacyLookHashes = Object.keys(assetVersions).length ? null : (current.lookHashes && typeof current.lookHashes === 'object' ? current.lookHashes : null);
+  const baselineLedgerSize = Math.max(Object.keys(assetVersions).length, Number(cumulative.ledgerSize) || 0, legacyLookHashes ? Object.keys(legacyLookHashes).length : 0);
   const [revision, token] = await Promise.all([fetchRevision(args), readWorkerToken(args.tokenService, args.tokenAccount)]);
   const now = Date.now();
   const runId = `macos_${args.calendar}_${kstDateStamp(new Date(now))}`;
@@ -385,7 +386,7 @@ async function main() {
       reanalysis: Math.max(0, Number(cumulative.reanalysis) || 0),
       changedAssets: Math.max(0, Number(cumulative.changedAssets) || 0),
       failedAttempts: Math.max(0, Number(cumulative.failedAttempts) || 0),
-      ledgerSize: Object.keys(assetVersions).length,
+      ledgerSize: baselineLedgerSize,
       ledgerTruncated: cumulative.ledgerTruncated === true
     };
     const result = heartbeatDue ? await upload(args, token, runId, [], 'scheduled', { status: 'idle', stats: idleStats }) : {};
@@ -464,7 +465,7 @@ async function main() {
     reanalysis: Math.max(0, Number(cumulative.reanalysis) || 0) + reanalysis,
     changedAssets: Math.max(0, Number(cumulative.changedAssets) || 0) + changedAssets,
     failedAttempts: Math.max(0, Number(cumulative.failedAttempts) || 0) + failures.length,
-    ledgerSize: Object.keys(assetVersions).length,
+    ledgerSize: Math.max(Object.keys(assetVersions).length, baselineLedgerSize),
     ledgerTruncated,
     lastBatchAt: now,
     lastBatchSize: rows.length
