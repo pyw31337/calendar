@@ -1955,7 +1955,17 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     }, "메모 열기"),
     /*#__PURE__*/React.createElement("div", {
-      className: "memo-card-header-row" + (isPageLayout ? " is-page-layout" : "")
+      className: "memo-card-header-row" + (isPageLayout ? " is-page-layout" : ""),
+      style: {
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '6px',
+        width: '100%',
+        minWidth: 0
+      }
     },
     /* Keep all three actions in one flex row.  The previous implementation positioned each
        control independently (and then applied a second set of V2 offsets in CSS), so the
@@ -1966,7 +1976,19 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "memo-card-action-group" + (hidePinButton ? " is-no-pin" : ""),
       "data-stop-card-open": true,
       role: "group",
-      "aria-label": "메모 동작"
+      "aria-label": "메모 동작",
+      style: {
+        position: 'relative',
+        inset: 'auto',
+        display: 'inline-flex',
+        flex: '0 0 auto',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        alignItems: 'center',
+        gap: 0,
+        order: 2,
+        height: '28px'
+      }
     },
       /* 좋아요 -- first in the visual row, matching the established 좋아요 · 공유 · 고정 order. */
       memo.id && /*#__PURE__*/React.createElement(LikeButton, {
@@ -2041,6 +2063,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         paddingRight: 0,
         flex: '1 1 auto',
         minWidth: 0,
+        order: 1,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
         wordBreak: 'break-all'
       }
     }, highlightKeyword(memo.title, searchQuery)),
