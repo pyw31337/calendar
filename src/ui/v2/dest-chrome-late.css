@@ -7824,13 +7824,30 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn:not(.is-l
 /* The memo actions are a single flex row.  Override the legacy per-button offsets here so
    V2's wider card inset cannot move one glyph above or below its neighbours. */
 html:has(.renewal-shell.v2-design) .memo-card-action-group {
-  position: absolute !important;
-  top: 8px !important;
-  right: 8px !important;
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 2px !important;
+  gap: 0 !important;
   height: 28px !important;
+}
+html:has(.renewal-shell.v2-design) .memo-card-header-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-bottom: 8px !important;
+}
+html:has(.renewal-shell.v2-design) .memo-card-header-row.is-page-layout { margin-bottom: 3px !important; }
+html:has(.renewal-shell.v2-design) .memo-card-header-row .v2-memo-card-title {
+  order: 1 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  padding-right: 0 !important;
+  margin-bottom: 0 !important;
 }
 html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-share-btn,
 html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-like-btn,
@@ -7840,10 +7857,10 @@ html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-pin-btn 
   top: auto !important;
   right: auto !important;
   transform: none !important;
-  flex: 0 0 28px !important;
-  width: 28px !important;
+  flex: 0 0 22px !important;
+  width: 22px !important;
   height: 28px !important;
-  min-width: 28px !important;
+  min-width: 22px !important;
   min-height: 28px !important;
   margin: 0 !important;
   box-sizing: border-box !important;

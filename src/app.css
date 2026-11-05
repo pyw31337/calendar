@@ -814,16 +814,35 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
    across card variants and narrow mobile widths. The buttons keep their own hit targets;
    only their visual placement is coordinated here. */
 .memo-card-action-group {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  position: relative;
+  top: auto;
+  right: auto;
   z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 0;
   height: 28px;
   line-height: 0;
+  order: 2;
+  flex: 0 0 auto;
+}
+.memo-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+.memo-card-header-row.is-page-layout { margin-bottom: 3px; }
+.memo-card-header-row .v2-memo-card-title {
+  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 0 !important;
+  margin-bottom: 0 !important;
 }
 .memo-card-action-group > .memo-card-share-btn,
 .memo-card-action-group > .memo-card-like-btn,
@@ -834,10 +853,10 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
   right: auto !important;
   transform: none !important;
   box-sizing: border-box;
-  flex: 0 0 28px;
-  width: 28px;
+  flex: 0 0 22px;
+  width: 22px;
   height: 28px;
-  min-width: 28px;
+  min-width: 22px;
   min-height: 28px;
   margin: 0;
 }

@@ -1954,10 +1954,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0
       }
     }, "메모 열기"),
+    /*#__PURE__*/React.createElement("div", {
+      className: "memo-card-header-row" + (isPageLayout ? " is-page-layout" : "")
+    },
     /* Keep all three actions in one flex row.  The previous implementation positioned each
        control independently (and then applied a second set of V2 offsets in CSS), so the
        heart, share and pin glyphs could sit on different baselines or drift into the title
-       when a card was narrow.  A single anchored row gives every icon the same 28px slot,
+       when a card was narrow.  A single anchored row gives every icon the same compact 22px slot,
        while the buttons' pseudo-elements retain the mobile-friendly hit area. */
     /*#__PURE__*/React.createElement("div", {
       className: "memo-card-action-group" + (hidePinButton ? " is-no-pin" : ""),
@@ -1970,7 +1973,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         calendarId: calendar?.id,
         size: 16,
         className: 'memo-card-like-btn',
-        style: { position: 'relative', inset: 'auto', width: '28px', height: '28px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 28px' },
+        style: { position: 'relative', inset: 'auto', width: '22px', height: '28px', padding: '6px 3px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 22px' },
         item: { kind: 'memo', ref: String(memo.id), title: memo.title || String(memo.text || memo.content || '').split('\n')[0].slice(0, 80) || '메모', subtitle: String(memo.text || memo.content || '').replace(/\s+/g, ' ').slice(0, 120), thumb: (Array.isArray(memo.thumbUrls) && memo.thumbUrls[0]) || (Array.isArray(memo.imageUrls) && memo.imageUrls[0]) || memo.imageUrl || '', target: { memoId: String(memo.id) } }
       }),
       /*#__PURE__*/React.createElement("button", {
@@ -1982,7 +1985,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onPointerDown: (e) => e.stopPropagation(),
         onTouchStart: (e) => e.stopPropagation(),
         title: "메모 공유",
-        style: { position: 'relative', inset: 'auto', width: '28px', height: '28px', padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 28px' },
+        style: { position: 'relative', inset: 'auto', width: '22px', height: '28px', padding: '6px 3px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 22px' },
         className: "memo-card-share-btn"
       }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
       /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) --
@@ -2000,8 +2003,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         "aria-label": effectivePinned ? (effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : "메모 고정 해제") : "메모 고정",
         style: {
           position: 'relative', inset: 'auto',
-          width: '28px', height: '28px',
-          padding: '6px',
+          width: '22px', height: '28px',
+          padding: '6px 3px',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           background: 'none', border: 'none', cursor: 'pointer',
           // Unpinned = the same gray as the share icon next to it (it used to pick up the brand
@@ -2010,7 +2013,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           opacity: effectivePinned ? 1 : 0.4,
           zIndex: 2,
           touchAction: 'manipulation',
-          flex: '0 0 28px'
+          flex: '0 0 22px'
         },
         className: "memo-card-pin-btn" + (effectivePinned ? " is-pinned" : "")
       }, effectivePinned ?
@@ -2033,12 +2036,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         fontSize: '1rem',
         fontWeight: isPageLayout ? 800 : 'bold',
         color: 'var(--text-main)',
-        marginBottom: isPageLayout ? '3px' : '8px',
+        marginBottom: 0,
         lineHeight: isPageLayout ? '1.25' : undefined,
-        paddingRight: hidePinButton ? '72px' : '96px',
+        paddingRight: 0,
+        flex: '1 1 auto',
+        minWidth: 0,
         wordBreak: 'break-all'
       }
     }, highlightKeyword(memo.title, searchQuery)),
+    ),
     variant !== 'preview' && !isPageLayout && memoMeta && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-meta",
     }, memoMeta),
