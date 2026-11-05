@@ -1954,68 +1954,76 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0
       }
     }, "메모 열기"),
-    /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
-       absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color
-       as the pin's neutral ("off") state -- including its 0.2 opacity, which is what actually
-       reads as "weight" at a glance (the stroke-width/color values were already identical; the
-       visual mismatch was the pin's off-state being much fainter than a full-opacity share
-       icon). Main-screen preview cards hide the pin (hidePinButton) so the share button takes
-       its slot instead. */
-    /*#__PURE__*/React.createElement("button", {
-      onClick: (e) => {
-        e.stopPropagation();
-        if (onShare) onShare(memo);
-      },
-      title: "메모 공유",
-      style: hidePinButton
-        ? { position: 'absolute', top: '12px', right: '18px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'flex', alignItems: 'center' }
-        : { position: 'absolute', top: '10px', right: '34px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'flex', alignItems: 'center' },
-      className: "memo-card-share-btn"
-    }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
-    /* 좋아요 -- immediately left of the share button (same 16px size, same top line). */
-    memo.id && /*#__PURE__*/React.createElement(LikeButton, {
-      calendarId: calendar?.id,
-      size: 16,
-      className: 'memo-card-like-btn' + (hidePinButton ? ' is-no-pin' : ''),
-      item: { kind: 'memo', ref: String(memo.id), title: memo.title || String(memo.text || memo.content || '').split('\n')[0].slice(0, 80) || '메모', subtitle: String(memo.text || memo.content || '').replace(/\s+/g, ' ').slice(0, 120), thumb: (Array.isArray(memo.thumbUrls) && memo.thumbUrls[0]) || (Array.isArray(memo.imageUrls) && memo.imageUrls[0]) || memo.imageUrl || '', target: { memoId: String(memo.id) } }
-    }),
-    /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) --
-       hidden entirely on the main-screen preview (hidePinButton), which has no "고정" concept. */
-    !hidePinButton && /*#__PURE__*/React.createElement("button", {
-      type: "button",
+    /* Keep all three actions in one flex row.  The previous implementation positioned each
+       control independently (and then applied a second set of V2 offsets in CSS), so the
+       heart, share and pin glyphs could sit on different baselines or drift into the title
+       when a card was narrow.  A single anchored row gives every icon the same 28px slot,
+       while the buttons' pseudo-elements retain the mobile-friendly hit area. */
+    /*#__PURE__*/React.createElement("div", {
+      className: "memo-card-action-group" + (hidePinButton ? " is-no-pin" : ""),
       "data-stop-card-open": true,
-      onClick: (e) => {
-        e.stopPropagation();
-        if (typeof onTogglePin === 'function') onTogglePin();
-      },
-      onPointerDown: (e) => e.stopPropagation(),
-      onTouchStart: (e) => e.stopPropagation(),
-      title: effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : undefined,
-      "aria-label": effectivePinned ? (effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : "메모 고정 해제") : "메모 고정",
-      style: {
-        position: 'absolute', top: '4px', right: '4px',
-        width: '32px', height: '32px',
-        padding: '8px',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'none', border: 'none', cursor: 'pointer',
-        // Unpinned = the same gray as the share icon next to it (it used to pick up the brand
-        // purple from the V2 card CSS even when off).
-        color: effectivePinned ? '#F59E0B' : 'var(--text-muted)',
-        opacity: effectivePinned ? 1 : 0.4,
-        zIndex: 2,
-        touchAction: 'manipulation',
-      },
-      className: "memo-card-pin-btn" + (effectivePinned ? " is-pinned" : "")
-    }, effectivePinned ?
+      role: "group",
+      "aria-label": "메모 동작"
+    },
+      /* 좋아요 -- first in the visual row, matching the established 좋아요 · 공유 · 고정 order. */
+      memo.id && /*#__PURE__*/React.createElement(LikeButton, {
+        calendarId: calendar?.id,
+        size: 16,
+        className: 'memo-card-like-btn',
+        style: { position: 'relative', inset: 'auto', width: '28px', height: '28px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 28px' },
+        item: { kind: 'memo', ref: String(memo.id), title: memo.title || String(memo.text || memo.content || '').split('\n')[0].slice(0, 80) || '메모', subtitle: String(memo.text || memo.content || '').replace(/\s+/g, ' ').slice(0, 120), thumb: (Array.isArray(memo.thumbUrls) && memo.thumbUrls[0]) || (Array.isArray(memo.imageUrls) && memo.imageUrls[0]) || memo.imageUrl || '', target: { memoId: String(memo.id) } }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: (e) => {
+          e.stopPropagation();
+          if (onShare) onShare(memo);
+        },
+        onPointerDown: (e) => e.stopPropagation(),
+        onTouchStart: (e) => e.stopPropagation(),
+        title: "메모 공유",
+        style: { position: 'relative', inset: 'auto', width: '28px', height: '28px', padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 28px' },
+        className: "memo-card-share-btn"
+      }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
+      /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) --
+         hidden entirely on the main-screen preview (hidePinButton), which has no "고정" concept. */
+      !hidePinButton && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        "data-stop-card-open": true,
+        onClick: (e) => {
+          e.stopPropagation();
+          if (typeof onTogglePin === 'function') onTogglePin();
+        },
+        onPointerDown: (e) => e.stopPropagation(),
+        onTouchStart: (e) => e.stopPropagation(),
+        title: effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : undefined,
+        "aria-label": effectivePinned ? (effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : "메모 고정 해제") : "메모 고정",
+        style: {
+          position: 'relative', inset: 'auto',
+          width: '28px', height: '28px',
+          padding: '6px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: 'none', border: 'none', cursor: 'pointer',
+          // Unpinned = the same gray as the share icon next to it (it used to pick up the brand
+          // purple from the V2 card CSS even when off).
+          color: effectivePinned ? '#F59E0B' : 'var(--text-muted)',
+          opacity: effectivePinned ? 1 : 0.4,
+          zIndex: 2,
+          touchAction: 'manipulation',
+          flex: '0 0 28px'
+        },
+        className: "memo-card-pin-btn" + (effectivePinned ? " is-pinned" : "")
+      }, effectivePinned ?
       /* ON state filled pin SVG */
       /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", className: "icon icon-tabler icon-tabler-filled icon-tabler-pin"
       }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15.113 3.21l.094 .083l5.5 5.5a1 1 0 0 1 -1.175 1.59l-3.172 3.171l-1.424 3.797a1 1 0 0 1 -.158 .277l-.07 .08l-1.5 1.5a1 1 0 0 1 -1.32 .082l-.095 -.083l-2.793 -2.792l-3.793 3.792a1 1 0 0 1 -1.497 -1.32l.083 -.094l3.792 -3.793l-2.792 -2.793a1 1 0 0 1 -.083 -1.32l.083 -.094l1.5 -1.5a1 1 0 0 1 .258 -.187l.098 -.042l3.796 -1.425l3.171 -3.17a1 1 0 0 1 1.497 -1.26z" }))
-    :
+      :
       /* OFF state outline pin SVG */
       /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icons-tabler-outline icon-tabler-pin"
       }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" }), /*#__PURE__*/React.createElement("path", { d: "M9 15l-4.5 4.5" }), /*#__PURE__*/React.createElement("path", { d: "M14.5 4l5.5 5.5" }))
+      )
     ),
 
     /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
@@ -2027,7 +2035,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         color: 'var(--text-main)',
         marginBottom: isPageLayout ? '3px' : '8px',
         lineHeight: isPageLayout ? '1.25' : undefined,
-        paddingRight: hidePinButton ? '56px' : '70px',
+        paddingRight: hidePinButton ? '72px' : '96px',
         wordBreak: 'break-all'
       }
     }, highlightKeyword(memo.title, searchQuery)),

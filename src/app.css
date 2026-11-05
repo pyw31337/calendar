@@ -809,6 +809,44 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
     color var(--motion-base) ease,
     opacity var(--motion-base) ease;
 }
+
+/* Memo-card actions share one anchored row so 좋아요·공유·고정 stay on the same baseline
+   across card variants and narrow mobile widths. The buttons keep their own hit targets;
+   only their visual placement is coordinated here. */
+.memo-card-action-group {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 28px;
+  line-height: 0;
+}
+.memo-card-action-group > .memo-card-share-btn,
+.memo-card-action-group > .memo-card-like-btn,
+.memo-card-action-group > .memo-card-pin-btn {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  transform: none !important;
+  box-sizing: border-box;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  margin: 0;
+}
+.memo-card-action-group .memo-card-share-btn svg,
+.memo-card-action-group .memo-card-like-btn svg,
+.memo-card-action-group .memo-card-pin-btn svg {
+  display: block;
+  flex: 0 0 auto;
+}
 .btn,
 .day-cell,
 .date-item-btn,

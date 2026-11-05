@@ -6976,7 +6976,7 @@ html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-like-btn {
   right: 64px !important;
 }
 html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .v2-memo-card-title {
-  padding-right: 86px !important;
+  padding-right: 96px !important;
   margin-bottom: 18px !important;
 }
 html:has(.renewal-shell.v2-design) .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
@@ -7820,6 +7820,39 @@ html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn {
 }
 html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn.is-no-pin { right: 40px; }
 html:has(.renewal-shell.v2-design) .gather-like-btn.memo-card-like-btn:not(.is-liked) { opacity: 0.35; }
+
+/* The memo actions are a single flex row.  Override the legacy per-button offsets here so
+   V2's wider card inset cannot move one glyph above or below its neighbours. */
+html:has(.renewal-shell.v2-design) .memo-card-action-group {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  height: 28px !important;
+}
+html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-share-btn,
+html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-like-btn,
+html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-pin-btn {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  transform: none !important;
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .memo-card-action-group .memo-card-share-btn svg,
+html:has(.renewal-shell.v2-design) .memo-card-action-group .memo-card-like-btn svg,
+html:has(.renewal-shell.v2-design) .memo-card-action-group .memo-card-pin-btn svg {
+  display: block !important;
+}
 /* Gallery 링크/파일 cards: room for the top-right heart so it never covers the title. */
 html:has(.renewal-shell.v2-design) .gallery-link-grid .gallery-like-card > :first-child,
 html:has(.renewal-shell.v2-design) .gallery-file-grid .gallery-like-card > :first-child { padding-right: 34px !important; box-sizing: border-box; }
