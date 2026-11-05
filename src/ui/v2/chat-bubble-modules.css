@@ -379,8 +379,8 @@
 .v2-design .chat-memo-share-card .v2-memo-card-title {
   font-size: 1rem !important;
   line-height: 1.25 !important;
-  margin-bottom: 3px !important;
-  padding-right: 30px !important;
+  margin-bottom: 0 !important;
+  padding-right: 0 !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-meta,
 .v2-design .v2-home-memo-module .v2-memo-card-wrap .v2-memo-card-meta,

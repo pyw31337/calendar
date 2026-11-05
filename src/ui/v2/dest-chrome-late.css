@@ -6956,28 +6956,11 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-he
 html:has(.renewal-shell.v2-design) {
   --v2-list-card-pad: 24px;
 }
-html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid > .v2-memo-card-wrap .v2-memo-card-contract,
 html:has(.renewal-shell.v2-design) .v2-places .places-list-body > .place-card-row,
 html:has(.renewal-shell.v2-design) .v2-settlement .settlement-ledger-row,
 html:has(.renewal-shell.v2-design) .v2-archive .history-meetings-grid > .date-item-btn {
   padding: var(--v2-list-card-pad) !important;
   box-sizing: border-box !important;
-}
-html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-pin-btn {
-  top: 18px !important;
-  right: 18px !important;
-}
-html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-share-btn {
-  top: 18px !important;
-  right: 42px !important;
-}
-html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .memo-card-like-btn {
-  top: 16px !important;
-  right: 64px !important;
-}
-html:has(.renewal-shell.v2-design) .v2-memo .bp-memo-grid .v2-memo-card-title {
-  padding-right: 96px !important;
-  margin-bottom: 18px !important;
 }
 html:has(.renewal-shell.v2-design) .bp-renewal-home-place-copy > small.bp-renewal-home-place-note.bp-place-note {
   font-size: max(12px, 0.8rem) !important;
@@ -7829,14 +7812,14 @@ html:has(.renewal-shell.v2-design) .memo-card-action-group {
   right: auto !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0 !important;
+  gap: 8px !important;
   height: 28px !important;
 }
 html:has(.renewal-shell.v2-design) .memo-card-header-row {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 6px !important;
+  gap: 8px !important;
   width: 100% !important;
   min-width: 0 !important;
   margin-bottom: 8px !important;
@@ -7857,10 +7840,10 @@ html:has(.renewal-shell.v2-design) .memo-card-action-group > .memo-card-pin-btn 
   top: auto !important;
   right: auto !important;
   transform: none !important;
-  flex: 0 0 22px !important;
-  width: 22px !important;
+  flex: 0 0 24px !important;
+  width: 24px !important;
   height: 28px !important;
-  min-width: 22px !important;
+  min-width: 24px !important;
   min-height: 28px !important;
   margin: 0 !important;
   box-sizing: border-box !important;
