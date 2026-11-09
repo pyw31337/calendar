@@ -112,6 +112,39 @@ test('resolveHomeGalleryStripState shows loading until photoIndex is ready', () 
   assert.equal(empty.state, 'empty');
 });
 
+test('selectGalleryPreviewPhotos sorts strictly by timestamp and never promotes older photos with newer updatedAt', () => {
+  const oldBabyWithRecentUpdate = {
+    id: 'old-baby',
+    thumb: ok('baby'),
+    full: ok('baby-full'),
+    timestamp: 1000,
+    updatedAt: 999999999, // recently updated tag or comment
+  };
+  const newKayakPhoto = {
+    id: 'new-kayak',
+    thumb: ok('kayak'),
+    full: ok('kayak-full'),
+    timestamp: 5000,
+    updatedAt: 5000,
+  };
+  const anniversaryPoster = {
+    id: 'movie-poster',
+    thumb: ok('poster'),
+    full: ok('poster-full'),
+    source: 'anniversary',
+    timestamp: 9000,
+  };
+
+  const picked = selectGalleryPreviewPhotos([oldBabyWithRecentUpdate, newKayakPhoto, anniversaryPoster], {
+    limit: 5,
+  });
+
+  // Anniversary posters must be excluded from gallery preview
+  assert.equal(picked.some(p => p.id === 'movie-poster'), false);
+  // Newer timestamp (kayak) must come before older timestamp (baby), ignoring updatedAt!
+  assert.deepEqual(picked.map(p => p.id), ['newKayak', 'old-baby'].map(id => id === 'newKayak' ? 'new-kayak' : id));
+});
+
 test('home gallery shows 12 per page: phones 4x3, wide tablets 6x2, PC 3x4', () => {
   const aurora = readFileSync(new URL('../src/ui/v2/aurora-theme.css', import.meta.url), 'utf8');
   const late = readFileSync(new URL('../src/ui/v2/dest-chrome-late.css', import.meta.url), 'utf8');

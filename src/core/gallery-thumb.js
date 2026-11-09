@@ -9,6 +9,7 @@
 import { isMemeKeyboardPhotoEntry } from './gallery-data.js';
 import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { selectImageVariant } from './image-variants.js';
+import { classifyGalleryItem } from './gallery-item-kind.js';
 
 const THUMB_FIELD_ORDER = [
   'thumb',
@@ -197,13 +198,18 @@ function parseSingleTimestamp(raw) {
   return 0;
 }
 
-function photoTimeMs(photo) {
-  const t1 = parseSingleTimestamp(photo?.uploadedAt);
+export function photoTimeMs(photo) {
+  // Capture/upload timestamp is the single authoritative sort order (identical to the gallery page).
+  // NEVER include updatedAt -- tag edits and comment writes must not promote older photos.
+  const t1 = parseSingleTimestamp(photo?.timestamp);
+  if (t1 > 0) return t1;
   const t2 = parseSingleTimestamp(photo?.messageTimestamp);
-  const t3 = parseSingleTimestamp(photo?.updatedAt);
-  const t4 = parseSingleTimestamp(photo?.timestamp);
-  const t5 = parseSingleTimestamp(photo?.createdAt);
-  return Math.max(t1, t2, t3, t4, t5);
+  if (t2 > 0) return t2;
+  const t3 = parseSingleTimestamp(photo?.createdAt);
+  if (t3 > 0) return t3;
+  const t4 = parseSingleTimestamp(photo?.uploadedAt);
+  if (t4 > 0) return t4;
+  return 0;
 }
 
 function photoIdentityKey(photo, index = 0) {
@@ -230,13 +236,14 @@ export function selectGalleryPreviewPhotos(items, options = {}) {
     isMeme = isMemeKeyboardPhotoEntry,
     isBroken = () => false,
     isRenderable = isGalleryThumbUrl,
+    classify = classifyGalleryItem,
   } = options;
 
   const list = Array.isArray(items) ? items.filter(Boolean) : [];
   const sorted = list.slice().sort((a, b) => {
     const delta = photoTimeMs(b) - photoTimeMs(a);
     if (delta) return delta;
-    return photoIdentityKey(b).localeCompare(photoIdentityKey(a));
+    return 0;
   });
 
   const picked = [];
@@ -245,6 +252,9 @@ export function selectGalleryPreviewPhotos(items, options = {}) {
   for (let i = 0; i < sorted.length && i < scan && picked.length < limit; i += 1) {
     const photo = sorted[i];
     if (typeof isMeme === 'function' && isMeme(photo)) continue;
+    const source = String(photo?.source || '').trim();
+    if (source === 'anniversary' || String(photo?.sourceOwner || '').startsWith('anniversary:')) continue;
+    if (typeof classify === 'function' && classify(photo) !== 'photo') continue;
     const resolved = resolvePhotoAsset(photo, { isRenderable, isBroken, surface: 'grid' });
     if (resolved.state !== 'ready') continue;
     const key = photoIdentityKey(photo, i);

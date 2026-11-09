@@ -2273,6 +2273,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
   const photoItems = React.useMemo(() => {
     const baseItems = Array.isArray(photoIndexItems) ? photoIndexItems : [];
     const liveMessages = Array.isArray(allMessages) ? allMessages : [];
+    if (!liveMessages.length) return baseItems;
+
+    const existingKeys = new Set();
+    baseItems.forEach(item => {
+      if (item?.full) existingKeys.add(String(item.full).trim());
+      if (item?.imageUrl) existingKeys.add(String(item.imageUrl).trim());
+      if (item?.thumb) existingKeys.add(String(item.thumb).trim());
+      if (item?.thumbUrl) existingKeys.add(String(item.thumbUrl).trim());
+      if (item?.messageId && item?.imageIndex != null) {
+        existingKeys.add(`${item.messageId}:${item.imageIndex}`);
+      }
+    });
+
     const livePhotos = [];
     liveMessages.forEach(msg => {
       const urls = Array.isArray(msg?.imageUrls) && msg.imageUrls.length > 0
@@ -2284,18 +2297,21 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView, onOpen
       if (!urls.length) return;
       const ts = Number(msg.timestamp || msg.createdAt || Date.now());
       urls.forEach((full, idx) => {
-        const thumb = thumbs[idx] || full;
+        const fullClean = String(full || '').trim();
+        if (!fullClean || existingKeys.has(fullClean) || existingKeys.has(`${msg.id}:${idx}`)) return;
+        const thumb = thumbs[idx] || fullClean;
+        existingKeys.add(fullClean);
+        existingKeys.add(`${msg.id}:${idx}`);
         livePhotos.push({
-          full,
+          full: fullClean,
           thumb,
-          imageUrl: full,
+          imageUrl: fullClean,
           thumbUrl: thumb,
           messageId: msg.id,
           imageIndex: idx,
           timestamp: ts,
           uploadedAt: ts,
           createdAt: ts,
-          updatedAt: ts,
           source: msg.uploadSource || 'chat',
         });
       });
