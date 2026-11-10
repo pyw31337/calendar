@@ -156,3 +156,26 @@ test('a calendar with only an active participant pref (no health key yet) adopts
   assert.deepEqual(endpointsOf('testcal'), [current.endpoint]);
   assert.equal(rowsOf('testcal').find(row => row.endpoint === current.endpoint)?.participantId, 'test_p_young');
 });
+
+test('when server row for cw was deleted, resuming kkot heals cw without rotating the shared endpoint', async () => {
+  rotations = 0;
+  const liveEndpoint = current.endpoint;
+  // Suppose cw row in Firestore was deleted (e.g. server 410 deletion)
+  for (const row of rowsOf('cw')) rows.delete(`cw/${row.id}`);
+  assert.equal(endpointsOf('cw').length, 0, 'cw row is gone');
+
+  // But local storage still knows about cw
+  storage.set('gather_push_health_cw', JSON.stringify({ subId: 'sub_live', participantId: 'cw_p_young' }));
+
+  // User opens or receives notification in kkot
+  const result = await ensurePushSubscriptionHealthy('kkot', 'kk_p_young');
+  assert.equal(result.ok, true);
+
+  // Endpoint must NOT have rotated
+  assert.equal(rotations, 0, 'shared endpoint is preserved');
+  assert.deepEqual(endpointsOf('kkot'), [liveEndpoint]);
+
+  // And cw must be automatically self-healed in Firestore!
+  assert.deepEqual(endpointsOf('cw'), [liveEndpoint], 'cw subscription is restored');
+  assert.equal(rowsOf('cw').find(row => row.endpoint === liveEndpoint)?.participantId, 'cw_p_young');
+});

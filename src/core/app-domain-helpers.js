@@ -1380,14 +1380,25 @@ async function adoptPushSubscriptionEverywhere(calendarId, subId, { cleanCurrent
   let others = [];
   try {
     others = readRegisteredPushCalendars(getLocalStorage()).filter(entry => entry.calendarId !== calendarId
-      && entry.subId !== subId
       && entry.participantId
       && isChatNotifyEnabledForCalendar(entry.calendarId));
   } catch (_) {}
   for (const entry of others) {
     try {
-      const adopted = await subscribeUserToPush(entry.calendarId, entry.participantId, { channelOverrides: { chat: true } });
-      if (adopted.ok) await removeStaleDevicePushRows(entry.calendarId, deviceId, adopted.subId);
+      let needsAdopt = entry.subId !== subId;
+      if (!needsAdopt) {
+        // Even if subId matches local storage, verify that the row actually exists in Firestore.
+        // If a server-side 410 deleted the row while this endpoint was still alive on other
+        // calendars, self-heal it immediately by re-registering the live endpoint.
+        const health = await readPushSubscriptionHealth(entry.calendarId, subId);
+        if (health.available && !health.exists) {
+          needsAdopt = true;
+        }
+      }
+      if (needsAdopt) {
+        const adopted = await subscribeUserToPush(entry.calendarId, entry.participantId, { channelOverrides: { chat: true } });
+        if (adopted.ok) await removeStaleDevicePushRows(entry.calendarId, deviceId, adopted.subId);
+      }
     } catch (err) {
       console.warn('push adopt:', entry.calendarId, err);
     }
