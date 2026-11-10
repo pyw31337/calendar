@@ -31,6 +31,7 @@ export function planPushSubscriptionRepair({ health, storedSubId, subId } = {}) 
 /** The calendars this browser registered, from the record subscribeUserToPush keeps for each. */
 export function readRegisteredPushCalendars(storage) {
   const out = [];
+  const seen = new Set();
   if (!storage || typeof storage.length !== 'number') return out;
   for (let i = 0; i < storage.length; i += 1) {
     const key = storage.key(i);
@@ -39,10 +40,27 @@ export function readRegisteredPushCalendars(storage) {
       const record = JSON.parse(storage.getItem(key) || 'null');
       const calendarId = key.slice(PUSH_HEALTH_KEY_PREFIX.length);
       if (calendarId && record && record.subId) {
+        seen.add(calendarId);
         out.push({ calendarId, subId: String(record.subId), participantId: record.participantId ? String(record.participantId) : '' });
       }
     } catch (_) { /* a malformed record is simply not a registration */ }
   }
+
+  // Also check active participant keys for known/used calendars that might not have a health record yet
+  const PARTICIPANT_KEY_PREFIX = 'gather_active_participant_id_';
+  for (let i = 0; i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (!key || !key.startsWith(PARTICIPANT_KEY_PREFIX) || !key.endsWith('_v1')) continue;
+    const calendarId = key.slice(PARTICIPANT_KEY_PREFIX.length, key.length - '_v1'.length);
+    if (calendarId && calendarId !== 'global' && !seen.has(calendarId)) {
+      const participantId = String(storage.getItem(key) || '').trim();
+      if (participantId) {
+        seen.add(calendarId);
+        out.push({ calendarId, subId: '', participantId });
+      }
+    }
+  }
+
   return out;
 }
 

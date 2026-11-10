@@ -144,3 +144,15 @@ test('a dead endpoint is replaced once and every calendar follows it', async () 
     assert.deepEqual(endpointsOf(calendarId), [fresh], calendarId);
   }
 });
+
+test('a calendar with only an active participant pref (no health key yet) adopts the live push endpoint', async () => {
+  rotations = 0;
+  // Suppose user has participant key for a new calendar 'testcal', but no gather_push_health_testcal yet
+  storage.set('gather_active_participant_id_testcal_v1', 'test_p_young');
+  // Trigger health check on cw
+  const result = await ensurePushSubscriptionHealthy('cw', 'cw_p_young');
+  assert.equal(result.ok, true);
+  // testcal should now have adopted the endpoint
+  assert.deepEqual(endpointsOf('testcal'), [current.endpoint]);
+  assert.equal(rowsOf('testcal').find(row => row.endpoint === current.endpoint)?.participantId, 'test_p_young');
+});

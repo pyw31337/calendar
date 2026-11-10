@@ -58,10 +58,12 @@ export function useNotificationPwaState({
     let cancelled = false;
     const run = async () => {
       if (cancelled || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
-      let participantId = null;
-      try {
-        participantId = ((window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId || (() => null))(activeCalId, null);
-      } catch (_) {}
+      let participantId = chatParticipantId || (typeof getCurrentParticipantId === 'function' ? getCurrentParticipantId() : null);
+      if (!participantId) {
+        try {
+          participantId = ((window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId || (() => null))(activeCalId, null);
+        } catch (_) {}
+      }
       if (!participantId) return;
       try {
         await ensurePushSubscriptionHealthy(activeCalId, participantId, getChatDeliveryOptions());
