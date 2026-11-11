@@ -794,9 +794,10 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
     return { sent: 0 };
   }
   const payload = JSON.stringify(payloadObj);
-  // Also send to ntfy for phone push
+  // Also send to ntfy for phone push (include calendar ID for distinction)
   try {
-    const ntfyTitle = payloadObj.title || payloadObj.body || '캘린더 알림';
+    const calName = calendarDocId.replace(/^cal_/, '').slice(0, 20);
+    const ntfyTitle = '[' + calName + '] ' + (payloadObj.title || payloadObj.body || '알림');
     const ntfyBody = payloadObj.body || payloadObj.title || JSON.stringify(payloadObj).slice(0, 200);
     sendNtfy(ntfyTitle, ntfyBody);
   } catch (e) { console.error('ntfy send failed', e); }
