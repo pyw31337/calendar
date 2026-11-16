@@ -29,10 +29,22 @@ function isDeleted(item) {
   return Boolean(item && (item.deletedAt || item.removedAt));
 }
 
+async function fetchWithRetry(url, options = {}, retries = 3, delayMs = 1500) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.warn(`[ops:audit] fetch network retry (${attempt}/${retries}): ${err.message}`);
+      await new Promise(r => setTimeout(r, delayMs * attempt));
+    }
+  }
+}
+
 async function fetchAllCalendarDocs() {
   const documents = [];
   for (const calendarId of CALENDAR_IDS) {
-    const response = await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/cal_${encodeURIComponent(calendarId)}`);
+    const response = await fetchWithRetry(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/cal_${encodeURIComponent(calendarId)}`);
     if (response.status === 404) continue;
     if (!response.ok) {
       throw new Error(`Firestore audit failed for ${calendarId}: ${response.status} ${await response.text()}`);
@@ -44,7 +56,7 @@ async function fetchAllCalendarDocs() {
 
 async function fetchSubcollection(calendarId, collectionName) {
   const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/cal_${encodeURIComponent(calendarId)}/${collectionName}?pageSize=500`;
-  const response = await fetch(url);
+  const response = await fetchWithRetry(url);
   if (response.status === 404) return [];
   if (!response.ok) throw new Error(`Firestore audit failed for ${calendarId}/${collectionName}: ${response.status}`);
   const body = await response.json();

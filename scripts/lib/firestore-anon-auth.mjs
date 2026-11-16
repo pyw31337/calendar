@@ -56,7 +56,26 @@ export function createAnonTokenProvider(baseFetch) {
   };
 }
 
+async function retryingFetch(url, init, baseFetch) {
+  const maxRetries = 3;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await baseFetch(url, init);
+    } catch (err) {
+      lastErr = err;
+      const isRetryable = /ETIMEDOUT|ENETUNREACH|ECONNRESET|ECONNREFUSED|fetch failed/i.test(
+        String(err?.message || '') + ' ' + String(err?.cause || '')
+      );
+      if (!isRetryable || attempt === maxRetries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
 if (process.env.FIRESTORE_ANON_AUTH !== '0' && typeof globalThis.fetch === 'function') {
-  const baseFetch = globalThis.fetch.bind(globalThis);
+  const rawFetch = globalThis.fetch.bind(globalThis);
+  const baseFetch = (url, init) => retryingFetch(url, init, rawFetch);
   installFirestoreAuthFetch(globalThis, createAnonTokenProvider(baseFetch));
 }
