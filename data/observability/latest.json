@@ -1,0 +1,33 @@
+{
+  "schema": "lets_observability_v1",
+  "run_id": "calendar-20261123T051412Z",
+  "observed_at": "2026-11-23T05:14:12.576424+00:00",
+  "service_id": "calendar",
+  "source": "persisted_calendar_data",
+  "stages": {
+    "collect": {
+      "status": "success",
+      "ok": 7703,
+      "artifact": true
+    },
+    "analyze": {
+      "status": "not_started",
+      "ok": null
+    },
+    "quality": {
+      "status": "success",
+      "quality_issue_count": 0
+    },
+    "publish": {
+      "status": "success",
+      "artifact": true
+    }
+  },
+  "counts": {
+    "records": 7703
+  },
+  "artifacts": {
+    "files": 4
+  },
+  "note": "Persisted calendar public data snapshot."
+}
