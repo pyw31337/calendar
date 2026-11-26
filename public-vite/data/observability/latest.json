@@ -1,13 +1,13 @@
 {
   "schema": "lets_observability_v1",
-  "run_id": "calendar-20261125T023705Z",
-  "observed_at": "2026-11-25T02:37:05.152330+00:00",
+  "run_id": "calendar-20261126T015142Z",
+  "observed_at": "2026-11-26T01:51:42.340625+00:00",
   "service_id": "calendar",
   "source": "persisted_calendar_data",
   "stages": {
     "collect": {
       "status": "success",
-      "ok": 7550,
+      "ok": 7650,
       "artifact": true
     },
     "analyze": {
@@ -24,7 +24,7 @@
     }
   },
   "counts": {
-    "records": 7550
+    "records": 7650
   },
   "artifacts": {
     "files": 4
